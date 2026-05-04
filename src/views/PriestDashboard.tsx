@@ -834,6 +834,59 @@ export function PriestDashboard({
     return { total, avgCollection, topPerformer, reassignCount, overBudget, topFive, bottomFive, reassignList };
   }, [diocesanPriestData]);
 
+  const pastoralAssignmentAnalysis = useMemo(() => {
+    const assignmentBuckets = [
+      { label: '0-12 mo', min: 0, max: 12 },
+      { label: '13-24 mo', min: 13, max: 24 },
+      { label: '25-36 mo', min: 25, max: 36 },
+      { label: '37-48 mo', min: 37, max: 48 },
+      { label: '49+ mo', min: 49, max: Number.POSITIVE_INFINITY },
+    ];
+
+    const trendData = assignmentBuckets.map((bucket) => {
+      const priests = diocesanPriestData.filter((priest) => priest.monthsAssigned >= bucket.min && priest.monthsAssigned <= bucket.max);
+      const averageCollections = priests.length
+        ? Math.round(priests.reduce((sum, priest) => sum + priest.avgCollections, 0) / priests.length)
+        : 0;
+      const averageChange = priests.length
+        ? priests.reduce((sum, priest) => sum + priest.collectionChange, 0) / priests.length
+        : 0;
+
+      return {
+        period: bucket.label,
+        averageCollections,
+        averageChange: Number(averageChange.toFixed(1)),
+        priestCount: priests.length,
+      };
+    });
+
+    const activeTrend = trendData.filter((row) => row.priestCount > 0);
+    const averageMonthlyCollections = activeTrend.length
+      ? Math.round(activeTrend.reduce((sum, row) => sum + row.averageCollections, 0) / activeTrend.length)
+      : 0;
+    const collectionMean = activeTrend.length
+      ? activeTrend.reduce((sum, row) => sum + row.averageCollections, 0) / activeTrend.length
+      : 0;
+    const variancePercent = collectionMean > 0 && activeTrend.length
+      ? Math.round((Math.sqrt(activeTrend.reduce((sum, row) => sum + Math.pow(row.averageCollections - collectionMean, 2), 0) / activeTrend.length) / collectionMean) * 100)
+      : 0;
+    const firstPeriod = activeTrend[0];
+    const latestPeriod = activeTrend[activeTrend.length - 1];
+    const monthOverMonthChange = firstPeriod && latestPeriod && firstPeriod.averageCollections > 0
+      ? ((latestPeriod.averageCollections - firstPeriod.averageCollections) / firstPeriod.averageCollections) * 100
+      : 0;
+
+    return {
+      trendData,
+      averageMonthlyCollections,
+      variancePercent,
+      monthOverMonthChange,
+      outputStatus: diocesanStats.reassignCount > 0
+        ? `${diocesanStats.reassignCount} assignments flagged for review`
+        : 'Performance analysis is stable',
+    };
+  }, [diocesanPriestData, diocesanStats.reassignCount]);
+
   const priestHealthScoreAnalysis = useMemo(() => {
     const bands = [
       { id: 'excellent', label: 'Excellent', min: 85, color: 'bg-emerald-500', fill: '#10B981', textColor: 'text-emerald-700', bg: 'bg-emerald-50', border: 'border-emerald-100' },
@@ -953,6 +1006,18 @@ export function PriestDashboard({
     return { predicted, actual: monthlyActual, score, lift, status, statusColor };
   }, [entityInfo?.class, kpis?.totalCollections, filteredRecords.length]);
 
+  const pastoralAssociationScore = priestAssignmentScore?.compositeScore ?? stewardshipData.score;
+  const pastoralAssociationLift = pastoralAssociationScore - 100;
+  const pastoralAssociationFactors = priestAssignmentScore
+    ? [
+        { label: 'Contribution Quality', value: priestAssignmentScore.dimensions.contribution },
+        { label: 'Growth Consistency', value: priestAssignmentScore.dimensions.growthConsistency },
+        { label: 'Financial Discipline', value: priestAssignmentScore.dimensions.discipline },
+        { label: 'Collection Stability', value: priestAssignmentScore.dimensions.stability },
+        { label: 'Assignment Context', value: priestAssignmentScore.dimensions.assignmentFairness },
+      ]
+    : [];
+
   // Per-priest stewardship scores for diocese view
   const priestStewardshipData = useMemo(() => {
     const classBenchmarks: Record<string, number> = {
@@ -966,6 +1031,73 @@ export function PriestDashboard({
       const lift = score - 100;
       return { ...p, predicted, actual, score, lift };
     });
+  }, [diocesanPriestData]);
+
+  const prescriptiveActionData = useMemo(() => {
+    const actionMeta = {
+      Maintain: { fill: '#10B981', bg: 'bg-emerald-50', text: 'text-emerald-700', border: 'border-emerald-100' },
+      Support: { fill: '#3B82F6', bg: 'bg-blue-50', text: 'text-blue-700', border: 'border-blue-100' },
+      Monitor: { fill: '#F59E0B', bg: 'bg-amber-50', text: 'text-amber-700', border: 'border-amber-100' },
+      Reallocate: { fill: '#8B5CF6', bg: 'bg-purple-50', text: 'text-purple-700', border: 'border-purple-100' },
+      Review: { fill: '#EF4444', bg: 'bg-red-50', text: 'text-red-700', border: 'border-red-100' },
+    } as const;
+
+    const rows = diocesanPriestData.map((priest) => {
+      const isOverBudget = priest.avgDisbursements > priest.avgCollections;
+      const marginRate = priest.avgCollections > 0
+        ? ((priest.avgCollections - priest.avgDisbursements) / priest.avgCollections) * 100
+        : -100;
+      const financialRisk = Math.max(0, Math.min(100,
+        (priest.collectionChange < 0 ? Math.abs(priest.collectionChange) * 2.5 : 0) +
+        (isOverBudget ? 28 : 0) +
+        (priest.disciplineScore < 75 ? (75 - priest.disciplineScore) * 1.2 : 0) +
+        (priest.monthsAssigned > 48 ? 16 : 0) +
+        (marginRate < 8 ? (8 - marginRate) * 1.5 : 0)
+      ));
+      const expectedImprovement = Math.max(6, Math.min(30, Math.round((financialRisk * 0.22) + (priest.collectionChange < 0 ? Math.abs(priest.collectionChange) * 0.55 : 4))));
+      const budgetImpact = isOverBudget ? 'High' : financialRisk >= 45 ? 'Medium' : 'Low';
+      const action =
+        financialRisk >= 62 ? 'Review' :
+        isOverBudget || (priest.monthsAssigned > 48 && priest.collectionChange < 0) ? 'Reallocate' :
+        financialRisk >= 36 ? 'Monitor' :
+        priest.collectionChange < 3 ? 'Support' :
+        'Maintain';
+      const issue = isOverBudget
+        ? 'Disbursements exceed collections'
+        : priest.collectionChange < 0
+          ? 'Declining collection trend'
+          : priest.monthsAssigned > 48
+            ? 'Long assignment tenure'
+            : priest.disciplineScore < 75
+              ? 'Financial discipline risk'
+              : 'Stable assignment';
+      const recommendedAction =
+        action === 'Review' ? 'Schedule diocesan financial review and intervention plan.' :
+        action === 'Reallocate' ? 'Shift support and spending controls toward this assignment.' :
+        action === 'Monitor' ? 'Track collections and expenses for the next reporting cycle.' :
+        action === 'Support' ? 'Provide stewardship coaching and donor engagement support.' :
+        'Maintain current support and continue routine monitoring.';
+
+      return {
+        ...priest,
+        action,
+        issue,
+        recommendedAction,
+        expectedImprovement,
+        financialRisk: Math.round(financialRisk),
+        budgetImpact,
+        fill: actionMeta[action].fill,
+        tone: `${actionMeta[action].bg} ${actionMeta[action].text} ${actionMeta[action].border}`,
+      };
+    });
+
+    const summary = (Object.keys(actionMeta) as Array<keyof typeof actionMeta>).map((action) => ({
+      action,
+      count: rows.filter((row) => row.action === action).length,
+      fill: actionMeta[action].fill,
+    }));
+
+    return { rows, summary };
   }, [diocesanPriestData]);
 
   const displayEntityName = useMemo(() => {
@@ -1670,81 +1802,98 @@ export function PriestDashboard({
                     <div className="w-10 h-10 rounded-xl bg-gold-500 text-black flex items-center justify-center shadow-lg shadow-gold-500/20">
                       <HeartPulse size={20} />
                     </div>
-                    <h3 className="text-xl md:text-2xl font-black text-church-green tracking-tight uppercase">{entityLabel} Performance Score</h3>
+                    <h3 className="text-xl md:text-2xl font-black text-church-green tracking-tight uppercase">Priest and Financial Diagnostic</h3>
                     <span className={`text-[10px] font-black uppercase px-3 py-1 rounded-full border ${stewardshipData.statusColor}`}>
                       {stewardshipData.status}
                     </span>
                   </div>
                   <p className="text-sm text-gray-400 font-medium md:ml-13">
-                    Parish-Adjusted Stewardship Score — measures actual donations relative to model-predicted donations for this entity.
+                    Pastoral Assignment Financial Association Score measures how assignment context relates to collections, financial discipline, and trend behavior.
                   </p>
                 </div>
               </div>
 
               {/* Main Score Display */}
-              <div className="mt-4 bg-gradient-to-br from-church-green to-[#0f2d1a] rounded-2xl p-8 relative overflow-hidden">
-                {/* Background decoration */}
-                <div className="absolute top-0 right-0 w-64 h-64 bg-white/5 rounded-full -mr-20 -mt-20 blur-3xl pointer-events-none" />
-                <div className="absolute bottom-0 left-0 w-40 h-40 bg-[#D4AF37]/10 rounded-full -ml-10 -mb-10 blur-2xl pointer-events-none" />
+              <div className="mt-4 rounded-2xl border border-gray-100 bg-white p-5 shadow-sm">
+                <div className="grid grid-cols-1 xl:grid-cols-[320px_1fr] gap-5">
+                  <div className="rounded-xl border border-gold-200 bg-gold-50/60 p-5">
+                    <div className="flex items-start justify-between gap-3">
+                      <div>
+                        <p className="text-[10px] font-black uppercase tracking-[0.22em] text-gold-700">Association Score</p>
+                        <p className="mt-1 text-xs font-semibold text-gray-500">Assignment context + financial behavior</p>
+                      </div>
+                      <button
+                        onClick={() => setShowFormulaModal(true)}
+                        className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-gold-200 bg-white text-gold-700 transition-colors hover:bg-gold-100"
+                        title="Formula"
+                      >
+                        <Info size={15} />
+                      </button>
+                    </div>
 
-                <div className="relative z-10 flex flex-col md:flex-row md:items-center gap-8">
-                  {/* Hero Score */}
-                  <div className="flex flex-col items-center md:items-start">
-                    <p className="text-[9px] font-black uppercase tracking-[0.3em] text-white/40 mb-1">Parish-Adjusted Stewardship Score</p>
-                    <div className="flex items-end gap-1">
-                      <span className="text-[clamp(4rem,8vw,6rem)] font-black text-white leading-none tracking-tight">{stewardshipData.score}</span>
-                      <span className="text-3xl font-black text-[#D4AF37] mb-2">%</span>
-                    </div>
-                    <div className="flex items-center gap-2 mt-2">
-                      <span className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[10px] font-black uppercase border ${
-                        stewardshipData.lift >= 5 ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/30'
-                        : stewardshipData.lift >= 0 ? 'bg-blue-500/20 text-blue-300 border-blue-500/30'
-                        : 'bg-red-500/20 text-red-300 border-red-500/30'
-                      }`}>
-                        {stewardshipData.lift >= 0 ? <ArrowUpRight size={11} /> : <ArrowDownRight size={11} />}
-                        Lift: {stewardshipData.lift >= 0 ? '+' : ''}{stewardshipData.lift}%
-                      </span>
-                      <span className={`px-3 py-1.5 rounded-full text-[10px] font-black uppercase border ${stewardshipData.statusColor}`}>
-                        {stewardshipData.status}
-                      </span>
-                    </div>
-                    <p className="text-[10px] text-white/40 mt-2 font-semibold">100% = On Target &nbsp;·&nbsp; {entityInfo.class} benchmark</p>
-                  </div>
+                    <div className="mt-6 flex items-center gap-5">
+                      <div className="relative h-32 w-32 flex-shrink-0">
+                        <div
+                          className="absolute inset-0 rounded-full"
+                          style={{ background: `conic-gradient(#1a472a ${pastoralAssociationScore * 3.6}deg, #E5E7EB 0deg)` }}
+                        />
+                        <div className="absolute inset-3 rounded-full bg-white shadow-inner" />
+                        <div className="absolute inset-0 flex flex-col items-center justify-center">
+                          <span className="text-4xl font-black text-church-green leading-none">{pastoralAssociationScore}</span>
+                          <span className="text-[10px] font-black uppercase tracking-widest text-gray-400">/100</span>
+                        </div>
+                      </div>
 
-                  {/* Divider */}
-                  <div className="hidden md:block w-px h-28 bg-white/10" />
-
-                  {/* Supporting Metrics */}
-                  <div className="flex flex-col sm:flex-row gap-5 flex-1">
-                    <div className="flex-1">
-                      <p className="text-[9px] font-black uppercase tracking-widest text-white/40 mb-1">Avg Monthly Actual</p>
-                      <p className="text-2xl font-black text-white">{formatCurrency(stewardshipData.actual)}</p>
-                      <p className="text-[10px] text-white/40 mt-0.5">Collections / month</p>
-                    </div>
-                    <div className="hidden sm:block w-px h-16 bg-white/10 self-center" />
-                    <div className="flex-1">
-                      <p className="text-[9px] font-black uppercase tracking-widest text-white/40 mb-1">Model-Predicted</p>
-                      <p className="text-2xl font-black text-[#D4AF37]">{formatCurrency(stewardshipData.predicted)}</p>
-                      <p className="text-[10px] text-white/40 mt-0.5">{entityInfo.class} monthly benchmark</p>
-                    </div>
-                    <div className="hidden sm:block w-px h-16 bg-white/10 self-center" />
-                    <div className="flex-1 flex flex-col justify-center">
-                      <p className="text-[9px] font-black uppercase tracking-widest text-white/40 mb-2">Gap vs Target</p>
-                      <p className={`text-2xl font-black ${stewardshipData.actual >= stewardshipData.predicted ? 'text-emerald-400' : 'text-red-400'}`}>
-                        {stewardshipData.actual >= stewardshipData.predicted ? '+' : ''}{formatCurrency(stewardshipData.actual - stewardshipData.predicted)}
-                      </p>
-                      <p className="text-[10px] text-white/40 mt-0.5">Actual minus predicted</p>
+                      <div className="min-w-0">
+                        <span className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-[10px] font-black uppercase ${
+                          pastoralAssociationLift >= 5 ? 'bg-emerald-50 text-emerald-700 border-emerald-100'
+                          : pastoralAssociationLift >= 0 ? 'bg-blue-50 text-blue-700 border-blue-100'
+                          : 'bg-red-50 text-red-700 border-red-100'
+                        }`}>
+                          {pastoralAssociationLift >= 0 ? <ArrowUpRight size={11} /> : <ArrowDownRight size={11} />}
+                          {pastoralAssociationLift >= 0 ? '+' : ''}{pastoralAssociationLift}% lift
+                        </span>
+                        <p className="mt-3 text-sm font-bold text-gray-800">Pastoral Assignment Financial Association Score</p>
+                        <p className="mt-1 text-xs leading-relaxed text-gray-500">Higher values indicate stronger alignment between assignment context, collection consistency, and financial discipline.</p>
+                      </div>
                     </div>
                   </div>
 
-                  {/* Formula Button */}
-                  <button
-                    onClick={() => setShowFormulaModal(true)}
-                    className="self-start md:self-center flex items-center gap-2 px-4 py-2 bg-white/10 hover:bg-white/20 border border-white/20 rounded-xl text-[10px] font-black text-white uppercase tracking-widest transition-colors"
-                  >
-                    <Info size={13} />
-                    Formula
-                  </button>
+                  <div className="space-y-4">
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                      {[
+                        { label: 'Avg Monthly Actual', value: formatCurrency(stewardshipData.actual), helper: 'Collections / month' },
+                        { label: 'Model-Predicted', value: formatCurrency(stewardshipData.predicted), helper: `${entityInfo.class} monthly benchmark` },
+                        { label: 'Gap vs Target', value: `${stewardshipData.actual >= stewardshipData.predicted ? '+' : ''}${formatCurrency(stewardshipData.actual - stewardshipData.predicted)}`, helper: 'Actual minus predicted', accent: stewardshipData.actual >= stewardshipData.predicted ? 'text-emerald-600' : 'text-red-600' },
+                      ].map((metric) => (
+                        <div key={metric.label} className="rounded-xl border border-gray-100 bg-gray-50 px-4 py-3">
+                          <p className="text-[9px] font-black uppercase tracking-[0.18em] text-gray-400">{metric.label}</p>
+                          <p className={`mt-1 text-lg font-black ${metric.accent || 'text-gray-900'}`}>{metric.value}</p>
+                          <p className="mt-0.5 text-[10px] font-semibold text-gray-400">{metric.helper}</p>
+                        </div>
+                      ))}
+                    </div>
+
+                    <div className="rounded-xl border border-gray-100 bg-white p-4">
+                      <div className="mb-3 flex items-center justify-between">
+                        <p className="text-[10px] font-black uppercase tracking-[0.22em] text-gray-400">Diagnostic Factors</p>
+                        <span className={`rounded-full border px-2.5 py-1 text-[9px] font-black uppercase ${stewardshipData.statusColor}`}>{stewardshipData.status}</span>
+                      </div>
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-x-5 gap-y-3">
+                        {pastoralAssociationFactors.map((factor) => (
+                          <div key={factor.label}>
+                            <div className="mb-1 flex items-center justify-between gap-3">
+                              <span className="text-xs font-bold text-gray-700">{factor.label}</span>
+                              <span className="text-xs font-black text-church-green">{Math.round(factor.value)}%</span>
+                            </div>
+                            <div className="h-2 overflow-hidden rounded-full bg-gray-100">
+                              <div className="h-full rounded-full bg-church-green" style={{ width: `${Math.max(0, Math.min(100, factor.value))}%` }} />
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
                 </div>
               </div>
 
@@ -1753,18 +1902,18 @@ export function PriestDashboard({
                 <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[200] flex items-center justify-center p-4" onClick={() => setShowFormulaModal(false)}>
                   <div className="bg-[#111111] rounded-2xl p-8 max-w-lg w-full shadow-2xl border border-white/10" onClick={e => e.stopPropagation()}>
                     <div className="flex items-center justify-between mb-6">
-                      <h3 className="text-xl font-black text-white">Stewardship Score Formula</h3>
+                      <h3 className="text-xl font-black text-white">Pastoral Association Score Formula</h3>
                       <button onClick={() => setShowFormulaModal(false)} className="p-2 hover:bg-white/10 rounded-full transition-colors text-white"><X size={18} /></button>
                     </div>
                     <div className="space-y-5 text-white">
                       <div className="bg-white/5 rounded-xl p-5 border border-white/10">
                         <p className="text-[10px] font-black text-[#D4AF37] uppercase tracking-widest mb-2">Main Score</p>
-                        <p className="text-base font-bold">Parish-Adjusted Stewardship Score</p>
+                        <p className="text-base font-bold">Pastoral Assignment Financial Association Score</p>
                         <p className="text-[#D4AF37] font-black text-lg mt-1">= 100 × (Actual Donations ÷ Model-Predicted Donations)</p>
                       </div>
                       <div className="bg-white/5 rounded-xl p-5 border border-white/10">
                         <p className="text-[10px] font-black text-[#D4AF37] uppercase tracking-widest mb-2">Companion Metric</p>
-                        <p className="text-base font-bold">Stewardship Lift %</p>
+                        <p className="text-base font-bold">Association Lift %</p>
                         <p className="text-[#D4AF37] font-black text-lg mt-1">= 100 × (Actual − Predicted) ÷ Predicted</p>
                         <p className="text-white/40 text-xs mt-1">Equivalent to: Score − 100</p>
                       </div>
@@ -2056,6 +2205,84 @@ export function PriestDashboard({
 
           {/* ── DIOCESAN: Full Assignment Table ── */}
           {isPriestDashboardContext && (
+            <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-200">
+              <div className="overflow-hidden rounded-xl border border-amber-200 bg-amber-50/60">
+                <div className="bg-amber-200/70 px-5 py-3 text-center border-b border-amber-300">
+                  <h3 className="text-lg font-black text-church-black">Pastoral Assignment Analysis</h3>
+                </div>
+
+                <div className="p-5">
+                  <div className="rounded-lg border border-amber-100 bg-white p-5">
+                      <div className="mb-4 flex items-start justify-between gap-4">
+                        <div>
+                          <p className="text-sm font-black text-gray-900">Visualization:</p>
+                          <p className="mt-1 text-sm font-bold text-gray-800">Average Collections by Assignment Duration</p>
+                          <p className="mt-1 text-xs text-gray-500">Each point groups all priests by how long they have been assigned.</p>
+                        </div>
+                        <div className="text-right">
+                          <p className="text-sm font-black text-gray-900">System Output:</p>
+                          <p className="mt-1 text-sm font-bold text-church-green">{pastoralAssignmentAnalysis.outputStatus}</p>
+                        </div>
+                      </div>
+
+                      <div className="grid grid-cols-3 gap-3 mb-4">
+                        <div className="rounded-lg border border-gray-100 bg-gray-50 px-3 py-2">
+                          <p className="text-[9px] font-black uppercase tracking-widest text-gray-400">All-Priest Avg</p>
+                          <p className="text-sm font-black text-gray-900">{formatCurrency(pastoralAssignmentAnalysis.averageMonthlyCollections)}</p>
+                        </div>
+                        <div className="rounded-lg border border-gray-100 bg-gray-50 px-3 py-2">
+                          <p className="text-[9px] font-black uppercase tracking-widest text-gray-400">Group Variance</p>
+                          <p className="text-sm font-black text-gray-900">{pastoralAssignmentAnalysis.variancePercent}%</p>
+                        </div>
+                        <div className="rounded-lg border border-gray-100 bg-gray-50 px-3 py-2">
+                          <p className="text-[9px] font-black uppercase tracking-widest text-gray-400">Shortest vs Longest</p>
+                          <p className={`text-sm font-black ${pastoralAssignmentAnalysis.monthOverMonthChange >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>
+                            {pastoralAssignmentAnalysis.monthOverMonthChange >= 0 ? '+' : ''}{pastoralAssignmentAnalysis.monthOverMonthChange.toFixed(1)}%
+                          </p>
+                        </div>
+                      </div>
+
+                      <div className="h-[220px]">
+                        <ResponsiveContainer width="100%" height="100%">
+                          <LineChart data={pastoralAssignmentAnalysis.trendData} margin={{ top: 8, right: 14, left: 0, bottom: 4 }}>
+                            <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#E5E7EB" />
+                            <XAxis dataKey="period" tick={{ fill: '#6B7280', fontSize: 10, fontWeight: 700 }} axisLine={false} tickLine={false} />
+                            <YAxis tick={{ fill: '#6B7280', fontSize: 10 }} tickFormatter={(value) => `${Number(value) / 1000}k`} width={42} axisLine={false} tickLine={false} />
+                            <Tooltip
+                              formatter={(value: number, name: string) => [
+                                name === 'averageCollections' ? formatCurrency(value) : `${value}%`,
+                                name === 'averageCollections' ? 'Avg Collections' : 'Avg Change',
+                              ]}
+                              labelFormatter={(label, payload) => {
+                                const row = payload?.[0]?.payload;
+                                return row ? `${label} assignment duration (${row.priestCount} priest${row.priestCount === 1 ? '' : 's'})` : `${label} assignment duration`;
+                              }}
+                              contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 10px 25px -5px rgba(0,0,0,0.1)', fontSize: '11px' }}
+                            />
+                            <Line type="monotone" dataKey="averageCollections" stroke="#1a472a" strokeWidth={3} dot={{ r: 4, fill: '#1a472a', stroke: '#fff', strokeWidth: 2 }} name="averageCollections" />
+                          </LineChart>
+                        </ResponsiveContainer>
+                      </div>
+                      <div className="mt-3 grid grid-cols-2 md:grid-cols-5 gap-2">
+                        {[
+                          '0-12 mo = assigned 0 to 12 months',
+                          '13-24 mo = assigned 13 to 24 months',
+                          '25-36 mo = assigned 25 to 36 months',
+                          '37-48 mo = assigned 37 to 48 months',
+                          '49+ mo = assigned 49+ months',
+                        ].map((label) => (
+                          <div key={label} className="rounded-lg border border-gray-100 bg-gray-50 px-3 py-2 text-[10px] font-bold text-gray-600">
+                            {label}
+                          </div>
+                        ))}
+                      </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {isPriestDashboardContext && (
             <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-200 overflow-x-auto">
               <div className="mb-5">
                 <p className="text-[10px] font-black uppercase tracking-[0.25em] text-gray-400">Descriptive · Assignment Overview</p>
@@ -2261,6 +2488,150 @@ export function PriestDashboard({
             </div>
           </div>
 
+          {isPriestDashboardContext && (
+            <div className="grid grid-cols-1 xl:grid-cols-[1.35fr_0.85fr] gap-6">
+              <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-200">
+                <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-3 mb-4">
+                  <div>
+                    <p className="text-[10px] font-black uppercase tracking-[0.25em] text-gray-400">Action Priority Matrix</p>
+                    <h3 className="text-lg font-black text-church-green">Financial Risk vs Improvement Target</h3>
+                    <p className="text-xs text-gray-500 mt-1">Each point is a priest assignment. Higher and farther right means more urgent action with higher expected impact.</p>
+                  </div>
+                  <div className="flex flex-wrap gap-2 text-[9px] font-black uppercase tracking-wide">
+                    {prescriptiveActionData.summary.filter((item) => item.count > 0).map((item) => (
+                      <span key={item.action} className="inline-flex items-center gap-1.5 rounded-full border border-gray-100 bg-gray-50 px-2 py-1 text-gray-600">
+                        <span className="h-2 w-2 rounded-full" style={{ backgroundColor: item.fill }} />
+                        {item.action}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+                <div className="h-[360px]">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <ScatterChart margin={{ top: 14, right: 22, left: 0, bottom: 18 }}>
+                      <CartesianGrid strokeDasharray="3 3" stroke="#E5E7EB" />
+                      <XAxis
+                        type="number"
+                        dataKey="financialRisk"
+                        name="Financial Risk"
+                        unit="%"
+                        domain={[0, 100]}
+                        axisLine={false}
+                        tickLine={false}
+                        tick={{ fill: '#6B7280', fontSize: 10 }}
+                        label={{ value: 'Financial Risk', position: 'insideBottom', offset: -10, fill: '#6B7280', fontSize: 10, fontWeight: 700 }}
+                      />
+                      <YAxis
+                        type="number"
+                        dataKey="expectedImprovement"
+                        name="Improvement Target"
+                        unit="%"
+                        domain={[0, 35]}
+                        axisLine={false}
+                        tickLine={false}
+                        tick={{ fill: '#6B7280', fontSize: 10 }}
+                        label={{ value: 'Improvement Target %', angle: -90, position: 'insideLeft', fill: '#6B7280', fontSize: 10, fontWeight: 700 }}
+                      />
+                      <ReferenceLine x={50} stroke="#94A3B8" strokeDasharray="4 4" />
+                      <ReferenceLine y={15} stroke="#94A3B8" strokeDasharray="4 4" />
+                      <Tooltip
+                        cursor={{ strokeDasharray: '3 3' }}
+                        formatter={(value: number, name: string) => [`${value}%`, name === 'financialRisk' ? 'Financial Risk' : 'Improvement Target']}
+                        labelFormatter={(_, payload) => {
+                          const row = payload?.[0]?.payload;
+                          return row ? `${row.name} - ${row.action}` : 'Assignment';
+                        }}
+                        contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 10px 25px -5px rgba(0,0,0,0.1)', fontSize: '11px' }}
+                      />
+                      <Scatter data={prescriptiveActionData.rows} name="Assignments">
+                        {prescriptiveActionData.rows.map((entry) => (
+                          <Cell key={entry.name} fill={entry.fill} />
+                        ))}
+                      </Scatter>
+                    </ScatterChart>
+                  </ResponsiveContainer>
+                </div>
+              </div>
+
+              <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-200">
+                <div className="mb-4">
+                  <p className="text-[10px] font-black uppercase tracking-[0.25em] text-gray-400">Action Category Summary</p>
+                  <h3 className="text-lg font-black text-church-green">Recommended Actions</h3>
+                  <p className="text-xs text-gray-500 mt-1">Count of assignments under each prescriptive action.</p>
+                </div>
+                <div className="h-[260px]">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <BarChart data={prescriptiveActionData.summary} margin={{ top: 10, right: 14, left: 0, bottom: 8 }}>
+                      <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#E5E7EB" />
+                      <XAxis dataKey="action" axisLine={false} tickLine={false} tick={{ fill: '#374151', fontSize: 10, fontWeight: 700 }} />
+                      <YAxis allowDecimals={false} axisLine={false} tickLine={false} tick={{ fill: '#6B7280', fontSize: 10 }} />
+                      <Tooltip
+                        formatter={(value: number) => [`${value} assignment${value === 1 ? '' : 's'}`, 'Count']}
+                        contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 10px 25px -5px rgba(0,0,0,0.1)', fontSize: '11px' }}
+                      />
+                      <Bar dataKey="count" radius={[8, 8, 0, 0]} barSize={36}>
+                        {prescriptiveActionData.summary.map((entry) => (
+                          <Cell key={entry.action} fill={entry.fill} />
+                        ))}
+                      </Bar>
+                    </BarChart>
+                  </ResponsiveContainer>
+                </div>
+                <div className="grid grid-cols-1 gap-2 mt-4">
+                  {prescriptiveActionData.summary.map((item) => (
+                    <div key={item.action} className="flex items-center justify-between rounded-lg border border-gray-100 bg-gray-50 px-3 py-2">
+                      <span className="inline-flex items-center gap-2 text-xs font-bold text-gray-700">
+                        <span className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: item.fill }} />
+                        {item.action}
+                      </span>
+                      <span className="text-sm font-black text-gray-900">{item.count}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              <div className="xl:col-span-2 bg-white rounded-2xl p-6 shadow-sm border border-gray-200 overflow-x-auto">
+                <div className="mb-4">
+                  <p className="text-[10px] font-black uppercase tracking-[0.25em] text-gray-400">Recommended Action Table</p>
+                  <h3 className="text-lg font-black text-church-green">Priest Assignment Prescriptions</h3>
+                </div>
+                <table className="w-full min-w-[980px] text-left">
+                  <thead>
+                    <tr className="border-b border-gray-100">
+                      {['Priest', 'Assignment', 'Main Issue', 'Recommended Action', 'Target', 'Budget', 'Priority'].map((header) => (
+                        <th key={header} className="pb-3 pr-4 text-[10px] font-black uppercase tracking-widest text-gray-400">{header}</th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-50">
+                    {prescriptiveActionData.rows
+                      .sort((a, b) => b.financialRisk - a.financialRisk)
+                      .map((row) => (
+                        <tr key={row.name} className="hover:bg-gray-50/70 transition-colors">
+                          <td className="py-3 pr-4">
+                            <p className="text-xs font-black text-gray-900">{row.name}</p>
+                            <p className="text-[10px] text-gray-400">{row.vicariate}</p>
+                          </td>
+                          <td className="py-3 pr-4 text-xs text-gray-600 max-w-[170px] truncate">{row.entity}</td>
+                          <td className="py-3 pr-4 text-xs font-semibold text-gray-700">{row.issue}</td>
+                          <td className="py-3 pr-4 text-xs text-gray-600 max-w-[260px]">{row.recommendedAction}</td>
+                          <td className="py-3 pr-4">
+                            <span className="text-xs font-black text-church-green">+{row.expectedImprovement}%</span>
+                          </td>
+                          <td className="py-3 pr-4 text-xs font-bold text-gray-700">{row.budgetImpact}</td>
+                          <td className="py-3">
+                            <span className={`inline-flex rounded-full border px-2 py-0.5 text-[10px] font-black uppercase ${row.tone}`}>
+                              {row.action}
+                            </span>
+                          </td>
+                        </tr>
+                      ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+
           {/* Strategy 1 */}
           <div className="bg-white rounded-2xl border-2 border-church-green/20 overflow-hidden shadow-sm">
             <div className="flex items-center gap-3 px-6 py-4 border-b-2 border-church-green/10 bg-church-green/5">
@@ -2275,13 +2646,13 @@ export function PriestDashboard({
             </div>
             <div className="grid grid-cols-1 md:grid-cols-3 divide-y md:divide-y-0 md:divide-x divide-gray-100">
               <div className="p-6">
-                <p className="text-[9px] font-black uppercase tracking-widest text-gray-400 mb-4">Methods</p>
+                <p className="text-[9px] font-black uppercase tracking-widest text-gray-400 mb-4">Recommended Action</p>
                 <ul className="space-y-3">
                   {[
-                    'Compare actual vs forecast',
-                    'Flag sudden monthly drops',
-                    'Alert below 80% target',
-                    'Benchmark similar parishes',
+                    'Focus this month on the parish with the largest collection shortfall.',
+                    'Schedule a stewardship appeal before the next Sunday mass.',
+                    'Assign one finance council member to contact recurring donors.',
+                    'Use the strongest peer parish as the practical collection target.',
                   ].map((m, i) => (
                     <li key={i} className="flex items-start gap-2 text-xs text-gray-600">
                       <span className="w-1.5 h-1.5 rounded-full bg-church-green mt-1.5 flex-shrink-0" />{m}
@@ -2290,12 +2661,12 @@ export function PriestDashboard({
                 </ul>
               </div>
               <div className="p-6 bg-amber-50/40">
-                <p className="text-[9px] font-black uppercase tracking-widest text-[#D4AF37] mb-4">KPI / Metric</p>
+                <p className="text-[9px] font-black uppercase tracking-widest text-[#D4AF37] mb-4">When To Act</p>
                 <ul className="space-y-4">
                   {[
-                    { label: 'Collection Gap', desc: 'Target: 0 or better' },
-                    { label: 'Stewardship Lift', desc: 'Target: positive' },
-                    { label: 'On-Target Streak', desc: 'Months at 100%+' },
+                    { label: 'Below Plan', desc: 'Collections are behind the monthly forecast.' },
+                    { label: 'Repeated Decline', desc: 'Giving has dropped for consecutive months.' },
+                    { label: 'Peak Season Nearing', desc: 'Major feast, fiesta, or holiday activity is coming.' },
                   ].map((k, i) => (
                     <li key={i} className="flex items-start gap-2">
                       <span className="w-1.5 h-1.5 rounded-full bg-[#D4AF37] mt-1.5 flex-shrink-0" />
@@ -2308,13 +2679,13 @@ export function PriestDashboard({
                 </ul>
               </div>
               <div className="p-6 bg-church-green/5">
-                <p className="text-[9px] font-black uppercase tracking-widest text-church-green mb-4">System Output</p>
+                <p className="text-[9px] font-black uppercase tracking-widest text-church-green mb-4">Prescribed Next Step</p>
                 <ul className="space-y-3">
                   {[
-                    'Flag weak months',
-                    'Send peak-season advisory',
-                    'Show top peer benchmarks',
-                    'Alert on 3-month decline',
+                    'Launch a targeted collection reminder this week.',
+                    'Prepare a short pulpit announcement for the next mass.',
+                    'Invite ministry leaders to support the appeal.',
+                    'Review results at the next finance council meeting.',
                   ].map((o, i) => (
                     <li key={i} className="flex items-start gap-2 text-xs text-gray-600">
                       <span className="w-1.5 h-1.5 rounded-full bg-church-green/50 mt-1.5 flex-shrink-0" />{o}
@@ -2339,13 +2710,13 @@ export function PriestDashboard({
             </div>
             <div className="grid grid-cols-1 md:grid-cols-3 divide-y md:divide-y-0 md:divide-x divide-gray-100">
               <div className="p-6">
-                <p className="text-[9px] font-black uppercase tracking-widest text-gray-400 mb-4">Methods</p>
+                <p className="text-[9px] font-black uppercase tracking-widest text-gray-400 mb-4">Recommended Action</p>
                 <ul className="space-y-3">
                   {[
-                    'Track spending ratio',
-                    'Alert above 85%',
-                    'Group major expenses',
-                    'Track report deadlines',
+                    'Freeze non-essential purchases until priority bills are settled.',
+                    'Review every major expense with the finance council.',
+                    'Move urgent pastoral needs ahead of cosmetic improvements.',
+                    'Prepare the report documents before the closing week.',
                   ].map((m, i) => (
                     <li key={i} className="flex items-start gap-2 text-xs text-gray-600">
                       <span className="w-1.5 h-1.5 rounded-full bg-church-green mt-1.5 flex-shrink-0" />{m}
@@ -2354,12 +2725,12 @@ export function PriestDashboard({
                 </ul>
               </div>
               <div className="p-6 bg-amber-50/40">
-                <p className="text-[9px] font-black uppercase tracking-widest text-[#D4AF37] mb-4">KPI / Metric</p>
+                <p className="text-[9px] font-black uppercase tracking-widest text-[#D4AF37] mb-4">When To Act</p>
                 <ul className="space-y-4">
                   {[
-                    { label: 'Disbursement Ratio', desc: 'Target: 85% or less' },
-                    { label: 'Monthly Surplus', desc: 'Target: positive' },
-                    { label: 'Report Timeliness', desc: 'Target: on time' },
+                    { label: 'Spending Is Near Limit', desc: 'Monthly expenses are approaching the planned ceiling.' },
+                    { label: 'Cash Buffer Is Thin', desc: 'Available funds may not cover near-term obligations.' },
+                    { label: 'Report Date Is Close', desc: 'Submission deadline is within the current cycle.' },
                   ].map((k, i) => (
                     <li key={i} className="flex items-start gap-2">
                       <span className="w-1.5 h-1.5 rounded-full bg-[#D4AF37] mt-1.5 flex-shrink-0" />
@@ -2372,13 +2743,13 @@ export function PriestDashboard({
                 </ul>
               </div>
               <div className="p-6 bg-church-green/5">
-                <p className="text-[9px] font-black uppercase tracking-widest text-church-green mb-4">System Output</p>
+                <p className="text-[9px] font-black uppercase tracking-widest text-church-green mb-4">Prescribed Next Step</p>
                 <ul className="space-y-3">
                   {[
-                    'Send overspending alert',
-                    'Defer non-urgent expenses',
-                    'Flag negative surplus',
-                    'Remind before deadline',
+                    'Defer non-urgent expenses to next month.',
+                    'Renegotiate or split large payables when possible.',
+                    'Reserve funds for utilities, salaries, and parish operations.',
+                    'Submit the financial report before making new commitments.',
                   ].map((o, i) => (
                     <li key={i} className="flex items-start gap-2 text-xs text-gray-600">
                       <span className="w-1.5 h-1.5 rounded-full bg-church-green/50 mt-1.5 flex-shrink-0" />{o}

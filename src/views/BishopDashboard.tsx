@@ -1734,12 +1734,12 @@ export function BishopDashboard({
             </Card>
           </div>
 
-          <div className={`grid grid-cols-1 ${filterMode !== 'per-entity' ? 'lg:grid-cols-3' : ''} gap-6`}>
-            {filterMode !== 'per-entity' && (
+          <div className={`grid grid-cols-1 ${filterMode !== 'per-entity' && entityType !== 'Diocesan Schools' ? 'lg:grid-cols-3' : ''} gap-6`}>
+            {filterMode !== 'per-entity' && entityType !== 'Diocesan Schools' && (
             <Card className="lg:col-span-2 border-none shadow-sm">
               <CardHeader>
-                <h3 className="text-2xl font-bold text-church-green uppercase tracking-wide">Entity Health Rankings</h3>
-                <p className="text-sm text-gray-400">Top and bottom performing entities by health score</p>
+                <h3 className="text-2xl font-bold text-church-green uppercase tracking-wide">Parish Health Rankings</h3>
+                <p className="text-sm text-gray-400">Top and bottom performing parishes by health score</p>
               </CardHeader>
               <CardContent className="mt-4">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -3715,7 +3715,7 @@ export function BishopDashboard({
               {entityFilter !== 'All Entities' ? (
                 /* Per-parish prescriptive content */
                 <div className="space-y-6">
-                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                  <div className={`grid grid-cols-1 gap-6 ${entityType === 'Diocesan Schools' ? '' : 'lg:grid-cols-2'}`}>
                     <Card className="bg-[#1A1A1A] text-white border-none shadow-sm">
                       <CardHeader>
                         <p className="text-[10px] font-bold tracking-widest uppercase text-gold-500">EFFICIENCY</p>
@@ -3738,6 +3738,7 @@ export function BishopDashboard({
                       </CardContent>
                     </Card>
 
+                    {entityType !== 'Diocesan Schools' && (
                     <Card className="border-none shadow-sm">
                       <CardHeader>
                         <p className="text-[10px] font-bold tracking-widest uppercase text-gold-500">ACTION PLAN</p>
@@ -3774,6 +3775,7 @@ export function BishopDashboard({
                         })()}
                       </CardContent>
                     </Card>
+                    )}
                   </div>
 
                   <Card className="bg-[#1A1A1A] text-white border-none shadow-sm">
@@ -3802,7 +3804,7 @@ export function BishopDashboard({
                 /* Diocese-wide prescriptive content */
                 <>
                   <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                    <Card className="bg-[#1A1A1A] text-white border-none shadow-sm">
+                    <Card className={`bg-[#1A1A1A] text-white border-none shadow-sm ${entityType === 'Diocesan Schools' ? 'lg:col-span-2' : ''}`}>
                       <CardHeader>
                         <p className="text-[10px] font-bold tracking-widest uppercase text-gold-500">EFFICIENCY</p>
                         <h3 className="text-2xl font-bold text-white">Utility Cost Reduction</h3>

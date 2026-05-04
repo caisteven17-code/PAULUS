@@ -1047,6 +1047,27 @@ export default function SeminaryAnalyticsDashboard({
           </div>
         </div>
 
+        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
+          <p className="text-[10px] font-bold tracking-widest uppercase text-[#D4AF37] mb-1">Risk Prediction</p>
+          <h3 className="text-2xl font-bold text-church-black">Monthly Bill Payment Risk</h3>
+          <div className="space-y-6 mt-6">
+            <div className="flex items-center justify-between gap-4 border-b border-gray-100 pb-6">
+              <div>
+                <p className="font-bold text-church-black text-lg">St. Peter's College Seminary</p>
+                <p className="text-xs font-bold text-rose-600 tracking-wider mt-1 uppercase">High Risk: Utilities & Salaries</p>
+              </div>
+              <span className="font-bold text-rose-600 text-xl whitespace-nowrap">82% Probability</span>
+            </div>
+            <div className="flex items-center justify-between gap-4">
+              <div>
+                <p className="font-bold text-church-black text-lg">Diocesan Memorial Seminary</p>
+                <p className="text-xs font-bold text-amber-500 tracking-wider mt-1 uppercase">Medium Risk: Utility Arrears</p>
+              </div>
+              <span className="font-bold text-amber-500 text-xl whitespace-nowrap">45% Probability</span>
+            </div>
+          </div>
+        </div>
+
       </div>
     );
   };
@@ -1054,48 +1075,23 @@ export default function SeminaryAnalyticsDashboard({
   const renderPrescriptive = () => (
     <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
 
-      {/* Utility Cost Reduction + Ranking Upgrades */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <div className="bg-[#1A1A1A] rounded-2xl p-6">
-          <p className="text-[10px] font-bold tracking-widest uppercase text-[#D4AF37] mb-1">EFFICIENCY</p>
-          <h3 className="text-2xl font-bold text-white mb-4">Utility Cost Reduction</h3>
-          <div className="space-y-4">
-            {[
-              { name: "St. Peter's College Seminary", desc: 'Shift to LED fixtures + scheduled AC maintenance, review peak-hour usage.', ratio: '25% Ratio' },
-              { name: 'San Pablo Theological Formation Center', desc: 'Shift to LED fixtures + scheduled AC maintenance, review peak-hour usage.', ratio: '28% Ratio' },
-            ].map((item, i) => (
-              <div key={i} className="bg-[#222222] border border-gray-800 rounded-xl p-5 flex justify-between items-center gap-4">
-                <div>
-                  <h4 className="font-bold text-white text-sm">{item.name}</h4>
-                  <p className="text-xs text-gray-400 mt-1">{item.desc}</p>
-                </div>
-                <span className="bg-emerald-500/10 text-emerald-600 px-3 py-1 rounded-md text-xs font-bold whitespace-nowrap">{item.ratio}</span>
+      {/* Utility Cost Reduction */}
+      <div className="bg-[#1A1A1A] rounded-2xl p-6">
+        <p className="text-[10px] font-bold tracking-widest uppercase text-[#D4AF37] mb-1">EFFICIENCY</p>
+        <h3 className="text-2xl font-bold text-white mb-4">Utility Cost Reduction</h3>
+        <div className="space-y-4">
+          {[
+            { name: "St. Peter's College Seminary", desc: 'Shift to LED fixtures + scheduled AC maintenance, review peak-hour usage.', ratio: '25% Ratio' },
+            { name: 'San Pablo Theological Formation Center', desc: 'Shift to LED fixtures + scheduled AC maintenance, review peak-hour usage.', ratio: '28% Ratio' },
+          ].map((item, i) => (
+            <div key={i} className="bg-[#222222] border border-gray-800 rounded-xl p-5 flex justify-between items-center gap-4">
+              <div>
+                <h4 className="font-bold text-white text-sm">{item.name}</h4>
+                <p className="text-xs text-gray-400 mt-1">{item.desc}</p>
               </div>
-            ))}
-          </div>
-        </div>
-
-        <div className="bg-white rounded-2xl border border-gray-100 p-6">
-          <p className="text-[10px] font-bold tracking-widest uppercase text-[#D4AF37] mb-1">ACTION PLAN</p>
-          <h3 className="text-2xl font-bold text-church-black mb-4">Ranking Upgrades</h3>
-          <div className="space-y-4">
-            {[
-              { name: "St. Peter's College Seminary", desc: 'Increase fee collection efficiency + align disbursements to baseline utilities and wages.', from: 'B', to: 'A' },
-              { name: 'San Pablo Theological Formation Center', desc: 'Reduce subsidy dependency + diversify income through fundraising programs.', from: 'C', to: 'B' },
-            ].map((item, i) => (
-              <div key={i} className="bg-gray-50 border border-gray-100 rounded-xl p-5 flex justify-between items-center gap-4">
-                <div>
-                  <h4 className="font-bold text-church-black text-sm">{item.name}</h4>
-                  <p className="text-xs text-gray-500 mt-1">{item.desc}</p>
-                </div>
-                <div className="flex items-center gap-2 flex-shrink-0">
-                  <div className="w-6 h-6 rounded-full bg-church-black text-white flex items-center justify-center text-xs font-bold">{item.from}</div>
-                  <ArrowUpRight className="w-4 h-4 text-[#D4AF37]" />
-                  <div className="w-6 h-6 rounded-full bg-[#D4AF37] text-church-black flex items-center justify-center text-xs font-bold">{item.to}</div>
-                </div>
-              </div>
-            ))}
-          </div>
+              <span className="bg-emerald-500/10 text-emerald-600 px-3 py-1 rounded-md text-xs font-bold whitespace-nowrap">{item.ratio}</span>
+            </div>
+          ))}
         </div>
       </div>
 
