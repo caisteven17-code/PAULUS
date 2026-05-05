@@ -715,7 +715,7 @@ export function SeminaryFinancialDashboard({ entityName, year }: { entityName: s
             </div>
           </ChartCard>
 
-          <ChartCard title="Enrollment Digital Twin" subtitle="Fee income impact under baseline and enrollment growth scenarios.">
+          <ChartCard title="Enrollment Simulator" subtitle="Fee income impact under baseline and enrollment growth scenarios.">
             <div className="h-80">
               <ResponsiveContainer width="100%" height="100%">
                 <BarChart data={enrollmentDigitalTwinData} margin={chartMargin}>
@@ -748,7 +748,7 @@ export function SeminaryFinancialDashboard({ entityName, year }: { entityName: s
             </div>
           </ChartCard>
 
-          <ChartCard title="Subsidy Risk Digital Twin" subtitle="Impact on annual income and surplus if RCBSP subsidy is reduced.">
+          <ChartCard title="Subsidy Risk Simulator" subtitle="Impact on annual income and surplus if RCBSP subsidy is reduced.">
             <div className="h-80">
               <ResponsiveContainer width="100%" height="100%">
                 <BarChart data={subsidyRiskDigitalTwinData} margin={chartMargin}>

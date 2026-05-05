@@ -74,23 +74,23 @@ export function Sidebar({
 
   const parishSubtabs = [
     { id: 'parish-dashboard', label: 'Dashboard', icon: BarChart3, section: 'PARISH' },
-    { id: 'parish-aitwin', label: 'Digital Twin', icon: Zap, section: 'PARISH' },
+    { id: 'parish-aitwin', label: 'Simulator', icon: Zap, section: 'PARISH' },
   ];
 
   const priestSubtabs = [
     { id: 'priest-dashboard', label: 'Dashboard', icon: BarChart3 },
     ...(role === 'priest' ? [] : [{ id: 'priest-health', label: 'Health Tracker', icon: Heart, section: 'PRIEST' }]),
-    { id: 'priest-aitwin', label: 'Digital Twin', icon: Zap, section: 'PRIEST' },
+    { id: 'priest-aitwin', label: 'Simulator', icon: Zap, section: 'PRIEST' },
   ];
 
   const seminarySubtabs = [
     { id: 'seminaries', label: 'Dashboard', icon: BarChart3 },
-    { id: 'seminary-aitwin', label: 'Digital Twin', icon: Zap },
+    { id: 'seminary-aitwin', label: 'Simulator', icon: Zap },
   ];
 
   const schoolSubtabs = [
     { id: 'school', label: 'Dashboard', icon: BarChart3 },
-    { id: 'school-aitwin', label: 'Digital Twin', icon: Zap },
+    { id: 'school-aitwin', label: 'Simulator', icon: Zap },
   ];
 
   const hasDioceseAccess = role === 'bishop' || role === 'admin';

@@ -11,7 +11,7 @@ interface BottomNavProps {
 const NAV_ITEMS = [
   { id: 'home', label: 'Home', icon: Home },
   { id: 'parish', label: 'Parish', icon: Church },
-  { id: 'aitwin', label: 'Digital Twin', icon: Zap },
+  { id: 'aitwin', label: 'Simulator', icon: Zap },
   { id: 'announcements', label: 'News', icon: Bell },
   { id: 'health', label: 'Health', icon: Heart },
   { id: 'settings', label: 'Settings', icon: Settings },

@@ -29,7 +29,7 @@ export function ParishContainer({
   const subtabs = [
     { id: 'dashboard', label: 'Dashboard', icon: BarChart3 },
     { id: 'health', label: 'Health Tracker', icon: Heart },
-    { id: 'aitwin', label: 'Digital Twin', icon: Zap },
+    { id: 'aitwin', label: 'Simulator', icon: Zap },
   ] as const;
 
   return (

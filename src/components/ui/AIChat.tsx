@@ -30,7 +30,7 @@ const PARISH_QUERIES = [
   },
   {
     trigger: ['forecast', 'predict', 'ai twin', 'digital twin', 'projection'],
-    response: 'Use the Digital Twin feature to test different financial scenarios. You can adjust collection rates, expenses, and one-time transactions to see how they impact your parish\'s cash position over 12 months. This helps with financial planning.',
+    response: 'Use the Simulator feature to test different financial scenarios. You can adjust collection rates, expenses, and one-time transactions to see how they impact your parish\'s cash position over 12 months. This helps with financial planning.',
   },
   {
     trigger: ['data', 'import', 'export', 'csv', 'file'],

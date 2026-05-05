@@ -158,7 +158,7 @@ const financialTwinConfigs = {
     labelLower: 'parish',
     pluralLower: 'parishes',
     selectTitle: 'Select Parish',
-    title: 'Parish Cash Flow Digital Twin',
+    title: 'Parish Cash Flow Simulator',
     description: 'Run what-if financial scenarios using parish trend, volatility, and runway analytics as the baseline.',
     incomeChangeLabel: 'Collections Change',
     externalSupportLabel: 'External Support',
@@ -170,7 +170,7 @@ const financialTwinConfigs = {
     labelLower: 'seminary',
     pluralLower: 'seminaries',
     selectTitle: 'Select Seminary',
-    title: 'Seminary Financial Digital Twin',
+    title: 'Seminary Financial Simulator',
     description: 'Model formation income, subsidy exposure, operating costs, and runway scenarios for diocesan seminaries.',
     incomeChangeLabel: 'Formation Income Change',
     externalSupportLabel: 'Diocesan Subsidy',
@@ -182,7 +182,7 @@ const financialTwinConfigs = {
     labelLower: 'school',
     pluralLower: 'schools',
     selectTitle: 'Select School',
-    title: 'School Financial Digital Twin',
+    title: 'School Financial Simulator',
     description: 'Model tuition income, enrollment-sensitive cash flow, operating costs, and support scenarios for diocesan schools.',
     incomeChangeLabel: 'Tuition Income Change',
     externalSupportLabel: 'Mission Support',
@@ -896,7 +896,7 @@ function ParishAITwin({ mode = 'parish' }: { mode?: FinancialAITwinMode }) {
                 </div>
                 <div className="space-y-1">
                   <p className="text-sm font-bold text-church-black">No saved scenarios yet</p>
-                  <p className="text-xs text-church-grey">Run a {config.labelLower} digital twin scenario and save it to see it here.</p>
+                  <p className="text-xs text-church-grey">Run a {config.labelLower} simulator scenario and save it to see it here.</p>
                 </div>
               </div>
             )}
