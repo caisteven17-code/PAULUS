@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
+import { ArrowLeft } from 'lucide-react';
 import { TopNav } from './components/layout/TopNav';
 import { Sidebar } from './components/layout/Sidebar';
 import { Footer } from './components/layout/Footer';
@@ -12,6 +13,7 @@ import { Login } from './views/Login';
 import { Home } from './views/Home';
 import { Projects } from './views/Projects';
 import { AITwin } from './views/AITwin';
+import { DigitalTwin } from './views/DigitalTwin';
 import { Announcements } from './views/Announcements';
 import { HealthTracker } from './views/HealthTracker';
 import { ConsolidatedFinancial } from './views/ConsolidatedFinancial';
@@ -23,6 +25,18 @@ import { auth, AuthUser } from './firebase';
 
 export type Role = 'bishop' | 'admin' | 'priest' | 'school' | 'seminary';
 export type Timeframe = '6m' | '1y' | 'all';
+type DigitalTwinSession = {
+  entityClass: string;
+  entityName: string;
+  entityType: 'parish' | 'school' | 'seminary';
+  viewRole: 'priest' | 'school' | 'seminary';
+};
+
+const getDigitalTwinDefaultTab = (role: DigitalTwinSession['viewRole']) => {
+  if (role === 'school') return 'school';
+  if (role === 'seminary') return 'seminaries';
+  return 'parish-dashboard';
+};
 
 const toPriestTimeframe = (tf: Timeframe): '3m' | '6m' | '12m' | undefined => {
   if (tf === '6m') return '6m';
@@ -52,6 +66,8 @@ export default function App() {
   const [activeTab, setActiveTab] = useState('home');
   const [timeframe, setTimeframe] = useState<Timeframe>('6m');
   const [year, setYear] = useState<number>(2026);
+  const [digitalTwinSession, setDigitalTwinSession] = useState<DigitalTwinSession | null>(null);
+  const [digitalTwinActiveTab, setDigitalTwinActiveTab] = useState('parish-dashboard');
 
   useEffect(() => {
     const unsubscribe = auth.onAuthStateChanged((user: AuthUser | null) => {
@@ -127,6 +143,194 @@ export default function App() {
     return <Login onLogin={handleLogin} />;
   }
 
+  const renderDigitalTwinSessionContent = () => {
+    if (!digitalTwinSession) return null;
+
+    const commonPriestProps = {
+      timeframe: toPriestTimeframe(timeframe),
+      year,
+      onYearChange: setYear,
+      onNavigate: setDigitalTwinActiveTab,
+      onLogout: handleLogout,
+    } as const;
+
+    if (digitalTwinSession.viewRole === 'priest') {
+      switch (digitalTwinActiveTab) {
+        case 'dashboard':
+        case 'parish-dashboard':
+        case 'parish-health':
+          return (
+            <BishopDashboard
+              initialEntityType="Parishes"
+              initialEntityFilter={digitalTwinSession.entityName}
+              lockEntityFilter
+              timeframe={timeframe}
+              year={year}
+              onYearChange={setYear}
+              onNavigate={setDigitalTwinActiveTab}
+            />
+          );
+        case 'parish-data-submission':
+          return (
+            <ParishDataSubmission
+              parishName={digitalTwinSession.entityName}
+              vicariate="Digital Twin Session"
+              parishClass={digitalTwinSession.entityClass}
+              year={year}
+              onBack={() => setDigitalTwinActiveTab('parish-dashboard')}
+            />
+          );
+        case 'priest-dashboard':
+          return (
+            <PriestDashboard
+              role="priest"
+              dashboardContext="priest"
+              entityName={digitalTwinSession.entityName}
+              entityType="parish"
+              entityClass={digitalTwinSession.entityClass}
+              isEmbedded
+              {...commonPriestProps}
+            />
+          );
+        case 'priest-health':
+          return <HealthTracker />;
+        case 'parish-aitwin':
+          return <AITwin mode="parish" />;
+        case 'priest-aitwin':
+          return <AITwin mode="priest" />;
+        case 'announcements':
+          return <Announcements />;
+        default:
+          return (
+            <div className="flex items-center justify-center h-[calc(100vh-80px)]">
+              <p className="text-church-grey">This institution view is not available in the current Digital Twin session.</p>
+            </div>
+          );
+      }
+    }
+
+    if (digitalTwinSession.viewRole === 'seminary') {
+      switch (digitalTwinActiveTab) {
+        case 'dashboard':
+        case 'seminaries':
+          return (
+            <PriestDashboard
+              role="seminary"
+              entityName={digitalTwinSession.entityName}
+              entityType="seminary"
+              entityClass={digitalTwinSession.entityClass}
+              isEmbedded
+              {...commonPriestProps}
+            />
+          );
+        case 'seminary-data-submission':
+          return (
+            <ParishDataSubmission
+              parishName={digitalTwinSession.entityName}
+              vicariate="Digital Twin Session"
+              parishClass="Seminary"
+              year={year}
+              onBack={() => setDigitalTwinActiveTab('seminaries')}
+            />
+          );
+        case 'seminary-aitwin':
+          return <AITwin mode="seminary" />;
+        case 'announcements':
+          return <Announcements />;
+        default:
+          return (
+            <div className="flex items-center justify-center h-[calc(100vh-80px)]">
+              <p className="text-church-grey">This seminary view is not available in the current Digital Twin session.</p>
+            </div>
+          );
+      }
+    }
+
+    switch (digitalTwinActiveTab) {
+      case 'dashboard':
+      case 'school':
+        return (
+          <PriestDashboard
+            role="school"
+            entityName={digitalTwinSession.entityName}
+            entityType="school"
+            entityClass={digitalTwinSession.entityClass}
+            isEmbedded
+            {...commonPriestProps}
+          />
+        );
+      case 'school-data-submission':
+        return (
+          <ParishDataSubmission
+            parishName={digitalTwinSession.entityName}
+            vicariate="Digital Twin Session"
+            parishClass="School"
+            year={year}
+            onBack={() => setDigitalTwinActiveTab('school')}
+          />
+        );
+      case 'school-aitwin':
+        return <AITwin mode="school" />;
+      case 'announcements':
+        return <Announcements />;
+      default:
+        return (
+          <div className="flex items-center justify-center h-[calc(100vh-80px)]">
+            <p className="text-church-grey">This school view is not available in the current Digital Twin session.</p>
+          </div>
+        );
+    }
+  };
+
+  if (digitalTwinSession) {
+    return (
+      <ErrorBoundary>
+        <div className="flex flex-row min-h-screen bg-church-light font-sans">
+          <Sidebar
+            activeTab={digitalTwinActiveTab}
+            onNavigate={setDigitalTwinActiveTab}
+            onLogout={handleLogout}
+            role={digitalTwinSession.viewRole}
+            timeframe={timeframe}
+            onTimeframeChange={setTimeframe}
+          />
+
+          <div className="flex flex-col flex-1 min-w-0 h-screen overflow-hidden">
+            <TopNav
+              onNavigate={setDigitalTwinActiveTab}
+              role={digitalTwinSession.viewRole}
+              currentPage={digitalTwinActiveTab}
+              timeframe={timeframe}
+              onTimeframeChange={setTimeframe}
+              year={year}
+              onYearChange={setYear}
+              onLogout={handleLogout}
+            />
+            <main className="flex-1 overflow-y-auto pb-20 md:pb-0">
+              {renderDigitalTwinSessionContent()}
+              <Footer />
+            </main>
+          </div>
+
+          <div className="fixed left-4 top-4 z-[70]">
+            <button
+              onClick={() => {
+                setDigitalTwinSession(null);
+                setActiveTab('digital-twin');
+              }}
+              className="inline-flex items-center gap-2 rounded-full border border-black/10 bg-white/95 px-4 py-2 text-sm font-bold text-gray-800 shadow-lg backdrop-blur transition hover:bg-white"
+            >
+              <ArrowLeft className="h-4 w-4" />
+              Back to Digital Twin
+            </button>
+          </div>
+          <BottomNav activeTab={digitalTwinActiveTab} onNavigate={setDigitalTwinActiveTab} role={digitalTwinSession.viewRole} />
+          <StewardChatbot />
+        </div>
+      </ErrorBoundary>
+    );
+  }
+
   /**
    * Renders the appropriate page component based on activeTab and user role.
    * Routes between Home, Dashboard, Projects, AITwin, and Settings pages.
@@ -148,7 +352,7 @@ export default function App() {
 
     if (activeTab === 'home') {
       if (role === 'bishop' || role === 'admin') {
-        return <Home onNavigate={(page) => setActiveTab(page)} />;
+        return <Home onNavigate={(page) => setActiveTab(page)} role={role} />;
       } else {
         // Redirect non-bishop roles to their respective dashboards if they somehow land on 'home'
         if (role === 'priest') return <BishopDashboard initialEntityType="Parishes" initialEntityFilter="San Isidro Labrador Parish" lockEntityFilter timeframe={timeframe} year={year} onYearChange={setYear} />;
@@ -183,6 +387,15 @@ export default function App() {
           return <AITwin mode="school" />;
         case 'projects':
           return <Projects role={role} />;
+        case 'digital-twin':
+          return role === 'admin' ? (
+            <DigitalTwin
+              onLaunch={(session) => {
+                setDigitalTwinActiveTab(getDigitalTwinDefaultTab(session.viewRole));
+                setDigitalTwinSession(session);
+              }}
+            />
+          ) : null;
         case 'announcements':
           return <Announcements />;
         case 'audit-log':
@@ -274,7 +487,7 @@ export default function App() {
           </main>
         </div>
         
-        <BottomNav activeTab={activeTab} onNavigate={setActiveTab} />
+        <BottomNav activeTab={activeTab} onNavigate={setActiveTab} role={role} />
         <StewardChatbot />
       </div>
     </ErrorBoundary>

@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useMemo, useEffect, useCallback } from 'react';
-import { TrendingUp, AlertTriangle, ArrowUpDown, Search, BrainCircuit, HeartPulse, Info, X, TrendingDown, Filter, Download, ChevronRight, ArrowUpRight, ArrowDownRight, Menu, Settings, Bell, User, LogOut, HelpCircle, FileText, Activity, Target, Zap, Clock, CalendarDays, Sparkles, ArrowRight, ArrowUp, Cpu, Award } from 'lucide-react';
+import { TrendingUp, AlertTriangle, ArrowUpDown, Search, BrainCircuit, HeartPulse, Info, X, TrendingDown, Filter, Download, ChevronRight, ArrowUpRight, ArrowDownRight, Menu, Settings, Bell, User, LogOut, HelpCircle, FileText, Activity, Target, Zap, Clock, CalendarDays, Sparkles, ArrowRight, ArrowUp, Cpu } from 'lucide-react';
 import { 
   BarChart, Bar, XAxis, YAxis, CartesianGrid, ResponsiveContainer,
   Line, LineChart, AreaChart, Area, ComposedChart, PieChart, Pie, Cell, Tooltip, Legend, ScatterChart, Scatter,
@@ -194,7 +194,7 @@ const AdvancedForecastChart = ({
             <ReferenceArea x1={pastEnd} x2={presentEnd} fill="#FFF7ED" fillOpacity={0.4} label={{ position: 'insideTopLeft', value: 'PRESENT', fill: '#F97316', fontSize: 8, fontWeight: 800, offset: 10 }} />
             <ReferenceArea x1={presentEnd} x2={futureEnd} fill="#F0FDF4" fillOpacity={0.4} label={{ position: 'insideTopLeft', value: 'FUTURE', fill: '#22C55E', fontSize: 8, fontWeight: 800, offset: 10 }} />
             
-            <ReferenceLine x={presentEnd} stroke="#D1D5DB" strokeDasharray="4 4" label={{ position: 'top', value: 'SPLIT', fill: '#9CA3AF', fontSize: 8, fontWeight: 700 }} />
+            <ReferenceLine x={presentEnd} stroke="#D1D5DB" strokeDasharray="4 4" />
 
             <Line 
               type="monotone" 
@@ -2144,64 +2144,6 @@ export function PriestDashboard({
             </div>
           )}
 
-          {/* ── DIOCESAN: Collection Performance Ranking ── */}
-          {isPriestDashboardContext && (
-            <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-200">
-              <div className="flex items-center justify-between mb-5">
-                <div>
-                  <p className="text-[10px] font-black uppercase tracking-[0.25em] text-gray-400">Descriptive · Ranking</p>
-                  <h3 className="text-lg font-bold text-church-green">Priest Collection Performance Ranking</h3>
-                </div>
-              </div>
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                {/* Top Performers */}
-                <div>
-                  <p className="text-[10px] font-black uppercase tracking-widest text-emerald-600 mb-3 flex items-center gap-2">
-                    <span className="w-2 h-2 rounded-full bg-emerald-500 inline-block" /> Top Performers
-                  </p>
-                  <div className="space-y-2">
-                    {diocesanStats.topFive.map((p, i) => (
-                      <div key={p.name} className="flex items-center gap-3 p-3 bg-emerald-50/50 rounded-xl border border-emerald-100">
-                        <span className="text-[10px] font-black text-emerald-600 w-5">#{i + 1}</span>
-                        <div className="flex-1 min-w-0">
-                          <p className="text-xs font-bold text-gray-900 truncate">{p.name}</p>
-                          <p className="text-[10px] text-gray-500">{p.entity}</p>
-                        </div>
-                        <div className="text-right">
-                          <p className="text-xs font-black text-gray-900">{formatCurrency(p.avgCollections)}</p>
-                          <p className={`text-[10px] font-bold ${p.collectionChange >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>
-                            {p.collectionChange >= 0 ? '+' : ''}{p.collectionChange}%
-                          </p>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-                {/* At-Risk / Declining */}
-                <div>
-                  <p className="text-[10px] font-black uppercase tracking-widest text-red-600 mb-3 flex items-center gap-2">
-                    <span className="w-2 h-2 rounded-full bg-red-500 inline-block" /> Declining — Needs Attention
-                  </p>
-                  <div className="space-y-2">
-                    {diocesanStats.bottomFive.map((p, i) => (
-                      <div key={p.name} className="flex items-center gap-3 p-3 bg-red-50/50 rounded-xl border border-red-100">
-                        <div className="flex-1 min-w-0">
-                          <p className="text-xs font-bold text-gray-900 truncate">{p.name}</p>
-                          <p className="text-[10px] text-gray-500">{p.entity}</p>
-                        </div>
-                        <div className="text-right">
-                          <p className="text-xs font-black text-gray-900">{formatCurrency(p.avgCollections)}</p>
-                          <p className={`text-[10px] font-bold ${p.collectionChange >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>
-                            {p.collectionChange >= 0 ? '+' : ''}{p.collectionChange}%
-                          </p>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              </div>
-            </div>
-          )}
 
           {/* ── DIOCESAN: Full Assignment Table ── */}
           {isPriestDashboardContext && (
@@ -2631,153 +2573,6 @@ export function PriestDashboard({
               </div>
             </div>
           )}
-
-          {/* Strategy 1 */}
-          <div className="bg-white rounded-2xl border-2 border-church-green/20 overflow-hidden shadow-sm">
-            <div className="flex items-center gap-3 px-6 py-4 border-b-2 border-church-green/10 bg-church-green/5">
-              <div className="w-8 h-8 rounded-lg bg-church-green flex items-center justify-center flex-shrink-0">
-                <Target size={15} className="text-white" />
-              </div>
-              <div>
-                <h4 className="text-sm font-black text-church-green">Close Collection Gap</h4>
-                <p className="text-[10px] text-gray-500 font-medium">Bring actual collections closer to forecast.</p>
-              </div>
-              <span className="ml-auto text-[9px] font-black text-[#D4AF37] bg-amber-50 border border-amber-100 px-2 py-0.5 rounded-full uppercase tracking-wider flex-shrink-0">Strategy 1</span>
-            </div>
-            <div className="grid grid-cols-1 md:grid-cols-3 divide-y md:divide-y-0 md:divide-x divide-gray-100">
-              <div className="p-6">
-                <p className="text-[9px] font-black uppercase tracking-widest text-gray-400 mb-4">Recommended Action</p>
-                <ul className="space-y-3">
-                  {[
-                    'Focus this month on the parish with the largest collection shortfall.',
-                    'Schedule a stewardship appeal before the next Sunday mass.',
-                    'Assign one finance council member to contact recurring donors.',
-                    'Use the strongest peer parish as the practical collection target.',
-                  ].map((m, i) => (
-                    <li key={i} className="flex items-start gap-2 text-xs text-gray-600">
-                      <span className="w-1.5 h-1.5 rounded-full bg-church-green mt-1.5 flex-shrink-0" />{m}
-                    </li>
-                  ))}
-                </ul>
-              </div>
-              <div className="p-6 bg-amber-50/40">
-                <p className="text-[9px] font-black uppercase tracking-widest text-[#D4AF37] mb-4">When To Act</p>
-                <ul className="space-y-4">
-                  {[
-                    { label: 'Below Plan', desc: 'Collections are behind the monthly forecast.' },
-                    { label: 'Repeated Decline', desc: 'Giving has dropped for consecutive months.' },
-                    { label: 'Peak Season Nearing', desc: 'Major feast, fiesta, or holiday activity is coming.' },
-                  ].map((k, i) => (
-                    <li key={i} className="flex items-start gap-2">
-                      <span className="w-1.5 h-1.5 rounded-full bg-[#D4AF37] mt-1.5 flex-shrink-0" />
-                      <div>
-                        <p className="text-xs font-black text-gray-800">{k.label}</p>
-                        <p className="text-[10px] text-gray-500 mt-0.5">{k.desc}</p>
-                      </div>
-                    </li>
-                  ))}
-                </ul>
-              </div>
-              <div className="p-6 bg-church-green/5">
-                <p className="text-[9px] font-black uppercase tracking-widest text-church-green mb-4">Prescribed Next Step</p>
-                <ul className="space-y-3">
-                  {[
-                    'Launch a targeted collection reminder this week.',
-                    'Prepare a short pulpit announcement for the next mass.',
-                    'Invite ministry leaders to support the appeal.',
-                    'Review results at the next finance council meeting.',
-                  ].map((o, i) => (
-                    <li key={i} className="flex items-start gap-2 text-xs text-gray-600">
-                      <span className="w-1.5 h-1.5 rounded-full bg-church-green/50 mt-1.5 flex-shrink-0" />{o}
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            </div>
-          </div>
-
-          {/* Strategy 2 */}
-          <div className="bg-white rounded-2xl border-2 border-church-green/20 overflow-hidden shadow-sm">
-            <div className="flex items-center gap-3 px-6 py-4 border-b-2 border-church-green/10 bg-church-green/5">
-              <div className="w-8 h-8 rounded-lg bg-church-green flex items-center justify-center flex-shrink-0">
-                <Award size={15} className="text-white" />
-              </div>
-              <div>
-                <h4 className="text-sm font-black text-church-green">Control Disbursements</h4>
-                <p className="text-[10px] text-gray-500 font-medium">Keep spending within the monthly limit.</p>
-              </div>
-              <span className="ml-auto text-[9px] font-black text-[#D4AF37] bg-amber-50 border border-amber-100 px-2 py-0.5 rounded-full uppercase tracking-wider flex-shrink-0">Strategy 2</span>
-            </div>
-            <div className="grid grid-cols-1 md:grid-cols-3 divide-y md:divide-y-0 md:divide-x divide-gray-100">
-              <div className="p-6">
-                <p className="text-[9px] font-black uppercase tracking-widest text-gray-400 mb-4">Recommended Action</p>
-                <ul className="space-y-3">
-                  {[
-                    'Freeze non-essential purchases until priority bills are settled.',
-                    'Review every major expense with the finance council.',
-                    'Move urgent pastoral needs ahead of cosmetic improvements.',
-                    'Prepare the report documents before the closing week.',
-                  ].map((m, i) => (
-                    <li key={i} className="flex items-start gap-2 text-xs text-gray-600">
-                      <span className="w-1.5 h-1.5 rounded-full bg-church-green mt-1.5 flex-shrink-0" />{m}
-                    </li>
-                  ))}
-                </ul>
-              </div>
-              <div className="p-6 bg-amber-50/40">
-                <p className="text-[9px] font-black uppercase tracking-widest text-[#D4AF37] mb-4">When To Act</p>
-                <ul className="space-y-4">
-                  {[
-                    { label: 'Spending Is Near Limit', desc: 'Monthly expenses are approaching the planned ceiling.' },
-                    { label: 'Cash Buffer Is Thin', desc: 'Available funds may not cover near-term obligations.' },
-                    { label: 'Report Date Is Close', desc: 'Submission deadline is within the current cycle.' },
-                  ].map((k, i) => (
-                    <li key={i} className="flex items-start gap-2">
-                      <span className="w-1.5 h-1.5 rounded-full bg-[#D4AF37] mt-1.5 flex-shrink-0" />
-                      <div>
-                        <p className="text-xs font-black text-gray-800">{k.label}</p>
-                        <p className="text-[10px] text-gray-500 mt-0.5">{k.desc}</p>
-                      </div>
-                    </li>
-                  ))}
-                </ul>
-              </div>
-              <div className="p-6 bg-church-green/5">
-                <p className="text-[9px] font-black uppercase tracking-widest text-church-green mb-4">Prescribed Next Step</p>
-                <ul className="space-y-3">
-                  {[
-                    'Defer non-urgent expenses to next month.',
-                    'Renegotiate or split large payables when possible.',
-                    'Reserve funds for utilities, salaries, and parish operations.',
-                    'Submit the financial report before making new commitments.',
-                  ].map((o, i) => (
-                    <li key={i} className="flex items-start gap-2 text-xs text-gray-600">
-                      <span className="w-1.5 h-1.5 rounded-full bg-church-green/50 mt-1.5 flex-shrink-0" />{o}
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            </div>
-          </div>
-
-          {/* Quick Wins */}
-          <div className="bg-[#1A1A1A] rounded-2xl p-6">
-            <p className="text-[10px] font-black text-[#D4AF37] uppercase tracking-widest mb-1">Quick Wins</p>
-            <h3 className="text-xl font-black text-white mb-4">Top 3 Immediate Actions This Month</h3>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              {[
-                { rank: '01', action: 'Review collection gap and act on the biggest drop.', impact: 'Close Gap', color: 'border-[#D4AF37]' },
-                { rank: '02', action: 'Check disbursement ratio and defer excess costs.', impact: 'Cut Spending', color: 'border-[#D4AF37]' },
-                { rank: '03', action: 'Submit the monthly report before the deadline.', impact: 'Stay Compliant', color: 'border-[#D4AF37]' },
-              ].map((item, i) => (
-                <div key={i} className={`bg-[#222222] rounded-xl p-5 border-l-4 ${item.color}`}>
-                  <p className="text-3xl font-black text-white/20 mb-2 leading-none">{item.rank}</p>
-                  <p className="text-sm font-bold text-white leading-snug">{item.action}</p>
-                  <span className="inline-block mt-3 text-[10px] font-black text-[#D4AF37] bg-[#D4AF37]/10 px-2 py-0.5 rounded-full">{item.impact}</span>
-                </div>
-              ))}
-            </div>
-          </div>
 
         </div>
       )}

@@ -3,7 +3,7 @@
 import React, { useState } from 'react';
 import { 
   Church, GraduationCap, BookOpen, Map as MapIcon, Target, ChevronLeft, ChevronRight,
-  Activity, TrendingUp, TrendingDown, ArrowRight, PieChart as PieChartIcon, Bell, AlertCircle, CheckCircle
+  Activity, TrendingUp, TrendingDown, ArrowRight, PieChart as PieChartIcon, Bell, AlertCircle, CheckCircle, Sparkles, ShieldCheck, Upload
 } from 'lucide-react';
 import { motion } from 'motion/react';
 import { SubmissionTracker } from '../components/projects/SubmissionTracker';
@@ -11,9 +11,11 @@ import { ClassificationManagement, ClassificationRecord } from '../components/ui
 import { 
   PieChart, Pie, Cell, ResponsiveContainer, Tooltip 
 } from 'recharts';
+import type { Role } from '../App';
 
 interface HomeProps {
   onNavigate: (page: string) => void;
+  role?: Role;
 }
 
 const mockAnnouncements = [
@@ -148,7 +150,7 @@ const contributionData = [
   { name: 'Schools', value: 20, color: '#1a472a', page: 'school', desc: 'Educational mission and youth formation' },
 ];
 
-export function Home({ onNavigate }: HomeProps) {
+export function Home({ onNavigate, role = 'bishop' }: HomeProps) {
   return (
     <div className="flex flex-col min-h-[calc(100vh-80px)] bg-[#FDFCFB]">
       {/* Hero Section - Restored based on user image */}
@@ -385,6 +387,72 @@ export function Home({ onNavigate }: HomeProps) {
               ))}
             </div>
           </div>
+
+          {role === 'admin' && (
+            <div className="mt-24 pt-20 border-t border-gray-100">
+              <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,1.2fr)_360px] gap-8 items-stretch">
+                <div className="rounded-[2rem] bg-gradient-to-br from-[#1f1f1f] via-[#2c2c2c] to-[#111111] p-8 md:p-10 text-white shadow-2xl">
+                  <div className="inline-flex items-center gap-3 px-5 py-2.5 bg-white/10 rounded-full text-[10px] font-black uppercase tracking-[0.3em] border border-white/10">
+                    <Sparkles className="w-4 h-4 text-[#d4af37]" />
+                    Admin Sandbox
+                  </div>
+                  <div className="mt-6 space-y-4">
+                    <h2 className="text-4xl md:text-5xl font-serif font-bold leading-[1.1]">
+                      Digital Twin <span className="text-[#d4af37] italic">Simulation</span>
+                    </h2>
+                    <p className="text-lg text-white/70 leading-relaxed max-w-2xl">
+                      Launch a temporary what-if environment for parishes, seminaries, or schools. Test projected collections, remittances, expenses, budget allocation, and file-based previews without affecting official analytics.
+                    </p>
+                  </div>
+                  <div className="mt-8 grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div className="rounded-[1.5rem] bg-white/5 border border-white/10 p-5">
+                      <ShieldCheck className="w-5 h-5 text-[#d4af37]" />
+                      <p className="mt-3 text-sm font-bold">Protected Sandbox</p>
+                      <p className="mt-2 text-sm text-white/60">No database write-back unless formally submitted and approved.</p>
+                    </div>
+                    <div className="rounded-[1.5rem] bg-white/5 border border-white/10 p-5">
+                      <Activity className="w-5 h-5 text-[#d4af37]" />
+                      <p className="mt-3 text-sm font-bold">Scenario Controls</p>
+                      <p className="mt-2 text-sm text-white/60">Adjust collections, disbursements, remittances, expenses, and budgets.</p>
+                    </div>
+                    <div className="rounded-[1.5rem] bg-white/5 border border-white/10 p-5">
+                      <Upload className="w-5 h-5 text-[#d4af37]" />
+                      <p className="mt-3 text-sm font-bold">Temporary File Preview</p>
+                      <p className="mt-2 text-sm text-white/60">Upload a report for simulation-only impact review.</p>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="rounded-[2rem] bg-[#faf8f4] border border-[#e8dfcf] p-8 shadow-sm flex flex-col justify-between">
+                  <div>
+                    <div className="text-[10px] font-black text-gray-400 uppercase tracking-[0.3em]">Simulation Flow</div>
+                    <div className="mt-4 space-y-4">
+                      <div className="rounded-2xl bg-white border border-gray-100 p-4">
+                        <p className="text-sm font-bold text-gray-900">1. Select institution type</p>
+                        <p className="mt-1 text-sm text-gray-500">Parish, Seminary, or School</p>
+                      </div>
+                      <div className="rounded-2xl bg-white border border-gray-100 p-4">
+                        <p className="text-sm font-bold text-gray-900">2. Launch sandbox dashboard</p>
+                        <p className="mt-1 text-sm text-gray-500">Review current standing, analytics, trends, and risk indicators</p>
+                      </div>
+                      <div className="rounded-2xl bg-white border border-gray-100 p-4">
+                        <p className="text-sm font-bold text-gray-900">3. Compare outcomes</p>
+                        <p className="mt-1 text-sm text-gray-500">Save or reload sandbox instances for internal planning</p>
+                      </div>
+                    </div>
+                  </div>
+
+                  <button
+                    onClick={() => onNavigate('digital-twin')}
+                    className="mt-8 w-full py-4 px-6 bg-[#d4af37] text-gray-900 font-bold rounded-2xl hover:bg-[#c49d1f] transition-colors flex items-center justify-center gap-3"
+                  >
+                    Open Digital Twin
+                    <ArrowRight className="w-4 h-4" />
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
 
           {/* Contribution Breakdown Section - Restored */}
           <div className="mt-24 pt-20 border-t border-gray-100">

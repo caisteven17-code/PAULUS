@@ -347,7 +347,7 @@ const AdvancedForecastChart = ({
             <ReferenceArea x1={pastEnd} x2={presentEnd} fill="#FFF7ED" fillOpacity={0.4} label={{ position: 'insideTopLeft', value: 'PRESENT (Holdout)', fill: '#F97316', fontSize: 9, fontWeight: 800, offset: 10 }} />
             <ReferenceArea x1={presentEnd} x2={futureEnd} fill="#F0FDF4" fillOpacity={0.4} label={{ position: 'insideTopLeft', value: 'FUTURE (Forecast)', fill: '#22C55E', fontSize: 9, fontWeight: 800, offset: 10 }} />
             
-            <ReferenceLine x={presentEnd} stroke="#D1D5DB" strokeDasharray="4 4" label={{ position: 'top', value: '80/20 SPLIT', fill: '#9CA3AF', fontSize: 9, fontWeight: 700 }} />
+            <ReferenceLine x={presentEnd} stroke="#D1D5DB" strokeDasharray="4 4" />
 
             <Line 
               type="monotone" 

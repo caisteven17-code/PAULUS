@@ -463,6 +463,26 @@ export function Sidebar({
           );
         })()}
 
+        {role === 'admin' && (() => {
+          const isActive = activeTab === 'digital-twin';
+          return (
+            <button
+              onClick={() => onNavigate('digital-twin')}
+              className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-300 group ${
+                isActive
+                  ? 'bg-white/10 text-gold-400 shadow-sm'
+                  : 'text-white/50 hover:bg-white/5 hover:text-white'
+              }`}
+            >
+              <Zap className={`w-4 h-4 transition-colors ${isActive ? 'text-gold-400' : 'text-white/20 group-hover:text-white/40'}`} />
+              <span className="text-xs font-bold tracking-wide">Digital Twin</span>
+              {isActive && (
+                <div className="ml-auto w-1.5 h-1.5 bg-gold-400 rounded-full shadow-[0_0_8px_rgba(212,175,55,0.6)]" />
+              )}
+            </button>
+          );
+        })()}
+
         {/* Administration Dropdown */}
         {hasDioceseAccess && (
           <div>

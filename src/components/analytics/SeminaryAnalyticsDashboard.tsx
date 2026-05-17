@@ -200,7 +200,7 @@ const SeminaryForecastChart = ({
             <ReferenceArea x1="Jun" x2={pastEnd} fill="#F0F9FF" fillOpacity={0.4} label={{ position: 'insideTopLeft', value: 'PAST (Train)', fill: '#0EA5E9', fontSize: 9, fontWeight: 800, offset: 10 }} />
             <ReferenceArea x1={pastEnd} x2={presentEnd} fill="#FFF7ED" fillOpacity={0.4} label={{ position: 'insideTopLeft', value: 'PRESENT (Holdout)', fill: '#F97316', fontSize: 9, fontWeight: 800, offset: 10 }} />
             <ReferenceArea x1={presentEnd} x2={futureEnd} fill="#F0FDF4" fillOpacity={0.4} label={{ position: 'insideTopLeft', value: 'FUTURE (Forecast)', fill: '#22C55E', fontSize: 9, fontWeight: 800, offset: 10 }} />
-            <ReferenceLine x={presentEnd} stroke="#D1D5DB" strokeDasharray="4 4" label={{ position: 'top', value: '80/20 SPLIT', fill: '#9CA3AF', fontSize: 9, fontWeight: 700 }} />
+            <ReferenceLine x={presentEnd} stroke="#D1D5DB" strokeDasharray="4 4" />
             <Line type="monotone" dataKey={actualKey} name="Historical (Actual)" stroke="#1a472a" strokeWidth={4} dot={{ r: 4, fill: '#1a472a', strokeWidth: 2, stroke: '#fff' }} activeDot={{ r: 7, strokeWidth: 0 }} connectNulls={false} />
             <Line type="monotone" dataKey={forecastKey} name="Forecast (ML Model)" stroke="#D4AF37" strokeWidth={4} strokeDasharray="8 4" dot={{ r: 4, fill: '#D4AF37', strokeWidth: 2, stroke: '#fff' }} activeDot={{ r: 7, strokeWidth: 0 }} />
             <Legend verticalAlign="top" align="right" height={50} iconType="circle" wrapperStyle={{ fontSize: '10px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em', color: '#4B5563' }} />
