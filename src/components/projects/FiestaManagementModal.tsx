@@ -31,11 +31,17 @@ export function FiestaManagementModal({
   const [fiestas, setFiestas] = useState<Fiesta[]>(initialFiestas);
   const [isAddingNew, setIsAddingNew] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
-  const [formData, setFormData] = useState({
+  const [formData, setFormData] = useState<{
+    primaryPatron: string;
+    secondaryPatron: string;
+    date: string;
+    expectedImpact: 'low' | 'medium' | 'high';
+    estimatedCollectionIncrease: number;
+  }>({
     primaryPatron: '',
     secondaryPatron: '',
     date: '',
-    expectedImpact: 'medium' as const,
+    expectedImpact: 'medium',
     estimatedCollectionIncrease: 0,
   });
 

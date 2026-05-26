@@ -25,11 +25,12 @@ interface ParishClassificationCardProps {
  * Classification thresholds for determining entity class
  * Based on annual collections
  */
-const CLASS_THRESHOLDS = {
+const CLASS_THRESHOLDS: Record<EntityClass, { min: number; tax: number }> = {
   'Class A': { min: 2500000, tax: 0.12 },
   'Class B': { min: 1500000, tax: 0.10 },
   'Class C': { min: 750000, tax: 0.08 },
-  'Class D': { min: 0, tax: 0.05 },
+  'Class D': { min: 250000, tax: 0.03 },
+  'Class E': { min: 0,      tax: 0.00 },
 };
 
 /**
@@ -48,7 +49,7 @@ export function calculateSustainabilityStatus(
   if (!isSubsidized) return { isSustainable: false };
 
   // Check if current income exceeds next class threshold
-  const classOrder: EntityClass[] = ['Class D', 'Class C', 'Class B', 'Class A'];
+  const classOrder: EntityClass[] = ['Class E', 'Class D', 'Class C', 'Class B', 'Class A'];
   const currentIndex = classOrder.indexOf(currentClass);
   
   if (currentIndex === 3) {
@@ -95,7 +96,7 @@ export function ParishClassificationCard({
   );
 
   const nextThreshold = useMemo(() => {
-    const classOrder: EntityClass[] = ['Class D', 'Class C', 'Class B', 'Class A'];
+    const classOrder: EntityClass[] = ['Class E', 'Class D', 'Class C', 'Class B', 'Class A'];
     const currentIndex = classOrder.indexOf(data.currentClass);
     if (currentIndex === 3) return null; // Already Class A
     const nextClass = classOrder[currentIndex + 1];

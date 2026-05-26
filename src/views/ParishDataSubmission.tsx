@@ -8,6 +8,8 @@ import {
   FileText,
   CheckCircle2,
   ShieldCheck,
+  Calendar,
+  Zap,
 } from 'lucide-react';
 import { motion } from 'motion/react';
 import { Card, CardContent } from '../components/ui/Card';
@@ -46,6 +48,8 @@ interface ParishDataSubmissionProps {
 }
 
 const wait = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+
+const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
 
 const roleBadgeMap: Record<SubmissionInstitutionType, string> = {
   parish: 'Parish Level',
@@ -87,6 +91,7 @@ export function ParishDataSubmission({
     });
   }, []);
 
+  // State declarations — kept together and ordered before memos that reference them
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [validationMessage, setValidationMessage] = useState('');
   const [isTemplateLoading, setIsTemplateLoading] = useState(false);
@@ -96,11 +101,36 @@ export function ParishDataSubmission({
   const [anomalyMode, setAnomalyMode] = useState<AnomalySimulationMode>('auto');
   const [showSuccessModal, setShowSuccessModal] = useState(false);
   const [showWarningModal, setShowWarningModal] = useState(false);
+  const [selectedMonth, setSelectedMonth] = useState<number>(new Date().getMonth());
   const [statusMessage, setStatusMessage] = useState(
     'No submission has started yet. Download a template or choose a report file to begin.'
   );
 
   const fileSizeLabel = selectedFile ? formatFileSize(selectedFile.size) : '';
+
+  // What-if calculation for selected month
+  const submissionWhatIf = useMemo(() => {
+    const now = new Date();
+    const selectedDeadline = new Date(year, selectedMonth, SUBMISSION_CONFIG.DEADLINE_DAY);
+    const daysRemaining = Math.ceil((selectedDeadline.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
+    const isOverdue = daysRemaining < 0;
+    const isCurrentMonth = selectedMonth === now.getMonth() && year === now.getFullYear();
+    const isUpcoming = selectedMonth === now.getMonth() + 1 && year === now.getFullYear();
+
+    return {
+      month: MONTHS[selectedMonth],
+      deadline: selectedDeadline.toLocaleDateString('en-PH', {
+        month: 'long',
+        day: 'numeric',
+        year: 'numeric',
+      }),
+      daysRemaining: Math.abs(daysRemaining),
+      isOverdue,
+      isCurrentMonth,
+      isUpcoming,
+      status: isCurrentMonth ? 'Current Month' : isUpcoming ? 'Next Month' : isOverdue ? 'Overdue' : 'Future Period',
+    };
+  }, [selectedMonth, year]);
 
   const validateFile = (file: File | null) => {
     if (!file) return 'Please select a financial report file first.';
@@ -229,8 +259,11 @@ export function ParishDataSubmission({
           </div>
 
           <div className="hidden rounded-2xl border border-gray-200 bg-church-light/50 px-4 py-3 text-right sm:block">
-            <p className="text-[10px] font-black uppercase tracking-[0.18em] text-gray-400">Next Deadline</p>
-            <p className="mt-1 text-sm font-bold text-red-600">{deadlineLabel}</p>
+            <p className="text-[10px] font-black uppercase tracking-[0.18em] text-gray-400">What-if Deadline</p>
+            <p className={`mt-1 text-sm font-bold ${submissionWhatIf.isOverdue ? 'text-red-600' : 'text-gold-700'}`}>
+              {submissionWhatIf.deadline}
+            </p>
+            <p className="mt-1 text-xs text-gray-500">{submissionWhatIf.status}</p>
           </div>
         </div>
       </div>
@@ -326,6 +359,146 @@ export function ParishDataSubmission({
                   </div>
                 </div>
               </div>
+            </CardContent>
+          </Card>
+        </motion.div>
+
+        <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.05 }}>
+          <Card className="overflow-hidden border-gold-100 bg-[radial-gradient(circle_at_top_left,rgba(212,175,55,0.08),transparent_40%),linear-gradient(135deg,#ffffff,#fffbf5)]">
+            <CardContent className="space-y-5">
+              <div className="flex items-start gap-4">
+                <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-gold-100 to-gold-50 text-gold-700">
+                  <Calendar className="h-6 w-6" />
+                </div>
+                <div className="space-y-1.5">
+                  <h3 className="text-2xl font-serif font-black text-church-black">What-If Submission Period</h3>
+                  <p className="text-sm text-gray-600 leading-relaxed">
+                    Explore different months to understand deadlines and submission requirements. Select any period to preview what-if scenarios.
+                  </p>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+                <div className="sm:col-span-1">
+                  <label className="block text-xs font-black uppercase tracking-[0.15em] text-gray-500 mb-2.5">
+                    Select Period
+                  </label>
+                  <select
+                    value={selectedMonth}
+                    onChange={(e) => setSelectedMonth(Number(e.target.value))}
+                    className="w-full rounded-[1.2rem] border-2 border-gold-200 bg-white px-4 py-3 text-sm font-semibold text-church-black outline-none transition-all hover:border-gold-300 focus:border-gold-500 focus:ring-2 focus:ring-gold-500/20"
+                  >
+                    {MONTHS.map((month, idx) => (
+                      <option key={month} value={idx}>
+                        {month} {year}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div className="sm:col-span-2 grid grid-cols-2 sm:grid-cols-2 gap-3">
+                  <div className="rounded-[1.2rem] border-2 border-gold-200 bg-gradient-to-br from-gold-50 to-white p-3.5">
+                    <p className="text-[10px] font-black uppercase tracking-[0.15em] text-gray-500">Selected Period</p>
+                    <p className="mt-2 text-base font-serif font-bold text-gold-800">
+                      {submissionWhatIf.month}
+                    </p>
+                    <p className="text-xs font-semibold text-gold-600">{year}</p>
+                  </div>
+
+                  <div className={`rounded-[1.2rem] border-2 p-3.5 ${submissionWhatIf.isOverdue ? 'border-red-300 bg-gradient-to-br from-red-50 to-white' : 'border-emerald-200 bg-gradient-to-br from-emerald-50 to-white'}`}>
+                    <p className="text-[10px] font-black uppercase tracking-[0.15em] text-gray-500">Status</p>
+                    <p className={`mt-2 text-base font-serif font-bold ${submissionWhatIf.isOverdue ? 'text-red-700' : submissionWhatIf.isCurrentMonth ? 'text-emerald-700' : 'text-gray-700'}`}>
+                      {submissionWhatIf.status}
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+                <div className={`rounded-[1.1rem] border-2 p-4 transition-all ${submissionWhatIf.isOverdue ? 'border-red-300 bg-gradient-to-br from-red-50 to-white shadow-sm hover:shadow-md' : 'border-gold-200 bg-gradient-to-br from-gold-50 to-white shadow-sm hover:shadow-md'}`}>
+                  <p className="text-[10px] font-black uppercase tracking-[0.15em] text-gray-600">Deadline</p>
+                  <p className={`mt-2.5 text-base font-serif font-bold leading-tight ${submissionWhatIf.isOverdue ? 'text-red-700' : 'text-gold-800'}`}>
+                    {submissionWhatIf.deadline.split(' ')[0]} {submissionWhatIf.deadline.split(' ')[1]}
+                  </p>
+                </div>
+
+                <div className={`rounded-[1.1rem] border-2 p-4 transition-all ${submissionWhatIf.daysRemaining <= 5 && !submissionWhatIf.isOverdue ? 'border-orange-300 bg-gradient-to-br from-orange-50 to-white shadow-sm hover:shadow-md' : 'border-emerald-200 bg-gradient-to-br from-emerald-50 to-white shadow-sm hover:shadow-md'}`}>
+                  <p className="text-[10px] font-black uppercase tracking-[0.15em] text-gray-600">Days Remaining</p>
+                  <p className={`mt-2.5 text-2xl font-serif font-black ${submissionWhatIf.isOverdue ? 'text-red-700' : submissionWhatIf.daysRemaining <= 5 ? 'text-orange-700' : 'text-emerald-700'}`}>
+                    {submissionWhatIf.isOverdue ? '−' : ''}{submissionWhatIf.daysRemaining}
+                  </p>
+                </div>
+
+                <div className="rounded-[1.1rem] border-2 border-blue-200 bg-gradient-to-br from-blue-50 to-white p-4 shadow-sm hover:shadow-md transition-all">
+                  <p className="text-[10px] font-black uppercase tracking-[0.15em] text-gray-600">Cycle Year</p>
+                  <p className="mt-2.5 text-2xl font-serif font-black text-blue-700">
+                    {year}
+                  </p>
+                </div>
+
+                <div className="rounded-[1.1rem] border-2 border-gray-200 bg-gradient-to-br from-gray-50 to-white p-4 shadow-sm hover:shadow-md transition-all">
+                  <p className="text-[10px] font-black uppercase tracking-[0.15em] text-gray-600">Submission Mode</p>
+                  <p className="mt-2.5 text-base font-serif font-bold text-gray-700">
+                    Test
+                  </p>
+                </div>
+              </div>
+
+              {submissionWhatIf.isOverdue && (
+                <motion.div initial={{ opacity: 0, y: -4 }} animate={{ opacity: 1, y: 0 }} className="rounded-[1.2rem] border-2 border-red-300 bg-gradient-to-r from-red-50 via-red-50 to-white p-4">
+                  <div className="flex items-start gap-3">
+                    <AlertCircle className="mt-0.5 h-5 w-5 shrink-0 text-red-600" />
+                    <div>
+                      <p className="font-semibold text-red-900">Overdue Period</p>
+                      <p className="mt-1 text-sm text-red-800">
+                        This submission period is {submissionWhatIf.daysRemaining} days overdue. Late submissions may require special approval from your diocese.
+                      </p>
+                    </div>
+                  </div>
+                </motion.div>
+              )}
+
+              {submissionWhatIf.isCurrentMonth && (
+                <motion.div initial={{ opacity: 0, y: -4 }} animate={{ opacity: 1, y: 0 }} className="rounded-[1.2rem] border-2 border-emerald-300 bg-gradient-to-r from-emerald-50 via-emerald-50 to-white p-4">
+                  <div className="flex items-start gap-3">
+                    <CheckCircle2 className="mt-0.5 h-5 w-5 shrink-0 text-emerald-600" />
+                    <div>
+                      <p className="font-semibold text-emerald-900">Active Period</p>
+                      <p className="mt-1 text-sm text-emerald-800">
+                        This is the current submission period. Upload your financial data for the ongoing month of {submissionWhatIf.month}.
+                      </p>
+                    </div>
+                  </div>
+                </motion.div>
+              )}
+
+              {submissionWhatIf.isUpcoming && (
+                <motion.div initial={{ opacity: 0, y: -4 }} animate={{ opacity: 1, y: 0 }} className="rounded-[1.2rem] border-2 border-blue-300 bg-gradient-to-r from-blue-50 via-blue-50 to-white p-4">
+                  <div className="flex items-start gap-3">
+                    <Clock3 className="mt-0.5 h-5 w-5 shrink-0 text-blue-600" />
+                    <div>
+                      <p className="font-semibold text-blue-900">Upcoming Period</p>
+                      <p className="mt-1 text-sm text-blue-800">
+                        {submissionWhatIf.month} is your next submission period. Begin preparing your financial reports now to ensure timely submission by {submissionWhatIf.deadline.split(' ')[0]} {submissionWhatIf.deadline.split(' ')[1]}.
+                      </p>
+                    </div>
+                  </div>
+                </motion.div>
+              )}
+
+              {!submissionWhatIf.isCurrentMonth && !submissionWhatIf.isUpcoming && !submissionWhatIf.isOverdue && (
+                <motion.div initial={{ opacity: 0, y: -4 }} animate={{ opacity: 1, y: 0 }} className="rounded-[1.2rem] border-2 border-amber-300 bg-gradient-to-r from-amber-50 via-amber-50 to-white p-4">
+                  <div className="flex items-start gap-3">
+                    <FileText className="mt-0.5 h-5 w-5 shrink-0 text-amber-600" />
+                    <div>
+                      <p className="font-semibold text-amber-900">Future Period</p>
+                      <p className="mt-1 text-sm text-amber-800">
+                        You're exploring a future submission period ({submissionWhatIf.month}). Use this to test workflows and understand deadline requirements in advance.
+                      </p>
+                    </div>
+                  </div>
+                </motion.div>
+              )}
             </CardContent>
           </Card>
         </motion.div>

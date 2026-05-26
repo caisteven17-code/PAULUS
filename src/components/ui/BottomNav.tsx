@@ -22,19 +22,22 @@ const NAV_ITEMS = [
 export function BottomNav({ activeTab, onNavigate, role = 'bishop' }: BottomNavProps) {
   const handleNavigate = (tab: string) => {
     if (tab === 'aitwin') {
-      if (role === 'admin') {
-        onNavigate('digital-twin');
-        return;
-      }
-      if (role === 'seminary') {
-        onNavigate('seminary-aitwin');
-        return;
-      }
-      if (role === 'school') {
-        onNavigate('school-aitwin');
-        return;
-      }
+      if (role === 'admin') { onNavigate('digital-twin'); return; }
+      if (role === 'seminary') { onNavigate('seminary-aitwin'); return; }
+      if (role === 'school') { onNavigate('school-aitwin'); return; }
       onNavigate('parish-aitwin');
+      return;
+    }
+
+    if (tab === 'parish') {
+      if (role === 'school') { onNavigate('school'); return; }
+      if (role === 'seminary') { onNavigate('seminaries'); return; }
+      onNavigate('parish-dashboard');
+      return;
+    }
+
+    if (tab === 'health') {
+      onNavigate('priest-health');
       return;
     }
 
@@ -52,7 +55,17 @@ export function BottomNav({ activeTab, onNavigate, role = 'bishop' }: BottomNavP
           activeTab === 'school-aitwin' ||
           activeTab === 'priest-aitwin'
         );
-        const isActive = activeTab === item.id || isSimulatorActive;
+        const isParishActive = item.id === 'parish' && (
+          activeTab === 'parish-dashboard' ||
+          activeTab === 'parish-health' ||
+          activeTab === 'parish-aitwin' ||
+          activeTab === 'school' ||
+          activeTab.startsWith('school-') ||
+          activeTab === 'seminaries' ||
+          activeTab.startsWith('seminary-')
+        );
+        const isHealthActive = item.id === 'health' && activeTab === 'priest-health';
+        const isActive = activeTab === item.id || isSimulatorActive || isParishActive || isHealthActive;
 
         return (
           <button

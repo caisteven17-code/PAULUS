@@ -78,11 +78,11 @@ export function ParishContainer({
         className="flex-1 overflow-auto"
       >
         {activeSubtab === 'dashboard' && (
-          role === 'priest' || role === 'school' || role === 'seminary' ? (
+          role === 'priest' ? (
             <PriestDashboard
               role={role}
-              dashboardContext={role === 'priest' ? 'parish' : undefined}
-              timeframe={timeframe}
+              dashboardContext="parish"
+              timeframe={timeframe === '1y' ? '12m' : timeframe === 'all' ? undefined : timeframe}
               year={year}
               onYearChange={onYearChange}
               onNavigate={onNavigate}
@@ -93,7 +93,7 @@ export function ParishContainer({
             <PriestDashboard
               role="priest"
               dashboardContext="parish"
-              timeframe={timeframe}
+              timeframe={timeframe === '1y' ? '12m' : timeframe === 'all' ? undefined : timeframe}
               year={year}
               onYearChange={onYearChange}
               onNavigate={onNavigate}

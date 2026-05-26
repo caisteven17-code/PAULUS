@@ -2138,13 +2138,13 @@ export function BishopDashboard({
                         />
                         <Tooltip
                           cursor={{ fill: '#F9FAFB' }}
-                          formatter={(value: number, name: string) => {
+                          formatter={(value, name) => {
                             const label = name === 'collections'
                               ? (selectedBarVicariate
                                   ? (entityType === 'Diocesan Schools' ? 'School Collections' : 'Parish Collections')
                                   : (entityType === 'Diocesan Schools' ? 'Cluster Collections' : 'Vicariate Collections'))
                               : 'Disbursements';
-                            return [formatCurrency(value), label];
+                            return [formatCurrency(Number(value ?? 0)), label];
                           }}
                           contentStyle={{
                             borderRadius: '16px',
@@ -2288,7 +2288,7 @@ export function BishopDashboard({
                         <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#E5E7EB" />
                         <XAxis dataKey="month" axisLine={true} tickLine={true} tick={{ fill: '#6B7280', fontSize: 12 }} />
                         <YAxis axisLine={true} tickLine={true} tick={{ fill: '#6B7280', fontSize: 12 }} tickFormatter={(value) => `${value / 1000000}M`} width={50} />
-                        <Tooltip formatter={(value: number) => formatCurrency(value)} />
+                        <Tooltip formatter={(value) => formatCurrency(Number(value ?? 0))} />
                         {(collectionsFilter === 'all' || collectionsFilter === 'collections_mass') && (
                           <Bar dataKey="collections_mass" name="Mass Collections" fill="#D4AF37" radius={[4, 4, 0, 0]} barSize={collectionsFilter === 'all' ? 20 : 40} />
                         )}
@@ -2365,7 +2365,7 @@ export function BishopDashboard({
                           <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#E5E7EB" />
                           <XAxis dataKey="month" axisLine={true} tickLine={true} tick={{ fill: '#6B7280', fontSize: 12 }} />
                           <YAxis axisLine={true} tickLine={true} tick={{ fill: '#6B7280', fontSize: 12 }} tickFormatter={(value) => `${value / 1000000}M`} width={50} />
-                          <Tooltip formatter={(value: number) => formatCurrency(value)} />
+                          <Tooltip formatter={(value) => formatCurrency(Number(value ?? 0))} />
                           {(disbursementsFilter === 'all' || disbursementsFilter === 'expenses_parish') && (
                             <Bar dataKey="expenses_parish" name="Parish Expenses" fill="#1a472a" radius={[4, 4, 0, 0]} barSize={disbursementsFilter === 'all' ? 25 : 50} />
                           )}
@@ -2406,7 +2406,7 @@ export function BishopDashboard({
                           <CartesianGrid strokeDasharray="3 3" horizontal={true} vertical={false} stroke="#E5E7EB" />
                           <XAxis type="number" axisLine={true} tickLine={true} tick={{ fill: '#6B7280', fontSize: 10 }} tickFormatter={(value) => `${value / 1000}k`} />
                           <YAxis dataKey="category" type="category" axisLine={true} tickLine={true} tick={{ fill: '#6B7280', fontSize: 10 }} width={130} />
-                          <Tooltip formatter={(value: number) => formatCurrency(value)} cursor={{ fill: '#F3F4F6' }} contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 4px 20px rgba(0,0,0,0.08)' }} />
+                          <Tooltip formatter={(value) => formatCurrency(Number(value ?? 0))} cursor={{ fill: '#F3F4F6' }} contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 4px 20px rgba(0,0,0,0.08)' }} />
                           <Bar dataKey="amount" fill="#1a472a" radius={[0, 6, 6, 0]} barSize={55} />
                         </BarChart>
                       </ResponsiveContainer>
@@ -2842,7 +2842,7 @@ export function BishopDashboard({
                         <Tooltip
                           contentStyle={{ background: '#111', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 12, fontSize: 12 }}
                           itemStyle={{ color: '#fff', fontWeight: 700 }}
-                          formatter={(v: any) => [`${v} parishes (${Math.round((v as number) / total * 100)}%)`, '']}
+                          formatter={(v) => [`${Number(v ?? 0)} parishes (${Math.round(Number(v ?? 0) / total * 100)}%)`, '']}
                         />
                       </PieChart>
                     </ResponsiveContainer>
@@ -2982,7 +2982,7 @@ export function BishopDashboard({
                           width={55}
                         />
                         <Tooltip
-                          formatter={(v: any) => [formatCurrency(v as number), cmpMetric === 'collections' ? 'Collections' : 'Disbursements']}
+                          formatter={(v) => [formatCurrency(Number(v ?? 0)), cmpMetric === 'collections' ? 'Collections' : 'Disbursements']}
                           contentStyle={{ borderRadius: 16, border: 'none', boxShadow: '0 10px 25px rgba(0,0,0,0.1)', fontSize: 12 }}
                         />
                         <Bar

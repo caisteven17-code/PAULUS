@@ -173,7 +173,7 @@ export function Sidebar({
 
         {/* Parishes Dropdown */}
         <div className={canViewParishes ? '' : 'hidden'}>
-          <div className={`w-full flex items-center gap-3 rounded-xl transition-all duration-300 ${
+          <div className={`relative w-full flex items-center gap-3 rounded-xl transition-all duration-300 ${
             activeTab.startsWith('parish')
               ? 'bg-white/10 text-gold-400 shadow-sm'
               : 'text-white/50'
@@ -197,10 +197,6 @@ export function Sidebar({
             >
               <ChevronDown className={`w-4 h-4 transition-transform duration-300 ${showParishDropdown ? 'rotate-180' : ''}`} />
             </button>
-
-            {activeTab.startsWith('parish') && (
-              <div className="absolute right-3 w-1.5 h-1.5 bg-gold-400 rounded-full shadow-[0_0_8px_rgba(212,175,55,0.6)]" />
-            )}
           </div>
 
           {/* Parish Subtabs Dropdown */}
@@ -243,7 +239,7 @@ export function Sidebar({
 
         {/* Priest Dropdown */}
         <div className={canViewPriests ? '' : 'hidden'}>
-          <div className={`w-full flex items-center gap-3 rounded-xl transition-all duration-300 ${
+          <div className={`relative w-full flex items-center gap-3 rounded-xl transition-all duration-300 ${
             activeTab.startsWith('priest')
               ? 'bg-white/10 text-gold-400 shadow-sm'
               : 'text-white/50'
@@ -265,10 +261,6 @@ export function Sidebar({
             >
               <ChevronDown className={`w-4 h-4 transition-transform duration-300 ${showPriestDropdown ? 'rotate-180' : ''}`} />
             </button>
-
-            {activeTab.startsWith('priest') && (
-              <div className="absolute right-3 w-1.5 h-1.5 bg-gold-400 rounded-full shadow-[0_0_8px_rgba(212,175,55,0.6)]" />
-            )}
           </div>
 
           <AnimatePresence>
@@ -310,7 +302,7 @@ export function Sidebar({
 
         {/* Seminaries Dropdown */}
         <div className={canViewSeminaries ? '' : 'hidden'}>
-          <div className={`w-full flex items-center gap-3 rounded-xl transition-all duration-300 ${
+          <div className={`relative w-full flex items-center gap-3 rounded-xl transition-all duration-300 ${
             activeTab === 'seminaries' || activeTab.startsWith('seminary-')
               ? 'bg-white/10 text-gold-400 shadow-sm'
               : 'text-white/50'
@@ -332,10 +324,6 @@ export function Sidebar({
             >
               <ChevronDown className={`w-4 h-4 transition-transform duration-300 ${showSeminaryDropdown ? 'rotate-180' : ''}`} />
             </button>
-
-            {(activeTab === 'seminaries' || activeTab.startsWith('seminary-')) && (
-              <div className="absolute right-3 w-1.5 h-1.5 bg-gold-400 rounded-full shadow-[0_0_8px_rgba(212,175,55,0.6)]" />
-            )}
           </div>
 
           <AnimatePresence>
@@ -377,7 +365,7 @@ export function Sidebar({
 
         {/* Schools Dropdown */}
         <div className={canViewSchools ? '' : 'hidden'}>
-          <div className={`w-full flex items-center gap-3 rounded-xl transition-all duration-300 ${
+          <div className={`relative w-full flex items-center gap-3 rounded-xl transition-all duration-300 ${
             activeTab === 'school' || activeTab.startsWith('school-')
               ? 'bg-white/10 text-gold-400 shadow-sm'
               : 'text-white/50'
@@ -399,10 +387,6 @@ export function Sidebar({
             >
               <ChevronDown className={`w-4 h-4 transition-transform duration-300 ${showSchoolDropdown ? 'rotate-180' : ''}`} />
             </button>
-
-            {(activeTab === 'school' || activeTab.startsWith('school-')) && (
-              <div className="absolute right-3 w-1.5 h-1.5 bg-gold-400 rounded-full shadow-[0_0_8px_rgba(212,175,55,0.6)]" />
-            )}
           </div>
 
           <AnimatePresence>
@@ -486,7 +470,7 @@ export function Sidebar({
         {/* Administration Dropdown */}
         {hasDioceseAccess && (
           <div>
-            <div className={`w-full flex items-center gap-3 rounded-xl transition-all duration-300 ${
+            <div className={`relative w-full flex items-center gap-3 rounded-xl transition-all duration-300 ${
               isAdminTab(activeTab) ? 'bg-white/10 text-gold-400' : 'text-white/50'
             }`}>
               <button
@@ -502,9 +486,6 @@ export function Sidebar({
               >
                 <ChevronDown className={`w-4 h-4 transition-transform duration-300 ${showAdminDropdown ? 'rotate-180' : ''}`} />
               </button>
-              {isAdminTab(activeTab) && (
-                <div className="absolute right-3 w-1.5 h-1.5 bg-gold-400 rounded-full shadow-[0_0_8px_rgba(212,175,55,0.6)]" />
-              )}
             </div>
             <AnimatePresence>
               {showAdminDropdown && (

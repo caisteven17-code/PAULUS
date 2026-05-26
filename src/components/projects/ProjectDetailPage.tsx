@@ -346,7 +346,7 @@ export function ProjectDetailPage({ project, donations, expenses, onBack, onAddD
                               <td className="px-6 md:px-10 py-7">
                                 <div className="flex items-center gap-4 md:gap-5">
                                   <div className="w-10 h-10 md:w-12 md:h-12 rounded-2xl bg-church-black text-white flex items-center justify-center font-serif font-bold text-base md:text-lg group-hover:bg-gold-500 group-hover:text-church-green-dark transition-all duration-500 shadow-lg shadow-church-black/10 shrink-0">
-                                    {donation.donorName.charAt(0)}
+                                    {donation.donorName?.charAt(0) ?? '?'}
                                   </div>
                                   <div className="space-y-0.5">
                                     <span className="text-sm font-bold text-church-black block tracking-tight">{donation.donorName}</span>

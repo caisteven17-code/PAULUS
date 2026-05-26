@@ -46,8 +46,8 @@ export function ClassificationManagement({
     } else if (sortBy === 'income') {
       filtered.sort((a, b) => b.annualIncome - a.annualIncome);
     } else if (sortBy === 'class') {
-      const classOrder = { 'Class A': 4, 'Class B': 3, 'Class C': 2, 'Class D': 1 };
-      filtered.sort((a, b) => (classOrder[b.currentClass] || 0) - (classOrder[a.currentClass] || 0));
+      const classOrder: Record<string, number> = { 'Class A': 5, 'Class B': 4, 'Class C': 3, 'Class D': 2, 'Class E': 1 };
+      filtered.sort((a, b) => (classOrder[b.currentClass] ?? 0) - (classOrder[a.currentClass] ?? 0));
     }
 
     return filtered;

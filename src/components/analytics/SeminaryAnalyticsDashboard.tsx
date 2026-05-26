@@ -196,7 +196,7 @@ const SeminaryForecastChart = ({
             <CartesianGrid strokeDasharray="3 3" vertical={true} stroke="#F3F4F6" />
             <XAxis dataKey="month" axisLine={false} tickLine={false} tick={{ fill: '#9CA3AF', fontSize: 11, fontWeight: 600 }} dy={10} />
             <YAxis axisLine={false} tickLine={false} tick={{ fill: '#9CA3AF', fontSize: 11, fontWeight: 600 }} tickFormatter={(v) => `${v / 1000}k`} width={50} />
-            <Tooltip contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 4px 20px rgba(0,0,0,0.08)' }} formatter={(v: any) => formatCurrency(v)} />
+            <Tooltip contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 4px 20px rgba(0,0,0,0.08)' }} formatter={(v) => formatCurrency(Number(v ?? 0))} />
             <ReferenceArea x1="Jun" x2={pastEnd} fill="#F0F9FF" fillOpacity={0.4} label={{ position: 'insideTopLeft', value: 'PAST (Train)', fill: '#0EA5E9', fontSize: 9, fontWeight: 800, offset: 10 }} />
             <ReferenceArea x1={pastEnd} x2={presentEnd} fill="#FFF7ED" fillOpacity={0.4} label={{ position: 'insideTopLeft', value: 'PRESENT (Holdout)', fill: '#F97316', fontSize: 9, fontWeight: 800, offset: 10 }} />
             <ReferenceArea x1={presentEnd} x2={futureEnd} fill="#F0FDF4" fillOpacity={0.4} label={{ position: 'insideTopLeft', value: 'FUTURE (Forecast)', fill: '#22C55E', fontSize: 9, fontWeight: 800, offset: 10 }} />
@@ -631,7 +631,7 @@ export default function SeminaryAnalyticsDashboard({
                 <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#F3F4F6" />
                 <XAxis dataKey="name" tick={{ fill: '#6B7280', fontSize: 11 }} />
                 <YAxis tickFormatter={(v) => `${(v/1000000).toFixed(1)}M`} tick={{ fill: '#9CA3AF', fontSize: 11 }} label={{ value: 'Amount (PHP)', angle: -90, position: 'insideLeft', style: { fill: '#9CA3AF', fontSize: 10, fontWeight: 'bold' }, offset: -20 }} />
-                <Tooltip formatter={(v: number) => formatCurrency(v)} contentStyle={{ borderRadius: '16px', border: 'none', boxShadow: '0 10px 25px rgba(0,0,0,0.1)' }} />
+                <Tooltip formatter={(v) => formatCurrency(Number(v ?? 0))} contentStyle={{ borderRadius: '16px', border: 'none', boxShadow: '0 10px 25px rgba(0,0,0,0.1)' }} />
                 <Legend verticalAlign="top" height={36} iconType="circle" />
                 <Bar dataKey="collections" name="collections" fill="#D4AF37" radius={[8, 8, 0, 0]} maxBarSize={50} />
                 <Bar dataKey="disbursements" name="disbursements" fill="#1a472a" radius={[8, 8, 0, 0]} maxBarSize={50} />
@@ -717,7 +717,7 @@ export default function SeminaryAnalyticsDashboard({
               <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#F3F4F6" />
               <XAxis dataKey="period" tick={{ fill: '#6B7280', fontSize: 11, fontWeight: 700 }} axisLine={false} tickLine={false} />
               <YAxis tick={{ fill: '#9CA3AF', fontSize: 10 }} tickFormatter={(value) => `${(value / 1_000_000).toFixed(1)}M`} axisLine={false} tickLine={false} width={55} />
-              <Tooltip formatter={(value: number) => [formatCurrency(value), periodMetric === 'collections' ? 'Receipts' : 'Disbursements']} contentStyle={{ borderRadius: 16, border: 'none', boxShadow: '0 10px 25px rgba(0,0,0,0.1)', fontSize: 12 }} />
+              <Tooltip formatter={(value) => [formatCurrency(Number(value ?? 0)), periodMetric === 'collections' ? 'Receipts' : 'Disbursements']} contentStyle={{ borderRadius: 16, border: 'none', boxShadow: '0 10px 25px rgba(0,0,0,0.1)', fontSize: 12 }} />
               <Bar dataKey="value" radius={[10, 10, 0, 0]} maxBarSize={90}>
                 {seminaryPeriodComparison.barData.map((_, index) => (
                   <Cell key={index} fill={index === 0 ? '#1a472a' : '#D4AF37'} />
@@ -767,7 +767,7 @@ export default function SeminaryAnalyticsDashboard({
               <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#E5E7EB" />
               <XAxis dataKey="month" tick={{ fill: '#6B7280', fontSize: 10 }} />
               <YAxis tickFormatter={(v) => `${(v/1000000).toFixed(1)}M`} tick={{ fill: '#6B7280', fontSize: 10 }} label={{ value: 'Amount (Millions)', angle: -90, position: 'insideLeft', style: { fill: '#9CA3AF', fontSize: 9, fontWeight: 'bold' }, offset: -5 }} />
-              <Tooltip formatter={(v: number) => formatCurrency(v)} contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 4px 20px rgba(0,0,0,0.08)' }} />
+              <Tooltip formatter={(v) => formatCurrency(Number(v ?? 0))} contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 4px 20px rgba(0,0,0,0.08)' }} />
               <Legend verticalAlign="bottom" height={36} iconType="circle" />
               <Bar dataKey="Mass Collections" fill="#D4AF37" radius={[4, 4, 0, 0]} maxBarSize={14} />
               <Bar dataKey="Seminary Fees"   fill="#1a472a" radius={[4, 4, 0, 0]} maxBarSize={14} />
@@ -791,7 +791,7 @@ export default function SeminaryAnalyticsDashboard({
               <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#E5E7EB" />
               <XAxis dataKey="month" tick={{ fill: '#6B7280', fontSize: 10 }} />
               <YAxis tickFormatter={(v) => `${(v/1000000).toFixed(1)}M`} tick={{ fill: '#6B7280', fontSize: 10 }} label={{ value: 'Amount (Millions)', angle: -90, position: 'insideLeft', style: { fill: '#9CA3AF', fontSize: 9, fontWeight: 'bold' }, offset: -5 }} />
-              <Tooltip formatter={(v: number) => formatCurrency(v)} contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 4px 20px rgba(0,0,0,0.08)' }} />
+              <Tooltip formatter={(v) => formatCurrency(Number(v ?? 0))} contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 4px 20px rgba(0,0,0,0.08)' }} />
               <Legend verticalAlign="bottom" height={36} iconType="circle" />
               <Bar dataKey="Personnel" fill="#1a472a" radius={[0,0,0,0]} />
               <Bar dataKey="Operations" fill="#D4AF37" radius={[0,0,0,0]} />
@@ -862,7 +862,7 @@ export default function SeminaryAnalyticsDashboard({
               <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#E5E7EB" />
               <XAxis dataKey="month" axisLine={true} tickLine={true} tick={{ fill: '#6B7280', fontSize: 11 }} />
               <YAxis axisLine={true} tickLine={true} tick={{ fill: '#6B7280', fontSize: 11 }} tickFormatter={(v) => `${v/1000}k`} width={55} />
-              <Tooltip formatter={(val: number) => formatCurrency(val)} contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 4px 20px rgba(0,0,0,0.08)' }} />
+              <Tooltip formatter={(val) => formatCurrency(Number(val ?? 0))} contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 4px 20px rgba(0,0,0,0.08)' }} />
               <Bar dataKey="totalIncome" name="Total Receipts" fill="#1a472a" radius={[4, 4, 0, 0]} maxBarSize={30} />
               <Bar dataKey="totalExpenses" name="Total Disbursements" fill="#D4AF37" radius={[4, 4, 0, 0]} maxBarSize={30} />
               <Line type="monotone" dataKey="netSurplus" name="Net Surplus/Deficit" stroke="#EF4444" strokeWidth={2} dot={{ r: 3 }} />

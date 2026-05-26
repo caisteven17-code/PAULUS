@@ -5,6 +5,14 @@ import { Calendar, ChevronDown, Check, User, Database, LogOut } from 'lucide-rea
 
 import { Role, Timeframe } from '../../App';
 
+const TIMEFRAME_LABELS: Record<Timeframe, string> = {
+  '6m': 'Past 6 Months',
+  '1y': 'Past 1 Year',
+  'all': 'All Time',
+};
+
+const YEAR_OPTIONS = [2026, 2025, 2024, 2023, 2022] as const;
+
 interface TopNavProps {
   onNavigate?: (page: string) => void;
   role?: Role;
@@ -16,11 +24,11 @@ interface TopNavProps {
   onLogout?: () => void;
 }
 
-export function TopNav({ 
-  onNavigate, 
-  role = 'bishop', 
-  currentPage = 'home', 
-  timeframe = '6m', 
+export function TopNav({
+  onNavigate,
+  role = 'bishop',
+  currentPage = 'home',
+  timeframe = '6m',
   onTimeframeChange,
   year = 2026,
   onYearChange,
@@ -30,12 +38,6 @@ export function TopNav({
   const [isYearOpen, setIsYearOpen] = useState(false);
   const [isAccountOpen, setIsAccountOpen] = useState(false);
 
-  const timeframeLabels: Record<Timeframe, string> = {
-    '6m': 'Past 6 Months',
-    '1y': 'Past 1 Year',
-    'all': 'All Time'
-  };
-
   const handleTimeframeSelect = (tf: Timeframe) => {
     onTimeframeChange?.(tf);
     setShowTimeframeDropdown(false);
@@ -43,7 +45,11 @@ export function TopNav({
 
   if (role === 'priest' || role === 'school' || role === 'seminary') {
     const entityLabel = role === 'school' ? 'School' : role === 'seminary' ? 'Seminary' : 'Parish';
-    const entityName = role === 'school' ? 'SAN PABLO DIOCESAN CATHOLIC SCHOOL' : role === 'seminary' ? 'ST. PETER\'S COLLEGE SEMINARY' : 'SAN ISIDRO LABRADOR PARISH';
+    const entityName = role === 'school'
+      ? 'SAN PABLO DIOCESAN CATHOLIC SCHOOL'
+      : role === 'seminary'
+        ? "ST. PETER'S COLLEGE SEMINARY"
+        : 'SAN ISIDRO LABRADOR PARISH';
     const metadata = role === 'school'
       ? ['Cluster 1', 'School Director: Rev. Fr. John Doe', 'Access: School']
       : role === 'seminary'
@@ -73,26 +79,26 @@ export function TopNav({
 
           <div className="flex items-center gap-2.5 lg:gap-3 shrink-0">
             <div className="relative hidden sm:block">
-              <button 
+              <button
                 onClick={() => setShowTimeframeDropdown(!showTimeframeDropdown)}
                 className="flex h-10 min-w-[176px] items-center justify-center gap-2 rounded-full border border-white/10 bg-white/5 px-4 text-sm font-black text-white hover:bg-white/10 transition-colors"
               >
                 <Calendar className="w-4 h-4 text-gold-400" />
-                <span className="hidden md:inline">{timeframeLabels[timeframe]}</span>
+                <span className="hidden md:inline">{TIMEFRAME_LABELS[timeframe]}</span>
                 <span className="md:hidden">{timeframe}</span>
                 <ChevronDown className={`w-4 h-4 text-white/35 transition-transform ${showTimeframeDropdown ? 'rotate-180' : ''}`} />
               </button>
 
               {showTimeframeDropdown && (
                 <div className="absolute right-0 mt-2 w-48 bg-white rounded-2xl shadow-xl border border-gray-100 py-2 z-[60] animate-in fade-in zoom-in duration-200">
-                  {(Object.keys(timeframeLabels) as Timeframe[]).map((tf) => (
+                  {(Object.keys(TIMEFRAME_LABELS) as Timeframe[]).map((tf) => (
                     <button
                       key={tf}
                       onClick={() => handleTimeframeSelect(tf)}
                       className="w-full px-4 py-2.5 text-left text-sm font-medium hover:bg-gray-50 flex items-center justify-between transition-colors"
                     >
                       <span className={timeframe === tf ? 'text-gold-600 font-bold' : 'text-gray-600'}>
-                        {timeframeLabels[tf]}
+                        {TIMEFRAME_LABELS[tf]}
                       </span>
                       {timeframe === tf && <Check className="w-4 h-4 text-gold-600" />}
                     </button>
@@ -112,7 +118,7 @@ export function TopNav({
 
               {isYearOpen && (
                 <div className="absolute right-0 mt-2 w-32 bg-white rounded-2xl shadow-xl border border-gray-100 py-2 z-[60] animate-in fade-in zoom-in duration-200">
-                  {[2026, 2025, 2024, 2023, 2022].map((y) => (
+                  {YEAR_OPTIONS.map((y) => (
                     <button
                       key={y}
                       onClick={() => {
@@ -198,25 +204,25 @@ export function TopNav({
           {/* Right Side: Actions */}
           <div className="flex items-center gap-4">
             <div className="relative">
-              <button 
+              <button
                 onClick={() => setShowTimeframeDropdown(!showTimeframeDropdown)}
                 className="flex items-center gap-2 bg-white/5 text-white px-4 py-2 rounded-xl text-xs font-bold hover:bg-white/10 transition-colors border border-white/10"
               >
                 <Calendar className="w-4 h-4 text-white/40" />
-                <span className="hidden sm:inline">{timeframeLabels[timeframe]}</span>
+                <span className="hidden sm:inline">{TIMEFRAME_LABELS[timeframe]}</span>
                 <ChevronDown className={`w-4 h-4 text-white/40 transition-transform ${showTimeframeDropdown ? 'rotate-180' : ''}`} />
               </button>
 
               {showTimeframeDropdown && (
                 <div className="absolute right-0 mt-2 w-48 bg-white rounded-2xl shadow-xl border border-gray-100 py-2 z-[60] animate-in fade-in zoom-in duration-200">
-                  {(Object.keys(timeframeLabels) as Timeframe[]).map((tf) => (
+                  {(Object.keys(TIMEFRAME_LABELS) as Timeframe[]).map((tf) => (
                     <button
                       key={tf}
                       onClick={() => handleTimeframeSelect(tf)}
                       className="w-full px-4 py-2.5 text-left text-sm font-medium hover:bg-gray-50 flex items-center justify-between transition-colors"
                     >
-                      <span className={timeframe === tf ? 'text-gold-600 font-bold' : 'text-church-green'}>
-                        {timeframeLabels[tf]}
+                      <span className={timeframe === tf ? 'text-gold-600 font-bold' : 'text-gray-700'}>
+                        {TIMEFRAME_LABELS[tf]}
                       </span>
                       {timeframe === tf && <Check className="w-4 h-4 text-gold-600" />}
                     </button>
@@ -235,20 +241,20 @@ export function TopNav({
               </button>
 
               {isYearOpen && (
-                <div className="absolute right-0 mt-2 w-32 bg-black/95 rounded-2xl shadow-xl border border-gold-500/30 py-2 z-[60] animate-in fade-in zoom-in duration-200">
-                  {[2026, 2025, 2024, 2023, 2022].map((y) => (
+                <div className="absolute right-0 mt-2 w-32 bg-white rounded-2xl shadow-xl border border-gray-100 py-2 z-[60] animate-in fade-in zoom-in duration-200">
+                  {YEAR_OPTIONS.map((y) => (
                     <button
                       key={y}
                       onClick={() => {
                         onYearChange?.(y);
                         setIsYearOpen(false);
                       }}
-                      className="w-full px-4 py-2.5 text-left text-xs font-bold hover:bg-white/5 flex items-center justify-between transition-colors text-white"
+                      className="w-full px-4 py-2.5 text-left text-sm font-medium hover:bg-gray-50 flex items-center justify-between transition-colors"
                     >
-                      <span className={year === y ? 'text-gold-500' : 'text-gray-300'}>
+                      <span className={year === y ? 'text-gold-600 font-bold' : 'text-gray-700'}>
                         {y}
                       </span>
-                      {year === y && <Check className="w-4 h-4 text-gold-500" />}
+                      {year === y && <Check className="w-4 h-4 text-gold-600" />}
                     </button>
                   ))}
                 </div>

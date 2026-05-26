@@ -220,11 +220,11 @@ export const GeospatialHeatMap = React.memo(function GeospatialHeatMapComponent(
         try {
           const sourceData = (data && data.length > 0) ? data : parishesData;
           // 1. Create points for parishes
-          const fallbackParishes = sourceData.filter(p => p.lat === 14.1686 && p.lng === 121.3253);
+          const fallbackParishes = sourceData.filter((p: any) => p.lat === 14.1686 && p.lng === 121.3253);
           const fallbackCount = fallbackParishes.length;
           let fallbackIndex = 0;
 
-          const points = sourceData.map((p) => {
+          const points = sourceData.map((p: any) => {
             // Add small offset for overlapping points (like the fallback coordinates)
             const isFallback = p.lat === 14.1686 && p.lng === 121.3253;
             let offsetLat = 0;
@@ -568,7 +568,7 @@ export const GeospatialHeatMap = React.memo(function GeospatialHeatMapComponent(
         
         if (isFallback) {
           // Recalculate the offset angle for this specific fallback point
-          const fallbackParishes = sourceData.filter(p => p.lat === 14.1686 && p.lng === 121.3253);
+          const fallbackParishes = sourceData.filter((p: any) => p.lat === 14.1686 && p.lng === 121.3253);
           const fallbackCount = fallbackParishes.length;
           // Find the index of this parish among the fallback parishes
           const fallbackIndex = fallbackParishes.findIndex(p => p.name === id);
@@ -779,9 +779,9 @@ export const GeospatialHeatMap = React.memo(function GeospatialHeatMapComponent(
                   </span>
                 </div>
                 
-                {viewMode === 'parish' && item.vicariate && (
+                {'vicariate' in item && viewMode === 'parish' && item.vicariate && (
                   <p className="text-[10px] text-gray-400 font-bold uppercase tracking-wider mb-2 truncate">
-                    {(item.vicariate || '').replace('Vicariate of ', '')}
+                    {(item.vicariate as string).replace('Vicariate of ', '')}
                   </p>
                 )}
                 

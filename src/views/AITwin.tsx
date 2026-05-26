@@ -840,7 +840,7 @@ function ParishAITwin({ mode = 'parish' }: { mode?: FinancialAITwinMode }) {
                   <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#E5E7EB" />
                   <XAxis dataKey="month" tick={{ fontSize: 10, fontWeight: 600, fill: '#9CA3AF' }} dy={10} />
                   <YAxis tick={{ fontSize: 10, fontWeight: 600, fill: '#9CA3AF' }} tickFormatter={(value) => `P${Math.round(value / 1000)}k`} />
-                  <Tooltip formatter={(value: number) => [formatCurrency(value), '']} />
+                  <Tooltip formatter={(value) => [formatCurrency(Number(value ?? 0)), '']} />
                   <Area type="monotone" dataKey="baseline" stroke="#9CA3AF" strokeWidth={2} strokeDasharray="5 5" fill="transparent" />
                   <Area type="monotone" dataKey="simulated" stroke="#D4AF37" strokeWidth={4} fillOpacity={1} fill="url(#parishTwinGradient)" />
                 </AreaChart>

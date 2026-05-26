@@ -2,19 +2,14 @@
 
 import React, { useEffect, useState } from 'react';
 import {
-  AlertTriangle,
   ArrowRight,
   Building2,
   Database,
-  FileUp,
   Landmark,
   Play,
-  Save,
   School,
   ShieldCheck,
   Sparkles,
-  Upload,
-  Wallet
 } from 'lucide-react';
 import { ALL_PARISHES, INITIAL_SEMINARIES, INITIAL_SCHOOLS } from '../constants';
 
@@ -29,29 +24,16 @@ interface InstitutionProfile {
   risk: 'Low' | 'Moderate' | 'High';
   currentBalance: number;
   monthlyCollections: number;
-  monthlyDisbursements: number;
-  monthlyRemittances: number;
-  monthlyExpenses: number;
-  budgetAllocation: number;
   trend: string;
   insight: string;
 }
 
-interface SandboxState {
-  projectedCollections: number;
-  projectedDisbursements: number;
-  projectedRemittances: number;
-  projectedExpenses: number;
-  projectedBudgetAllocation: number;
-}
-
-interface SavedSandbox {
+/** A saved quick-launch — just records which institution was pinned, no financial state. */
+interface SavedSession {
   id: string;
   name: string;
   institutionType: InstitutionType;
   institutionId: string;
-  state: SandboxState;
-  uploadedFileName?: string;
   savedAt: number;
 }
 
@@ -64,7 +46,7 @@ interface DigitalTwinProps {
   }) => void;
 }
 
-const STORAGE_KEY = 'admin_digital_twin_instances';
+const STORAGE_KEY = 'admin_digital_twin_sessions';
 
 const institutionTypeMeta: Record<
   InstitutionType,
@@ -117,10 +99,6 @@ const institutionProfiles: InstitutionProfile[] = [
     risk: 'Low',
     currentBalance: 1860000,
     monthlyCollections: 548000,
-    monthlyDisbursements: 164000,
-    monthlyRemittances: 72000,
-    monthlyExpenses: 231000,
-    budgetAllocation: 495000,
     trend: '+8.4%',
     insight: 'Consistent collection growth and disciplined parish operating expenses.'
   },
@@ -133,10 +111,6 @@ const institutionProfiles: InstitutionProfile[] = [
     risk: 'High',
     currentBalance: 690000,
     monthlyCollections: 284000,
-    monthlyDisbursements: 109000,
-    monthlyRemittances: 46000,
-    monthlyExpenses: 171000,
-    budgetAllocation: 318000,
     trend: '-3.2%',
     insight: 'Tight reserves and weak net surplus make this parish sensitive to shocks.'
   },
@@ -149,10 +123,6 @@ const institutionProfiles: InstitutionProfile[] = [
     risk: 'Moderate',
     currentBalance: 1290000,
     monthlyCollections: 431000,
-    monthlyDisbursements: 152000,
-    monthlyRemittances: 61000,
-    monthlyExpenses: 189000,
-    budgetAllocation: 402000,
     trend: '+4.9%',
     insight: 'Healthy balance position, but discretionary spending is rising faster than inflows.'
   },
@@ -165,10 +135,6 @@ const institutionProfiles: InstitutionProfile[] = [
     risk: 'Moderate',
     currentBalance: 4920000,
     monthlyCollections: 1230000,
-    monthlyDisbursements: 382000,
-    monthlyRemittances: 118000,
-    monthlyExpenses: 641000,
-    budgetAllocation: 1100000,
     trend: '+6.1%',
     insight: 'Stable cash position supported by subsidy continuity and predictable donor base.'
   },
@@ -181,10 +147,6 @@ const institutionProfiles: InstitutionProfile[] = [
     risk: 'Moderate',
     currentBalance: 2810000,
     monthlyCollections: 918000,
-    monthlyDisbursements: 331000,
-    monthlyRemittances: 92000,
-    monthlyExpenses: 566000,
-    budgetAllocation: 835000,
     trend: '+1.8%',
     insight: 'Operating margin remains positive, but support dependence is increasing.'
   },
@@ -197,10 +159,6 @@ const institutionProfiles: InstitutionProfile[] = [
     risk: 'Low',
     currentBalance: 6480000,
     monthlyCollections: 1840000,
-    monthlyDisbursements: 624000,
-    monthlyRemittances: 145000,
-    monthlyExpenses: 781000,
-    budgetAllocation: 1550000,
     trend: '+9.7%',
     insight: 'Strong tuition performance and reserve growth provide good simulation headroom.'
   },
@@ -213,10 +171,6 @@ const institutionProfiles: InstitutionProfile[] = [
     risk: 'Moderate',
     currentBalance: 2140000,
     monthlyCollections: 921000,
-    monthlyDisbursements: 309000,
-    monthlyRemittances: 88000,
-    monthlyExpenses: 487000,
-    budgetAllocation: 876000,
     trend: '-1.1%',
     insight: 'Enrollment-sensitive collections create pressure on school operating flexibility.'
   }
@@ -228,14 +182,6 @@ const formatCurrency = (value: number) =>
     currency: 'PHP',
     maximumFractionDigits: 0
   }).format(value);
-
-const getDefaultSandboxState = (institution?: InstitutionProfile): SandboxState => ({
-  projectedCollections: institution?.monthlyCollections ?? 0,
-  projectedDisbursements: institution?.monthlyDisbursements ?? 0,
-  projectedRemittances: institution?.monthlyRemittances ?? 0,
-  projectedExpenses: institution?.monthlyExpenses ?? 0,
-  projectedBudgetAllocation: institution?.budgetAllocation ?? 0
-});
 
 const getRiskTone = (risk: string) => {
   if (risk === 'High') return 'text-rose-700 bg-rose-50 border-rose-200';
@@ -256,17 +202,12 @@ const getInstitutionClass = (institution: InstitutionProfile) => {
 export function DigitalTwin({ onLaunch }: DigitalTwinProps) {
   const [institutionType, setInstitutionType] = useState<InstitutionType>('parish');
   const [selectedInstitutionId, setSelectedInstitutionId] = useState('');
-  const [launchedInstitutionId, setLaunchedInstitutionId] = useState('');
-  const [sandboxState, setSandboxState] = useState<SandboxState>(getDefaultSandboxState());
-  const [uploadedFileName, setUploadedFileName] = useState('');
-  const [savedSandboxes, setSavedSandboxes] = useState<SavedSandbox[]>([]);
+  const [savedSessions, setSavedSessions] = useState<SavedSession[]>([]);
   const [isLaunching, setIsLaunching] = useState(false);
 
   const filteredInstitutions = institutionProfiles.filter((item) => item.type === institutionType);
   const selectedInstitution =
     filteredInstitutions.find((item) => item.id === selectedInstitutionId) ?? filteredInstitutions[0];
-  const activeInstitution =
-    institutionProfiles.find((item) => item.id === launchedInstitutionId) ?? null;
   const activeMeta = institutionTypeMeta[institutionType];
 
   useEffect(() => {
@@ -276,114 +217,76 @@ export function DigitalTwin({ onLaunch }: DigitalTwinProps) {
   }, [filteredInstitutions, selectedInstitutionId]);
 
   useEffect(() => {
-    if (selectedInstitution) {
-      setSandboxState(getDefaultSandboxState(selectedInstitution));
-      setUploadedFileName('');
-      setLaunchedInstitutionId('');
-    }
-  }, [institutionType, selectedInstitutionId]);
-
-  useEffect(() => {
     if (typeof window === 'undefined') return;
     const saved = window.localStorage.getItem(STORAGE_KEY);
     if (!saved) return;
-
     try {
-      setSavedSandboxes(JSON.parse(saved));
+      setSavedSessions(JSON.parse(saved));
     } catch {
-      setSavedSandboxes([]);
+      setSavedSessions([]);
     }
   }, []);
-
-  const baselineNet = activeInstitution
-    ? activeInstitution.monthlyCollections -
-      activeInstitution.monthlyDisbursements -
-      activeInstitution.monthlyRemittances -
-      activeInstitution.monthlyExpenses
-    : 0;
-
-  const simulatedNet =
-    sandboxState.projectedCollections -
-    sandboxState.projectedDisbursements -
-    sandboxState.projectedRemittances -
-    sandboxState.projectedExpenses;
-
-  const balanceDelta =
-    simulatedNet -
-    baselineNet +
-    (sandboxState.projectedBudgetAllocation - (activeInstitution?.budgetAllocation ?? 0)) * 0.15;
-
-  const simulatedHealth = activeInstitution
-    ? Math.max(20, Math.min(98, Math.round(activeInstitution.healthScore + balanceDelta / 45000)))
-    : 0;
-
-  const simulatedRisk: 'Low' | 'Moderate' | 'High' =
-    simulatedNet < 0 || simulatedHealth < 60 ? 'High' : simulatedHealth < 75 ? 'Moderate' : 'Low';
-
-  const persistSandboxes = (items: SavedSandbox[]) => {
-    setSavedSandboxes(items);
-    if (typeof window !== 'undefined') {
-      window.localStorage.setItem(STORAGE_KEY, JSON.stringify(items));
-    }
-  };
 
   const handleLaunch = () => {
     if (!selectedInstitution) return;
     const entityClass = getInstitutionClass(selectedInstitution);
     const viewRole = selectedInstitution.type === 'parish' ? 'priest' : selectedInstitution.type;
-    setLaunchedInstitutionId(selectedInstitution.id);
     setIsLaunching(true);
 
-    window.setTimeout(() => {
-      onLaunch({
-        entityClass,
-        entityName: selectedInstitution.name,
-        entityType: selectedInstitution.type,
-        viewRole
-      });
+    // Pin this institution to quick-launch list
+    if (typeof window !== 'undefined') {
+      const prev = window.localStorage.getItem(STORAGE_KEY);
+      const list: SavedSession[] = prev ? JSON.parse(prev) : [];
+      const alreadySaved = list.find((s) => s.institutionId === selectedInstitution.id);
+      if (!alreadySaved) {
+        const nextList = [
+          {
+            id: `${selectedInstitution.id}-${Date.now()}`,
+            name: selectedInstitution.name,
+            institutionType: selectedInstitution.type,
+            institutionId: selectedInstitution.id,
+            savedAt: Date.now(),
+          },
+          ...list,
+        ].slice(0, 8);
+        window.localStorage.setItem(STORAGE_KEY, JSON.stringify(nextList));
+        setSavedSessions(nextList);
+      }
+    }
+
+    setTimeout(() => {
+      onLaunch({ entityClass, entityName: selectedInstitution.name, entityType: selectedInstitution.type, viewRole });
       setIsLaunching(false);
     }, 1200);
   };
 
-  const handleReset = () => {
-    if (!activeInstitution) return;
-    setSandboxState(getDefaultSandboxState(activeInstitution));
-    setUploadedFileName('');
+  const handleQuickLaunch = (item: SavedSession) => {
+    const inst = institutionProfiles.find((p) => p.id === item.institutionId);
+    if (!inst) return;
+    const entityClass = getInstitutionClass(inst);
+    const viewRole = inst.type === 'parish' ? 'priest' : inst.type;
+    setInstitutionType(inst.type);
+    setSelectedInstitutionId(inst.id);
+    setIsLaunching(true);
+    setTimeout(() => {
+      onLaunch({ entityClass, entityName: inst.name, entityType: inst.type, viewRole });
+      setIsLaunching(false);
+    }, 1200);
   };
 
-  const handleSaveSandbox = () => {
-    if (!activeInstitution) return;
-
-    const nextItem: SavedSandbox = {
-      id: `${activeInstitution.id}-${Date.now()}`,
-      name: `${activeInstitution.name} Sandbox ${new Date().toLocaleDateString('en-US')}`,
-      institutionType: activeInstitution.type,
-      institutionId: activeInstitution.id,
-      state: sandboxState,
-      uploadedFileName: uploadedFileName || undefined,
-      savedAt: Date.now()
-    };
-
-    persistSandboxes([nextItem, ...savedSandboxes].slice(0, 8));
+  const handleRemoveSession = (id: string) => {
+    const updated = savedSessions.filter((s) => s.id !== id);
+    setSavedSessions(updated);
+    if (typeof window !== 'undefined') {
+      window.localStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
+    }
   };
-
-  const handleLoadSandbox = (item: SavedSandbox) => {
-    setInstitutionType(item.institutionType);
-    setSelectedInstitutionId(item.institutionId);
-    setLaunchedInstitutionId(item.institutionId);
-    setSandboxState(item.state);
-    setUploadedFileName(item.uploadedFileName ?? '');
-  };
-
-  const advisoryMessage = !activeInstitution
-    ? 'Select and launch an institution to enter its real dashboard interface.'
-    : simulatedNet >= baselineNet
-      ? 'The sandbox scenario improves the institution’s net monthly position if those assumptions hold.'
-      : 'The sandbox scenario weakens resilience. Review disbursements, remittances, expenses, or budget allocation before acting.';
 
   return (
     <div className="min-h-[calc(100vh-80px)] bg-[#f7f3ec]">
       <div className="mx-auto max-w-[1600px] px-4 py-6 md:px-8 md:py-8 space-y-8">
+
+        {/* ── Hero Banner ─────────────────────────────────────────────────── */}
         <section className="overflow-hidden rounded-[36px] border border-black/5 bg-gradient-to-br from-[#1f1f1f] via-[#2c2c2c] to-[#111111] text-white shadow-2xl">
           <div className="grid gap-8 px-6 py-8 md:grid-cols-[minmax(0,1.3fr)_minmax(320px,0.8fr)] md:px-10 md:py-10">
             <div className="space-y-5">
@@ -398,7 +301,6 @@ export function DigitalTwin({ onLaunch }: DigitalTwinProps) {
                 Select a parish, seminary, or school, then launch its actual dashboard interface inside a protected bishop-only simulation workspace.
               </p>
             </div>
-
             <div className="rounded-[32px] border border-[#d8b56a]/25 bg-white/95 p-6 text-gray-900 shadow-xl">
               <div className="flex items-start gap-3">
                 <div className="rounded-2xl bg-amber-100 p-3 text-amber-700">
@@ -415,42 +317,47 @@ export function DigitalTwin({ onLaunch }: DigitalTwinProps) {
           </div>
         </section>
 
-        <section className="grid gap-8 xl:grid-cols-[440px_minmax(0,1fr)]">
-          <div className="space-y-6">
+        {/* ── Three-Column Grid ────────────────────────────────────────────── */}
+        <section className="grid gap-6 xl:grid-cols-[280px_minmax(0,1fr)_320px]">
+
+          {/* ── LEFT: Setup ─────────────────────────────────────────────── */}
+          <div className="space-y-5">
             <div className="rounded-[32px] border border-black/5 bg-white p-6 shadow-sm">
-              <div className="flex items-center gap-3">
+              <div className="flex items-center gap-3 mb-6">
                 <div className="rounded-2xl bg-[#efe3c2] p-3 text-[#8f6513]">
                   <Database className="h-5 w-5" />
                 </div>
                 <div>
-                  <h2 className="text-lg font-black text-gray-900">Simulation Setup</h2>
-                  <p className="text-sm text-gray-500">Select type, choose institution, then launch the actual dashboard view.</p>
+                  <h2 className="text-base font-black text-gray-900">Simulation Setup</h2>
+                  <p className="text-xs text-gray-500">Select type, then launch.</p>
                 </div>
               </div>
 
-              <div className="mt-6 space-y-6">
-                <div className="space-y-3">
+              <div className="space-y-5">
+                {/* Institution type picker */}
+                <div className="space-y-2">
                   <label className="text-[11px] font-black uppercase tracking-[0.24em] text-gray-500">Institution Type</label>
-                  <div className="grid gap-3 sm:grid-cols-3 xl:grid-cols-1">
+                  <div className="space-y-2">
                     {(Object.keys(institutionTypeMeta) as InstitutionType[]).map((type) => {
                       const meta = institutionTypeMeta[type];
                       const Icon = meta.icon;
                       const isActive = institutionType === type;
-
                       return (
                         <button
                           key={type}
                           onClick={() => setInstitutionType(type)}
-                          className={`flex items-center gap-3 rounded-[22px] border px-4 py-4 text-left transition-all ${
+                          className={`flex w-full items-center gap-3 rounded-[18px] border px-4 py-3 text-left transition-all ${
                             isActive ? `${meta.accentSoft} ${meta.border} shadow-sm` : 'border-gray-200 bg-white hover:border-gray-300'
                           }`}
                         >
-                          <div className={`rounded-2xl p-3 ${isActive ? meta.accentSoft : 'bg-gray-100'} ${meta.accent}`}>
-                            <Icon className="h-5 w-5" />
+                          <div className={`rounded-xl p-2 ${isActive ? meta.accentSoft : 'bg-gray-100'} ${meta.accent}`}>
+                            <Icon className="h-4 w-4" />
                           </div>
                           <div>
                             <p className="text-sm font-black text-gray-900">{meta.label}</p>
-                            <p className="text-xs text-gray-500">{institutionProfiles.filter((item) => item.type === type).length} listed</p>
+                            <p className="text-xs text-gray-500">
+                              {institutionProfiles.filter((i) => i.type === type).length} listed
+                            </p>
                           </div>
                         </button>
                       );
@@ -458,247 +365,90 @@ export function DigitalTwin({ onLaunch }: DigitalTwinProps) {
                   </div>
                 </div>
 
-                <div className="space-y-3">
-                  <label className="text-[11px] font-black uppercase tracking-[0.24em] text-gray-500">{activeMeta.plural} List</label>
+                {/* Institution dropdown */}
+                <div className="space-y-2">
+                  <label className="text-[11px] font-black uppercase tracking-[0.24em] text-gray-500">
+                    {activeMeta.plural}
+                  </label>
                   <select
                     value={selectedInstitutionId}
-                    onChange={(event) => setSelectedInstitutionId(event.target.value)}
-                    className="w-full rounded-[22px] border border-gray-200 bg-[#faf8f4] px-4 py-4 text-sm font-semibold text-gray-900 outline-none transition focus:border-[#d4af37]"
+                    onChange={(e) => setSelectedInstitutionId(e.target.value)}
+                    className="w-full rounded-[18px] border border-gray-200 bg-[#faf8f4] px-4 py-3 text-sm font-semibold text-gray-900 outline-none transition focus:border-[#d4af37]"
                   >
-                    {filteredInstitutions.map((institution) => (
-                      <option key={institution.id} value={institution.id}>
-                        {institution.name}
-                      </option>
+                    {filteredInstitutions.map((inst) => (
+                      <option key={inst.id} value={inst.id}>{inst.name}</option>
                     ))}
                   </select>
                 </div>
 
-                {selectedInstitution && (
-                  <div className="rounded-[26px] border border-dashed border-gray-300 bg-[#faf8f4] p-5">
-                    <div className="flex items-start justify-between gap-4">
-                      <div>
-                        <p className="text-[10px] font-black uppercase tracking-[0.25em] text-gray-500">Selected Institution</p>
-                        <h3 className="mt-2 text-lg font-black text-gray-900">{selectedInstitution.name}</h3>
-                        <p className="mt-1 text-sm text-gray-500">{selectedInstitution.location}</p>
-                      </div>
-                      <div className={`rounded-full border px-3 py-1 text-xs font-black ${getRiskTone(selectedInstitution.risk)}`}>
-                        {selectedInstitution.risk} Risk
-                      </div>
-                    </div>
-                    <p className="mt-4 text-sm leading-6 text-gray-600">{selectedInstitution.insight}</p>
-                  </div>
-                )}
-
+                {/* Launch button */}
                 <button
                   onClick={handleLaunch}
-                  disabled={!selectedInstitution}
-                  className="flex w-full items-center justify-center gap-3 rounded-[22px] bg-[#111111] px-4 py-4 text-sm font-black text-white transition hover:bg-[#282828] disabled:cursor-not-allowed disabled:opacity-60"
+                  disabled={!selectedInstitution || isLaunching}
+                  className="flex w-full items-center justify-center gap-3 rounded-[18px] bg-[#111111] px-4 py-4 text-sm font-black text-white transition hover:bg-[#282828] disabled:cursor-not-allowed disabled:opacity-60"
                 >
                   <Play className="h-4 w-4 fill-current" />
-                  {activeMeta.launchLabel}
+                  {isLaunching ? 'Launching…' : activeMeta.launchLabel}
                 </button>
               </div>
             </div>
-
-            {activeInstitution && (
-              <div className="rounded-[32px] border border-black/5 bg-white p-6 shadow-sm">
-                <div className="flex items-center justify-between gap-4">
-                  <div>
-                    <h2 className="text-lg font-black text-gray-900">Simulation Controls</h2>
-                    <p className="text-sm text-gray-500">Sandbox inputs beside the real dashboard.</p>
-                  </div>
-                  <div className="flex gap-3">
-                    <button
-                      onClick={handleReset}
-                      className="rounded-[18px] border border-gray-200 px-4 py-2 text-xs font-black text-gray-700 transition hover:bg-gray-50"
-                    >
-                      Reset
-                    </button>
-                    <button
-                      onClick={handleSaveSandbox}
-                      className="inline-flex items-center gap-2 rounded-[18px] bg-[#111111] px-4 py-2 text-xs font-black text-white transition hover:bg-[#282828]"
-                    >
-                      <Save className="h-3.5 w-3.5" />
-                      Save Instance
-                    </button>
-                  </div>
-                </div>
-
-                <div className="mt-6 grid gap-4 md:grid-cols-2">
-                  {[
-                    ['projectedCollections', 'Projected Collections'],
-                    ['projectedDisbursements', 'Projected Disbursements'],
-                    ['projectedRemittances', 'Projected Remittances'],
-                    ['projectedExpenses', 'Projected Expenses'],
-                    ['projectedBudgetAllocation', 'Budget Allocation']
-                  ].map(([key, label]) => (
-                    <label key={key} className="space-y-2">
-                      <span className="text-[11px] font-black uppercase tracking-[0.22em] text-gray-500">{label}</span>
-                      <input
-                        type="number"
-                        min="0"
-                        value={sandboxState[key as keyof SandboxState]}
-                        onChange={(event) =>
-                          setSandboxState((current) => ({
-                            ...current,
-                            [key]: Number(event.target.value || 0)
-                          }))
-                        }
-                        className="w-full rounded-[20px] border border-gray-200 bg-[#faf8f4] px-4 py-3 text-sm font-semibold text-gray-900 outline-none transition focus:border-[#d4af37]"
-                      />
-                    </label>
-                  ))}
-                </div>
-
-                <div className="mt-6 rounded-[24px] border border-dashed border-gray-300 bg-[#faf8f4] p-5">
-                  <div className="flex items-start gap-3">
-                    <div className="rounded-2xl bg-white p-3 text-gray-700 shadow-sm">
-                      <FileUp className="h-5 w-5" />
-                    </div>
-                    <div className="min-w-0 flex-1">
-                      <p className="text-sm font-black text-gray-900">Temporary Financial Report Upload</p>
-                      <p className="mt-1 text-sm leading-6 text-gray-500">
-                        Upload a report to preview its effect inside the sandbox only.
-                      </p>
-                      <label className="mt-4 inline-flex cursor-pointer items-center gap-2 rounded-[18px] border border-gray-200 bg-white px-4 py-2 text-xs font-black text-gray-700 transition hover:border-[#d4af37]">
-                        <Upload className="h-3.5 w-3.5" />
-                        Choose File
-                        <input
-                          type="file"
-                          className="hidden"
-                          onChange={(event) => {
-                            const file = event.target.files?.[0];
-                            setUploadedFileName(file?.name ?? '');
-                          }}
-                        />
-                      </label>
-                      <p className="mt-3 text-sm font-semibold text-gray-600">
-                        {uploadedFileName ? `${uploadedFileName} loaded into sandbox preview.` : 'No temporary file attached.'}
-                      </p>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            )}
-
-            <div className="rounded-[32px] border border-black/5 bg-white p-6 shadow-sm">
-              <div className="flex items-center justify-between gap-4">
-                <div>
-                  <h2 className="text-lg font-black text-gray-900">Saved Instances</h2>
-                  <p className="text-sm text-gray-500">Retrieve previous sandbox runs for comparison.</p>
-                </div>
-                <span className="rounded-full bg-gray-100 px-3 py-1 text-xs font-black text-gray-600">{savedSandboxes.length}</span>
-              </div>
-
-              <div className="mt-5 space-y-3">
-                {savedSandboxes.length > 0 ? (
-                  savedSandboxes.map((item) => (
-                    <button
-                      key={item.id}
-                      onClick={() => handleLoadSandbox(item)}
-                      className="w-full rounded-[22px] border border-gray-200 bg-[#faf8f4] p-4 text-left transition hover:border-[#d4af37]"
-                    >
-                      <div className="flex items-start justify-between gap-4">
-                        <div>
-                          <p className="text-sm font-black text-gray-900">{item.name}</p>
-                          <p className="mt-1 text-xs font-semibold uppercase tracking-[0.2em] text-gray-500">
-                            {institutionTypeMeta[item.institutionType].label} Instance
-                          </p>
-                        </div>
-                        <ArrowRight className="h-4 w-4 text-gray-400" />
-                      </div>
-                      <p className="mt-3 text-xs text-gray-500">
-                        {new Date(item.savedAt).toLocaleString('en-US')}
-                        {item.uploadedFileName ? ` • ${item.uploadedFileName}` : ''}
-                      </p>
-                    </button>
-                  ))
-                ) : (
-                  <div className="rounded-[22px] border border-dashed border-gray-300 bg-[#faf8f4] px-4 py-8 text-center">
-                    <p className="text-sm font-semibold text-gray-500">No saved sandbox instance yet.</p>
-                  </div>
-                )}
-              </div>
-            </div>
-
-            {activeInstitution && (
-              <div className="rounded-[32px] border border-black/5 bg-white p-6 shadow-sm">
-                <div className="flex items-center gap-3">
-                  <div className="rounded-2xl bg-emerald-50 p-3 text-emerald-700">
-                    <Wallet className="h-5 w-5" />
-                  </div>
-                  <div>
-                    <h3 className="text-lg font-black text-gray-900">Sandbox Notes</h3>
-                    <p className="text-sm text-gray-500">Extra simulation context while using the real dashboard.</p>
-                  </div>
-                </div>
-
-                <div className="mt-5 space-y-4">
-                  <div className="rounded-[22px] bg-[#faf8f4] p-4">
-                    <p className="text-[10px] font-black uppercase tracking-[0.22em] text-gray-500">Baseline Net</p>
-                    <p className="mt-2 text-2xl font-black text-gray-900">{formatCurrency(baselineNet)}</p>
-                  </div>
-                  <div className="rounded-[22px] bg-[#faf8f4] p-4">
-                    <p className="text-[10px] font-black uppercase tracking-[0.22em] text-gray-500">Scenario Net</p>
-                    <p className={`mt-2 text-2xl font-black ${simulatedNet >= 0 ? 'text-emerald-700' : 'text-rose-700'}`}>
-                      {formatCurrency(simulatedNet)}
-                    </p>
-                  </div>
-                  <div className="rounded-[22px] bg-[#faf8f4] p-4">
-                    <p className="text-[10px] font-black uppercase tracking-[0.22em] text-gray-500">Health Shift</p>
-                    <p className="mt-2 text-2xl font-black text-gray-900">{activeInstitution.healthScore} to {simulatedHealth}</p>
-                  </div>
-                  <div className="rounded-[22px] border border-amber-200 bg-amber-50 p-4">
-                    <div className="flex items-start gap-3">
-                      <AlertTriangle className="mt-0.5 h-4 w-4 text-amber-700" />
-                      <p className="text-sm font-semibold leading-6 text-amber-900">{advisoryMessage}</p>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            )}
           </div>
 
+          {/* ── MIDDLE: Institution Profile + Controls ───────────────────── */}
           <div className="space-y-6">
             {isLaunching ? (
               <div className="rounded-[32px] border border-black/5 bg-white px-6 py-28 text-center shadow-sm">
                 <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-[#faf8f4]">
                   <div className="h-8 w-8 animate-spin rounded-full border-4 border-[#d4af37]/30 border-t-[#d4af37]" />
                 </div>
-                <p className="mt-6 text-xl font-black text-gray-900">Opening {selectedInstitution?.name} dashboard...</p>
+                <p className="mt-6 text-xl font-black text-gray-900">Opening {selectedInstitution?.name} dashboard…</p>
                 <p className="mt-2 text-sm text-gray-500">
                   Loading the full {activeMeta.label.toLowerCase()} view inside Digital Twin.
                 </p>
               </div>
-            ) : activeInstitution ? (
-              <div className="rounded-[32px] border border-black/5 bg-white p-3 shadow-sm md:p-4">
-                <div className="flex flex-col gap-3 px-3 py-3 md:flex-row md:items-center md:justify-between md:px-4">
-                  <div>
-                    <div className={`inline-flex items-center gap-2 rounded-full px-3 py-1 text-[10px] font-black uppercase tracking-[0.24em] ${institutionTypeMeta[activeInstitution.type].accentSoft} ${institutionTypeMeta[activeInstitution.type].accent}`}>
-                      <Play className="h-3.5 w-3.5 fill-current" />
-                      Actual Dashboard Interface
+            ) : selectedInstitution ? (
+              <>
+                {/* Institution Profile */}
+                <div className="rounded-[32px] border border-black/5 bg-white p-6 shadow-sm">
+                  <div className="flex items-start justify-between gap-4">
+                    <div>
+                      <p className="text-[10px] font-black uppercase tracking-[0.25em] text-gray-500">Selected Institution</p>
+                      <h3 className="mt-2 text-2xl font-black text-gray-900">{selectedInstitution.name}</h3>
+                      <p className="mt-1 text-sm text-gray-500">{selectedInstitution.location}</p>
                     </div>
-                    <h3 className="mt-3 text-xl font-black text-gray-900">
-                      {activeInstitution.name}
-                    </h3>
-                    <p className="mt-1 text-sm text-gray-500">
-                      Launch will switch to the selected institution&apos;s full dashboard view.
-                    </p>
+                    <div className={`shrink-0 rounded-full border px-3 py-1.5 text-xs font-black ${getRiskTone(selectedInstitution.risk)}`}>
+                      {selectedInstitution.risk} Risk
+                    </div>
                   </div>
-                  <div className={`rounded-[18px] border px-4 py-3 text-sm font-black ${getRiskTone(simulatedRisk)}`}>
-                    Simulated Risk: {simulatedRisk}
+                  <p className="mt-4 text-sm leading-6 text-gray-600">{selectedInstitution.insight}</p>
+
+                  {/* Quick stats */}
+                  <div className="mt-5 grid grid-cols-3 gap-3">
+                    <div className="rounded-[18px] bg-[#faf8f4] p-3 text-center">
+                      <p className="text-[10px] font-black uppercase tracking-[0.2em] text-gray-400">Health</p>
+                      <p className="mt-1 text-xl font-black text-gray-900">{selectedInstitution.healthScore}</p>
+                    </div>
+                    <div className="rounded-[18px] bg-[#faf8f4] p-3 text-center">
+                      <p className="text-[10px] font-black uppercase tracking-[0.2em] text-gray-400">Collections</p>
+                      <p className="mt-1 text-sm font-black text-gray-900">{formatCurrency(selectedInstitution.monthlyCollections)}</p>
+                    </div>
+                    <div className="rounded-[18px] bg-[#faf8f4] p-3 text-center">
+                      <p className="text-[10px] font-black uppercase tracking-[0.2em] text-gray-400">Trend</p>
+                      <p className={`mt-1 text-sm font-black ${selectedInstitution.trend.startsWith('+') ? 'text-emerald-700' : 'text-rose-700'}`}>
+                        {selectedInstitution.trend}
+                      </p>
+                    </div>
                   </div>
                 </div>
 
-                <div className="flex min-h-[520px] items-center justify-center rounded-[28px] border border-dashed border-gray-300 bg-[#fcfbf8] px-6 py-16 text-center">
-                  <div className="max-w-xl">
-                    <p className="text-lg font-black text-gray-900">Ready to launch full dashboard view</p>
-                    <p className="mt-2 text-sm leading-6 text-gray-500">
-                      Click the launch button on the left to leave this setup screen and enter the full {institutionTypeMeta[activeInstitution.type].label.toLowerCase()} dashboard.
-                    </p>
-                  </div>
+                {/* Launch hint */}
+                <div className="rounded-[32px] border border-dashed border-gray-200 bg-white px-6 py-8 text-center shadow-sm">
+                  <p className="text-sm font-black text-gray-700">Ready to launch</p>
+                  <p className="mt-1 text-xs leading-5 text-gray-400">
+                    Click <strong>Launch</strong> on the left to open this institution's exact dashboard — the same interface the institution sees. Use the year/period selectors at the top to navigate across time.
+                  </p>
                 </div>
-              </div>
+              </>
             ) : (
               <div className="rounded-[32px] border border-dashed border-gray-300 bg-white px-6 py-20 text-center shadow-sm">
                 <p className="text-lg font-black text-gray-900">Launch an institution to open its actual dashboard interface.</p>
@@ -706,6 +456,65 @@ export function DigitalTwin({ onLaunch }: DigitalTwinProps) {
               </div>
             )}
           </div>
+
+          {/* ── RIGHT: Recent Launches ───────────────────────────────────── */}
+          <div className="space-y-6">
+            <div className="rounded-[32px] border border-black/5 bg-white p-6 shadow-sm">
+              <div className="flex items-center justify-between gap-4 mb-5">
+                <div>
+                  <h2 className="text-base font-black text-gray-900">Recent Launches</h2>
+                  <p className="text-xs text-gray-500">Jump back into a previous session.</p>
+                </div>
+                <span className="rounded-full bg-gray-100 px-3 py-1 text-xs font-black text-gray-600">
+                  {savedSessions.length}
+                </span>
+              </div>
+
+              <div className="space-y-3">
+                {savedSessions.length > 0 ? (
+                  savedSessions.map((item) => (
+                    <div
+                      key={item.id}
+                      className="rounded-[22px] border border-gray-200 bg-[#faf8f4] p-4"
+                    >
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="min-w-0">
+                          <p className="truncate text-sm font-black text-gray-900">{item.name}</p>
+                          <p className="mt-0.5 text-xs font-semibold uppercase tracking-[0.2em] text-gray-500">
+                            {institutionTypeMeta[item.institutionType].label}
+                          </p>
+                          <p className="mt-1 text-xs text-gray-400">
+                            {new Date(item.savedAt).toLocaleDateString('en-US')}
+                          </p>
+                        </div>
+                      </div>
+                      <div className="mt-3 flex gap-2">
+                        <button
+                          onClick={() => handleQuickLaunch(item)}
+                          className="flex flex-1 items-center justify-center gap-1.5 rounded-[14px] bg-[#111111] px-3 py-2 text-xs font-black text-white transition hover:bg-[#282828]"
+                        >
+                          <ArrowRight className="h-3.5 w-3.5" />
+                          Launch
+                        </button>
+                        <button
+                          onClick={() => handleRemoveSession(item.id)}
+                          className="rounded-[14px] border border-gray-200 px-3 py-2 text-xs font-semibold text-gray-500 transition hover:bg-gray-100"
+                        >
+                          Remove
+                        </button>
+                      </div>
+                    </div>
+                  ))
+                ) : (
+                  <div className="rounded-[22px] border border-dashed border-gray-300 bg-[#faf8f4] px-4 py-8 text-center">
+                    <p className="text-sm font-semibold text-gray-500">No recent sessions yet.</p>
+                    <p className="mt-1 text-xs text-gray-400">Launch an institution to add it here.</p>
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+
         </section>
       </div>
     </div>

@@ -116,7 +116,7 @@ function formatMetricValue(value: number | string, format: KpiMetric['format']) 
 
 function ChartCard({ title, subtitle, children }: { title: string; subtitle: string; children: React.ReactNode }) {
   return (
-    <div className="rounded-[1.5rem] border border-gray-200 bg-white p-4 shadow-base md:p-6" style={{ boxShadow: seminaryTheme.cardShadow }}>
+    <div className="min-w-0 rounded-[1.5rem] border border-gray-200 bg-white p-4 shadow-base md:p-6" style={{ boxShadow: seminaryTheme.cardShadow }}>
       <div className="mb-4">
         <h3 className="text-base font-black tracking-tight text-church-black md:text-lg">{title}</h3>
         <p className="text-xs font-medium text-gray-500 md:text-sm">{subtitle}</p>
@@ -156,7 +156,7 @@ function KpiCard({ metric }: { metric: KpiMetric }) {
                 <stop offset="95%" stopColor={metric.accent} stopOpacity={0} />
               </linearGradient>
             </defs>
-            <Tooltip formatter={(value: number) => compactCurrency(value)} labelFormatter={(label) => label} />
+            <Tooltip formatter={(value) => compactCurrency(Number(value ?? 0))} labelFormatter={(label) => label} />
             <Area type="monotone" dataKey="value" stroke={metric.accent} fill={`url(#spark-${metric.title})`} strokeWidth={2} />
           </AreaChart>
         </ResponsiveContainer>
@@ -448,7 +448,7 @@ export function SeminaryFinancialDashboard({ entityName, year }: { entityName: s
             {kpiMetrics.map((metric) => <KpiCard key={metric.title} metric={metric} />)}
           </div>
 
-          <div className="grid grid-cols-1 gap-5 xl:grid-cols-2">
+          <div className="grid grid-cols-1 gap-5 xl:grid-cols-2 [&>*]:min-w-0">
             <ChartCard title="Income vs Expense Runway" subtitle="Monthly operating position with axis labels, tooltip, and legend.">
               <div className="h-80">
                 <ResponsiveContainer width="100%" height="100%">
@@ -456,7 +456,7 @@ export function SeminaryFinancialDashboard({ entityName, year }: { entityName: s
                     <CartesianGrid strokeDasharray="3 3" stroke="#E5E7EB" />
                     <XAxis dataKey="month" label={{ value: 'Month', position: 'insideBottom', offset: -8 }} />
                     <YAxis tickFormatter={(value) => `${Math.round(Number(value) / 1000)}k`} label={{ value: 'PHP', angle: -90, position: 'insideLeft' }} />
-                    <Tooltip formatter={(value: number) => currencyFormatter(value)} />
+                    <Tooltip formatter={(value) => currencyFormatter(Number(value ?? 0))} />
                     <Legend />
                     <Bar dataKey="Income" fill={palette[0]} radius={[10, 10, 0, 0]} />
                     <Bar dataKey="Expenses" fill={palette[1]} radius={[10, 10, 0, 0]} />
@@ -485,7 +485,7 @@ export function SeminaryFinancialDashboard({ entityName, year }: { entityName: s
                     <XAxis dataKey="month" label={{ value: 'Month', position: 'insideBottom', offset: -8 }} />
                     <YAxis yAxisId="left" tickFormatter={(value) => `${Math.round(Number(value) / 1000)}k`} label={{ value: 'Net (PHP)', angle: -90, position: 'insideLeft' }} />
                     <YAxis yAxisId="right" orientation="right" tickFormatter={(value) => `${value}%`} label={{ value: 'Dependency %', angle: 90, position: 'insideRight' }} />
-                    <Tooltip formatter={(value: number, name: string) => name === 'Dependency' ? percentFormatter(value) : currencyFormatter(value)} />
+                    <Tooltip formatter={(value, name) => name === 'Dependency' ? percentFormatter(Number(value ?? 0)) : currencyFormatter(Number(value ?? 0))} />
                     <Legend />
                     <Line yAxisId="left" type="monotone" dataKey="Net" stroke={latest.net >= 0 ? seminaryTheme.success : seminaryTheme.danger} strokeWidth={3} dot={{ r: 3 }} />
                     <Line yAxisId="right" type="monotone" dataKey="Dependency" stroke={palette[2]} strokeWidth={3} dot={{ r: 3 }} />
@@ -498,12 +498,12 @@ export function SeminaryFinancialDashboard({ entityName, year }: { entityName: s
       )}
 
       {activeTab === 'descriptive' && (
-        <div className="grid grid-cols-1 gap-5 xl:grid-cols-2">
+        <div className="grid grid-cols-1 gap-5 xl:grid-cols-2 [&>*]:min-w-0">
           <ChartCard title="Revenue Mix" subtitle="Donut chart of income source contribution across the full year.">
             <div className="h-80">
               <ResponsiveContainer width="100%" height="100%">
                 <PieChart>
-                  <Tooltip formatter={(value: number) => currencyFormatter(value)} />
+                  <Tooltip formatter={(value) => currencyFormatter(Number(value ?? 0))} />
                   <Legend />
                   <Pie data={revenueMixData} dataKey="value" nameKey="name" innerRadius={72} outerRadius={110} paddingAngle={3}>
                     {revenueMixData.map((entry) => <Cell key={entry.name} fill={entry.fill} />)}
@@ -520,7 +520,7 @@ export function SeminaryFinancialDashboard({ entityName, year }: { entityName: s
                   <CartesianGrid strokeDasharray="3 3" stroke="#E5E7EB" />
                   <XAxis type="number" tickFormatter={(value) => `${Math.round(Number(value) / 1000)}k`} label={{ value: 'Annual PHP', position: 'insideBottom', offset: -8 }} />
                   <YAxis type="category" dataKey="name" width={140} label={{ value: 'Fee Components', angle: -90, position: 'insideLeft' }} />
-                  <Tooltip formatter={(value: number) => currencyFormatter(value)} />
+                  <Tooltip formatter={(value) => currencyFormatter(Number(value ?? 0))} />
                   <Legend />
                   <Bar dataKey="value" name="Fee Income" radius={[0, 10, 10, 0]}>
                     {feeStructureData.map((entry) => <Cell key={entry.name} fill={entry.fill} />)}
@@ -555,7 +555,7 @@ export function SeminaryFinancialDashboard({ entityName, year }: { entityName: s
                   <CartesianGrid strokeDasharray="3 3" stroke="#E5E7EB" />
                   <XAxis dataKey="month" label={{ value: 'Month', position: 'insideBottom', offset: -8 }} />
                   <YAxis tickFormatter={(value) => `${Math.round(Number(value) / 1000)}k`} label={{ value: 'PHP', angle: -90, position: 'insideLeft' }} />
-                  <Tooltip formatter={(value: number) => currencyFormatter(value)} />
+                  <Tooltip formatter={(value) => currencyFormatter(Number(value ?? 0))} />
                   <Legend />
                   <Bar dataKey="Income" fill={palette[0]} radius={[10, 10, 0, 0]} />
                   <Bar dataKey="Expenses" fill={palette[1]} radius={[10, 10, 0, 0]} />
@@ -571,7 +571,7 @@ export function SeminaryFinancialDashboard({ entityName, year }: { entityName: s
                   <CartesianGrid strokeDasharray="3 3" stroke="#E5E7EB" />
                   <XAxis dataKey="month" label={{ value: 'Month', position: 'insideBottom', offset: -8 }} />
                   <YAxis tickFormatter={(value) => `${Math.round(Number(value) / 1000)}k`} label={{ value: 'Income (PHP)', angle: -90, position: 'insideLeft' }} />
-                  <Tooltip formatter={(value: number) => currencyFormatter(value)} />
+                  <Tooltip formatter={(value) => currencyFormatter(Number(value ?? 0))} />
                   <Legend />
                   <Bar dataKey="Subsidies + Donations" stackId="dependency" fill={palette[2]} radius={[10, 10, 0, 0]} />
                   <Bar dataKey="Self-Generated" stackId="dependency" fill={palette[0]} radius={[10, 10, 0, 0]} />
@@ -584,7 +584,7 @@ export function SeminaryFinancialDashboard({ entityName, year }: { entityName: s
             <div className="h-80">
               <ResponsiveContainer width="100%" height="100%">
                 <PieChart>
-                  <Tooltip formatter={(value: number) => currencyFormatter(value)} />
+                  <Tooltip formatter={(value) => currencyFormatter(Number(value ?? 0))} />
                   <Legend />
                   <Pie data={peopleOperationalData} dataKey="value" nameKey="name" innerRadius={72} outerRadius={110}>
                     {peopleOperationalData.map((entry) => <Cell key={entry.name} fill={entry.fill} />)}
@@ -606,7 +606,7 @@ export function SeminaryFinancialDashboard({ entityName, year }: { entityName: s
                   <CartesianGrid strokeDasharray="3 3" stroke="#E5E7EB" />
                   <XAxis dataKey="month" label={{ value: 'Month', position: 'insideBottom', offset: -8 }} />
                   <YAxis tickFormatter={(value) => `${Math.round(Number(value) / 1000)}k`} label={{ value: 'PHP', angle: -90, position: 'insideLeft' }} />
-                  <Tooltip formatter={(value: number) => currencyFormatter(value)} />
+                  <Tooltip formatter={(value) => currencyFormatter(Number(value ?? 0))} />
                   <Legend />
                   <Bar dataKey="maintenance" name="Maintenance Spend" fill={palette[3]} radius={[10, 10, 0, 0]} />
                 </BarChart>
@@ -621,7 +621,7 @@ export function SeminaryFinancialDashboard({ entityName, year }: { entityName: s
                   <CartesianGrid strokeDasharray="3 3" stroke="#E5E7EB" />
                   <XAxis dataKey="month" label={{ value: 'Month', position: 'insideBottom', offset: -8 }} />
                   <YAxis tickFormatter={(value) => `${Math.round(Number(value) / 1000)}k`} label={{ value: 'PHP', angle: -90, position: 'insideLeft' }} />
-                  <Tooltip formatter={(value: number) => currencyFormatter(value)} />
+                  <Tooltip formatter={(value) => currencyFormatter(Number(value ?? 0))} />
                   <Legend />
                   <Line type="monotone" dataKey="Donations" stroke={palette[0]} strokeWidth={3} />
                   <Line type="monotone" dataKey="Seminary Fees" stroke={palette[1]} strokeWidth={3} />
@@ -636,7 +636,7 @@ export function SeminaryFinancialDashboard({ entityName, year }: { entityName: s
       )}
 
       {activeTab === 'predictive' && (
-        <div className="grid grid-cols-1 gap-5 xl:grid-cols-2">
+        <div className="grid grid-cols-1 gap-5 xl:grid-cols-2 [&>*]:min-w-0">
           <ChartCard title="Revenue Forecast" subtitle="Actual versus projected income using simple linear regression in JavaScript.">
             <div className="h-80">
               <ResponsiveContainer width="100%" height="100%">
@@ -644,7 +644,7 @@ export function SeminaryFinancialDashboard({ entityName, year }: { entityName: s
                   <CartesianGrid strokeDasharray="3 3" stroke="#E5E7EB" />
                   <XAxis dataKey="label" angle={-25} textAnchor="end" height={60} label={{ value: 'Period', position: 'insideBottom', offset: -6 }} />
                   <YAxis tickFormatter={(value) => `${Math.round(Number(value) / 1000)}k`} label={{ value: 'Income (PHP)', angle: -90, position: 'insideLeft' }} />
-                  <Tooltip formatter={(value: number) => currencyFormatter(value)} />
+                  <Tooltip formatter={(value) => currencyFormatter(Number(value ?? 0))} />
                   <Legend />
                   <Line type="monotone" dataKey="Actual" stroke={palette[1]} strokeWidth={3} connectNulls={false} />
                   <Line type="monotone" dataKey="Projected" stroke={palette[0]} strokeWidth={3} strokeDasharray="6 4" connectNulls={false} />
@@ -660,7 +660,7 @@ export function SeminaryFinancialDashboard({ entityName, year }: { entityName: s
                   <CartesianGrid strokeDasharray="3 3" stroke="#E5E7EB" />
                   <XAxis dataKey="month" label={{ value: 'Month', position: 'insideBottom', offset: -8 }} />
                   <YAxis tickFormatter={(value) => `${Math.round(Number(value) / 1000)}k`} label={{ value: 'Expense (PHP)', angle: -90, position: 'insideLeft' }} />
-                  <Tooltip formatter={(value: number) => currencyFormatter(value)} />
+                  <Tooltip formatter={(value) => currencyFormatter(Number(value ?? 0))} />
                   <Legend />
                   <Line type="monotone" dataKey="Facilities" stroke={palette[0]} strokeWidth={3} />
                   <Line type="monotone" dataKey="Payroll" stroke={palette[1]} strokeWidth={3} />
@@ -688,7 +688,7 @@ export function SeminaryFinancialDashboard({ entityName, year }: { entityName: s
                   <CartesianGrid strokeDasharray="3 3" stroke="#E5E7EB" />
                   <XAxis dataKey="label" angle={-25} textAnchor="end" height={60} label={{ value: 'Period', position: 'insideBottom', offset: -6 }} />
                   <YAxis tickFormatter={(value) => `${Math.round(Number(value) / 1000)}k`} label={{ value: 'Net (PHP)', angle: -90, position: 'insideLeft' }} />
-                  <Tooltip formatter={(value: number) => currencyFormatter(value)} />
+                  <Tooltip formatter={(value) => currencyFormatter(Number(value ?? 0))} />
                   <Legend />
                   <Area type="monotone" dataKey="Actual Net" stroke={seminaryTheme.success} fill="url(#actualNetFill)" strokeWidth={3} />
                   <Area type="monotone" dataKey="Projected Net" stroke={palette[0]} fill="url(#projectedNetFill)" strokeWidth={3} />
@@ -704,7 +704,7 @@ export function SeminaryFinancialDashboard({ entityName, year }: { entityName: s
                   <CartesianGrid strokeDasharray="3 3" stroke="#E5E7EB" />
                   <XAxis dataKey="source" angle={-18} textAnchor="end" height={70} label={{ value: 'Income Source', position: 'insideBottom', offset: -4 }} />
                   <YAxis tickFormatter={(value) => `${Math.round(Number(value) / 1000)}k`} label={{ value: 'Mean Monthly PHP', angle: -90, position: 'insideLeft' }} />
-                  <Tooltip formatter={(value: number, name: string) => name === 'stdDev' ? `${currencyFormatter(value)} std dev` : currencyFormatter(value)} />
+                  <Tooltip formatter={(value, name) => name === 'stdDev' ? `${currencyFormatter(Number(value ?? 0))} std dev` : currencyFormatter(Number(value ?? 0))} />
                   <Legend />
                   <Bar dataKey="mean" name="Mean">
                     {donationVolatilityData.map((entry) => <Cell key={entry.source} fill={entry.fill} />)}
@@ -722,7 +722,7 @@ export function SeminaryFinancialDashboard({ entityName, year }: { entityName: s
                   <CartesianGrid strokeDasharray="3 3" stroke="#E5E7EB" />
                   <XAxis dataKey="scenario" label={{ value: 'Enrollment Scenario', position: 'insideBottom', offset: -8 }} />
                   <YAxis tickFormatter={(value) => `${Math.round(Number(value) / 1000)}k`} label={{ value: 'Projected Fee Income (PHP)', angle: -90, position: 'insideLeft' }} />
-                  <Tooltip formatter={(value: number, name: string) => name === 'enrollment' ? numberFormatter(value) : currencyFormatter(value)} />
+                  <Tooltip formatter={(value, name) => name === 'enrollment' ? numberFormatter(Number(value ?? 0)) : currencyFormatter(Number(value ?? 0))} />
                   <Legend />
                   <Bar dataKey="income" name="Projected Income" radius={[10, 10, 0, 0]}>
                     {enrollmentDigitalTwinData.map((entry) => <Cell key={entry.scenario} fill={entry.fill} />)}
@@ -739,7 +739,7 @@ export function SeminaryFinancialDashboard({ entityName, year }: { entityName: s
                   <CartesianGrid strokeDasharray="3 3" stroke="#E5E7EB" />
                   <XAxis dataKey="month" label={{ value: 'Month', position: 'insideBottom', offset: -8 }} />
                   <YAxis tickFormatter={(value) => `${Math.round(Number(value) / 1000)}k`} label={{ value: 'Infrastructure PHP', angle: -90, position: 'insideLeft' }} />
-                  <Tooltip formatter={(value: number) => currencyFormatter(value)} />
+                  <Tooltip formatter={(value) => currencyFormatter(Number(value ?? 0))} />
                   <Legend />
                   <Line type="monotone" dataKey="Spend" stroke={palette[1]} strokeWidth={3} />
                   <Line type="monotone" dataKey="Rolling Avg" stroke={palette[0]} strokeWidth={3} strokeDasharray="6 4" />
@@ -755,7 +755,7 @@ export function SeminaryFinancialDashboard({ entityName, year }: { entityName: s
                   <CartesianGrid strokeDasharray="3 3" stroke="#E5E7EB" />
                   <XAxis dataKey="scenario" label={{ value: 'RCBSP Cut Scenario', position: 'insideBottom', offset: -8 }} />
                   <YAxis tickFormatter={(value) => `${Math.round(Number(value) / 1000000)}M`} label={{ value: 'Annual PHP', angle: -90, position: 'insideLeft' }} />
-                  <Tooltip formatter={(value: number) => currencyFormatter(value)} />
+                  <Tooltip formatter={(value) => currencyFormatter(Number(value ?? 0))} />
                   <Legend />
                   <Bar dataKey="Income" fill={palette[0]} radius={[10, 10, 0, 0]} />
                   <Bar dataKey="Surplus" fill={palette[1]} radius={[10, 10, 0, 0]} />
@@ -767,7 +767,7 @@ export function SeminaryFinancialDashboard({ entityName, year }: { entityName: s
       )}
 
       {activeTab === 'prescriptive' && (
-        <div className="grid grid-cols-1 gap-5 xl:grid-cols-2">
+        <div className="grid grid-cols-1 gap-5 xl:grid-cols-2 [&>*]:min-w-0">
           <ChartCard title="Cost Optimization Table" subtitle="Highest reducible expense lines with recommended cut rates and savings.">
             <DataTable
               columns={[
@@ -809,7 +809,7 @@ export function SeminaryFinancialDashboard({ entityName, year }: { entityName: s
                   <CartesianGrid strokeDasharray="3 3" stroke="#E5E7EB" />
                   <XAxis dataKey="source" angle={-20} textAnchor="end" height={70} label={{ value: 'Income Source', position: 'insideBottom', offset: -4 }} />
                   <YAxis label={{ value: 'Share of Total Income (%)', angle: -90, position: 'insideLeft' }} />
-                  <Tooltip formatter={(value: number) => `${value}%`} />
+                  <Tooltip formatter={(value) => `${Number(value ?? 0)}%`} />
                   <Legend />
                   <Bar dataKey="current" name="Current Share" fill={palette[1]} radius={[10, 10, 0, 0]} />
                   <Bar dataKey="target" name="Target Share" fill={palette[0]} radius={[10, 10, 0, 0]} />
@@ -869,7 +869,7 @@ export function SeminaryFinancialDashboard({ entityName, year }: { entityName: s
                   <CartesianGrid strokeDasharray="3 3" stroke="#E5E7EB" />
                   <XAxis dataKey="increase" label={{ value: 'Salary Increase Level', position: 'insideBottom', offset: -8 }} />
                   <YAxis tickFormatter={(value) => `${Math.round(Number(value) / 1000000)}M`} label={{ value: 'Minimum Annual Income (PHP)', angle: -90, position: 'insideLeft' }} />
-                  <Tooltip formatter={(value: number) => currencyFormatter(value)} />
+                  <Tooltip formatter={(value) => currencyFormatter(Number(value ?? 0))} />
                   <Legend />
                   <Line type="monotone" dataKey="Minimum Income Needed" stroke={palette[0]} strokeWidth={3} dot={{ r: 4 }} />
                 </LineChart>
@@ -884,7 +884,7 @@ export function SeminaryFinancialDashboard({ entityName, year }: { entityName: s
                   <CartesianGrid strokeDasharray="3 3" stroke="#E5E7EB" />
                   <XAxis type="number" domain={[0, 12]} tickFormatter={(value) => `M${Number(value) + 1}`} label={{ value: 'Project Timeline (Months)', position: 'insideBottom', offset: -8 }} />
                   <YAxis type="category" dataKey="initiative" width={160} label={{ value: 'Capital Projects', angle: -90, position: 'insideLeft' }} />
-                  <Tooltip formatter={(value: number, name: string, item: any) => name === 'duration' ? `${value} months` : currencyFormatter(item.payload.budget)} />
+                  <Tooltip formatter={(value, name, item: { payload?: { budget: number } }) => name === 'duration' ? `${Number(value ?? 0)} months` : currencyFormatter(item.payload?.budget ?? 0)} />
                   <Legend />
                   <Bar dataKey="start" stackId="timeline" fill="transparent" legendType="none" />
                   <Bar dataKey="duration" stackId="timeline" name="Planned Duration" fill={palette[0]} radius={[10, 10, 10, 10]} />
@@ -910,7 +910,7 @@ export function SeminaryFinancialDashboard({ entityName, year }: { entityName: s
                   <CartesianGrid strokeDasharray="3 3" stroke="#E5E7EB" />
                   <XAxis dataKey="year" label={{ value: 'Year', position: 'insideBottom', offset: -8 }} />
                   <YAxis tickFormatter={(value) => `${Math.round(Number(value) / 1000000)}M`} label={{ value: 'PHP', angle: -90, position: 'insideLeft' }} />
-                  <Tooltip formatter={(value: number) => currencyFormatter(value)} />
+                  <Tooltip formatter={(value) => currencyFormatter(Number(value ?? 0))} />
                   <Legend />
                   <Area type="monotone" dataKey="Subsidy" stackId="1" stroke={palette[1]} fill="url(#roadmapSubsidy)" />
                   <Area type="monotone" dataKey="Own-Source Income" stackId="1" stroke={palette[0]} fill="url(#roadmapOwn)" />

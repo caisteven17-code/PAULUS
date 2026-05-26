@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { ArrowLeft } from 'lucide-react';
+import { ArrowLeft, CalendarClock, ChevronDown } from 'lucide-react';
 import { TopNav } from './components/layout/TopNav';
 import { Sidebar } from './components/layout/Sidebar';
 import { Footer } from './components/layout/Footer';
@@ -22,6 +22,7 @@ import { ParishDataSubmission } from './views/ParishDataSubmission';
 import { BottomNav } from './components/ui/BottomNav';
 import { StewardChatbot } from './components/ui/StewardChatbot';
 import { auth, AuthUser } from './firebase';
+import { AppRole } from './lib/access';
 
 export type Role = 'bishop' | 'admin' | 'priest' | 'school' | 'seminary';
 export type Timeframe = '6m' | '1y' | 'all';
@@ -31,6 +32,7 @@ type DigitalTwinSession = {
   entityType: 'parish' | 'school' | 'seminary';
   viewRole: 'priest' | 'school' | 'seminary';
 };
+
 
 const getDigitalTwinDefaultTab = (role: DigitalTwinSession['viewRole']) => {
   if (role === 'school') return 'school';
@@ -68,24 +70,29 @@ export default function App() {
   const [year, setYear] = useState<number>(2026);
   const [digitalTwinSession, setDigitalTwinSession] = useState<DigitalTwinSession | null>(null);
   const [digitalTwinActiveTab, setDigitalTwinActiveTab] = useState('parish-dashboard');
+  // Pending = what the user has picked in the dropdowns; applied = what is actually shown
+  const MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'] as const;
+  const currentMonthName = MONTHS[new Date().getMonth()];
+  const [dtMonth, setDtMonth] = useState<string>(currentMonthName);
+  const [dtPendingMonth, setDtPendingMonth] = useState<string>(currentMonthName);
+  const [dtPendingYear, setDtPendingYear] = useState<number>(year);
 
   useEffect(() => {
+    const roleDefaultTab: Record<Role, string> = {
+      bishop:   'home',
+      admin:    'home',
+      priest:   'parish-dashboard',
+      school:   'school',
+      seminary: 'seminaries',
+    };
+
     const unsubscribe = auth.onAuthStateChanged((user: AuthUser | null) => {
       if (user?.role) {
         const internalRole = appRoleToRole(user.role);
         setRole(internalRole);
         setIsAuthenticated(true);
-
-        if (activeTab === 'home') {
-          const roleDefaultTab: Record<Role, string> = {
-            bishop:   'home',
-            admin:    'home',
-            priest:   'parish-dashboard',
-            school:   'school',
-            seminary: 'seminaries',
-          };
-          setActiveTab(roleDefaultTab[internalRole]);
-        }
+        // Use functional update so the effect doesn't need activeTab in its deps
+        setActiveTab((prev) => (prev === 'home' ? roleDefaultTab[internalRole] : prev));
       } else {
         setIsAuthenticated(false);
         setRole('bishop');
@@ -95,18 +102,19 @@ export default function App() {
     });
 
     return () => unsubscribe();
-  }, [activeTab]);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const handleLogin = (loggedInRole: Role) => {
-    setRole(loggedInRole);
+  const handleLogin = (loggedInRole: AppRole) => {
+    const internalRole = appRoleToRole(loggedInRole);
+    setRole(internalRole);
     setIsAuthenticated(true);
-    
+
     // Set default tab based on role
-    if (loggedInRole === 'priest') {
+    if (internalRole === 'priest') {
       setActiveTab('parish-dashboard');
-    } else if (loggedInRole === 'school') {
+    } else if (internalRole === 'school') {
       setActiveTab('school');
-    } else if (loggedInRole === 'seminary') {
+    } else if (internalRole === 'seminary') {
       setActiveTab('seminaries');
     } else {
       setActiveTab('home');
@@ -303,25 +311,79 @@ export default function App() {
               timeframe={timeframe}
               onTimeframeChange={setTimeframe}
               year={year}
-              onYearChange={setYear}
+              onYearChange={(y) => { setYear(y); setDtPendingYear(y); }}
               onLogout={handleLogout}
             />
+
+            {/* ── Digital Twin Period Bar ──────────────────────────────── */}
+            <div className="flex shrink-0 items-center gap-2 border-b border-amber-200 bg-gradient-to-r from-amber-50 to-yellow-50 px-4 py-2">
+              <CalendarClock className="h-3.5 w-3.5 text-amber-700 shrink-0" />
+              <span className="text-[11px] font-black uppercase tracking-[0.2em] text-amber-800 shrink-0">
+                Digital Twin
+              </span>
+              <span className="text-amber-300 shrink-0">|</span>
+              <span className="text-xs text-amber-700 shrink-0">Viewing period:</span>
+
+              {/* Month picker */}
+              <div className="relative">
+                <select
+                  value={dtPendingMonth}
+                  onChange={(e) => setDtPendingMonth(e.target.value)}
+                  className="appearance-none cursor-pointer rounded-lg border border-amber-200 bg-white pl-2.5 pr-6 py-1 text-xs font-bold text-gray-800 outline-none focus:border-amber-400 focus:ring-1 focus:ring-amber-400/30"
+                >
+                  {['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'].map((m) => (
+                    <option key={m} value={m}>{m}</option>
+                  ))}
+                </select>
+                <ChevronDown className="pointer-events-none absolute right-1.5 top-1/2 h-3 w-3 -translate-y-1/2 text-amber-500" />
+              </div>
+
+              {/* Year picker */}
+              <div className="relative">
+                <select
+                  value={dtPendingYear}
+                  onChange={(e) => setDtPendingYear(Number(e.target.value))}
+                  className="appearance-none cursor-pointer rounded-lg border border-amber-200 bg-white pl-2.5 pr-6 py-1 text-xs font-bold text-gray-800 outline-none focus:border-amber-400 focus:ring-1 focus:ring-amber-400/30"
+                >
+                  {[2024, 2025, 2026].map((y) => (
+                    <option key={y} value={y}>{y}</option>
+                  ))}
+                </select>
+                <ChevronDown className="pointer-events-none absolute right-1.5 top-1/2 h-3 w-3 -translate-y-1/2 text-amber-500" />
+              </div>
+
+              <button
+                onClick={() => {
+                  setDtMonth(dtPendingMonth);
+                  setYear(dtPendingYear);
+                }}
+                className="rounded-lg bg-amber-700 px-3 py-1 text-xs font-black text-white transition hover:bg-amber-800 active:bg-amber-900"
+              >
+                Apply Period
+              </button>
+
+              {/* Active period badge */}
+              <span className="ml-auto shrink-0 rounded-full border border-amber-300 bg-white px-2.5 py-0.5 text-[11px] font-bold text-amber-800">
+                {dtMonth} {year} • Read-only view
+              </span>
+            </div>
+
             <main className="flex-1 overflow-y-auto pb-20 md:pb-0">
               {renderDigitalTwinSessionContent()}
               <Footer />
             </main>
           </div>
 
-          <div className="fixed left-4 top-4 z-[70]">
+          <div className="fixed left-4 bottom-4 z-[70]">
             <button
               onClick={() => {
                 setDigitalTwinSession(null);
                 setActiveTab('digital-twin');
               }}
-              className="inline-flex items-center gap-2 rounded-full border border-black/10 bg-white/95 px-4 py-2 text-sm font-bold text-gray-800 shadow-lg backdrop-blur transition hover:bg-white"
+              className="inline-flex items-center gap-2 rounded-full border border-black/10 bg-yellow-300 px-4 py-2 text-sm font-bold text-gray-800 shadow-lg backdrop-blur transition hover:bg-yellow-400"
             >
               <ArrowLeft className="h-4 w-4" />
-              Back to Digital Twin
+              Back to Digital Twin Page
             </button>
           </div>
           <BottomNav activeTab={digitalTwinActiveTab} onNavigate={setDigitalTwinActiveTab} role={digitalTwinSession.viewRole} />
@@ -493,3 +555,4 @@ export default function App() {
     </ErrorBoundary>
   );
 }
+

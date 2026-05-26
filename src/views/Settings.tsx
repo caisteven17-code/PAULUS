@@ -8,6 +8,7 @@ import { UserRole, Parish, Seminary, DiocesanSchool } from '../types';
 import { INITIAL_ROLES, VICARIATES, CLASSES, INITIAL_PARISHES, INITIAL_SEMINARIES, INITIAL_SCHOOLS } from '../constants';
 import { auth } from '../firebase';
 import { dataService } from '../services/dataService';
+import { supabaseBrowser } from '../lib/supabase';
 
 interface SettingsProps {
   onBack: () => void;
@@ -41,41 +42,62 @@ export function Settings({ onBack, onLogout, onNavigate, role = 'bishop', initia
   const [schools, setSchools] = useState<DiocesanSchool[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
-  // Subscribe to users
-  React.useEffect(() => {
-    const update = () => {
-      const storedUsers = JSON.parse(localStorage.getItem('users') || '[]');
-      const mappedAccounts = storedUsers.map((u: any) => ({
-        id: u.id,
-        entity: u.entityName || 'Unassigned',
-        leader: u.displayName || u.email.split('@')[0],
-        email: u.email,
-        role: getAccessRoleLabel(u.roleId || u.accessRole || u.role),
-        roleId: normalizeAccessRole(u.roleId || u.accessRole || u.role),
-        status: u.status || 'active',
-        entityId: u.entityId,
-        entityType: u.entityType
-      }));
-      setAccounts(mappedAccounts);
+  // ── Load users from Supabase (with localStorage fallback) ─────────────
+  const fetchAccounts = React.useCallback(async () => {
+    try {
+      const res = await fetch('/api/admin/users');
+      if (!res.ok) throw new Error('API error');
+      const data: any[] = await res.json();
+      setAccounts(data.map((u) => ({
+        id:         u.id,
+        entity:     u.entityName  || 'Unassigned',
+        leader:     u.displayName || u.email?.split('@')[0] || '',
+        email:      u.email       || '',
+        role:       getAccessRoleLabel(u.roleId || u.role),
+        roleId:     normalizeAccessRole(u.roleId || u.role),
+        status:     u.status      || 'active',
+        entityId:   u.entityId,
+        entityType: u.entityType,
+      })));
+    } catch {
+      // Fallback: read from localStorage (demo / offline mode)
+      const stored: any[] = JSON.parse(localStorage.getItem('users') || '[]');
+      setAccounts(stored.map((u) => ({
+        id:         u.id,
+        entity:     u.entityName  || 'Unassigned',
+        leader:     u.displayName || u.email.split('@')[0],
+        email:      u.email,
+        role:       getAccessRoleLabel(u.roleId || u.accessRole || u.role),
+        roleId:     normalizeAccessRole(u.roleId || u.accessRole || u.role),
+        status:     u.status      || 'active',
+        entityId:   u.entityId,
+        entityType: u.entityType,
+      })));
+    } finally {
       setIsLoading(false);
-    };
-    
-    window.addEventListener('storage_update', update);
-    update();
-    return () => window.removeEventListener('storage_update', update);
+    }
   }, []);
 
-  // Subscribe to entities
+  React.useEffect(() => { fetchAccounts(); }, [fetchAccounts]);
+
+  // ── Load entities from Supabase (with constants fallback) ─────────────
   React.useEffect(() => {
-    const update = () => {
-      setParishes(JSON.parse(localStorage.getItem('parishes') || '[]'));
-      setSeminaries(JSON.parse(localStorage.getItem('seminaries') || '[]'));
-      setSchools(JSON.parse(localStorage.getItem('schools') || '[]'));
+    const fetchEntities = async () => {
+      try {
+        const res = await fetch('/api/admin/entities');
+        if (!res.ok) throw new Error('API error');
+        const data = await res.json();
+        if (Array.isArray(data.parishes))   setParishes(data.parishes);
+        if (Array.isArray(data.seminaries)) setSeminaries(data.seminaries);
+        if (Array.isArray(data.schools))    setSchools(data.schools);
+      } catch {
+        // Fallback to compiled-in constants
+        setParishes(INITIAL_PARISHES as Parish[]);
+        setSeminaries(INITIAL_SEMINARIES as Seminary[]);
+        setSchools(INITIAL_SCHOOLS as DiocesanSchool[]);
+      }
     };
-    
-    window.addEventListener('storage_update', update);
-    update();
-    return () => window.removeEventListener('storage_update', update);
+    fetchEntities();
   }, []);
 
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -104,31 +126,28 @@ export function Settings({ onBack, onLogout, onNavigate, role = 'bishop', initia
     };
   });
 
-  const handleUpdatePassword = () => {
-    if (passwords.current && passwords.new) {
+  const handleUpdatePassword = async () => {
+    if (!passwords.new) return;
+    try {
+      // Update via Supabase Auth (works when logged in with a real Supabase session)
+      const { error } = await supabaseBrowser.auth.updateUser({ password: passwords.new });
+      if (error) throw error;
+    } catch {
+      // Also update the localStorage demo record so offline sessions work
       const currentUser = auth.currentUser;
       if (currentUser) {
-        const updatedUser = {
+        localStorage.setItem('currentUser', JSON.stringify({
           ...currentUser,
-          passwordUpdatedAt: new Date().toISOString()
-        };
-        localStorage.setItem('currentUser', JSON.stringify(updatedUser));
-
-        const storedUsers = JSON.parse(localStorage.getItem('users') || '[]');
-        const updatedUsers = storedUsers.map((user: any) =>
-          user.email?.toLowerCase() === currentUser.email?.toLowerCase()
-            ? { ...user, passwordUpdatedAt: updatedUser.passwordUpdatedAt }
-            : user
-        );
-        localStorage.setItem('users', JSON.stringify(updatedUsers));
+          passwordUpdatedAt: new Date().toISOString(),
+        }));
       }
-      setShowPasswordSuccess(true);
-      setPasswords({ current: '', new: '' });
-      setTimeout(() => setShowPasswordSuccess(false), 3000);
     }
+    setShowPasswordSuccess(true);
+    setPasswords({ current: '', new: '' });
+    setTimeout(() => setShowPasswordSuccess(false), 3000);
   };
 
-  const handleProfileSave = (event: React.FormEvent) => {
+  const handleProfileSave = async (event: React.FormEvent) => {
     event.preventDefault();
     const currentUser = auth.currentUser || {};
     const displayName = [profileForm.firstName, profileForm.lastName].filter(Boolean).join(' ') || currentUser.displayName || profileForm.email;
@@ -138,25 +157,29 @@ export function Settings({ onBack, onLogout, onNavigate, role = 'bishop', initia
       displayName,
       email: profileForm.email,
       entityName: profileForm.entityName || currentUser.entityName,
-      updatedAt: new Date().toISOString()
+      updatedAt: new Date().toISOString(),
     };
 
-    localStorage.setItem('currentUser', JSON.stringify(updatedUser));
+    // Persist to Supabase if we have a real session
+    await supabaseBrowser.auth.updateUser({
+      data: {
+        displayName,
+        firstName:       profileForm.firstName,
+        lastName:        profileForm.lastName,
+        nickName:        profileForm.nickName,
+        contactNumber:   profileForm.contactNumber,
+        address:         profileForm.address,
+        position:        profileForm.position,
+        entityName:      profileForm.entityName || currentUser.entityName,
+        emergencyContact: profileForm.emergencyContact,
+        notes:           profileForm.notes,
+      },
+    }).catch(() => {
+      // Ignore — may be a demo/offline session
+    });
 
-    const storedUsers = JSON.parse(localStorage.getItem('users') || '[]');
-    const updatedUsers = storedUsers.map((user: any) =>
-      user.email?.toLowerCase() === currentUser.email?.toLowerCase() || user.id === currentUser.id || user.uid === currentUser.uid
-        ? {
-            ...user,
-            ...profileForm,
-            email: profileForm.email,
-            displayName,
-            entityName: profileForm.entityName || user.entityName
-          }
-        : user
-    );
-    localStorage.setItem('users', JSON.stringify(updatedUsers));
-    window.dispatchEvent(new Event('storage_update'));
+    // Always update localStorage so the profile reflects in the UI
+    localStorage.setItem('currentUser', JSON.stringify(updatedUser));
     setShowProfileSuccess(true);
     setTimeout(() => setShowProfileSuccess(false), 3000);
   };
@@ -188,10 +211,11 @@ export function Settings({ onBack, onLogout, onNavigate, role = 'bishop', initia
   
   const [formState, setFormState] = useState({
     institutionType: '' as InstitutionType | '',
-    entity: '',
-    leader: '',
-    email: '',
-    role: INITIAL_ROLES[2].id
+    entity:   '',
+    leader:   '',
+    email:    '',
+    role:     INITIAL_ROLES[2].id,
+    password: '',
   });
   const [showInstitutionSuggestions, setShowInstitutionSuggestions] = useState(false);
 
@@ -268,50 +292,59 @@ export function Settings({ onBack, onLogout, onNavigate, role = 'bishop', initia
   const handleSaveAccount = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!formState.institutionType || !formState.entity || !formState.leader || !formState.email || !formState.role) return;
-    
+    if (editingAccountId === null && !formState.password) {
+      setShowAccountSuccess({ show: true, message: 'Error: Password is required for new accounts.' });
+      setTimeout(() => setShowAccountSuccess({ show: false, message: '' }), 4000);
+      return;
+    }
+
     try {
-      const storedUsers = JSON.parse(localStorage.getItem('users') || '[]');
-      const accessRole = normalizeAccessRole(formState.role);
+      const accessRole    = normalizeAccessRole(formState.role);
       const selectedEntity = findSelectedEntity(formState.entity, accessRole);
+
       if (editingAccountId !== null) {
-        const updatedUsers = storedUsers.map((u: any) => 
-          u.id === editingAccountId.toString() ? {
-            ...u,
-            email: formState.email,
-            role: selectedEntity.appRole,
-            accessRole,
-            roleId: accessRole,
-            entityName: formState.entity,
-            entityType: selectedEntity.entityType,
-            entityId: selectedEntity.entityId,
-            displayName: formState.leader
-          } : u
-        );
-        localStorage.setItem('users', JSON.stringify(updatedUsers));
+        // ── Update existing user ──────────────────────────────────────────
+        const res = await fetch('/api/admin/users', {
+          method:  'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body:    JSON.stringify({
+            id:          editingAccountId.toString(),
+            email:       formState.email,
+            displayName: formState.leader,
+            role:        accessRole,
+            entityName:  formState.entity,
+            entityType:  selectedEntity.entityType,
+            entityId:    selectedEntity.entityId,
+          }),
+        });
+        if (!res.ok) throw new Error((await res.json()).error ?? 'Update failed');
         setShowAccountSuccess({ show: true, message: 'Account updated successfully!' });
       } else {
-        const newUser = {
-          id: Date.now().toString(),
-          email: formState.email,
-          role: selectedEntity.appRole,
-          accessRole,
-          roleId: accessRole,
-          entityName: formState.entity,
-          entityType: selectedEntity.entityType,
-          entityId: selectedEntity.entityId,
-          displayName: formState.leader,
-          status: 'active',
-          createdAt: new Date().toISOString()
-        };
-        localStorage.setItem('users', JSON.stringify([...storedUsers, newUser]));
+        // ── Create new user ───────────────────────────────────────────────
+        const res = await fetch('/api/admin/users', {
+          method:  'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body:    JSON.stringify({
+            email:       formState.email,
+            password:    formState.password,
+            displayName: formState.leader,
+            role:        accessRole,
+            entityName:  formState.entity,
+            entityType:  selectedEntity.entityType,
+            entityId:    selectedEntity.entityId,
+          }),
+        });
+        if (!res.ok) throw new Error((await res.json()).error ?? 'Create failed');
         setShowAccountSuccess({ show: true, message: 'New account created successfully!' });
       }
-      window.dispatchEvent(new Event('storage_update'));
-    } catch (error) {
-      console.error("Error saving account:", error);
+
+      await fetchAccounts();
+    } catch (err: any) {
+      console.error('Error saving account:', err);
+      setShowAccountSuccess({ show: true, message: `Error: ${err.message}` });
     }
-    
-    setTimeout(() => setShowAccountSuccess({ show: false, message: '' }), 3000);
+
+    setTimeout(() => setShowAccountSuccess({ show: false, message: '' }), 4000);
     closeModal();
   };
 
@@ -334,18 +367,18 @@ export function Settings({ onBack, onLogout, onNavigate, role = 'bishop', initia
 
   const toggleAccountStatus = async (id: string | number) => {
     try {
-      const storedUsers = JSON.parse(localStorage.getItem('users') || '[]');
-      const acc = storedUsers.find((a: any) => a.id === id.toString());
-      if (acc) {
-        const newStatus = acc.status === 'active' ? 'archived' : 'active';
-        const updatedUsers = storedUsers.map((u: any) => 
-          u.id === id.toString() ? { ...u, status: newStatus } : u
-        );
-        localStorage.setItem('users', JSON.stringify(updatedUsers));
-        window.dispatchEvent(new Event('storage_update'));
-      }
+      const acc    = accounts.find((a) => a.id === id.toString());
+      const action = acc?.status === 'active' ? 'archive' : 'restore';
+
+      const res = await fetch('/api/admin/users', {
+        method:  'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body:    JSON.stringify({ id: id.toString(), action }),
+      });
+      if (!res.ok) throw new Error((await res.json()).error ?? 'Status change failed');
+      await fetchAccounts();
     } catch (error) {
-      console.error("Error toggling status:", error);
+      console.error('Error toggling status:', error);
     }
     setIsArchiveModalOpen(false);
     setAccountToArchive(null);
@@ -355,7 +388,7 @@ export function Settings({ onBack, onLogout, onNavigate, role = 'bishop', initia
     setIsModalOpen(false);
     setEditingAccountId(null);
     setShowInstitutionSuggestions(false);
-    setFormState({ institutionType: '', entity: '', leader: '', email: '', role: roles[2]?.id || 'parish_priest' });
+    setFormState({ institutionType: '', entity: '', leader: '', email: '', role: roles[2]?.id || 'parish_priest', password: '' });
   };
 
   const filteredAccounts = accounts.filter(acc => 
@@ -497,8 +530,8 @@ export function Settings({ onBack, onLogout, onNavigate, role = 'bishop', initia
                 </div>
                 <div>
                   <label className="block text-xs font-bold text-gray-400 uppercase tracking-widest mb-1.5 ml-1">Email Address</label>
-                  <input 
-                    type="email" 
+                  <input
+                    type="email"
                     required
                     value={formState.email}
                     onChange={(e) => setFormState({...formState, email: e.target.value})}
@@ -506,6 +539,25 @@ export function Settings({ onBack, onLogout, onNavigate, role = 'bishop', initia
                     className="w-full px-4 py-3 border border-gray-200 rounded-xl text-gray-700 focus:outline-none focus:border-[#D4AF37] focus:ring-1 focus:ring-[#D4AF37] transition-all"
                   />
                 </div>
+                {editingAccountId === null && (
+                  <div>
+                    <label className="block text-xs font-bold text-gray-400 uppercase tracking-widest mb-1.5 ml-1">
+                      Temporary Password
+                    </label>
+                    <input
+                      type="password"
+                      required
+                      value={formState.password}
+                      onChange={(e) => setFormState({ ...formState, password: e.target.value })}
+                      placeholder="Min. 8 characters"
+                      minLength={8}
+                      className="w-full px-4 py-3 border border-gray-200 rounded-xl text-gray-700 focus:outline-none focus:border-[#D4AF37] focus:ring-1 focus:ring-[#D4AF37] transition-all"
+                    />
+                    <p className="mt-1.5 ml-1 text-[10px] text-gray-400">
+                      The user can change this after their first login.
+                    </p>
+                  </div>
+                )}
                 <div>
                   <label className="block text-xs font-bold text-gray-400 uppercase tracking-widest mb-1.5 ml-1">Account Role</label>
                   <select 

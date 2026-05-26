@@ -370,7 +370,7 @@ export function AuditLog() {
                             <Cell key={i} fill={entry.color} />
                           ))}
                         </Pie>
-                        <Tooltip formatter={(v: number, n: string) => [v, n]} contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 4px 20px rgba(0,0,0,0.08)', fontSize: 11 }} />
+                        <Tooltip formatter={(v, n) => [Number(v ?? 0), n as string]} contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 4px 20px rgba(0,0,0,0.08)', fontSize: 11 }} />
                       </PieChart>
                     </ResponsiveContainer>
                   </div>

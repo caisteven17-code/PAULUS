@@ -72,27 +72,36 @@ export const StewardChatbot: React.FC<StewardChatbotProps> = ({ currentEntityId 
       // Fetch all records to calculate real health scores
       const allRecords = await dataService.getAllRecords();
       
-      // Get unique entities
-      const entities = Array.from(new Set(allRecords.map(r => r.entityId)));
-      
+      // Get unique entities (filter out any undefined entityIds)
+      const entities = Array.from(new Set(allRecords.map(r => r.entityId).filter((id): id is string => id != null)));
+
+      interface ScoreData {
+        id: string;
+        score: number;
+        class: string | undefined;
+        analysis: string;
+        recommendations: string | undefined;
+        dimensions: string;
+      }
+
       // Calculate real health scores for each entity (with caching)
       const scores = await Promise.all(
-        entities.map(async (id) => {
+        entities.map(async (id): Promise<ScoreData> => {
           // Check cache first
-          if (scoresCache.current[id]) return scoresCache.current[id];
+          if (scoresCache.current[id]) return scoresCache.current[id] as ScoreData;
 
           const record = allRecords.find(r => r.entityId === id);
           const score = await dataService.calculateHealthScore(
-            id, 
+            id,
             (record?.entityType as any) || 'parish',
             record?.entityClass
           );
-          
-          const scoreData = { 
-            id, 
-            score: score.compositeScore, 
+
+          const scoreData: ScoreData = {
+            id,
+            score: score.compositeScore,
             class: score.entityClass,
-            analysis: score.analysis,
+            analysis: score.analysis ?? '',
             recommendations: score.recommendations?.join('; '),
             dimensions: JSON.stringify(score.dimensions)
           };

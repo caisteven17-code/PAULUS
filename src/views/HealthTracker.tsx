@@ -45,13 +45,23 @@ export function HealthTracker() {
   const [filter, setFilter] = useState<'all' | 'birthdays' | 'checkups'>('all');
   const [search, setSearch] = useState('');
 
-  const [formData, setFormData] = useState({
+  const [formData, setFormData] = useState<{
+    name: string;
+    position: string;
+    parish: string;
+    birthDate: string;
+    lastCheckup: string;
+    healthStatus: 'good' | 'fair' | 'needs-attention';
+    notes: string;
+    email: string;
+    phone: string;
+  }>({
     name: '',
     position: '',
     parish: '',
     birthDate: '',
     lastCheckup: '',
-    healthStatus: 'good' as const,
+    healthStatus: 'good',
     notes: '',
     email: '',
     phone: '',

@@ -1,22 +1,17 @@
-import type { NextConfig } from 'next';
-
-const nextConfig: NextConfig = {
+/** @type {import('next').NextConfig} */
+const nextConfig = {
   reactStrictMode: true,
   distDir: process.env.NODE_ENV === 'production' ? '.next-build' : '.next',
   env: {
     GOOGLE_MAPS_PLATFORM_KEY: process.env.GOOGLE_MAPS_PLATFORM_KEY,
   },
-  // Allow images from external sources if needed
   images: {
     unoptimized: true,
   },
-  // Skip type checking during build for faster deployment
   typescript: {
     ignoreBuildErrors: true,
   },
-  eslint: {
-    ignoreDuringBuilds: true,
-  },
 };
 
-export default nextConfig;
+module.exports = nextConfig;
+

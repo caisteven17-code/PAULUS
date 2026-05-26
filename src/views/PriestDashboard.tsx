@@ -429,7 +429,7 @@ export function PriestDashboard({
   };
 
   // Helper for backward compatibility - always shows all sections since search is removed
-  const isVisible = () => true;
+  const isVisible = (_sectionName?: string) => true;
 
   const totalCollections = useMemo(() => filteredRecords.reduce((sum, r) => sum + r.collections, 0), [filteredRecords]);
   const totalDisbursements = useMemo(() => filteredRecords.reduce((sum, r) => sum + r.disbursements, 0), [filteredRecords]);
@@ -2046,7 +2046,7 @@ export function PriestDashboard({
                         <XAxis dataKey="label" axisLine={false} tickLine={false} tick={{ fill: '#374151', fontSize: 10, fontWeight: 700 }} />
                         <YAxis allowDecimals={false} axisLine={false} tickLine={false} tick={{ fill: '#6B7280', fontSize: 10 }} />
                         <Tooltip
-                          formatter={(value: number) => [`${value} priest${value !== 1 ? 's' : ''}`, 'Count']}
+                          formatter={(value) => [`${Number(value ?? 0)} priest${Number(value ?? 0) !== 1 ? 's' : ''}`, 'Count']}
                           labelFormatter={(label) => `${label} health score band`}
                           contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 10px 25px -5px rgba(0,0,0,0.1)', fontSize: '11px' }}
                         />
@@ -2109,9 +2109,9 @@ export function PriestDashboard({
                         />
                         <Tooltip
                           cursor={{ strokeDasharray: '3 3' }}
-                          formatter={(value: number, name: string) => [
-                            name === 'Collection growth' ? `${value}%` : `${value}/100`,
-                            name,
+                          formatter={(value, name) => [
+                            name === 'Collection growth' ? `${Number(value ?? 0)}%` : `${Number(value ?? 0)}/100`,
+                            name as string,
                           ]}
                           labelFormatter={(_, payload) => payload?.[0]?.payload?.name || 'Priest'}
                           contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 10px 25px -5px rgba(0,0,0,0.1)', fontSize: '11px' }}
@@ -2191,8 +2191,8 @@ export function PriestDashboard({
                             <XAxis dataKey="period" tick={{ fill: '#6B7280', fontSize: 10, fontWeight: 700 }} axisLine={false} tickLine={false} />
                             <YAxis tick={{ fill: '#6B7280', fontSize: 10 }} tickFormatter={(value) => `${Number(value) / 1000}k`} width={42} axisLine={false} tickLine={false} />
                             <Tooltip
-                              formatter={(value: number, name: string) => [
-                                name === 'averageCollections' ? formatCurrency(value) : `${value}%`,
+                              formatter={(value, name) => [
+                                name === 'averageCollections' ? formatCurrency(Number(value ?? 0)) : `${Number(value ?? 0)}%`,
                                 name === 'averageCollections' ? 'Avg Collections' : 'Avg Change',
                               ]}
                               labelFormatter={(label, payload) => {
@@ -2284,7 +2284,7 @@ export function PriestDashboard({
                   <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#E5E7EB" />
                   <XAxis dataKey="month" tick={{ fill: '#6B7280', fontSize: 10 }} />
                   <YAxis tick={{ fill: '#6B7280', fontSize: 10 }} tickFormatter={(value) => `${value / 1000}k`} width={50} />
-                  <Tooltip formatter={(value: number) => formatCurrency(value)} />
+                  <Tooltip formatter={(value) => formatCurrency(Number(value ?? 0))} />
                   <Legend />
                   <Line type="monotone" dataKey="actual" stroke="#1a472a" strokeWidth={3} dot={{ r: 3 }} name="Actual Collections" />
                 </LineChart>
@@ -2337,7 +2337,7 @@ export function PriestDashboard({
                       <XAxis dataKey="month" tick={{ fill: '#6B7280', fontSize: 11 }} />
                       <YAxis domain={[0, 100]} tick={{ fill: '#6B7280', fontSize: 11 }} tickFormatter={(v) => `${v}`} width={35} />
                       <Tooltip
-                        formatter={(value: any, name: string) => [`${value}/100`, name === 'score' ? 'Actual Score' : 'Forecasted Score']}
+                        formatter={(value, name) => [`${Number(value ?? 0)}/100`, name === 'score' ? 'Actual Score' : 'Forecasted Score']}
                         contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 4px 20px rgba(0,0,0,0.08)' }}
                       />
                       <ReferenceLine y={80} stroke="#10B981" strokeDasharray="4 4" label={{ value: 'Target (80)', position: 'insideTopRight', fill: '#10B981', fontSize: 9, fontWeight: 700 }} />
@@ -2478,7 +2478,7 @@ export function PriestDashboard({
                       <ReferenceLine y={15} stroke="#94A3B8" strokeDasharray="4 4" />
                       <Tooltip
                         cursor={{ strokeDasharray: '3 3' }}
-                        formatter={(value: number, name: string) => [`${value}%`, name === 'financialRisk' ? 'Financial Risk' : 'Improvement Target']}
+                        formatter={(value, name) => [`${Number(value ?? 0)}%`, name === 'financialRisk' ? 'Financial Risk' : 'Improvement Target']}
                         labelFormatter={(_, payload) => {
                           const row = payload?.[0]?.payload;
                           return row ? `${row.name} - ${row.action}` : 'Assignment';
@@ -2508,7 +2508,7 @@ export function PriestDashboard({
                       <XAxis dataKey="action" axisLine={false} tickLine={false} tick={{ fill: '#374151', fontSize: 10, fontWeight: 700 }} />
                       <YAxis allowDecimals={false} axisLine={false} tickLine={false} tick={{ fill: '#6B7280', fontSize: 10 }} />
                       <Tooltip
-                        formatter={(value: number) => [`${value} assignment${value === 1 ? '' : 's'}`, 'Count']}
+                        formatter={(value) => [`${Number(value ?? 0)} assignment${Number(value ?? 0) === 1 ? '' : 's'}`, 'Count']}
                         contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 10px 25px -5px rgba(0,0,0,0.1)', fontSize: '11px' }}
                       />
                       <Bar dataKey="count" radius={[8, 8, 0, 0]} barSize={36}>

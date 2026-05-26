@@ -318,7 +318,7 @@ export function Home({ onNavigate, role = 'bishop' }: HomeProps) {
                   viewport={{ once: true }}
                   transition={{ delay: index * 0.1 }}
                   onClick={() => {
-                    if (card.title === 'Parishes') onNavigate('parish');
+                    if (card.title === 'Parishes') onNavigate('parish-dashboard');
                     else if (card.title === 'Seminaries') onNavigate('seminaries');
                     else if (card.title === 'Diocesan Schools') onNavigate('school');
                   }}

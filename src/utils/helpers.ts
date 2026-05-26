@@ -2,7 +2,7 @@
  * Utility helper functions for the Diocese Financial Analytics System
  */
 
-import { Role } from './App';
+import { Role } from '../App';
 
 /**
  * Formats currency values to Philippine Peso format

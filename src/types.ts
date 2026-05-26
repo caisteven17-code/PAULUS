@@ -12,6 +12,7 @@ export type EntityClass = 'Class A' | 'Class B' | 'Class C' | 'Class D' | 'Class
 export interface FinancialRecord {
   id?: string;
   month: string;
+  year?: number;
   collections: number;
   consumableCollections: number;
   disbursements: number;
