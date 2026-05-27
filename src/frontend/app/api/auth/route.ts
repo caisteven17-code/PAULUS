@@ -1,0 +1,14 @@
+import { NextRequest } from 'next/server';
+import { proxyToBackend } from '../../../src/lib/backend-proxy';
+
+export async function POST(req: NextRequest) {
+  return proxyToBackend(req, { path: '/auth/login' });
+}
+
+export async function DELETE(req: NextRequest) {
+  return proxyToBackend(req, { path: '/auth/logout', method: 'POST' });
+}
+
+export async function GET(req: NextRequest) {
+  return proxyToBackend(req, { path: '/auth/me' });
+}

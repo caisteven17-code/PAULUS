@@ -9,6 +9,17 @@
 -- Enable UUID generation
 CREATE EXTENSION IF NOT EXISTS "pgcrypto";
 
+-- Helper to format IDs securely without risk of truncation
+CREATE OR REPLACE FUNCTION format_seq_id(prefix TEXT, seq_name TEXT, min_digits INT DEFAULT 5)
+RETURNS TEXT AS $$
+DECLARE
+  val BIGINT;
+BEGIN
+  val := nextval(seq_name);
+  RETURN prefix || lpad(val::text, GREATEST(min_digits, length(val::text))::int, '0');
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER SET search_path = public, pg_catalog;
+
 -- =============================================================================
 -- 1. USER PROFILES
 --    Extends Supabase auth.users with diocese-specific metadata.
@@ -19,9 +30,10 @@ CREATE TABLE IF NOT EXISTS profiles (
   email           TEXT,
   role            TEXT        NOT NULL DEFAULT 'parish_priest'
     CHECK (role IN (
-      'bishop', 'diocese_admin',
+      'bishop', 'chancellor', 'diocesan_oeconomus', 'finance_staff',
       'parish_priest', 'parish_secretary',
-      'seminary_rector', 'school_registrar'
+      'seminary_rector', 'seminary_oeconomus',
+      'school_superintendent', 'finance_supervisor', 'finance_officer', 'school_principal'
     )),
   entity_id       TEXT,
   entity_name     TEXT,
@@ -39,9 +51,9 @@ CREATE TABLE IF NOT EXISTS profiles (
 
 -- Auto-create a profile row whenever a new user signs up or is created
 CREATE OR REPLACE FUNCTION handle_new_user()
-RETURNS TRIGGER LANGUAGE plpgsql SECURITY DEFINER AS $$
+RETURNS TRIGGER LANGUAGE plpgsql SECURITY DEFINER SET search_path = public, pg_catalog AS $$
 BEGIN
-  INSERT INTO public.profiles (id, email, role, entity_id, entity_name, entity_type, display_name)
+  INSERT INTO public.profiles (auth_user_id, email, role, entity_id, entity_name, entity_type, display_name)
   VALUES (
     NEW.id,
     NEW.email,
@@ -51,7 +63,7 @@ BEGIN
     NEW.raw_user_meta_data->>'entityType',
     COALESCE(NEW.raw_user_meta_data->>'displayName', split_part(NEW.email, '@', 1))
   )
-  ON CONFLICT (id) DO UPDATE SET
+  ON CONFLICT (auth_user_id) DO UPDATE SET
     email        = EXCLUDED.email,
     role         = COALESCE(EXCLUDED.role, profiles.role),
     entity_id    = COALESCE(EXCLUDED.entity_id, profiles.entity_id),
@@ -72,8 +84,10 @@ CREATE TRIGGER on_auth_user_created
 -- =============================================================================
 -- 2. FINANCIAL RECORDS
 -- =============================================================================
+CREATE SEQUENCE IF NOT EXISTS financial_records_id_seq START 1;
+
 CREATE TABLE IF NOT EXISTS financial_records (
-  id                                      TEXT        PRIMARY KEY DEFAULT gen_random_uuid()::text,
+  id                                      TEXT        PRIMARY KEY DEFAULT format_seq_id('FIN-', 'financial_records_id_seq', 6),
   month                                   TEXT        NOT NULL,
   year                                    INTEGER,          -- ← required for time-travel / Digital Twin
   collections                             NUMERIC     NOT NULL DEFAULT 0,
@@ -114,8 +128,10 @@ CREATE INDEX IF NOT EXISTS idx_financial_records_period
 -- =============================================================================
 -- 3. PROJECTS
 -- =============================================================================
+CREATE SEQUENCE IF NOT EXISTS projects_id_seq START 1;
+
 CREATE TABLE IF NOT EXISTS projects (
-  id                   TEXT        PRIMARY KEY DEFAULT gen_random_uuid()::text,
+  id                   TEXT        PRIMARY KEY DEFAULT format_seq_id('PRJ-', 'projects_id_seq', 3),
   name                 TEXT        NOT NULL,
   description          TEXT,
   fund_usage           TEXT,
@@ -145,8 +161,10 @@ CREATE INDEX IF NOT EXISTS idx_projects_entity
 -- =============================================================================
 -- 4. DONATIONS
 -- =============================================================================
+CREATE SEQUENCE IF NOT EXISTS donations_id_seq START 1;
+
 CREATE TABLE IF NOT EXISTS donations (
-  id                  TEXT        PRIMARY KEY DEFAULT gen_random_uuid()::text,
+  id                  TEXT        PRIMARY KEY DEFAULT format_seq_id('DON-', 'donations_id_seq', 5),
   project_id          TEXT        NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
   donor_name          TEXT,
   amount              NUMERIC     NOT NULL DEFAULT 0,
@@ -165,8 +183,10 @@ CREATE INDEX IF NOT EXISTS idx_donations_project
 -- =============================================================================
 -- 5. PROJECT EXPENSES
 -- =============================================================================
+CREATE SEQUENCE IF NOT EXISTS project_expenses_id_seq START 1;
+
 CREATE TABLE IF NOT EXISTS project_expenses (
-  id                  TEXT        PRIMARY KEY DEFAULT gen_random_uuid()::text,
+  id                  TEXT        PRIMARY KEY DEFAULT format_seq_id('EXP-', 'project_expenses_id_seq', 5),
   project_id          TEXT        NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
   description         TEXT        NOT NULL,
   amount              NUMERIC     NOT NULL DEFAULT 0,

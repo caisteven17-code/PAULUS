@@ -1,0 +1,49 @@
+{
+  "name": "capstone-backend",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "dev": "npm run dev:all",
+    "dev:gateway": "npm run build && dotenv -e ../../.env -- node dist/apps/api-gateway/main.js",
+    "dev:auth": "npm run build && dotenv -e ../../.env -- node dist/apps/auth-service/main.js",
+    "dev:entity": "npm run build && dotenv -e ../../.env -- node dist/apps/entity-service/main.js",
+    "dev:financial": "npm run build && dotenv -e ../../.env -- node dist/apps/financial-service/main.js",
+    "dev:project": "npm run build && dotenv -e ../../.env -- node dist/apps/project-service/main.js",
+    "dev:analytics": "npm run build && dotenv -e ../../.env -- node dist/apps/analytics-service/main.js",
+    "dev:all": "npm run build && dotenv -e ../../.env -- concurrently -n gateway,auth,entity,financial,project,analytics -c cyan,green,yellow,blue,magenta,gray \"node dist/apps/api-gateway/main.js\" \"node dist/apps/auth-service/main.js\" \"node dist/apps/entity-service/main.js\" \"node dist/apps/financial-service/main.js\" \"node dist/apps/project-service/main.js\" \"node dist/apps/analytics-service/main.js\"",
+    "build": "tsc -p tsconfig.json",
+    "start": "npm run start:all",
+    "start:gateway": "dotenv -e ../../.env -- node dist/apps/api-gateway/main.js",
+    "start:auth": "dotenv -e ../../.env -- node dist/apps/auth-service/main.js",
+    "start:entity": "dotenv -e ../../.env -- node dist/apps/entity-service/main.js",
+    "start:financial": "dotenv -e ../../.env -- node dist/apps/financial-service/main.js",
+    "start:project": "dotenv -e ../../.env -- node dist/apps/project-service/main.js",
+    "start:analytics": "dotenv -e ../../.env -- node dist/apps/analytics-service/main.js",
+    "start:all": "dotenv -e ../../.env -- concurrently -n gateway,auth,entity,financial,project,analytics -c cyan,green,yellow,blue,magenta,gray \"node dist/apps/api-gateway/main.js\" \"node dist/apps/auth-service/main.js\" \"node dist/apps/entity-service/main.js\" \"node dist/apps/financial-service/main.js\" \"node dist/apps/project-service/main.js\" \"node dist/apps/analytics-service/main.js\""
+  },
+  "dependencies": {
+    "@nestjs/common": "^11.1.6",
+    "@nestjs/config": "^4.0.2",
+    "@nestjs/core": "^11.1.6",
+    "@nestjs/platform-express": "^11.1.6",
+    "@supabase/supabase-js": "^2.106.1",
+    "bcrypt": "^6.0.0",
+    "cookie-parser": "^1.4.7",
+    "jsonwebtoken": "^9.0.2",
+    "nodemailer": "^8.0.4",
+    "reflect-metadata": "^0.2.2",
+    "rxjs": "^7.8.2"
+  },
+  "devDependencies": {
+    "@types/bcrypt": "^6.0.0",
+    "@types/cookie-parser": "^1.4.9",
+    "@types/express": "^5.0.3",
+    "@types/jsonwebtoken": "^9.0.10",
+    "@types/node": "^24.6.1",
+    "@types/nodemailer": "^7.0.1",
+    "concurrently": "^9.2.1",
+    "dotenv-cli": "^8.0.0",
+    "tsx": "^4.21.0",
+    "typescript": "^5.9.3"
+  }
+}
