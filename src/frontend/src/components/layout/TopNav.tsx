@@ -217,7 +217,8 @@ export function TopNav({
     );
   }
 
-  if (role === 'bishop' || role === 'admin') {
+  const isDioceseHeader = ['bishop', 'admin', 'chancellor', 'diocesan_oeconomus', 'finance_staff'].includes(role);
+  if (isDioceseHeader) {
     return (
       <header className="bg-black text-white border-b border-white/5 sticky top-0 z-30 h-16 flex items-center w-full">
         <div className="flex items-center justify-between w-full px-8">

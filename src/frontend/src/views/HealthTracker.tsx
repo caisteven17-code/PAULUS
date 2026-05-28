@@ -5,6 +5,8 @@ import { Heart, Plus, Trash2, Edit2, X, Calendar, Users, Cake, Stethoscope, Sear
 import { motion, AnimatePresence } from 'motion/react';
 import { useAuth } from '../firebase';
 import { formatDate } from '../lib/format';
+import { usePermissions } from '../hooks/usePermissions';
+
 
 interface PriestRecord {
   id: string;
@@ -71,7 +73,9 @@ export function HealthTracker() {
     localStorage.setItem('priest_health_records', JSON.stringify(priests));
   }, [priests]);
 
-  const canManageRecords = user?.role === 'bishop' || user?.role === 'admin';
+  const { permissions } = usePermissions();
+
+  const canManageRecords = permissions.manage_assignments === true || permissions.view_diocese === true;
 
   const calculateAge = (birthDate: string) => {
     const today = new Date();

@@ -28,10 +28,35 @@ export function Projects({ role }: ProjectsProps) {
   const [showEntityFilterDropdown, setShowEntityFilterDropdown] = useState(false);
   const [userContext, setUserContext] = useState<{ id: string, type: EntityType } | null>(null);
 
+  const [customRoles, setCustomRoles] = useState<any[]>([]);
+
+  useEffect(() => {
+    const loadRoles = async () => {
+      try {
+        const res = await fetch('/api/admin/roles');
+        if (!res.ok) throw new Error();
+        const data = await res.json();
+        if (Array.isArray(data)) setCustomRoles(data);
+      } catch {
+        const stored = localStorage.getItem('diocese_roles');
+        if (stored) setCustomRoles(JSON.parse(stored));
+      }
+    };
+    loadRoles();
+  }, []);
+
   // Load the current user's role permissions dynamically
   const permissions = useMemo(() => {
     const userRole = auth.currentUser?.role || 'bishop';
-    const matchingRole = INITIAL_ROLES.find(r => r.id === userRole);
+    
+    // First, look in dynamically loaded custom roles
+    let matchingRole = customRoles.find(r => r.id === userRole);
+    
+    // Fall back to INITIAL_ROLES
+    if (!matchingRole) {
+      matchingRole = INITIAL_ROLES.find(r => r.id === userRole);
+    }
+
     if (matchingRole) {
       return {
         manage_projects: matchingRole.permissions.manage_projects !== false,
@@ -40,16 +65,17 @@ export function Projects({ role }: ProjectsProps) {
     }
     return {
       manage_projects: userRole === 'bishop' || userRole === 'admin',
-      view_projects: true
+      view_projects: userRole === 'bishop' || userRole === 'admin'
     };
-  }, [auth.currentUser]);
+  }, [customRoles, auth.currentUser]);
 
   useEffect(() => {
     const unsubscribe = auth.onAuthStateChanged((user: any) => {
       if (user) {
+        const isDioceseRole = ['bishop', 'admin', 'chancellor', 'diocesan_oeconomus', 'finance_staff'].includes(user.role);
         setUserContext({
           id: user.displayName || 'Unknown Entity',
-          type: user.role === 'bishop' ? 'diocese' : user.role as EntityType
+          type: isDioceseRole ? 'diocese' : user.role as EntityType
         });
       }
     });
@@ -109,7 +135,7 @@ export function Projects({ role }: ProjectsProps) {
     };
   }, [userContext, filterEntityType]);
 
-  const isDiocese = role === 'bishop' || role === 'admin';
+  const isDiocese = permissions.view_diocese === true;
 
   const filteredProjects = projects.filter(p => {
     const query = searchQuery.toLowerCase();

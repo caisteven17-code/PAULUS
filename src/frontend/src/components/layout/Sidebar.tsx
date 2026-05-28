@@ -21,8 +21,10 @@ import {
   Shield
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
-import { APP_CONFIG } from '../../constants';
+import { APP_CONFIG, INITIAL_ROLES } from '../../constants';
 import { Timeframe } from '../../App';
+import { auth } from '../../firebase';
+import { usePermissions } from '../../hooks/usePermissions';
 
 interface SidebarProps {
   activeTab: string;
@@ -54,6 +56,7 @@ export function Sidebar({
   const [showSchoolDropdown, setShowSchoolDropdown] = React.useState(activeTab === 'school' || activeTab.startsWith('school-'));
   const isAdminTab = (t: string) => t.startsWith('admin-') || t === 'settings' || t === 'audit-log';
   const [showAdminDropdown, setShowAdminDropdown] = React.useState(isAdminTab(activeTab));
+  const { permissions } = usePermissions();
 
   // Auto-expand dropdowns for their active sections
   React.useEffect(() => {
@@ -94,10 +97,12 @@ export function Sidebar({
   ];
 
   const hasDioceseAccess = role === 'bishop' || role === 'admin';
-  const canViewParishes = hasDioceseAccess || role === 'priest';
-  const canViewPriests = hasDioceseAccess || role === 'priest';
-  const canViewSeminaries = hasDioceseAccess || role === 'seminary';
-  const canViewSchools = hasDioceseAccess || role === 'school';
+
+  const canViewParishes = permissions.view_parish_dashboard === true;
+  const canViewPriests = permissions.view_priests === true;
+  const canViewSeminaries = permissions.view_seminary_dashboard === true;
+  const canViewSchools = permissions.view_school_dashboard === true;
+  const canViewProjects = permissions.view_projects === true;
 
   return (
     <aside className="hidden md:flex flex-col w-64 bg-black text-white h-screen sticky top-0 left-0 z-40 shadow-2xl border-r border-white/5">
@@ -150,8 +155,8 @@ export function Sidebar({
           );
         })()}
 
-        {/* Announcements — right after Home for bishop/admin */}
-        {hasDioceseAccess && (() => {
+        {/* Announcements — right after Home for authorized roles */}
+        {(permissions.view_announcements === true || permissions.manage_announcements === true) && (() => {
           const isActive = activeTab === 'announcements';
           return (
             <button
@@ -428,6 +433,7 @@ export function Sidebar({
 
         {/* Projects */}
         {(() => {
+          if (!canViewProjects) return null;
           const isActive = activeTab === 'projects';
           return (
             <button
@@ -447,7 +453,7 @@ export function Sidebar({
           );
         })()}
 
-        {(role === 'admin' || role === 'bishop') && (() => {
+        {permissions.digital_twin === true && (() => {
           const isActive = activeTab === 'digital-twin';
           return (
             <button
@@ -468,13 +474,26 @@ export function Sidebar({
         })()}
 
         {/* Administration Dropdown */}
-        {hasDioceseAccess && (
+        {(permissions.create_users === true ||
+          permissions.manage_roles === true ||
+          permissions.manage_entities === true ||
+          permissions.download_csv === true ||
+          permissions.upload_csv_admin === true ||
+          permissions.upload_csv_entity === true ||
+          permissions.view_audit_logs === true) && (
           <div>
             <div className={`relative w-full flex items-center gap-3 rounded-xl transition-all duration-300 ${
               isAdminTab(activeTab) ? 'bg-white/10 text-gold-400' : 'text-white/50'
             }`}>
               <button
-                onClick={() => { onNavigate('admin-user-management'); setShowAdminDropdown(true); }}
+                onClick={() => {
+                  if (permissions.create_users) onNavigate('admin-user-management');
+                  else if (permissions.manage_roles) onNavigate('admin-user-role');
+                  else if (permissions.manage_entities) onNavigate('admin-entity');
+                  else if (permissions.download_csv || permissions.upload_csv_admin || permissions.upload_csv_entity) onNavigate('admin-data');
+                  else if (permissions.view_audit_logs) onNavigate('audit-log');
+                  setShowAdminDropdown(true);
+                }}
                 className="flex-1 flex items-center gap-3 px-4 py-3 hover:text-white transition-colors group"
               >
                 <Settings className={`w-4 h-4 transition-colors ${isAdminTab(activeTab) ? 'text-gold-400' : 'text-white/20 group-hover:text-white/40'}`} />
@@ -497,11 +516,11 @@ export function Sidebar({
                   className="mt-1 pl-6 space-y-0"
                 >
                   {[
-                    { id: 'admin-user-management', label: 'User Management',   icon: Users,      show: true },
-                    { id: 'admin-user-role',       label: 'User Role Control', icon: UserCog,    show: true },
-                    { id: 'admin-entity',          label: 'Entity Management', icon: FileText,   show: true },
-                    { id: 'admin-data',            label: 'Data Management',   icon: FileText,   show: true },
-                    { id: 'audit-log',             label: 'Audit Log',         icon: ScrollText, show: role === 'admin' || role === 'bishop' },
+                    { id: 'admin-user-management', label: 'User Management',   icon: Users,      show: permissions.create_users === true },
+                    { id: 'admin-user-role',       label: 'User Role Control', icon: UserCog,    show: permissions.manage_roles === true },
+                    { id: 'admin-entity',          label: 'Entity Management', icon: FileText,   show: permissions.manage_entities === true },
+                    { id: 'admin-data',            label: 'Data Management',   icon: FileText,   show: permissions.download_csv === true || permissions.upload_csv_admin === true || permissions.upload_csv_entity === true },
+                    { id: 'audit-log',             label: 'Audit Log',         icon: ScrollText, show: permissions.view_audit_logs === true },
                   ].filter(item => item.show).map(item => {
                     const Icon = item.icon;
                     const active = activeTab === item.id;
@@ -524,6 +543,7 @@ export function Sidebar({
             </AnimatePresence>
           </div>
         )}
+
       </nav>
 
       <div className="p-4 border-t border-white/5" />

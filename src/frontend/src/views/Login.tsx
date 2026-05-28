@@ -133,7 +133,7 @@ export function Login({ onLogin }: LoginProps) {
         role        = getAppRole(accessRole);
         entityName  = 'San Isidro Labrador Parish';
       } else if (storedUser) {
-        if (storedUser.password && password !== storedUser.password) {
+        if (!storedUser.password || password !== storedUser.password) {
           throw new Error('Invalid email or password');
         }
         accessRole  = normalizeAccessRole(storedUser.roleId || storedUser.accessRole || storedUser.role);

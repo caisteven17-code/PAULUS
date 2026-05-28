@@ -37,6 +37,7 @@ import {
   SubmissionStepId,
 } from '../components/submission/types';
 import { SUBMISSION_CONFIG } from '../constants';
+import { usePermissions } from '../hooks/usePermissions';
 
 interface ParishDataSubmissionProps {
   parishName?: string;
@@ -72,6 +73,7 @@ export function ParishDataSubmission({
   onBack,
   onImport,
 }: ParishDataSubmissionProps) {
+  const { permissions } = usePermissions();
   const institutionType = useMemo(() => resolveInstitutionType(parishClass), [parishClass]);
   const heading = institutionHeadingMap[institutionType];
   const template = submissionTemplates[institutionType];
@@ -510,6 +512,7 @@ export function ParishDataSubmission({
               institutionLabel={heading}
               isLoading={isTemplateLoading}
               onDownload={handleDownloadTemplate}
+              disabled={permissions?.download_csv !== true}
             />
           </motion.div>
 
@@ -525,6 +528,7 @@ export function ParishDataSubmission({
               onFileSelect={handleFileSelection}
               onRequestUpload={handleRequestUpload}
               onRemoveFile={() => handleFileSelection(null)}
+              disabled={permissions?.upload_csv_entity !== true}
             />
           </motion.div>
         </div>

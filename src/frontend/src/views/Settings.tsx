@@ -24,9 +24,11 @@ import { EntityManagementControl } from '../components/settings/EntityManagement
 import { ParishClassificationLogic } from '../components/settings/ParishClassificationLogic';
 import { DashboardHeader } from '../components/layout/DashboardHeader';
 import { getAccessRoleLabel, getAppRole, normalizeAccessRole } from '../lib/access';
+import { usePermissions } from '../hooks/usePermissions';
 
 export function Settings({ onBack, onLogout, onNavigate, role = 'bishop', initialTab }: SettingsProps) {
-  const [activeTab, setActiveTab] = useState(initialTab || ((role === 'bishop' || role === 'admin') ? 'user-management' : 'security'));
+  const { permissions } = usePermissions();
+  const [activeTab, setActiveTab] = useState(initialTab || (permissions.create_users ? 'user-management' : 'security'));
   type InstitutionType = 'diocese' | 'parish' | 'seminary' | 'school';
 
   React.useEffect(() => {
@@ -205,10 +207,43 @@ export function Settings({ onBack, onLogout, onNavigate, role = 'bishop', initia
     setTimeout(() => setShowProfileSuccess(false), 3000);
   };
 
-  // Auto-save roles when they change
+  // Fetch roles from Supabase database
+  const fetchRoles = React.useCallback(async () => {
+    try {
+      const res = await fetch('/api/admin/roles');
+      if (!res.ok) throw new Error('API error');
+      const data = await res.json();
+      if (Array.isArray(data) && data.length > 0) {
+        setRoles(data);
+      }
+    } catch {
+      const stored = localStorage.getItem('diocese_roles');
+      if (stored) {
+        setRoles(JSON.parse(stored));
+      } else {
+        setRoles(INITIAL_ROLES);
+      }
+    }
+  }, []);
+
   React.useEffect(() => {
-    // localStorage.setItem('diocese_roles', JSON.stringify(roles));
-  }, [roles]);
+    fetchRoles();
+  }, [fetchRoles]);
+
+  const handleUpdateRoles = async (newRoles: UserRole[]) => {
+    setRoles(newRoles);
+    try {
+      const res = await fetch('/api/admin/roles', {
+        method:  'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body:    JSON.stringify({ roles: newRoles }),
+      });
+      if (!res.ok) throw new Error('Failed to save roles');
+    } catch (err) {
+      console.error('Error saving roles, falling back to local storage:', err);
+      localStorage.setItem('diocese_roles', JSON.stringify(newRoles));
+    }
+  };
 
   // Auto-save accounts when they change
   React.useEffect(() => {
@@ -250,17 +285,31 @@ export function Settings({ onBack, onLogout, onNavigate, role = 'bishop', initia
     { id: 'school', label: 'School' }
   ];
 
-  const rolesByInstitutionType: Record<InstitutionType, string[]> = {
-    diocese: ['bishop', 'chancellor', 'diocesan_oeconomus', 'finance_staff'],
-    parish: ['parish_priest', 'parish_secretary'],
-    seminary: ['seminary_rector', 'seminary_oeconomus'],
-    school: ['school_superintendent', 'finance_supervisor', 'finance_officer', 'school_principal'],
-  };
-
   const filteredRoles = React.useMemo(() => {
     if (!formState.institutionType) return [];
-    const allowedIds = rolesByInstitutionType[formState.institutionType];
-    return roles.filter(r => allowedIds.includes(r.id));
+    
+    const instType = formState.institutionType as InstitutionType;
+    const staticRoles: Record<InstitutionType, string[]> = {
+      diocese: ['bishop', 'chancellor', 'diocesan_oeconomus', 'finance_staff'],
+      parish: ['parish_priest', 'parish_secretary'],
+      seminary: ['seminary_rector', 'seminary_oeconomus'],
+      school: ['school_superintendent', 'finance_supervisor', 'finance_officer', 'school_principal'],
+    };
+
+    return roles.filter(r => {
+      const allowedIds = staticRoles[instType];
+      if (allowedIds && allowedIds.includes(r.id)) return true;
+
+      // Dynamic custom role type detection based on permissions
+      if (r.permissions.view_diocese && formState.institutionType === 'diocese') return true;
+      if (r.permissions.view_parish && formState.institutionType === 'parish') return true;
+      if (r.permissions.view_seminary && formState.institutionType === 'seminary') return true;
+      
+      const isSchoolPerm = r.permissions.view_school || r.permissions.view_school_cluster || r.permissions.view_school_all;
+      if (isSchoolPerm && formState.institutionType === 'school') return true;
+
+      return false;
+    });
   }, [formState.institutionType, roles]);
 
   const institutionNames = React.useMemo(() => {
@@ -896,7 +945,7 @@ export function Settings({ onBack, onLogout, onNavigate, role = 'bishop', initia
                   <div className="space-y-4">
                     <div>
                       <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Access Role</p>
-                      <p className="text-sm font-bold text-gray-900 mt-1">{auth.currentUser?.roleLabel || profileForm.position || 'User'}</p>
+                      <p className="text-sm font-bold text-gray-900 mt-1">{getAccessRoleLabel(auth.currentUser?.role) || profileForm.position || 'User'}</p>
                     </div>
                     <div>
                       <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Status</p>
@@ -957,7 +1006,7 @@ export function Settings({ onBack, onLogout, onNavigate, role = 'bishop', initia
             </div>
           )}
 
-          {activeTab === 'user-management' && (
+          {activeTab === 'user-management' && permissions.create_users === true && (
             <div className="bg-white rounded-[32px] shadow-sm border border-gray-100 p-8">
               <div className="flex items-center justify-between mb-8">
                 <div className="space-y-1">
@@ -1084,11 +1133,11 @@ export function Settings({ onBack, onLogout, onNavigate, role = 'bishop', initia
             </div>
           )}
 
-          {activeTab === 'role-control' && (
-            <UserRoleControl roles={roles} onUpdateRoles={setRoles} />
+          {activeTab === 'role-control' && permissions.manage_roles === true && (
+            <UserRoleControl roles={roles} onUpdateRoles={handleUpdateRoles} accounts={accounts} />
           )}
 
-          {activeTab === 'entity-management' && (
+          {activeTab === 'entity-management' && permissions.manage_entities === true && (
             <EntityManagementControl 
               parishes={parishes}
               seminaries={seminaries}
@@ -1100,11 +1149,11 @@ export function Settings({ onBack, onLogout, onNavigate, role = 'bishop', initia
             />
           )}
 
-          {activeTab === 'data-management' && (
+          {activeTab === 'data-management' && (permissions.download_csv === true || permissions.upload_csv_admin === true || permissions.upload_csv_entity === true) && (
             <DataManagementControl />
           )}
 
-          {activeTab === 'parish-classification' && (
+          {activeTab === 'parish-classification' && permissions.manage_entities === true && (
             <ParishClassificationLogic
               parishes={parishes.map(p => ({
                 id: p.id,

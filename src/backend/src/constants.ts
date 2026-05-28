@@ -84,8 +84,8 @@ export const ALL_PERMISSIONS = [
     category: 'User Management',
     icon: Users,
     permissions: [
-      { id: 'create_users', name: 'Create User Accounts', description: 'Allows the user to create new accounts for other personnel.' },
-      { id: 'manage_roles', name: 'Manage User Roles', description: 'Allows the user to modify role permissions and assign roles to users.' },
+      { id: 'create_users', name: 'Manage User Accounts', description: 'Can add, update, or remove staff accounts in the system.' },
+      { id: 'manage_roles', name: 'Manage User Roles', description: 'Can change what each staff member is allowed to see and do in the system.' },
     ]
   }
 ];

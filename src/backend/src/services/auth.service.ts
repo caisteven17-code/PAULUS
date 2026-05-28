@@ -161,4 +161,104 @@ export class AppAuthService {
     }
     throw new Error(`Unknown action: ${action}`);
   }
+
+  async listRoles() {
+    const { data: rolesData, error: rolesError } = await this.supabaseService.supabaseServer
+      .from('roles')
+      .select('*')
+      .order('is_predefined', { ascending: false })
+      .order('name');
+    
+    if (rolesError) throw rolesError;
+
+    const { data: permsData, error: permsError } = await this.supabaseService.supabaseServer
+      .from('role_permissions')
+      .select('*');
+
+    if (permsError) throw permsError;
+
+    return (rolesData ?? []).map(role => {
+      const permissions: Record<string, boolean> = {};
+      const permissionKeys = [
+        'view_diocese', 'view_parish', 'view_seminary', 'view_school', 
+        'view_school_cluster', 'view_school_all', 'download_csv', 
+        'upload_csv_admin', 'upload_csv_entity', 'create_users', 
+        'manage_roles', 'digital_twin', 'manage_entities', 
+        'manage_projects', 'view_projects', 'manage_announcements', 
+        'view_announcements', 'view_priests', 'manage_assignments', 
+        'view_audit_logs', 'view_parish_dashboard', 'view_seminary_dashboard', 
+        'view_school_dashboard'
+      ];
+      
+      permissionKeys.forEach(k => {
+        permissions[k] = false;
+      });
+
+      const activePerms = (permsData ?? []).filter((p: any) => p.role_id === role.id);
+      activePerms.forEach((p: any) => {
+        permissions[p.permission_id] = true;
+      });
+
+      return {
+        id: role.id,
+        name: role.name,
+        color: role.color,
+        permissions,
+        is_predefined: role.is_predefined,
+      };
+    });
+  }
+
+  async saveRoles(rolesList: any[]) {
+    const { data: dbRoles, error: rolesError } = await this.supabaseService.supabaseServer
+      .from('roles')
+      .select('*');
+    if (rolesError) throw rolesError;
+
+    const payloadIds = new Set(rolesList.map(r => r.id));
+    
+    const rolesToDelete = (dbRoles ?? []).filter(r => !r.is_predefined && !payloadIds.has(r.id));
+    for (const role of rolesToDelete) {
+      await this.supabaseService.supabaseServer
+        .from('roles')
+        .delete()
+        .eq('id', role.id);
+    }
+
+    for (const role of rolesList) {
+      if (!role.is_predefined) {
+        const { error: upsertErr } = await this.supabaseService.supabaseServer
+          .from('roles')
+          .upsert({
+            id: role.id,
+            name: role.name,
+            color: role.color,
+            is_predefined: false,
+            updated_at: new Date().toISOString(),
+          });
+        if (upsertErr) throw upsertErr;
+      }
+
+      await this.supabaseService.supabaseServer
+        .from('role_permissions')
+        .delete()
+        .eq('role_id', role.id);
+
+      const activeKeys = Object.entries(role.permissions ?? {})
+        .filter(([_, val]) => val === true)
+        .map(([key]) => ({
+          role_id: role.id,
+          permission_id: key,
+        }));
+
+      if (activeKeys.length > 0) {
+        const { error: insertPermErr } = await this.supabaseService.supabaseServer
+          .from('role_permissions')
+          .insert(activeKeys);
+        if (insertPermErr) throw insertPermErr;
+      }
+    }
+
+    return { ok: true };
+  }
 }

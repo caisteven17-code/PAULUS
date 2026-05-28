@@ -78,4 +78,28 @@ export class AuthController {
       return res.status(HttpStatus.BAD_REQUEST).json({ error: err.message });
     }
   }
+
+  @Get('admin/roles')
+  async listRoles(@Res() res: Response) {
+    try {
+      const roles = await this.authService.listRoles();
+      return res.status(HttpStatus.OK).json(roles);
+    } catch (err: any) {
+      return res.status(HttpStatus.INTERNAL_SERVER_ERROR).json({ error: err.message });
+    }
+  }
+
+  @Post('admin/roles')
+  async saveRoles(@Body() body: any, @Res() res: Response) {
+    try {
+      const { roles } = body;
+      if (!Array.isArray(roles)) {
+        return res.status(HttpStatus.BAD_REQUEST).json({ error: 'roles array is required.' });
+      }
+      const result = await this.authService.saveRoles(roles);
+      return res.status(HttpStatus.OK).json(result);
+    } catch (err: any) {
+      return res.status(HttpStatus.BAD_REQUEST).json({ error: err.message });
+    }
+  }
 }

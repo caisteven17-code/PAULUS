@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { ArrowLeft, CalendarClock, ChevronDown } from 'lucide-react';
+import { ArrowLeft, CalendarClock, ChevronDown, ShieldAlert } from 'lucide-react';
 import { TopNav } from './components/layout/TopNav';
 import { Sidebar } from './components/layout/Sidebar';
 import { Footer } from './components/layout/Footer';
@@ -22,7 +22,8 @@ import { ParishDataSubmission } from './views/ParishDataSubmission';
 import { BottomNav } from './components/ui/BottomNav';
 import { StewardChatbot } from './components/ui/StewardChatbot';
 import { auth, AuthUser } from './firebase';
-import { AppRole } from './lib/access';
+import { AppRole, getAppRole } from './lib/access';
+import { usePermissions } from './hooks/usePermissions';
 
 export type Role = 'bishop' | 'admin' | 'priest' | 'school' | 'seminary';
 export type Timeframe = '6m' | '1y' | 'all';
@@ -47,18 +48,9 @@ const toPriestTimeframe = (tf: Timeframe): '3m' | '6m' | '12m' | undefined => {
 };
 
 const appRoleToRole = (appRole: string): Role => {
-  const map: Record<string, Role> = {
-    bishop:           'bishop',
-    admin:            'admin',
-    parish_priest:    'priest',
-    parish_secretary: 'priest',
-    school:           'school',
-    school_registrar: 'school',
-    seminary:         'seminary',
-    seminary_rector:  'seminary',
-    diocese_admin:    'admin',
-  };
-  return map[appRole] ?? 'priest';
+  const mapped = getAppRole(appRole);
+  if (mapped === 'parish_priest' || mapped === 'parish_secretary') return 'priest';
+  return mapped as Role;
 };
 
 export default function App() {
@@ -66,6 +58,7 @@ export default function App() {
   const [isAuthReady, setIsAuthReady] = useState(false);
   const [role, setRole] = useState<Role>('bishop');
   const [activeTab, setActiveTab] = useState('home');
+  const { permissions } = usePermissions();
   const [timeframe, setTimeframe] = useState<Timeframe>('6m');
   const [year, setYear] = useState<number>(2026);
   const [digitalTwinSession, setDigitalTwinSession] = useState<DigitalTwinSession | null>(null);
@@ -401,6 +394,18 @@ export default function App() {
     // Dynamically retrieve the logged-in user's assigned parish/institution name
     const currentEntityName = auth.currentUser?.entityName || "San Isidro Labrador Parish";
 
+    const renderAccessDenied = () => (
+      <div className="flex flex-col items-center justify-center h-[calc(100vh-80px)] bg-church-light p-6 text-center">
+        <div className="w-16 h-16 bg-red-50 border border-red-200 rounded-2xl flex items-center justify-center text-red-600 mb-4 animate-pulse">
+          <ShieldAlert className="w-8 h-8" />
+        </div>
+        <h3 className="text-xl font-bold text-gray-900 mb-2">Access Restricted</h3>
+        <p className="text-sm text-gray-500 max-w-sm leading-relaxed">
+          Your user account role does not have permission to access this page. Please contact your system administrator to adjust your permissions.
+        </p>
+      </div>
+    );
+
     // Administration sub-routes — each deep-links to a specific Settings tab
     const adminTabMap: Record<string, string> = {
       'admin-user-management': 'user-management',
@@ -415,9 +420,11 @@ export default function App() {
       return <Settings onBack={() => setActiveTab('home')} onLogout={handleLogout} role={role} onNavigate={(page) => setActiveTab(page)} initialTab={adminTabMap[activeTab]} />;
     }
 
+    const hasDioceseView = permissions.view_diocese === true;
+
     if (activeTab === 'home') {
-      if (role === 'bishop' || role === 'admin') {
-        return <Home onNavigate={(page) => setActiveTab(page)} role={role} />;
+      if (hasDioceseView) {
+        return <Home onNavigate={(page) => setActiveTab(page)} role={role} permissions={permissions} />;
       } else {
         // Redirect non-bishop roles to their respective dashboards if they somehow land on 'home'
         if (role === 'priest') return <BishopDashboard initialEntityType="Parishes" initialEntityFilter={currentEntityName} lockEntityFilter timeframe={timeframe} year={year} onYearChange={setYear} />;
@@ -426,45 +433,52 @@ export default function App() {
       }
     }
 
-    if (role === 'bishop' || role === 'admin') {
+    if (hasDioceseView) {
       switch (activeTab) {
         case 'dashboard':
-          return <BishopDashboard initialEntityType="Parishes" timeframe={timeframe} year={year} onYearChange={setYear} />;
         case 'parish-dashboard':
-          return <BishopDashboard initialEntityType="Parishes" timeframe={timeframe} year={year} onYearChange={setYear} />;
         case 'parish-health':
+          if (permissions.view_parish_dashboard !== true) return renderAccessDenied();
           return <BishopDashboard initialEntityType="Parishes" timeframe={timeframe} year={year} onYearChange={setYear} />;
         case 'parish-aitwin':
+          if (permissions.view_parish_dashboard !== true && permissions.digital_twin !== true) return renderAccessDenied();
           return <AITwin mode="parish" />;
         case 'priest-dashboard':
+          if (permissions.view_parish_dashboard !== true) return renderAccessDenied();
           return <PriestDashboard role="priest" dashboardContext="priest" timeframe={toPriestTimeframe(timeframe)} year={year} onYearChange={setYear} onNavigate={setActiveTab} onLogout={handleLogout} />;
         case 'priest-health':
+          if (permissions.view_priests !== true) return renderAccessDenied();
           return <HealthTracker />;
         case 'priest-aitwin':
+          if (permissions.view_parish_dashboard !== true && permissions.digital_twin !== true) return renderAccessDenied();
           return <AITwin mode="priest" />;
         case 'seminaries':
+          if (permissions.view_seminary_dashboard !== true) return renderAccessDenied();
           return <BishopDashboard initialEntityType="Seminaries" timeframe={timeframe} year={year} onYearChange={setYear} />;
         case 'seminary-aitwin':
+          if (permissions.view_seminary_dashboard !== true && permissions.digital_twin !== true) return renderAccessDenied();
           return <AITwin mode="seminary" />;
         case 'school':
+          if (permissions.view_school_dashboard !== true) return renderAccessDenied();
           return <BishopDashboard initialEntityType="Diocesan Schools" timeframe={timeframe} year={year} onYearChange={setYear} />;
         case 'school-aitwin':
+          if (permissions.view_school_dashboard !== true && permissions.digital_twin !== true) return renderAccessDenied();
           return <AITwin mode="school" />;
         case 'projects':
-          return <Projects role={role} />;
+          return permissions.view_projects ? <Projects role={role} /> : renderAccessDenied();
         case 'digital-twin':
-          return (role === 'admin' || role === 'bishop') ? (
+          return permissions.digital_twin ? (
             <DigitalTwin
               onLaunch={(session) => {
                 setDigitalTwinActiveTab(getDigitalTwinDefaultTab(session.viewRole));
                 setDigitalTwinSession(session);
               }}
             />
-          ) : null;
+          ) : renderAccessDenied();
         case 'announcements':
-          return <Announcements />;
+          return (permissions.view_announcements || permissions.manage_announcements) ? <Announcements /> : renderAccessDenied();
         case 'audit-log':
-          return (role === 'admin' || role === 'bishop') ? <AuditLog /> : null;
+          return permissions.view_audit_logs ? <AuditLog /> : renderAccessDenied();
         default:
           return (
             <div className="flex items-center justify-center h-[calc(100vh-80px)]">
@@ -476,41 +490,71 @@ export default function App() {
       switch (activeTab) {
         case 'dashboard':
         case 'parish-dashboard':
+          if (role === 'priest' && permissions.view_parish_dashboard !== true) {
+            return renderAccessDenied();
+          }
+          if (role === 'school' && permissions.view_school_dashboard !== true) {
+            return renderAccessDenied();
+          }
+          if (role === 'seminary' && permissions.view_seminary_dashboard !== true) {
+            return renderAccessDenied();
+          }
           if (role === 'priest') {
             return <BishopDashboard initialEntityType="Parishes" initialEntityFilter={currentEntityName} lockEntityFilter timeframe={timeframe} year={year} onYearChange={setYear} onNavigate={setActiveTab} />;
           }
           return <PriestDashboard role={role} timeframe={toPriestTimeframe(timeframe)} year={year} onYearChange={setYear} onNavigate={setActiveTab} onLogout={handleLogout} />;
         case 'parish-data-submission':
+          if (permissions.download_csv !== true && permissions.upload_csv_entity !== true) {
+            return renderAccessDenied();
+          }
           return <ParishDataSubmission parishName={currentEntityName} vicariate="Holy Family Vicariate" parishClass="Class B" year={year} onBack={() => setActiveTab('parish-dashboard')} />;
         case 'parish-health':
+          if (role === 'priest' && permissions.view_parish_dashboard !== true) {
+            return renderAccessDenied();
+          }
           if (role === 'priest') {
             return <BishopDashboard initialEntityType="Parishes" initialEntityFilter={currentEntityName} lockEntityFilter timeframe={timeframe} year={year} onYearChange={setYear} onNavigate={setActiveTab} />;
           }
           return <PriestDashboard role={role} timeframe={toPriestTimeframe(timeframe)} year={year} onYearChange={setYear} onNavigate={setActiveTab} onLogout={handleLogout} />;
         case 'parish-aitwin':
-          return <AITwin mode="parish" />;
+          return (permissions.view_parish_dashboard === true || permissions.digital_twin === true) ? <AITwin mode="parish" /> : renderAccessDenied();
         case 'priest-dashboard':
+          if (permissions.view_parish_dashboard !== true) {
+            return renderAccessDenied();
+          }
           return <PriestDashboard role={role} dashboardContext={role === 'priest' ? 'priest' : undefined} timeframe={toPriestTimeframe(timeframe)} year={year} onYearChange={setYear} onNavigate={setActiveTab} onLogout={handleLogout} />;
         case 'priest-health':
-          return <HealthTracker />;
+          return permissions.view_priests ? <HealthTracker /> : renderAccessDenied();
         case 'priest-aitwin':
-          return <AITwin mode="priest" />;
+          return (permissions.view_parish_dashboard === true || permissions.digital_twin === true) ? <AITwin mode="priest" /> : renderAccessDenied();
         case 'seminaries':
+          if (permissions.view_seminary_dashboard !== true) {
+            return renderAccessDenied();
+          }
           return <PriestDashboard role="seminary" timeframe={toPriestTimeframe(timeframe)} year={year} onYearChange={setYear} onNavigate={setActiveTab} onLogout={handleLogout} />;
         case 'seminary-data-submission':
+          if (permissions.download_csv !== true && permissions.upload_csv_entity !== true) {
+            return renderAccessDenied();
+          }
           return <ParishDataSubmission parishName="St. Peter's College Seminary" vicariate="St. John the Baptist Vicariate" parishClass="Seminary" year={year} onBack={() => setActiveTab('seminaries')} />;
         case 'seminary-aitwin':
-          return <AITwin mode="seminary" />;
+          return (permissions.view_seminary_dashboard === true || permissions.digital_twin === true) ? <AITwin mode="seminary" /> : renderAccessDenied();
         case 'school':
+          if (permissions.view_school_dashboard !== true) {
+            return renderAccessDenied();
+          }
           return <PriestDashboard role="school" timeframe={toPriestTimeframe(timeframe)} year={year} onYearChange={setYear} onNavigate={setActiveTab} onLogout={handleLogout} />;
         case 'school-data-submission':
+          if (permissions.download_csv !== true && permissions.upload_csv_entity !== true) {
+            return renderAccessDenied();
+          }
           return <ParishDataSubmission parishName="San Pablo Diocesan Catholic School" vicariate="St. John the Baptist Vicariate" parishClass="School" year={year} onBack={() => setActiveTab('school')} />;
         case 'school-aitwin':
-          return <AITwin mode="school" />;
+          return (permissions.view_school_dashboard === true || permissions.digital_twin === true) ? <AITwin mode="school" /> : renderAccessDenied();
         case 'projects':
-          return <Projects role={role} />;
+          return permissions.view_projects ? <Projects role={role} /> : renderAccessDenied();
         case 'announcements':
-          return <Announcements />;
+          return (permissions.view_announcements || permissions.manage_announcements) ? <Announcements /> : renderAccessDenied();
         case 'consolidated':
           return <ConsolidatedFinancial />;
         default:
@@ -522,6 +566,7 @@ export default function App() {
       }
     }
   };
+
 
   return (
     <ErrorBoundary>

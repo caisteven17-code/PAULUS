@@ -6,6 +6,7 @@ import { motion, AnimatePresence } from 'motion/react';
 import { useAuth } from '../firebase';
 import { formatDate } from '../lib/format';
 import { INITIAL_ROLES } from '../constants';
+import { usePermissions } from '../hooks/usePermissions';
 
 interface Announcement {
   id: string;
@@ -44,23 +45,8 @@ const CATEGORY_META = {
 } as const;
 
 export function Announcements() {
+  const { permissions } = usePermissions();
   const { user } = useAuth();
-  
-  // Load the current user's role permissions dynamically
-  const permissions = useMemo(() => {
-    const userRole = user?.role || 'bishop';
-    const matchingRole = INITIAL_ROLES.find(r => r.id === userRole);
-    if (matchingRole) {
-      return {
-        manage_announcements: matchingRole.permissions.manage_announcements !== false,
-        view_announcements: matchingRole.permissions.view_announcements !== false
-      };
-    }
-    return {
-      manage_announcements: userRole === 'bishop' || userRole === 'admin',
-      view_announcements: true
-    };
-  }, [user]);
 
   const [announcements, setAnnouncements] = useState<Announcement[]>(() => {
     const saved = localStorage.getItem('announcements');
@@ -82,7 +68,7 @@ export function Announcements() {
     localStorage.setItem('announcements', JSON.stringify(announcements));
   }, [announcements]);
 
-  if (!permissions.view_announcements) {
+  if (!permissions.view_announcements && !permissions.manage_announcements) {
     return (
       <div className="min-h-screen bg-slate-50 flex items-center justify-center p-4">
         <div className="bg-white p-12 rounded-[40px] border border-slate-100 shadow-xl max-w-md text-center space-y-6">

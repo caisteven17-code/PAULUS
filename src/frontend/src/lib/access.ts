@@ -58,20 +58,59 @@ const legacyRoleToAccessRole: Record<string, AccessRole> = {
   school_registrar: 'school_principal',
 };
 
-export function normalizeAccessRole(role?: string): AccessRole {
+export function normalizeAccessRole(role?: string): string {
   if (!role) return 'parish_priest';
 
   const normalized = role.trim().toLowerCase().replace(/\s+/g, '_');
   const displayNameMatch = roleNameToId.get(role.trim().toLowerCase());
 
-  return displayNameMatch || legacyRoleToAccessRole[normalized] || 'parish_priest';
+  return displayNameMatch || legacyRoleToAccessRole[normalized] || normalized;
 }
 
 export function getAppRole(role?: string): AppRole {
-  return ACCESS_ROLE_TO_APP_ROLE[normalizeAccessRole(role)];
+  const accessRole = normalizeAccessRole(role);
+  const predefined = ACCESS_ROLE_TO_APP_ROLE[accessRole as AccessRole];
+  if (predefined) return predefined;
+
+  // Dynamic custom role lookup based on active viewing permissions
+  if (typeof window !== 'undefined') {
+    try {
+      const stored = localStorage.getItem('diocese_roles');
+      if (stored) {
+        const rolesList = JSON.parse(stored);
+        const match = rolesList.find((r: any) => r.id === accessRole);
+        if (match && match.permissions) {
+          if (match.permissions.view_diocese) return 'bishop';
+          if (match.permissions.view_parish) return 'parish_priest';
+          if (match.permissions.view_seminary) return 'seminary';
+          if (match.permissions.view_school || match.permissions.view_school_cluster || match.permissions.view_school_all) return 'school';
+        }
+      }
+    } catch (e) {
+      console.error('Error resolving custom AppRole:', e);
+    }
+  }
+
+  return 'parish_priest';
 }
 
 export function getAccessRoleLabel(role?: string) {
   const accessRole = normalizeAccessRole(role);
-  return INITIAL_ROLES.find((item) => item.id === accessRole)?.name || 'Parish Priest';
+  const matchedPredefined = INITIAL_ROLES.find((item) => item.id === accessRole);
+  if (matchedPredefined) return matchedPredefined.name;
+
+  // For custom roles, retrieve the display name from localStorage roles
+  if (typeof window !== 'undefined') {
+    try {
+      const stored = localStorage.getItem('diocese_roles');
+      if (stored) {
+        const rolesList = JSON.parse(stored);
+        const match = rolesList.find((r: any) => r.id === accessRole);
+        if (match && match.name) return match.name;
+      }
+    } catch {}
+  }
+
+  // Capitalize the first letter of custom role ID as a fallback label
+  return accessRole.charAt(0).toUpperCase() + accessRole.slice(1).replace(/_/g, ' ');
 }

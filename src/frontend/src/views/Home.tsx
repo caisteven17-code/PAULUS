@@ -16,6 +16,7 @@ import type { Role } from '../App';
 interface HomeProps {
   onNavigate: (page: string) => void;
   role?: Role;
+  permissions?: Record<string, boolean>;
 }
 
 const mockAnnouncements = [
@@ -150,7 +151,7 @@ const contributionData = [
   { name: 'Schools', value: 20, color: '#1a472a', page: 'school', desc: 'Educational mission and youth formation' },
 ];
 
-export function Home({ onNavigate, role = 'bishop' }: HomeProps) {
+export function Home({ onNavigate, role = 'bishop', permissions = {} }: HomeProps) {
   return (
     <div className="flex flex-col min-h-[calc(100vh-80px)] bg-[#FDFCFB]">
       {/* Hero Section - Restored based on user image */}
@@ -388,7 +389,7 @@ export function Home({ onNavigate, role = 'bishop' }: HomeProps) {
             </div>
           </div>
 
-          {(role === 'admin' || role === 'bishop') && (
+          {(role === 'admin' || role === 'bishop' || permissions.digital_twin === true) && (
             <div className="mt-24 pt-20 border-t border-gray-100">
               <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,1.2fr)_360px] gap-8 items-stretch">
                 <div className="rounded-[2rem] bg-gradient-to-br from-[#1f1f1f] via-[#2c2c2c] to-[#111111] p-8 md:p-10 text-white shadow-2xl">

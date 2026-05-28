@@ -10,6 +10,7 @@ interface TemplateDownloadCardProps {
   institutionLabel: string;
   isLoading: boolean;
   onDownload: () => void;
+  disabled?: boolean;
 }
 
 export function TemplateDownloadCard({
@@ -17,6 +18,7 @@ export function TemplateDownloadCard({
   institutionLabel,
   isLoading,
   onDownload,
+  disabled,
 }: TemplateDownloadCardProps) {
   return (
     <Card className="space-y-5">
@@ -65,11 +67,15 @@ export function TemplateDownloadCard({
 
         <button
           onClick={onDownload}
-          disabled={isLoading}
-          className="flex w-full items-center justify-center gap-2 rounded-2xl bg-gold-500 px-4 py-4 text-sm font-bold text-black shadow-lg shadow-gold-500/20 transition-all hover:bg-gold-600 disabled:cursor-not-allowed disabled:opacity-60"
+          disabled={isLoading || disabled}
+          className={`flex w-full items-center justify-center gap-2 rounded-2xl px-4 py-4 text-sm font-bold transition-all disabled:cursor-not-allowed ${
+            disabled
+              ? 'bg-gray-100 text-gray-400 border border-gray-200 shadow-none'
+              : 'bg-gold-500 text-black shadow-lg shadow-gold-500/20 hover:bg-gold-600'
+          }`}
         >
           {isLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />}
-          {isLoading ? 'Retrieving Template...' : 'Download Template'}
+          {disabled ? 'Download Disabled' : isLoading ? 'Retrieving Template...' : 'Download Template'}
         </button>
       </CardContent>
     </Card>

@@ -22,7 +22,8 @@ const NAV_ITEMS = [
 export function BottomNav({ activeTab, onNavigate, role = 'bishop' }: BottomNavProps) {
   const handleNavigate = (tab: string) => {
     if (tab === 'aitwin') {
-      if (role === 'admin' || role === 'bishop') { onNavigate('digital-twin'); return; }
+      const isDioceseRole = ['bishop', 'admin', 'chancellor', 'diocesan_oeconomus', 'finance_staff'].includes(role);
+      if (isDioceseRole) { onNavigate('digital-twin'); return; }
       if (role === 'seminary') { onNavigate('seminary-aitwin'); return; }
       if (role === 'school') { onNavigate('school-aitwin'); return; }
       onNavigate('parish-aitwin');
