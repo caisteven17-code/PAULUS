@@ -18,7 +18,8 @@ import {
   ScrollText,
   Users,
   UserCog,
-  Shield
+  Shield,
+  Archive
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { APP_CONFIG, INITIAL_ROLES } from '../../constants';
@@ -520,6 +521,7 @@ export function Sidebar({
                     { id: 'admin-user-role',       label: 'User Role Control', icon: UserCog,    show: permissions.manage_roles === true },
                     { id: 'admin-entity',          label: 'Entity Management', icon: FileText,   show: permissions.manage_entities === true },
                     { id: 'admin-data',            label: 'Data Management',   icon: FileText,   show: permissions.download_csv === true || permissions.upload_csv_admin === true || permissions.upload_csv_entity === true },
+                    { id: 'admin-archives',        label: 'Archives',          icon: Archive,    show: permissions.create_users === true || permissions.manage_entities === true },
                     { id: 'audit-log',             label: 'Audit Log',         icon: ScrollText, show: permissions.view_audit_logs === true },
                   ].filter(item => item.show).map(item => {
                     const Icon = item.icon;

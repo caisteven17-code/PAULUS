@@ -60,6 +60,10 @@ export interface Parish {
   primaryPatron?: string;
   secondaryPatron?: string;
   fiestaDate?: string;
+  status?: 'active' | 'inactive';
+  updatedAt?: string;
+  timestamp?: string;
+  createdAt?: string;
 }
 
 export interface Seminary {
@@ -74,6 +78,10 @@ export interface Seminary {
   capacity: number;
   staff: number;
   collections?: number;
+  status?: 'active' | 'inactive';
+  updatedAt?: string;
+  timestamp?: string;
+  createdAt?: string;
 }
 
 export interface DiocesanSchool {
@@ -89,6 +97,10 @@ export interface DiocesanSchool {
   capacity: number;
   staff: number;
   collections?: number;
+  status?: 'active' | 'inactive';
+  updatedAt?: string;
+  timestamp?: string;
+  createdAt?: string;
 }
 
 export interface FinancialHealthScore {

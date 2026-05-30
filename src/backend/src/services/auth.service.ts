@@ -187,7 +187,7 @@ export class AppAuthService {
         'manage_projects', 'view_projects', 'manage_announcements', 
         'view_announcements', 'view_priests', 'manage_assignments', 
         'view_audit_logs', 'view_parish_dashboard', 'view_seminary_dashboard', 
-        'view_school_dashboard'
+        'view_school_dashboard', 'manage_own_institution'
       ];
       
       permissionKeys.forEach(k => {

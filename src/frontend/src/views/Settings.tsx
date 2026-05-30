@@ -21,15 +21,36 @@ interface SettingsProps {
 import { UserRoleControl } from '../components/settings/UserRoleControl';
 import { DataManagementControl } from '../components/settings/DataManagementControl';
 import { EntityManagementControl } from '../components/settings/EntityManagementControl';
+import { ArchivesControl } from '../components/settings/ArchivesControl';
 import { ParishClassificationLogic } from '../components/settings/ParishClassificationLogic';
 import { DashboardHeader } from '../components/layout/DashboardHeader';
 import { getAccessRoleLabel, getAppRole, normalizeAccessRole } from '../lib/access';
 import { usePermissions } from '../hooks/usePermissions';
 
 export function Settings({ onBack, onLogout, onNavigate, role = 'bishop', initialTab }: SettingsProps) {
-  const { permissions } = usePermissions();
+  const { permissions, user } = usePermissions();
   const [activeTab, setActiveTab] = useState(initialTab || (permissions.create_users ? 'user-management' : 'security'));
   type InstitutionType = 'diocese' | 'parish' | 'seminary' | 'school';
+
+  const institutionTabType = React.useMemo(() => {
+    if (permissions.view_parish) return 'parish';
+    if (permissions.view_seminary) return 'seminary';
+    if (permissions.view_school && !permissions.view_school_cluster && !permissions.view_school_all) return 'school';
+    return null;
+  }, [permissions]);
+
+  const institutionTabLabel = React.useMemo(() => {
+    if (institutionTabType === 'parish') return 'My Parish';
+    if (institutionTabType === 'seminary') return 'My Seminary';
+    if (institutionTabType === 'school') return 'My School';
+    return null;
+  }, [institutionTabType]);
+
+  const [instContactNumber, setInstContactNumber] = useState('');
+  const [instEmail, setInstEmail] = useState('');
+  const [showInstSuccess, setShowInstSuccess] = useState(false);
+  const [showInstError, setShowInstError] = useState('');
+  const [isUpdatingInst, setIsUpdatingInst] = useState(false);
 
   React.useEffect(() => {
     if (initialTab) {
@@ -43,6 +64,97 @@ export function Settings({ onBack, onLogout, onNavigate, role = 'bishop', initia
   const [seminaries, setSeminaries] = useState<Seminary[]>([]);
   const [schools, setSchools] = useState<DiocesanSchool[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+
+  const userEntity = React.useMemo(() => {
+    const entityId = user?.entityId || auth.currentUser?.entityId;
+    const entityName = user?.entityName || auth.currentUser?.entityName;
+    
+    if (institutionTabType === 'parish') {
+      const list = [...parishes, ...INITIAL_PARISHES];
+      if (entityId) {
+        const found = list.find(p => p.id.toString() === entityId.toString());
+        if (found) return found;
+      }
+      if (entityName) {
+        const found = list.find(p => p.name.toLowerCase() === entityName.toLowerCase());
+        if (found) return found;
+      }
+    }
+    if (institutionTabType === 'seminary') {
+      const list = [...seminaries, ...INITIAL_SEMINARIES];
+      if (entityId) {
+        const found = list.find(s => s.id.toString() === entityId.toString());
+        if (found) return found;
+      }
+      if (entityName) {
+        const found = list.find(s => s.name.toLowerCase() === entityName.toLowerCase());
+        if (found) return found;
+      }
+    }
+    if (institutionTabType === 'school') {
+      const list = [...schools, ...INITIAL_SCHOOLS];
+      if (entityId) {
+        const found = list.find(s => s.id.toString() === entityId.toString());
+        if (found) return found;
+      }
+      if (entityName) {
+        const found = list.find(s => s.name.toLowerCase() === entityName.toLowerCase());
+        if (found) return found;
+      }
+    }
+    return null;
+  }, [institutionTabType, user, parishes, seminaries, schools]);
+
+  React.useEffect(() => {
+    if (userEntity) {
+      setInstContactNumber((userEntity as any).contactNumber || (userEntity as any).contact_number || '');
+      setInstEmail((userEntity as any).email || '');
+    }
+  }, [userEntity]);
+
+  const handleSaveInstitution = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!userEntity || !institutionTabType) return;
+    
+    setIsUpdatingInst(true);
+    setShowInstError('');
+    setShowInstSuccess(false);
+    
+    try {
+      const res = await fetch('/api/entities/my-institution', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          type: institutionTabType,
+          id: userEntity.id.toString(),
+          contactNumber: instContactNumber,
+          email: instEmail
+        })
+      });
+      
+      if (!res.ok) {
+        const errorData = await res.json().catch(() => ({}));
+        throw new Error(errorData.error || 'Failed to update institution details.');
+      }
+      
+      // Update local state
+      if (institutionTabType === 'parish') {
+        setParishes(prev => prev.map(p => p.id.toString() === userEntity.id.toString() ? { ...p, contactNumber: instContactNumber, email: instEmail } : p));
+      } else if (institutionTabType === 'seminary') {
+        setSeminaries(prev => prev.map(s => s.id.toString() === userEntity.id.toString() ? { ...s, contactNumber: instContactNumber, email: instEmail } : s));
+      } else if (institutionTabType === 'school') {
+        setSchools(prev => prev.map(s => s.id.toString() === userEntity.id.toString() ? { ...s, contactNumber: instContactNumber, email: instEmail } : s));
+      }
+      
+      setShowInstSuccess(true);
+      setTimeout(() => setShowInstSuccess(false), 3000);
+    } catch (err: any) {
+      console.error('[Settings] Error saving institution details:', err);
+      setShowInstError(err.message || 'An error occurred while saving.');
+    } finally {
+      setIsUpdatingInst(false);
+    }
+  };
 
   // ── Load users from Supabase (with localStorage fallback) ─────────────
   const fetchAccounts = React.useCallback(async () => {
@@ -103,11 +215,10 @@ export function Settings({ onBack, onLogout, onNavigate, role = 'bishop', initia
 
   React.useEffect(() => { fetchAccounts(); }, [fetchAccounts]);
 
-  // ── Load entities from Supabase (with constants fallback) ─────────────
   React.useEffect(() => {
     const fetchEntities = async () => {
       try {
-        const res = await fetch('/api/admin/entities');
+        const res = await fetch('/api/admin/entities?all=true');
         if (!res.ok) throw new Error('API error');
         const data = await res.json();
         if (Array.isArray(data.parishes))   setParishes(data.parishes);
@@ -860,6 +971,33 @@ export function Settings({ onBack, onLogout, onNavigate, role = 'bishop', initia
       {/* Main Content */}
       <div className="flex-1 max-w-[1600px] mx-auto w-full px-8 py-8">
         <div className="w-full min-w-0">
+          {institutionTabLabel && (
+            <div className="flex border-b border-gray-200 mb-8 gap-6">
+              <button
+                type="button"
+                onClick={() => setActiveTab('profile')}
+                className={`pb-4 px-2 text-sm font-bold border-b-2 transition-all relative ${
+                  activeTab === 'profile'
+                    ? 'border-[#D4AF37] text-gray-900 font-extrabold'
+                    : 'border-transparent text-gray-400 hover:text-gray-600'
+                }`}
+              >
+                My Profile
+              </button>
+              <button
+                type="button"
+                onClick={() => setActiveTab('my-institution')}
+                className={`pb-4 px-2 text-sm font-bold border-b-2 transition-all relative ${
+                  activeTab === 'my-institution'
+                    ? 'border-[#D4AF37] text-gray-900 font-extrabold'
+                    : 'border-transparent text-gray-400 hover:text-gray-600'
+                }`}
+              >
+                {institutionTabLabel}
+              </button>
+            </div>
+          )}
+
           {activeTab === 'profile' && (
             <div className="grid grid-cols-1 xl:grid-cols-3 gap-8">
               <form onSubmit={handleProfileSave} className="xl:col-span-2 bg-white rounded-[32px] shadow-sm border border-gray-100 p-10">
@@ -1006,6 +1144,221 @@ export function Settings({ onBack, onLogout, onNavigate, role = 'bishop', initia
             </div>
           )}
 
+          {activeTab === 'my-institution' && userEntity && (
+            <div className="grid grid-cols-1 xl:grid-cols-3 gap-8">
+              <form onSubmit={handleSaveInstitution} className="xl:col-span-2 bg-white rounded-[32px] shadow-sm border border-gray-100 p-10 animate-in fade-in duration-200">
+                <div className="flex items-start justify-between gap-6 mb-10">
+                  <div>
+                    <h3 className="text-3xl font-serif font-bold text-gray-900">{institutionTabLabel} Details</h3>
+                    <p className="text-sm text-gray-500 mt-1">
+                      {permissions.manage_own_institution 
+                        ? 'Manage contact information for your assigned institution.' 
+                        : 'View-only details for your assigned institution.'}
+                    </p>
+                  </div>
+                  <div className="w-16 h-16 rounded-2xl bg-emerald-500 text-white flex items-center justify-center text-2xl font-black shadow-lg shadow-emerald-500/20 shrink-0">
+                    ⛪
+                  </div>
+                </div>
+
+                {showInstSuccess && (
+                  <div className="mb-8 p-5 bg-emerald-50 border border-emerald-100 text-emerald-700 rounded-2xl text-sm font-bold animate-in fade-in slide-in-from-top-2 flex items-center gap-3">
+                    <div className="w-8 h-8 bg-emerald-100 rounded-full flex items-center justify-center flex-shrink-0">
+                      <ShieldCheck className="w-5 h-5" />
+                    </div>
+                    Institution details updated successfully!
+                  </div>
+                )}
+
+                {showInstError && (
+                  <div className="mb-8 p-5 bg-rose-50 border border-rose-100 text-rose-700 rounded-2xl text-sm font-bold animate-in fade-in slide-in-from-top-2 flex items-center gap-3">
+                    <div className="w-8 h-8 bg-rose-100 rounded-full flex items-center justify-center flex-shrink-0">
+                      ⚠️
+                    </div>
+                    {showInstError}
+                  </div>
+                )}
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  {/* Name (Read-only) */}
+                  <div className="space-y-2">
+                    <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1.5 ml-1">Name</label>
+                    <input
+                      type="text"
+                      disabled
+                      value={userEntity.name || ''}
+                      className="w-full px-5 py-4 bg-gray-50 border border-gray-100 rounded-2xl text-gray-400 cursor-not-allowed font-medium transition-all"
+                    />
+                  </div>
+
+                  {/* Leader (Read-only) */}
+                  <div className="space-y-2">
+                    <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1.5 ml-1">
+                      {institutionTabType === 'parish' ? 'Pastor' : institutionTabType === 'seminary' ? 'Rector' : 'Principal'}
+                    </label>
+                    <input
+                      type="text"
+                      disabled
+                      value={(userEntity as any).pastor || (userEntity as any).rector || (userEntity as any).principal || ''}
+                      className="w-full px-5 py-4 bg-gray-50 border border-gray-100 rounded-2xl text-gray-400 cursor-not-allowed font-medium transition-all"
+                    />
+                  </div>
+
+                  {/* Vicariate (Read-only) */}
+                  <div className="space-y-2">
+                    <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1.5 ml-1">Vicariate / Region</label>
+                    <input
+                      type="text"
+                      disabled
+                      value={userEntity.vicariate || 'Diocesan'}
+                      className="w-full px-5 py-4 bg-gray-50 border border-gray-100 rounded-2xl text-gray-400 cursor-not-allowed font-medium transition-all"
+                    />
+                  </div>
+
+                  {/* Class / Level (Read-only) */}
+                  <div className="space-y-2">
+                    <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1.5 ml-1">
+                      {institutionTabType === 'school' ? 'Academic Level' : 'Classification'}
+                    </label>
+                    <input
+                      type="text"
+                      disabled
+                      value={(userEntity as any).class || (userEntity as any).level || 'Class A'}
+                      className="w-full px-5 py-4 bg-gray-50 border border-gray-100 rounded-2xl text-gray-400 cursor-not-allowed font-medium transition-all"
+                    />
+                  </div>
+
+                  {/* Address (Read-only) */}
+                  <div className="md:col-span-2 space-y-2">
+                    <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1.5 ml-1">Physical Address</label>
+                    <input
+                      type="text"
+                      disabled
+                      value={userEntity.address || ''}
+                      className="w-full px-5 py-4 bg-gray-50 border border-gray-100 rounded-2xl text-gray-400 cursor-not-allowed font-medium transition-all"
+                    />
+                  </div>
+
+                  {/* Contact Number (Editable if permissions allow) */}
+                  <div className="space-y-2">
+                    <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1.5 ml-1">Contact / Phone Number</label>
+                    <input
+                      type="tel"
+                      disabled={!permissions.manage_own_institution || isUpdatingInst}
+                      value={instContactNumber}
+                      onChange={(event) => setInstContactNumber(event.target.value)}
+                      placeholder="e.g. 049-562-1234"
+                      className={`w-full px-5 py-4 rounded-2xl font-medium transition-all ${
+                        permissions.manage_own_institution 
+                          ? 'bg-white border border-gray-200 text-gray-900 focus:outline-none focus:border-[#D4AF37] focus:ring-4 focus:ring-[#D4AF37]/10' 
+                          : 'bg-gray-50 border border-gray-100 text-gray-400 cursor-not-allowed'
+                      }`}
+                    />
+                  </div>
+
+                  {/* Email Address (Editable if permissions allow) */}
+                  <div className="space-y-2">
+                    <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1.5 ml-1">Email Address</label>
+                    <input
+                      type="email"
+                      disabled={!permissions.manage_own_institution || isUpdatingInst}
+                      value={instEmail}
+                      onChange={(event) => setInstEmail(event.target.value)}
+                      placeholder="e.g. stfrancis@diocese.org"
+                      className={`w-full px-5 py-4 rounded-2xl font-medium transition-all ${
+                        permissions.manage_own_institution 
+                          ? 'bg-white border border-gray-200 text-gray-900 focus:outline-none focus:border-[#D4AF37] focus:ring-4 focus:ring-[#D4AF37]/10' 
+                          : 'bg-gray-50 border border-gray-100 text-gray-400 cursor-not-allowed'
+                      }`}
+                    />
+                  </div>
+                </div>
+
+                {permissions.manage_own_institution && (
+                  <div className="flex justify-end mt-8">
+                    <button
+                      type="submit"
+                      disabled={isUpdatingInst}
+                      className="bg-emerald-500 hover:bg-emerald-600 text-white px-8 py-4 rounded-2xl font-bold transition-all shadow-lg shadow-emerald-500/20 flex items-center justify-center gap-3 active:scale-[0.98] disabled:opacity-50 cursor-pointer"
+                    >
+                      {isUpdatingInst ? (
+                        <>
+                          <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                          Saving...
+                        </>
+                      ) : (
+                        <>
+                          <Save className="w-5 h-5" />
+                          Update Details
+                        </>
+                      )}
+                    </button>
+                  </div>
+                )}
+              </form>
+
+              {/* Side Card */}
+              <div className="bg-[#1A1A1A] rounded-[32px] text-white p-8 relative overflow-hidden shadow-xl border border-gray-800 animate-in fade-in slide-in-from-right-4 duration-350">
+                <div className="absolute top-0 right-0 w-48 h-48 bg-[#D4AF37]/5 rounded-full -mr-24 -mt-24 blur-3xl"></div>
+                <h4 className="text-xl font-serif font-bold text-gold-400 mb-6 flex items-center gap-2">
+                  <span>⛪</span> Official Records
+                </h4>
+                
+                <div className="space-y-6 text-sm text-white/70">
+                  <p className="leading-relaxed">
+                    This form allows you to update the official contact details for this institution in the diocese database.
+                  </p>
+                  
+                  <div className="bg-white/5 rounded-2xl p-5 border border-white/10 space-y-4">
+                    <div className="flex justify-between items-center py-2 border-b border-white/5">
+                      <span className="font-bold text-white/55">Status</span>
+                      <span className="px-2.5 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400 text-xs font-bold border border-emerald-500/20">
+                        Verified
+                      </span>
+                    </div>
+                    
+                    {institutionTabType === 'seminary' && (
+                      <>
+                        <div className="flex justify-between items-center py-2 border-b border-white/5">
+                          <span className="font-bold text-white/55">Enrollment</span>
+                          <span className="text-white font-mono font-bold">{(userEntity as Seminary).enrollment || 0}</span>
+                        </div>
+                        <div className="flex justify-between items-center py-2">
+                          <span className="font-bold text-white/55">Capacity</span>
+                          <span className="text-white font-mono font-bold">{(userEntity as Seminary).capacity || 0}</span>
+                        </div>
+                      </>
+                    )}
+
+                    {institutionTabType === 'school' && (
+                      <>
+                        <div className="flex justify-between items-center py-2 border-b border-white/5">
+                          <span className="font-bold text-white/55">Enrollment</span>
+                          <span className="text-white font-mono font-bold">{(userEntity as DiocesanSchool).enrollment || 0}</span>
+                        </div>
+                        <div className="flex justify-between items-center py-2">
+                          <span className="font-bold text-white/55">Capacity</span>
+                          <span className="text-white font-mono font-bold">{(userEntity as DiocesanSchool).capacity || 0}</span>
+                        </div>
+                      </>
+                    )}
+
+                    {institutionTabType === 'parish' && (
+                      <div className="flex justify-between items-center py-2">
+                        <span className="font-bold text-white/55">Pastor since</span>
+                        <span className="text-white font-bold">Current Assignment</span>
+                      </div>
+                    )}
+                  </div>
+
+                  <p className="text-xs text-white/40 leading-relaxed">
+                    Note: Structural configurations, pastor/director assignments, and physical locations can only be modified by the Diocesan Admin or Bishop.
+                  </p>
+                </div>
+              </div>
+            </div>
+          )}
+
           {activeTab === 'user-management' && permissions.create_users === true && (
             <div className="bg-white rounded-[32px] shadow-sm border border-gray-100 p-8">
               <div className="flex items-center justify-between mb-8">
@@ -1146,6 +1499,20 @@ export function Settings({ onBack, onLogout, onNavigate, role = 'bishop', initia
               onUpdateSeminaries={setSeminaries}
               onUpdateSchools={setSchools}
               onNavigate={onNavigate}
+              accounts={accounts}
+            />
+          )}
+
+          {activeTab === 'archives' && (permissions.create_users === true || permissions.manage_entities === true) && (
+            <ArchivesControl 
+              parishes={parishes}
+              seminaries={seminaries}
+              schools={schools}
+              accounts={accounts}
+              onUpdateParishes={setParishes}
+              onUpdateSeminaries={setSeminaries}
+              onUpdateSchools={setSchools}
+              onUpdateAccounts={fetchAccounts}
             />
           )}
 

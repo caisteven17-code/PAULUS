@@ -60,12 +60,14 @@ export function Projects({ role }: ProjectsProps) {
     if (matchingRole) {
       return {
         manage_projects: matchingRole.permissions.manage_projects !== false,
-        view_projects: matchingRole.permissions.view_projects !== false
+        view_projects: matchingRole.permissions.view_projects !== false,
+        view_diocese: matchingRole.permissions.view_diocese === true
       };
     }
     return {
       manage_projects: userRole === 'bishop' || userRole === 'admin',
-      view_projects: userRole === 'bishop' || userRole === 'admin'
+      view_projects: userRole === 'bishop' || userRole === 'admin',
+      view_diocese: userRole === 'bishop' || userRole === 'admin'
     };
   }, [customRoles, auth.currentUser]);
 

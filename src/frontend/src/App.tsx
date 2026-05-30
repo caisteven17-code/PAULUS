@@ -412,6 +412,7 @@ export default function App() {
       'admin-user-role':       'role-control',
       'admin-entity':          'entity-management',
       'admin-data':            'data-management',
+      'admin-archives':        'archives',
       'admin-security':        'security',
       'settings':              'user-management',
       'profile':               'profile',
@@ -502,7 +503,7 @@ export default function App() {
           if (role === 'priest') {
             return <BishopDashboard initialEntityType="Parishes" initialEntityFilter={currentEntityName} lockEntityFilter timeframe={timeframe} year={year} onYearChange={setYear} onNavigate={setActiveTab} />;
           }
-          return <PriestDashboard role={role} timeframe={toPriestTimeframe(timeframe)} year={year} onYearChange={setYear} onNavigate={setActiveTab} onLogout={handleLogout} />;
+          return <PriestDashboard role={role as 'priest' | 'school' | 'seminary' | 'bishop'} timeframe={toPriestTimeframe(timeframe)} year={year} onYearChange={setYear} onNavigate={setActiveTab} onLogout={handleLogout} />;
         case 'parish-data-submission':
           if (permissions.download_csv !== true && permissions.upload_csv_entity !== true) {
             return renderAccessDenied();
@@ -515,14 +516,14 @@ export default function App() {
           if (role === 'priest') {
             return <BishopDashboard initialEntityType="Parishes" initialEntityFilter={currentEntityName} lockEntityFilter timeframe={timeframe} year={year} onYearChange={setYear} onNavigate={setActiveTab} />;
           }
-          return <PriestDashboard role={role} timeframe={toPriestTimeframe(timeframe)} year={year} onYearChange={setYear} onNavigate={setActiveTab} onLogout={handleLogout} />;
+          return <PriestDashboard role={role as 'priest' | 'school' | 'seminary' | 'bishop'} timeframe={toPriestTimeframe(timeframe)} year={year} onYearChange={setYear} onNavigate={setActiveTab} onLogout={handleLogout} />;
         case 'parish-aitwin':
           return (permissions.view_parish_dashboard === true || permissions.digital_twin === true) ? <AITwin mode="parish" /> : renderAccessDenied();
         case 'priest-dashboard':
           if (permissions.view_parish_dashboard !== true) {
             return renderAccessDenied();
           }
-          return <PriestDashboard role={role} dashboardContext={role === 'priest' ? 'priest' : undefined} timeframe={toPriestTimeframe(timeframe)} year={year} onYearChange={setYear} onNavigate={setActiveTab} onLogout={handleLogout} />;
+          return <PriestDashboard role={role as 'priest' | 'school' | 'seminary' | 'bishop'} dashboardContext={role === 'priest' ? 'priest' : undefined} timeframe={toPriestTimeframe(timeframe)} year={year} onYearChange={setYear} onNavigate={setActiveTab} onLogout={handleLogout} />;
         case 'priest-health':
           return permissions.view_priests ? <HealthTracker /> : renderAccessDenied();
         case 'priest-aitwin':

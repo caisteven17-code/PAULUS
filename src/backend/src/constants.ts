@@ -91,12 +91,12 @@ export const ALL_PERMISSIONS = [
 ];
 
 export const INITIAL_ROLES: UserRole[] = [
-  { id: 'bishop', name: 'Bishop', color: '#D4AF37', permissions: { view_diocese: true, view_parish: true, view_seminary: true, view_school: true, download_csv: true, upload_csv_admin: true, upload_csv_entity: true, create_users: true, manage_roles: true } },
-  { id: 'diocese_admin', name: 'Diocese Admin', color: '#1E3A8A', permissions: { view_diocese: true, view_parish: true, view_seminary: true, view_school: true, download_csv: true, upload_csv_admin: true, upload_csv_entity: true, create_users: true, manage_roles: true } },
-  { id: 'parish_priest', name: 'Parish Priest', color: '#059669', permissions: { view_diocese: false, view_parish: true, view_seminary: false, view_school: false, download_csv: true, upload_csv_admin: false, upload_csv_entity: true, create_users: false, manage_roles: false } },
-  { id: 'parish_secretary', name: 'Parish Secretary', color: '#10B981', permissions: { view_diocese: false, view_parish: true, view_seminary: false, view_school: false, download_csv: true, upload_csv_admin: false, upload_csv_entity: true, create_users: false, manage_roles: false } },
-  { id: 'seminary_rector', name: 'Seminary Rector', color: '#DC2626', permissions: { view_diocese: false, view_parish: false, view_seminary: true, view_school: false, download_csv: true, upload_csv_admin: false, upload_csv_entity: true, create_users: false, manage_roles: false } },
-  { id: 'school_registrar', name: 'Diocesan School Registrar', color: '#7C3AED', permissions: { view_diocese: false, view_parish: false, view_seminary: false, view_school: true, download_csv: true, upload_csv_admin: false, upload_csv_entity: true, create_users: false, manage_roles: false } }
+  { id: 'bishop', name: 'Bishop', color: '#D4AF37', permissions: { view_diocese: true, view_parish: true, view_seminary: true, view_school: true, download_csv: true, upload_csv_admin: true, upload_csv_entity: true, create_users: true, manage_roles: true, manage_own_institution: false } },
+  { id: 'diocese_admin', name: 'Diocese Admin', color: '#1E3A8A', permissions: { view_diocese: true, view_parish: true, view_seminary: true, view_school: true, download_csv: true, upload_csv_admin: true, upload_csv_entity: true, create_users: true, manage_roles: true, manage_own_institution: false } },
+  { id: 'parish_priest', name: 'Parish Priest', color: '#059669', permissions: { view_diocese: false, view_parish: true, view_seminary: false, view_school: false, download_csv: true, upload_csv_admin: false, upload_csv_entity: true, create_users: false, manage_roles: false, manage_own_institution: true } },
+  { id: 'parish_secretary', name: 'Parish Secretary', color: '#10B981', permissions: { view_diocese: false, view_parish: true, view_seminary: false, view_school: false, download_csv: true, upload_csv_admin: false, upload_csv_entity: true, create_users: false, manage_roles: false, manage_own_institution: true } },
+  { id: 'seminary_rector', name: 'Seminary Rector', color: '#DC2626', permissions: { view_diocese: false, view_parish: false, view_seminary: true, view_school: false, download_csv: true, upload_csv_admin: false, upload_csv_entity: true, create_users: false, manage_roles: false, manage_own_institution: true } },
+  { id: 'school_registrar', name: 'Diocesan School Registrar', color: '#7C3AED', permissions: { view_diocese: false, view_parish: false, view_seminary: false, view_school: true, download_csv: true, upload_csv_admin: false, upload_csv_entity: true, create_users: false, manage_roles: false, manage_own_institution: true } }
 ];
 
 export const PREDEFINED_ROLE_IDS = ['bishop', 'diocese_admin', 'parish_priest', 'parish_secretary', 'seminary_rector', 'school_registrar'];

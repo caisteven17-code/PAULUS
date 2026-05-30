@@ -93,18 +93,60 @@ export class EntityService {
     return data;
   }
 
-  async deleteAdminEntity(type: EntityType, id: string): Promise<any> {
+  async updateOwnInstitution(type: EntityType, id: string, contactNumber?: string, email?: string): Promise<any> {
     const table = this.tableFor(type);
     if (!table || !id) throw new Error('type and id are required');
 
+    const updatePayload: any = {
+      updated_at: new Date().toISOString(),
+    };
+
+    if (type === 'parish') {
+      if (contactNumber !== undefined) updatePayload.contact_number = contactNumber;
+      if (email !== undefined) updatePayload.email = email;
+    } else {
+      if (contactNumber !== undefined) {
+        updatePayload.contact_number = contactNumber;
+        updatePayload.contactNumber = contactNumber;
+      }
+      if (email !== undefined) updatePayload.email = email;
+    }
+
     const { data, error } = await this.supabaseService.supabaseServer
       .from(table)
-      .update({ status: 'inactive', updated_at: new Date().toISOString() })
+      .update(updatePayload)
       .eq('id', id)
       .select()
       .single();
 
     if (error) throw error;
     return data;
+  }
+
+  async deleteAdminEntity(type: EntityType, id: string, hardDelete = false): Promise<any> {
+    const table = this.tableFor(type);
+    if (!table || !id) throw new Error('type and id are required');
+
+    if (hardDelete) {
+      const { data, error } = await this.supabaseService.supabaseServer
+        .from(table)
+        .delete()
+        .eq('id', id)
+        .select()
+        .single();
+
+      if (error) throw error;
+      return data;
+    } else {
+      const { data, error } = await this.supabaseService.supabaseServer
+        .from(table)
+        .update({ status: 'inactive', updated_at: new Date().toISOString() })
+        .eq('id', id)
+        .select()
+        .single();
+
+      if (error) throw error;
+      return data;
+    }
   }
 }

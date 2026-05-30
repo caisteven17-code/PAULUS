@@ -3,7 +3,7 @@
 import React, { useState } from 'react';
 import { Search, Plus, ShieldCheck, Trash, Edit2, ShieldAlert } from 'lucide-react';
 import { UserRole } from '../../types';
-import { ALL_PERMISSIONS, PREDEFINED_ROLE_IDS } from '../../constants';
+import { ALL_PERMISSIONS, PREDEFINED_ROLE_IDS, INITIAL_ROLES } from '../../constants';
 
 interface UserRoleControlProps {
   roles: UserRole[];
@@ -15,7 +15,10 @@ export function UserRoleControl({ roles, onUpdateRoles, accounts = [] }: UserRol
   // Enforce that exactly one viewing permission is true for every role at any time
   const sanitizedRoles = React.useMemo(() => {
     return roles.map(role => {
-      const permissions = { ...role.permissions };
+      // If it's a predefined role, reset its permissions to match INITIAL_ROLES
+      const initialRole = INITIAL_ROLES.find(r => r.id === role.id);
+      const permissions = initialRole ? { ...initialRole.permissions } : { ...role.permissions };
+
       const viewingKeys = ['view_diocese', 'view_parish', 'view_seminary', 'view_school', 'view_school_cluster', 'view_school_all'];
       
       // Find the first viewing key that is explicitly true, default to 'view_diocese' if none are set
@@ -43,6 +46,12 @@ export function UserRoleControl({ roles, onUpdateRoles, accounts = [] }: UserRol
       // Enforce mutual exclusivity: manage_projects and view_projects cannot both be true
       if ((permissions as any)['manage_projects'] === true) {
         (permissions as any)['view_projects'] = false;
+      }
+
+      // Default manage_own_institution for custom roles if not set
+      if ((permissions as any)['manage_own_institution'] === undefined) {
+        const isSingleInstitution = activeViewingKey === 'view_parish' || activeViewingKey === 'view_seminary' || activeViewingKey === 'view_school';
+        (permissions as any)['manage_own_institution'] = isSingleInstitution;
       }
 
       return {
@@ -124,6 +133,13 @@ export function UserRoleControl({ roles, onUpdateRoles, accounts = [] }: UserRol
       (updatedPermissions as any)['view_parish_dashboard'] = (permId === 'view_diocese' || permId === 'view_parish');
       (updatedPermissions as any)['view_seminary_dashboard'] = (permId === 'view_diocese' || permId === 'view_seminary');
       (updatedPermissions as any)['view_school_dashboard'] = (permId === 'view_diocese' || permId === 'view_school');
+      
+      // Auto-configure manage_own_institution permission
+      if (permId === 'view_parish' || permId === 'view_seminary' || permId === 'view_school') {
+        (updatedPermissions as any)['manage_own_institution'] = true;
+      } else {
+        (updatedPermissions as any)['manage_own_institution'] = false;
+      }
 
       if (permId !== 'view_diocese') {
         const RESTRICTED_IDS = [
@@ -394,6 +410,14 @@ export function UserRoleControl({ roles, onUpdateRoles, accounts = [] }: UserRol
                       updated['view_parish_dashboard']   = (levelId === 'view_diocese' || levelId === 'view_parish');
                       updated['view_seminary_dashboard'] = (levelId === 'view_diocese' || levelId === 'view_seminary');
                       updated['view_school_dashboard']   = (levelId === 'view_diocese' || levelId === 'view_school' || levelId === 'view_school_cluster' || levelId === 'view_school_all');
+                      
+                      // Auto-configure manage_own_institution permission
+                      if (levelId === 'view_parish' || levelId === 'view_seminary' || levelId === 'view_school') {
+                        updated['manage_own_institution'] = true;
+                      } else {
+                        updated['manage_own_institution'] = false;
+                      }
+
                       if (levelId !== 'view_diocese') {
                         RESTRICTED_IDS.forEach(id => {
                           if ((levelId === 'view_parish' || levelId === 'view_seminary') && id === 'view_priests') return;
@@ -523,6 +547,47 @@ export function UserRoleControl({ roles, onUpdateRoles, accounts = [] }: UserRol
                           </div>
                         </div>
 
+                        {/* STEP 1.5: Institution Tab Settings */}
+                        {(isParishSelected || isSeminarySelected || (isSchoolSelected && permissionsObj.view_school === true)) && (
+                          <div className="space-y-3">
+                            <div className="flex items-center gap-2">
+                              <span className="w-5 h-5 rounded-full bg-[#1A1A1A] text-white text-[10px] font-bold flex items-center justify-center shrink-0">1.5</span>
+                              <span className="text-xs font-bold text-gray-500 uppercase tracking-widest">Institution Tab Settings</span>
+                            </div>
+                            <div className="bg-white border border-gray-100 rounded-2xl overflow-hidden divide-y divide-gray-50 shadow-sm">
+                              {[
+                                { val: true, name: `Manage ${isParishSelected ? 'Parish' : isSeminarySelected ? 'Seminary' : 'School'} Tab`, desc: `Allows editing contact number and email.` },
+                                { val: false, name: `View Only ${isParishSelected ? 'Parish' : isSeminarySelected ? 'Seminary' : 'School'} Tab`, desc: `Restricts to read-only view.` }
+                              ].map(opt => {
+                                const isSelected = permissionsObj.manage_own_institution === opt.val;
+                                return (
+                                  <div key={String(opt.val)} className="flex items-center justify-between gap-6 px-5 py-4">
+                                    <div>
+                                      <div className="text-sm font-bold text-gray-700">{opt.name}</div>
+                                      <div className="text-xs text-gray-500 mt-0.5">{opt.desc}</div>
+                                    </div>
+                                    <button
+                                      type="button"
+                                      onClick={() => {
+                                        const updated = { ...roleForm.permissions } as any;
+                                        updated.manage_own_institution = isSelected ? !opt.val : opt.val;
+                                        setRoleForm({ ...roleForm, permissions: updated });
+                                      }}
+                                      className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
+                                        isSelected ? 'bg-[#22C55E]' : 'bg-gray-200'
+                                      }`}
+                                    >
+                                      <span className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
+                                        isSelected ? 'translate-x-4' : 'translate-x-0'
+                                      }`} />
+                                    </button>
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          </div>
+                        )}
+
                         {/* School sub-level scope */}
                         {isSchoolSelected && (
                           <div className="ml-2 pl-4 border-l-2 border-purple-200 space-y-2">
@@ -547,6 +612,7 @@ export function UserRoleControl({ roles, onUpdateRoles, accounts = [] }: UserRol
                                         updated[id] = (id === sub.id);
                                       });
                                       updated['view_school_dashboard'] = true;
+                                      updated['manage_own_institution'] = (sub.id === 'view_school');
                                       const RESTRICTED_IDS = [
                                         'digital_twin','upload_csv_admin','manage_entities',
                                         'view_priests','manage_assignments','create_users','manage_roles',
@@ -624,36 +690,13 @@ export function UserRoleControl({ roles, onUpdateRoles, accounts = [] }: UserRol
                                           <div className="text-sm font-bold text-gray-900">{item.name}</div>
                                           <div className="text-xs text-gray-500 mt-0.5 leading-relaxed">{item.desc}</div>
                                         </div>
-                                        {(isAnnouncementItem && isDioceseSelected) || isProjectItem ? (
-                                          // Radio button — only one option at a time
-                                          <button
-                                            type="button"
-                                            onClick={() => {
-                                              const updated = { ...roleForm.permissions } as any;
-                                              if (isAnnouncementItem) {
-                                                updated['manage_announcements'] = item.id === 'manage_announcements' ? !isOn : false;
-                                                updated['view_announcements']   = item.id === 'view_announcements'   ? !isOn : false;
-                                              } else {
-                                                updated['manage_projects'] = item.id === 'manage_projects' ? !isOn : false;
-                                                updated['view_projects']   = item.id === 'view_projects'   ? !isOn : false;
-                                              }
-                                              setRoleForm({ ...roleForm, permissions: updated });
-                                            }}
-                                            className={`w-5 h-5 rounded-full border-2 flex items-center justify-center shrink-0 transition-all cursor-pointer ${
-                                              isOn ? 'border-[#22C55E] bg-[#22C55E]/10' : 'border-gray-300 bg-white'
-                                            }`}
-                                          >
-                                            {isOn && <span className="w-2.5 h-2.5 rounded-full bg-[#22C55E]" />}
-                                          </button>
-                                        ) : (
-                                          <button
-                                            type="button"
-                                            onClick={() => togglePerm(item.id)}
-                                            className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${isOn ? 'bg-[#22C55E]' : 'bg-gray-200'}`}
-                                          >
-                                            <span className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${isOn ? 'translate-x-4' : 'translate-x-0'}`} />
-                                          </button>
-                                        )}
+                                        <button
+                                          type="button"
+                                          onClick={() => togglePerm(item.id)}
+                                          className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${isOn ? 'bg-[#22C55E]' : 'bg-gray-200'}`}
+                                        >
+                                          <span className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${isOn ? 'translate-x-4' : 'translate-x-0'}`} />
+                                        </button>
                                       </div>
                                     );
                                   })}
@@ -939,26 +982,6 @@ export function UserRoleControl({ roles, onUpdateRoles, accounts = [] }: UserRol
                                   <span className="w-2.5 h-2.5 rounded-full bg-[#22C55E]" />
                                 )}
                               </button>
-                            ) : (isAnnouncementCategory && isDioceseSelected) || isProjectsCategory ? (
-                              // Radio button for Announcements — only one can be selected
-                              <button
-                                type="button"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  if (canEdit) togglePermission(perm.id);
-                                }}
-                                disabled={!canEdit}
-                                aria-pressed={!!isEnabled}
-                                className={`w-5 h-5 rounded-full border-2 flex items-center justify-center shrink-0 transition-all ${
-                                  !canEdit ? 'cursor-not-allowed' : 'cursor-pointer'
-                                } ${
-                                  isEnabled ? 'border-[#22C55E] bg-[#22C55E]/10' : 'border-gray-300 bg-white'
-                                }`}
-                              >
-                                {isEnabled && (
-                                  <span className="w-2.5 h-2.5 rounded-full bg-[#22C55E]" />
-                                )}
-                              </button>
                             ) : (
                               <button
                                 type="button"
@@ -1001,6 +1024,7 @@ export function UserRoleControl({ roles, onUpdateRoles, accounts = [] }: UserRol
                                           updatedPermissions[id] = (id === sub.id);
                                         });
                                         updatedPermissions['view_school_dashboard'] = true;
+                                        updatedPermissions['manage_own_institution'] = (sub.id === 'view_school');
                                         const RESTRICTED_IDS = [
                                           'digital_twin', 
                                           'upload_csv_admin', 
@@ -1101,9 +1125,83 @@ export function UserRoleControl({ roles, onUpdateRoles, accounts = [] }: UserRol
                       </div>
                     </div>
                   );
-                })()}
-                </React.Fragment>
+                })()}                </React.Fragment>
               ))}
+
+              {/* ── Institution Tab Settings — Standalone Category Block outside the loop ── */}
+              {(isParishSelected || isSeminarySelected || (isSchoolSelected && activePermissionsState.view_school === true)) && (() => {
+                const instLabel = isParishSelected ? 'Parish' : isSeminarySelected ? 'Seminary' : 'School';
+                const canEditInst = !isPredefined && isEditing;
+                return (
+                  <div className="mt-8">
+                    <h3 className="text-[11px] font-bold text-gray-400 uppercase tracking-widest mb-5 flex items-center gap-2.5 ml-1">
+                      🔑 Institution Tab Settings
+                    </h3>
+                    <div className="bg-white border border-gray-100 rounded-[24px] overflow-hidden divide-y divide-gray-50 shadow-sm">
+                      {[
+                        { val: true, name: `Manage ${instLabel} Tab`, description: `Allows editing contact number and email in the My ${instLabel} tab.` },
+                        { val: false, name: `View Only ${instLabel} Tab`, description: `Restricts the My ${instLabel} tab to read-only view.` }
+                      ].map(opt => {
+                        const isSelected = activePermissionsState.manage_own_institution === opt.val;
+                        return (
+                          <div
+                            key={String(opt.val)}
+                            onClick={() => {
+                              if (canEditInst && tempRole) {
+                                setTempRole({
+                                  ...tempRole,
+                                  permissions: {
+                                    ...tempRole.permissions,
+                                    manage_own_institution: isSelected ? !opt.val : opt.val
+                                  }
+                                });
+                              }
+                            }}
+                            className={`p-6 flex items-center justify-between gap-8 transition-all ${
+                              canEditInst ? 'hover:bg-gray-50/30 cursor-pointer' : ''
+                            } ${
+                              !isSelected && !canEditInst ? 'opacity-40' : 'opacity-100'
+                            }`}
+                          >
+                            <div className="flex-1 pr-10">
+                              <div className="text-sm font-bold text-gray-900 mb-1.5">{opt.name}</div>
+                              <div className="text-sm text-gray-500 leading-relaxed font-medium">{opt.description}</div>
+                            </div>
+                            <button
+                              type="button"
+                              disabled={!canEditInst}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                if (canEditInst && tempRole) {
+                                  setTempRole({
+                                    ...tempRole,
+                                    permissions: {
+                                      ...tempRole.permissions,
+                                      manage_own_institution: isSelected ? !opt.val : opt.val
+                                    }
+                                  });
+                                }
+                              }}
+                              className={`relative inline-flex h-6 w-11 flex-shrink-0 rounded-full border-2 border-transparent transition-all duration-300 ease-in-out focus:outline-none ${
+                                !canEditInst ? 'cursor-not-allowed' : 'cursor-pointer focus:ring-4 focus:ring-[#22C55E]/20 focus:ring-offset-0'
+                              } ${
+                                isSelected ? 'bg-[#22C55E]' : 'bg-gray-200'
+                              }`}
+                            >
+                              <span
+                                aria-hidden="true"
+                                className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow-lg ring-0 transition duration-300 ease-in-out ${
+                                  isSelected ? 'translate-x-5' : 'translate-x-0'
+                                }`}
+                              />
+                            </button>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                );
+              })()}
 
                 </>
               );
