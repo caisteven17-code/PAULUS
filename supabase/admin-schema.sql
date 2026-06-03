@@ -8,8 +8,10 @@
 -- =============================================================================
 -- 1. PARISHES
 -- =============================================================================
+CREATE SEQUENCE IF NOT EXISTS parishes_id_seq START 1;
+
 CREATE TABLE IF NOT EXISTS parishes (
-  id               TEXT        PRIMARY KEY DEFAULT gen_random_uuid()::text,
+  id               TEXT        PRIMARY KEY DEFAULT format_seq_id('PAR-', 'parishes_id_seq', 3),
   name             TEXT        NOT NULL,
   vicariate        TEXT        NOT NULL,
   district         TEXT,
@@ -36,8 +38,10 @@ CREATE INDEX IF NOT EXISTS idx_parishes_class     ON parishes (class);
 -- =============================================================================
 -- 2. SEMINARIES
 -- =============================================================================
+CREATE SEQUENCE IF NOT EXISTS seminaries_id_seq START 1;
+
 CREATE TABLE IF NOT EXISTS seminaries (
-  id           TEXT        PRIMARY KEY DEFAULT gen_random_uuid()::text,
+  id           TEXT        PRIMARY KEY DEFAULT format_seq_id('SEM-', 'seminaries_id_seq', 3),
   name         TEXT        NOT NULL,
   vicariate    TEXT        NOT NULL,
   district     TEXT,
@@ -57,8 +61,10 @@ CREATE TABLE IF NOT EXISTS seminaries (
 -- =============================================================================
 -- 3. DIOCESAN SCHOOLS
 -- =============================================================================
+CREATE SEQUENCE IF NOT EXISTS diocesan_schools_id_seq START 1;
+
 CREATE TABLE IF NOT EXISTS diocesan_schools (
-  id           TEXT        PRIMARY KEY DEFAULT gen_random_uuid()::text,
+  id           TEXT        PRIMARY KEY DEFAULT format_seq_id('SCH-', 'diocesan_schools_id_seq', 3),
   name         TEXT        NOT NULL,
   vicariate    TEXT        NOT NULL,
   district     TEXT,
@@ -79,8 +85,10 @@ CREATE TABLE IF NOT EXISTS diocesan_schools (
 -- =============================================================================
 -- 4. ANNOUNCEMENTS
 -- =============================================================================
+CREATE SEQUENCE IF NOT EXISTS announcements_id_seq START 1;
+
 CREATE TABLE IF NOT EXISTS announcements (
-  id           TEXT        PRIMARY KEY DEFAULT gen_random_uuid()::text,
+  id           TEXT        PRIMARY KEY DEFAULT format_seq_id('ANC-', 'announcements_id_seq', 3),
   title        TEXT        NOT NULL,
   content      TEXT        NOT NULL,
   author       TEXT        NOT NULL,
@@ -100,8 +108,10 @@ CREATE INDEX IF NOT EXISTS idx_announcements_created  ON announcements (created_
 -- =============================================================================
 -- 5. AUDIT LOGS
 -- =============================================================================
+CREATE SEQUENCE IF NOT EXISTS audit_logs_id_seq START 1;
+
 CREATE TABLE IF NOT EXISTS audit_logs (
-  id          TEXT        PRIMARY KEY DEFAULT gen_random_uuid()::text,
+  id          TEXT        PRIMARY KEY DEFAULT format_seq_id('LOG-', 'audit_logs_id_seq', 5),
   user_name   TEXT        NOT NULL,
   user_role   TEXT        NOT NULL,
   user_id     UUID        REFERENCES auth.users(id) ON DELETE SET NULL,
