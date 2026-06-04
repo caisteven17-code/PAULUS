@@ -3,18 +3,30 @@
 INSERT INTO shared_analytics.dim_institutions (
   institution_id,
   institution_name,
-  institution_type
+  institution_type,
+  vicariate,
+  district,
+  cluster,
+  class
 )
 SELECT
   id,
   name,
-  institution_type
+  institution_type,
+  vicariate,
+  district,
+  cluster,
+  class
 FROM diocese.institutions
 WHERE institution_type IN ('parish', 'school', 'seminary')
   AND deleted_at IS NULL
 ON CONFLICT (institution_id) DO UPDATE
 SET institution_name = EXCLUDED.institution_name,
-    institution_type = EXCLUDED.institution_type;
+    institution_type = EXCLUDED.institution_type,
+    vicariate        = EXCLUDED.vicariate,
+    district         = EXCLUDED.district,
+    cluster          = EXCLUDED.cluster,
+    class            = EXCLUDED.class;
 
 WITH all_submissions AS (
   SELECT
@@ -112,23 +124,24 @@ SELECT
   i.vicariate,
   i.district,
   i.cluster,
-  pd.assigned_priest,
+  pr.full_name,
   i.address,
   i.latitude,
   i.longitude
 FROM diocese.institutions i
 JOIN shared_analytics.dim_institutions di ON di.institution_id = i.id
 LEFT JOIN parishes.details pd ON pd.institution_id = i.id
+LEFT JOIN diocese.profiles pr ON pr.id = pd.assigned_priest_id
 WHERE i.institution_type = 'parish'
   AND i.deleted_at IS NULL
 ON CONFLICT (institution_key) DO UPDATE
-SET vicariate = EXCLUDED.vicariate,
-    district = EXCLUDED.district,
-    cluster = EXCLUDED.cluster,
-    assigned_priest = EXCLUDED.assigned_priest,
-    address = EXCLUDED.address,
-    latitude = EXCLUDED.latitude,
-    longitude = EXCLUDED.longitude;
+SET vicariate        = EXCLUDED.vicariate,
+    district         = EXCLUDED.district,
+    cluster          = EXCLUDED.cluster,
+    assigned_priest  = EXCLUDED.assigned_priest,
+    address          = EXCLUDED.address,
+    latitude         = EXCLUDED.latitude,
+    longitude        = EXCLUDED.longitude;
 
 
 INSERT INTO school_analytics.dim_schools (
@@ -138,16 +151,17 @@ INSERT INTO school_analytics.dim_schools (
 )
 SELECT
   di.institution_key,
-  sd.principal,
+  pr.full_name,
   i.address
 FROM diocese.institutions i
 JOIN shared_analytics.dim_institutions di ON di.institution_id = i.id
 LEFT JOIN schools.details sd ON sd.institution_id = i.id
+LEFT JOIN diocese.profiles pr ON pr.id = sd.principal_id
 WHERE i.institution_type = 'school'
   AND i.deleted_at IS NULL
 ON CONFLICT (institution_key) DO UPDATE
 SET principal = EXCLUDED.principal,
-    address = EXCLUDED.address;
+    address   = EXCLUDED.address;
 
 
 INSERT INTO seminary_analytics.dim_seminaries (
@@ -157,16 +171,60 @@ INSERT INTO seminary_analytics.dim_seminaries (
 )
 SELECT
   di.institution_key,
-  sd.rector,
+  pr.full_name,
   i.address
 FROM diocese.institutions i
 JOIN shared_analytics.dim_institutions di ON di.institution_id = i.id
 LEFT JOIN seminaries.details sd ON sd.institution_id = i.id
+LEFT JOIN diocese.profiles pr ON pr.id = sd.rector_id
 WHERE i.institution_type = 'seminary'
   AND i.deleted_at IS NULL
 ON CONFLICT (institution_key) DO UPDATE
-SET rector = EXCLUDED.rector,
+SET rector  = EXCLUDED.rector,
     address = EXCLUDED.address;
+
+-- Sync priest dimension from profiles + current active assignment
+INSERT INTO priest_assignment_analytics.dim_priests (
+  profile_id,
+  full_name,
+  email,
+  contact_number,
+  is_active,
+  current_institution_key,
+  parish_assigned,
+  assignment_start_date,
+  assignment_end_date
+)
+SELECT
+  p.id,
+  p.full_name,
+  p.email,
+  p.contact_number,
+  p.is_active,
+  di.institution_key,
+  i.name,
+  pa.start_date,
+  pa.end_date
+FROM diocese.profiles p
+LEFT JOIN operations.priest_assignments pa
+  ON pa.priest_id = p.id
+  AND pa.is_active = true
+  AND pa.deleted_at IS NULL
+LEFT JOIN diocese.institutions i
+  ON i.id = pa.institution_id
+LEFT JOIN shared_analytics.dim_institutions di
+  ON di.institution_id = pa.institution_id
+WHERE p.deleted_at IS NULL
+ON CONFLICT (profile_id) DO UPDATE
+SET full_name               = EXCLUDED.full_name,
+    email                   = EXCLUDED.email,
+    contact_number          = EXCLUDED.contact_number,
+    is_active               = EXCLUDED.is_active,
+    current_institution_key = EXCLUDED.current_institution_key,
+    parish_assigned         = EXCLUDED.parish_assigned,
+    assignment_start_date   = EXCLUDED.assignment_start_date,
+    assignment_end_date     = EXCLUDED.assignment_end_date;
+
 
 INSERT INTO parish_analytics.dim_iafr_account (
   source_account_title_id,

@@ -1,9 +1,9 @@
 CREATE TABLE IF NOT EXISTS seminaries.details (
   institution_id uuid PRIMARY KEY REFERENCES diocese.institutions(id) ON DELETE CASCADE,
-  rector text,
-  created_at timestamptz NOT NULL DEFAULT now(),
-  updated_at timestamptz NOT NULL DEFAULT now(),
-  deleted_at timestamptz
+  rector_id      uuid REFERENCES diocese.profiles(id) ON DELETE SET NULL,
+  created_at     timestamptz NOT NULL DEFAULT now(),
+  updated_at     timestamptz NOT NULL DEFAULT now(),
+  deleted_at     timestamptz
 );
 
 
@@ -25,7 +25,7 @@ CREATE TABLE IF NOT EXISTS seminaries.financial_records (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   institution_id uuid NOT NULL REFERENCES diocese.institutions(id),
   submission_batch_id uuid REFERENCES operations.submission_batches(id),
-  institution_class text,
+  institution_class text CHECK (institution_class IN ('A', 'B', 'C', 'D', 'E') OR institution_class IS NULL),
   month text NOT NULL CHECK (month IN ('Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec')),
   year smallint NOT NULL,
   status text NOT NULL DEFAULT 'draft' CHECK (status IN ('draft', 'submitted', 'verified')),

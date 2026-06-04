@@ -53,6 +53,32 @@ CREATE TABLE IF NOT EXISTS operations.reconciliation_checks (
   deleted_at timestamptz
 );
 
+CREATE TABLE IF NOT EXISTS operations.priest_assignments (
+  id             uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  priest_id      uuid NOT NULL REFERENCES diocese.profiles(id),
+  institution_id uuid NOT NULL REFERENCES diocese.institutions(id),
+  assignment_role text NOT NULL CHECK (assignment_role IN ('parish_priest', 'assistant_priest', 'administrator', 'in_charge', 'temporary_support')),
+  start_date     date NOT NULL,
+  end_date       date,
+  status         text NOT NULL DEFAULT 'active' CHECK (status IN ('active', 'completed', 'transferred')),
+  is_active      boolean NOT NULL DEFAULT true,
+  assigned_by    uuid REFERENCES diocese.profiles(id),
+  notes          text,
+  created_at     timestamptz NOT NULL DEFAULT now(),
+  updated_at     timestamptz NOT NULL DEFAULT now(),
+  deleted_at     timestamptz
+);
+
+-- One active assignment per priest at a time
+CREATE UNIQUE INDEX IF NOT EXISTS uq_priest_active_assignment
+  ON operations.priest_assignments (priest_id)
+  WHERE is_active = true AND deleted_at IS NULL;
+
+-- Fast lookup by institution
+CREATE INDEX IF NOT EXISTS idx_priest_assignments_institution
+  ON operations.priest_assignments (institution_id, is_active)
+  WHERE deleted_at IS NULL;
+
 CREATE INDEX IF NOT EXISTS idx_submission_batches_period
   ON operations.submission_batches (institution_id, reporting_year, reporting_month)
   WHERE deleted_at IS NULL;
@@ -64,6 +90,11 @@ CREATE INDEX IF NOT EXISTS idx_validation_errors_batch
 CREATE INDEX IF NOT EXISTS idx_reconciliation_checks_batch
   ON operations.reconciliation_checks (submission_batch_id, status)
   WHERE deleted_at IS NULL;
+
+DROP TRIGGER IF EXISTS set_updated_at_priest_assignments ON operations.priest_assignments;
+CREATE TRIGGER set_updated_at_priest_assignments
+  BEFORE UPDATE ON operations.priest_assignments
+  FOR EACH ROW EXECUTE FUNCTION public.set_row_updated_at();
 
 DROP TRIGGER IF EXISTS set_updated_at_submission_batches ON operations.submission_batches;
 CREATE TRIGGER set_updated_at_submission_batches

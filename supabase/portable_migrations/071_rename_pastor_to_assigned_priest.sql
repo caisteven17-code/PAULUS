@@ -1,7 +1,4 @@
--- Run this only if the old `pastor` columns already exist.
-
-ALTER TABLE parishes.details
-  RENAME COLUMN pastor TO assigned_priest;
-
-ALTER TABLE parish_analytics.dim_parishes
-  RENAME COLUMN pastor TO assigned_priest;
+-- Historical rename migration. Both targets have been superseded:
+-- parishes.details.assigned_priest was replaced by assigned_priest_id (FK) in the personnel FK fix.
+-- parish_analytics.dim_parishes is created with assigned_priest in 070_parish_analytics.sql.
+-- This file is intentionally a no-op and kept only for migration sequence continuity.

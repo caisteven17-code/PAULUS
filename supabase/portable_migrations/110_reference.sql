@@ -31,6 +31,12 @@ CREATE TABLE IF NOT EXISTS reference.weather_observations (
   updated_at timestamptz NOT NULL DEFAULT now()
 );
 
+-- One weather record per (date, institution_id). NULLS NOT DISTINCT ensures
+-- diocese-wide records (institution_id IS NULL) are also deduplicated per date.
+CREATE UNIQUE INDEX IF NOT EXISTS uq_weather_date_institution
+  ON reference.weather_observations (date, institution_id)
+  NULLS NOT DISTINCT;
+
 DROP TRIGGER IF EXISTS set_updated_at_liturgical_calendar ON reference.liturgical_calendar;
 CREATE TRIGGER set_updated_at_liturgical_calendar
 BEFORE UPDATE ON reference.liturgical_calendar
