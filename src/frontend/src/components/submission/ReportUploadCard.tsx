@@ -48,9 +48,7 @@ export function ReportUploadCard({
             <Upload className="h-5 w-5" />
           </div>
           <div className="space-y-2">
-            <CardTitle className="text-sm md:text-base text-church-black tracking-[0.18em]">
-              Upload Report
-            </CardTitle>
+            <CardTitle className="text-sm md:text-base text-church-black tracking-[0.18em]">Upload Report</CardTitle>
             <p className="text-sm text-gray-500 leading-relaxed">
               Choose a completed report file, then confirm upload.
             </p>
@@ -89,9 +87,7 @@ export function ReportUploadCard({
 
               <div className="rounded-2xl border border-emerald-100 bg-emerald-50 p-4">
                 <p className="text-[10px] font-black uppercase tracking-[0.2em] text-emerald-700">Upload Status</p>
-                <p className="mt-2 text-sm font-medium text-emerald-800">
-                  File ready for upload confirmation.
-                </p>
+                <p className="mt-2 text-sm font-medium text-emerald-800">File ready for upload confirmation.</p>
               </div>
             </div>
           ) : (
@@ -100,9 +96,13 @@ export function ReportUploadCard({
                 <FileUp className="h-7 w-7" />
               </div>
               <div className="space-y-1">
-                <p className="text-sm font-bold text-church-black">{disabled ? 'Upload Access Restricted' : 'No file selected'}</p>
+                <p className="text-sm font-bold text-church-black">
+                  {disabled ? 'Upload Access Restricted' : 'No file selected'}
+                </p>
                 <p className="text-xs text-gray-500">
-                  {disabled ? 'Please contact your administrator.' : `Accepted file types: ${acceptedFormats.replaceAll('.', '').toUpperCase()}`}
+                  {disabled
+                    ? 'Please contact your administrator.'
+                    : `Accepted file types: ${acceptedFormats.replaceAll('.', '').toUpperCase()}`}
                 </p>
               </div>
             </div>

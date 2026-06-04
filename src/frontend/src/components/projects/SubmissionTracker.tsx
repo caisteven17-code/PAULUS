@@ -25,20 +25,22 @@ interface SubmissionTrackerProps {
 
 export function SubmissionTracker({ submissions, onViewDetails, onExportReport }: SubmissionTrackerProps) {
   const [searchQuery, setSearchQuery] = useState('');
-  const [filterStatus, setFilterStatus] = useState<'all' | 'on-time' | 'warning' | 'action-required' | 'not-submitted'>('all');
+  const [filterStatus, setFilterStatus] = useState<'all' | 'on-time' | 'warning' | 'action-required' | 'not-submitted'>(
+    'all',
+  );
   const [filterType, setFilterType] = useState<'all' | 'parish' | 'school' | 'seminary'>('all');
   const [sortBy, setSortBy] = useState<'entity' | 'status' | 'date'>('status');
 
   const filteredSubmissions = useMemo(() => {
-    let filtered = submissions.filter(sub => {
-      const matchesSearch = 
+    let filtered = submissions.filter((sub) => {
+      const matchesSearch =
         sub.entityName.toLowerCase().includes(searchQuery.toLowerCase()) ||
         sub.district?.toLowerCase().includes(searchQuery.toLowerCase()) ||
         sub.vicariate?.toLowerCase().includes(searchQuery.toLowerCase());
-      
+
       const matchesStatus = filterStatus === 'all' || sub.status === filterStatus;
       const matchesType = filterType === 'all' || sub.entityType === filterType;
-      
+
       return matchesSearch && matchesStatus && matchesType;
     });
 
@@ -46,7 +48,7 @@ export function SubmissionTracker({ submissions, onViewDetails, onExportReport }
     if (sortBy === 'entity') {
       filtered.sort((a, b) => a.entityName.localeCompare(b.entityName));
     } else if (sortBy === 'status') {
-      const statusOrder = { 'action-required': 0, 'warning': 1, 'not-submitted': 2, 'on-time': 3 };
+      const statusOrder = { 'action-required': 0, warning: 1, 'not-submitted': 2, 'on-time': 3 };
       filtered.sort((a, b) => statusOrder[a.status] - statusOrder[b.status]);
     } else if (sortBy === 'date') {
       filtered.sort((a, b) => {
@@ -64,9 +66,17 @@ export function SubmissionTracker({ submissions, onViewDetails, onExportReport }
       case 'on-time':
         return { badge: '🟢 On Time', color: 'bg-green-50 border-green-200 text-green-700', icon: CheckCircle };
       case 'warning':
-        return { badge: `🟠 Warning (${monthsLate} months late)`, color: 'bg-amber-50 border-amber-200 text-amber-700', icon: AlertTriangle };
+        return {
+          badge: `🟠 Warning (${monthsLate} months late)`,
+          color: 'bg-amber-50 border-amber-200 text-amber-700',
+          icon: AlertTriangle,
+        };
       case 'action-required':
-        return { badge: `🔴 Action Required (${monthsLate} months late)`, color: 'bg-red-50 border-red-200 text-red-700', icon: AlertTriangle };
+        return {
+          badge: `🔴 Action Required (${monthsLate} months late)`,
+          color: 'bg-red-50 border-red-200 text-red-700',
+          icon: AlertTriangle,
+        };
       case 'not-submitted':
         return { badge: '🔴 Not Submitted', color: 'bg-red-50 border-red-200 text-red-700', icon: Clock };
       default:
@@ -77,11 +87,11 @@ export function SubmissionTracker({ submissions, onViewDetails, onExportReport }
   const stats = useMemo(() => {
     return {
       total: submissions.length,
-      onTime: submissions.filter(s => s.status === 'on-time').length,
-      warning: submissions.filter(s => s.status === 'warning').length,
-      actionRequired: submissions.filter(s => s.status === 'action-required').length,
-      notSubmitted: submissions.filter(s => s.status === 'not-submitted').length,
-      budgetsSet: submissions.filter(s => s.budgetSet).length,
+      onTime: submissions.filter((s) => s.status === 'on-time').length,
+      warning: submissions.filter((s) => s.status === 'warning').length,
+      actionRequired: submissions.filter((s) => s.status === 'action-required').length,
+      notSubmitted: submissions.filter((s) => s.status === 'not-submitted').length,
+      budgetsSet: submissions.filter((s) => s.budgetSet).length,
     };
   }, [submissions]);
 
@@ -89,32 +99,61 @@ export function SubmissionTracker({ submissions, onViewDetails, onExportReport }
     <div className="space-y-4 md:space-y-6">
       {/* Stats Cards */}
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2 md:gap-3 lg:gap-4">
-        <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="bg-white border border-gray-200 rounded-lg p-3 md:p-4">
+        <motion.div
+          initial={{ opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="bg-white border border-gray-200 rounded-lg p-3 md:p-4"
+        >
           <p className="text-[9px] md:text-xs text-gray-600 font-bold uppercase mb-2 leading-tight">Total Entities</p>
           <p className="text-xl md:text-2xl font-bold text-gray-900">{stats.total}</p>
         </motion.div>
 
-        <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }} className="bg-green-50 border border-green-200 rounded-lg p-3 md:p-4">
+        <motion.div
+          initial={{ opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.1 }}
+          className="bg-green-50 border border-green-200 rounded-lg p-3 md:p-4"
+        >
           <p className="text-[9px] md:text-xs text-green-700 font-bold uppercase mb-2 leading-tight">On Time</p>
           <p className="text-xl md:text-2xl font-bold text-green-700">{stats.onTime}</p>
         </motion.div>
 
-        <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2 }} className="bg-amber-50 border border-amber-200 rounded-lg p-3 md:p-4">
+        <motion.div
+          initial={{ opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.2 }}
+          className="bg-amber-50 border border-amber-200 rounded-lg p-3 md:p-4"
+        >
           <p className="text-[9px] md:text-xs text-amber-700 font-bold uppercase mb-2 leading-tight">Warning</p>
           <p className="text-xl md:text-2xl font-bold text-amber-700">{stats.warning}</p>
         </motion.div>
 
-        <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.3 }} className="bg-red-50 border border-red-200 rounded-lg p-3 md:p-4">
+        <motion.div
+          initial={{ opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.3 }}
+          className="bg-red-50 border border-red-200 rounded-lg p-3 md:p-4"
+        >
           <p className="text-[9px] md:text-xs text-red-700 font-bold uppercase mb-2 leading-tight">Action Req.</p>
           <p className="text-xl md:text-2xl font-bold text-red-700">{stats.actionRequired + stats.notSubmitted}</p>
         </motion.div>
 
-        <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.4 }} className="bg-blue-50 border border-blue-200 rounded-lg p-3 md:p-4">
+        <motion.div
+          initial={{ opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.4 }}
+          className="bg-blue-50 border border-blue-200 rounded-lg p-3 md:p-4"
+        >
           <p className="text-[9px] md:text-xs text-blue-700 font-bold uppercase mb-2 leading-tight">Budgets Set</p>
           <p className="text-xl md:text-2xl font-bold text-blue-700">{stats.budgetsSet}</p>
         </motion.div>
 
-        <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.5 }} className="col-span-2 sm:col-span-1">
+        <motion.div
+          initial={{ opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.5 }}
+          className="col-span-2 sm:col-span-1"
+        >
           <button
             onClick={onExportReport}
             className="w-full h-full flex items-center justify-center bg-gold-500 hover:bg-gold-600 text-black font-bold rounded-lg transition-colors p-3 md:p-4 hover:scale-105"
@@ -197,7 +236,9 @@ export function SubmissionTracker({ submissions, onViewDetails, onExportReport }
                 <th className="hidden sm:table-cell px-2 md:px-4 py-3 text-left font-bold text-gray-700">Type</th>
                 <th className="hidden md:table-cell px-2 md:px-4 py-3 text-left font-bold text-gray-700">Location</th>
                 <th className="px-2 md:px-4 py-3 text-left font-bold text-gray-700">Status</th>
-                <th className="hidden lg:table-cell px-2 md:px-4 py-3 text-left font-bold text-gray-700">Last Submitted</th>
+                <th className="hidden lg:table-cell px-2 md:px-4 py-3 text-left font-bold text-gray-700">
+                  Last Submitted
+                </th>
                 <th className="hidden sm:table-cell px-2 md:px-4 py-3 text-left font-bold text-gray-700">Budget</th>
                 <th className="px-2 md:px-4 py-3 text-center font-bold text-gray-700">Action</th>
               </tr>
@@ -214,10 +255,13 @@ export function SubmissionTracker({ submissions, onViewDetails, onExportReport }
                     transition={{ delay: index * 0.05 }}
                     className="border-b border-gray-100 hover:bg-gray-50 transition-colors"
                   >
-                    <td className="px-2 md:px-4 py-3 font-bold text-gray-900 text-[11px] md:text-sm">{submission.entityName}</td>
+                    <td className="px-2 md:px-4 py-3 font-bold text-gray-900 text-[11px] md:text-sm">
+                      {submission.entityName}
+                    </td>
                     <td className="hidden sm:table-cell px-2 md:px-4 py-3 text-gray-600">
                       <span className="inline-block px-2 py-1 bg-blue-100 text-blue-700 rounded text-[10px] md:text-xs font-bold">
-                        {submission.entityType.charAt(0).toUpperCase()}{submission.entityType.slice(1)}
+                        {submission.entityType.charAt(0).toUpperCase()}
+                        {submission.entityType.slice(1)}
                       </span>
                     </td>
                     <td className="hidden md:table-cell px-2 md:px-4 py-3 text-gray-600 text-[11px] md:text-sm">
@@ -227,14 +271,19 @@ export function SubmissionTracker({ submissions, onViewDetails, onExportReport }
                       </div>
                     </td>
                     <td className="px-2 md:px-4 py-3">
-                      <div className={`inline-flex items-center gap-1 px-2 md:px-2.5 py-1 rounded text-[10px] md:text-xs font-bold border ${statusInfo.color}`}>
+                      <div
+                        className={`inline-flex items-center gap-1 px-2 md:px-2.5 py-1 rounded text-[10px] md:text-xs font-bold border ${statusInfo.color}`}
+                      >
                         <Icon className="w-3 md:w-4 h-3 md:h-4 shrink-0" />
                         <span className="truncate">{statusInfo.badge}</span>
                       </div>
                     </td>
                     <td className="hidden lg:table-cell px-2 md:px-4 py-3 text-gray-600 text-[11px] md:text-sm">
                       {submission.lastSubmissionDate
-                        ? new Date(submission.lastSubmissionDate).toLocaleDateString('en-PH', { month: 'short', day: 'numeric' })
+                        ? new Date(submission.lastSubmissionDate).toLocaleDateString('en-PH', {
+                            month: 'short',
+                            day: 'numeric',
+                          })
                         : '—'}
                     </td>
                     <td className="hidden sm:table-cell px-2 md:px-4 py-3 text-gray-600 text-[11px] md:text-sm">

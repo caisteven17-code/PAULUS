@@ -48,10 +48,8 @@ const copyResponseHeaders = (source: Headers) => {
 
 export async function proxyToBackend(request: Request, options: ProxyOptions) {
   const incomingUrl = new URL(request.url);
-  const targetPath = options.preserveQuery === false
-    ? options.path
-    : `${options.path}${incomingUrl.search}`;
-  
+  const targetPath = options.preserveQuery === false ? options.path : `${options.path}${incomingUrl.search}`;
+
   const backendBaseUrl = process.env.BACKEND_PROXY_BASE_URL?.trim() || 'http://127.0.0.1:4000/api';
   const targetUrl = `${backendBaseUrl.replace(/\/$/, '')}${targetPath}`;
 

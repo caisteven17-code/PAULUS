@@ -8,7 +8,12 @@ import { Project, ProjectCategory } from '../../types';
 interface ProjectCreationFormProps {
   isOpen: boolean;
   onClose: () => void;
-  onSubmit: (project: Omit<Project, 'id' | 'currentAmount' | 'healthScore' | 'successProbability' | 'recommendation' | 'entityId' | 'entityType'>) => void;
+  onSubmit: (
+    project: Omit<
+      Project,
+      'id' | 'currentAmount' | 'healthScore' | 'successProbability' | 'recommendation' | 'entityId' | 'entityType'
+    >,
+  ) => void;
 }
 
 export function ProjectCreationForm({ isOpen, onClose, onSubmit }: ProjectCreationFormProps) {
@@ -22,7 +27,7 @@ export function ProjectCreationForm({ isOpen, onClose, onSubmit }: ProjectCreati
     category: 'Building/Construction' as ProjectCategory,
     beneficiaries: '',
     contactPerson: '',
-    status: 'active' as const
+    status: 'active' as const,
   });
 
   const [imagePreview, setImagePreview] = useState<string | null>(null);
@@ -42,13 +47,13 @@ export function ProjectCreationForm({ isOpen, onClose, onSubmit }: ProjectCreati
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     setIsSubmitting(true);
-    
+
     // Mock API call
     setTimeout(() => {
       onSubmit({
         ...formData,
         targetAmount: Number(formData.targetAmount),
-        coverImage: imagePreview || undefined
+        coverImage: imagePreview || undefined,
       });
       setIsSubmitting(false);
       onClose();
@@ -56,23 +61,28 @@ export function ProjectCreationForm({ isOpen, onClose, onSubmit }: ProjectCreati
   };
 
   const categories: ProjectCategory[] = [
-    'Building/Construction', 'Equipment', 'Programs/Outreach', 
-    'Education', 'Emergency/Relief', 'Liturgical', 'Operational'
+    'Building/Construction',
+    'Equipment',
+    'Programs/Outreach',
+    'Education',
+    'Emergency/Relief',
+    'Liturgical',
+    'Operational',
   ];
 
   return (
     <AnimatePresence>
       {isOpen && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 overflow-y-auto">
-          <motion.div 
+          <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             onClick={onClose}
             className="fixed inset-0 bg-black/60 backdrop-blur-sm"
           />
-          
-          <motion.div 
+
+          <motion.div
             initial={{ opacity: 0, scale: 0.95, y: 20 }}
             animate={{ opacity: 1, scale: 1, y: 0 }}
             exit={{ opacity: 0, scale: 0.95, y: 20 }}
@@ -81,9 +91,11 @@ export function ProjectCreationForm({ isOpen, onClose, onSubmit }: ProjectCreati
             <div className="p-8 border-b border-gray-100 flex justify-between items-center bg-white sticky top-0 z-10">
               <div>
                 <h2 className="text-2xl font-serif font-bold text-church-black tracking-tight">Create New Project</h2>
-                <p className="text-sm text-gray-500 font-medium mt-1">Define your fundraising goal and project details.</p>
+                <p className="text-sm text-gray-500 font-medium mt-1">
+                  Define your fundraising goal and project details.
+                </p>
               </div>
-              <button 
+              <button
                 onClick={onClose}
                 className="w-12 h-12 rounded-full hover:bg-gray-100 flex items-center justify-center text-gray-400 transition-all hover:rotate-90"
               >
@@ -99,16 +111,22 @@ export function ProjectCreationForm({ isOpen, onClose, onSubmit }: ProjectCreati
                   Visual Identity
                 </label>
                 <div className="relative group">
-                  <input 
-                    type="file" 
+                  <input
+                    type="file"
                     accept="image/*"
                     onChange={handleImageChange}
                     className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"
                   />
-                  <div className={`w-full h-52 rounded-3xl border-2 border-dashed transition-all duration-500 flex flex-col items-center justify-center gap-3 overflow-hidden ${imagePreview ? 'border-gold-500 bg-gold-50/5' : 'border-gray-200 bg-gray-50 group-hover:border-gold-400 group-hover:bg-gold-50/10'}`}>
+                  <div
+                    className={`w-full h-52 rounded-3xl border-2 border-dashed transition-all duration-500 flex flex-col items-center justify-center gap-3 overflow-hidden ${imagePreview ? 'border-gold-500 bg-gold-50/5' : 'border-gray-200 bg-gray-50 group-hover:border-gold-400 group-hover:bg-gold-50/10'}`}
+                  >
                     {imagePreview ? (
                       <div className="relative w-full h-full group/preview">
-                        <img src={imagePreview} alt="Preview" className="w-full h-full object-cover transition-transform duration-700 group-hover/preview:scale-105" />
+                        <img
+                          src={imagePreview}
+                          alt="Preview"
+                          className="w-full h-full object-cover transition-transform duration-700 group-hover/preview:scale-105"
+                        />
                         <div className="absolute inset-0 bg-black/40 opacity-0 group-hover/preview:opacity-100 transition-opacity flex items-center justify-center">
                           <p className="text-white text-xs font-bold tracking-widest uppercase">Change Image</p>
                         </div>
@@ -119,7 +137,9 @@ export function ProjectCreationForm({ isOpen, onClose, onSubmit }: ProjectCreati
                           <Upload className="w-6 h-6" />
                         </div>
                         <div className="text-center">
-                          <p className="text-sm font-bold text-gray-500 group-hover:text-gold-700 transition-colors">Upload Cover Image</p>
+                          <p className="text-sm font-bold text-gray-500 group-hover:text-gold-700 transition-colors">
+                            Upload Cover Image
+                          </p>
                           <p className="text-[10px] text-gray-400 mt-1 uppercase tracking-wider">JPG, PNG up to 5MB</p>
                         </div>
                       </>
@@ -134,7 +154,7 @@ export function ProjectCreationForm({ isOpen, onClose, onSubmit }: ProjectCreati
                     <Tag className="w-3.5 h-3.5" />
                     Project Name
                   </label>
-                  <input 
+                  <input
                     type="text"
                     required
                     value={formData.name}
@@ -150,14 +170,16 @@ export function ProjectCreationForm({ isOpen, onClose, onSubmit }: ProjectCreati
                     Category
                   </label>
                   <div className="relative">
-                    <select 
+                    <select
                       required
                       value={formData.category}
                       onChange={(e) => setFormData({ ...formData, category: e.target.value as ProjectCategory })}
                       className="w-full px-5 py-4 bg-gray-50/50 border border-gray-200 rounded-2xl text-sm font-medium focus:outline-none focus:ring-4 focus:ring-gold-500/10 focus:border-gold-500 focus:bg-white transition-all appearance-none cursor-pointer"
                     >
-                      {categories.map(cat => (
-                        <option key={cat} value={cat}>{cat}</option>
+                      {categories.map((cat) => (
+                        <option key={cat} value={cat}>
+                          {cat}
+                        </option>
                       ))}
                     </select>
                     <div className="absolute right-5 top-1/2 -translate-y-1/2 pointer-events-none text-gray-400">
@@ -172,7 +194,7 @@ export function ProjectCreationForm({ isOpen, onClose, onSubmit }: ProjectCreati
                   <FileText className="w-3.5 h-3.5" />
                   Project Description
                 </label>
-                <textarea 
+                <textarea
                   required
                   value={formData.description}
                   onChange={(e) => setFormData({ ...formData, description: e.target.value })}
@@ -187,7 +209,7 @@ export function ProjectCreationForm({ isOpen, onClose, onSubmit }: ProjectCreati
                   <Check className="w-3.5 h-3.5" />
                   Fund Usage
                 </label>
-                <textarea 
+                <textarea
                   required
                   value={formData.fundUsage}
                   onChange={(e) => setFormData({ ...formData, fundUsage: e.target.value })}
@@ -203,7 +225,7 @@ export function ProjectCreationForm({ isOpen, onClose, onSubmit }: ProjectCreati
                     <Target className="w-3.5 h-3.5" />
                     Target (₱)
                   </label>
-                  <input 
+                  <input
                     type="number"
                     required
                     value={formData.targetAmount}
@@ -218,7 +240,7 @@ export function ProjectCreationForm({ isOpen, onClose, onSubmit }: ProjectCreati
                     <Calendar className="w-3.5 h-3.5" />
                     Start Date
                   </label>
-                  <input 
+                  <input
                     type="date"
                     required
                     value={formData.startDate}
@@ -232,7 +254,7 @@ export function ProjectCreationForm({ isOpen, onClose, onSubmit }: ProjectCreati
                     <Calendar className="w-3.5 h-3.5" />
                     End Date
                   </label>
-                  <input 
+                  <input
                     type="date"
                     required
                     value={formData.endDate}
@@ -248,7 +270,7 @@ export function ProjectCreationForm({ isOpen, onClose, onSubmit }: ProjectCreati
                     <User className="w-3.5 h-3.5" />
                     Beneficiaries
                   </label>
-                  <input 
+                  <input
                     type="text"
                     value={formData.beneficiaries}
                     onChange={(e) => setFormData({ ...formData, beneficiaries: e.target.value })}
@@ -262,7 +284,7 @@ export function ProjectCreationForm({ isOpen, onClose, onSubmit }: ProjectCreati
                     <User className="w-3.5 h-3.5" />
                     Contact Person
                   </label>
-                  <input 
+                  <input
                     type="text"
                     value={formData.contactPerson}
                     onChange={(e) => setFormData({ ...formData, contactPerson: e.target.value })}
@@ -273,14 +295,14 @@ export function ProjectCreationForm({ isOpen, onClose, onSubmit }: ProjectCreati
               </div>
 
               <div className="pt-8 border-t border-gray-100 flex gap-4 sticky bottom-0 bg-white pb-4">
-                <button 
+                <button
                   type="button"
                   onClick={onClose}
                   className="flex-1 py-4 px-6 rounded-2xl text-sm font-bold text-gray-500 hover:bg-gray-50 transition-all active:scale-95"
                 >
                   Cancel
                 </button>
-                <button 
+                <button
                   type="submit"
                   disabled={isSubmitting}
                   className="flex-[2] py-4 px-6 bg-gold-500 text-church-green-dark rounded-2xl text-sm font-bold hover:bg-gold-600 transition-all shadow-xl shadow-gold-500/20 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-3 active:scale-[0.98]"

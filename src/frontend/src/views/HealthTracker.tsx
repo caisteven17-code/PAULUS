@@ -7,7 +7,6 @@ import { useAuth } from '../firebase';
 import { formatDate } from '../lib/format';
 import { usePermissions } from '../hooks/usePermissions';
 
-
 interface PriestRecord {
   id: string;
   name: string;
@@ -91,12 +90,12 @@ export function HealthTracker() {
   const getUpcomingBirthdays = () => {
     const today = new Date();
     return priests
-      .map(p => ({
+      .map((p) => ({
         ...p,
         age: calculateAge(p.birthDate),
         daysUntilBirthday: getDaysUntilBirthday(p.birthDate),
       }))
-      .filter(p => p.daysUntilBirthday <= 30 && p.daysUntilBirthday >= 0)
+      .filter((p) => p.daysUntilBirthday <= 30 && p.daysUntilBirthday >= 0)
       .sort((a, b) => a.daysUntilBirthday - b.daysUntilBirthday);
   };
 
@@ -104,11 +103,11 @@ export function HealthTracker() {
     const today = new Date();
     const birth = new Date(birthDate);
     const thisYearBirthday = new Date(today.getFullYear(), birth.getMonth(), birth.getDate());
-    
+
     if (thisYearBirthday < today) {
       thisYearBirthday.setFullYear(today.getFullYear() + 1);
     }
-    
+
     const diff = thisYearBirthday.getTime() - today.getTime();
     return Math.ceil(diff / (1000 * 60 * 60 * 24));
   };
@@ -127,16 +126,16 @@ export function HealthTracker() {
     }
 
     if (editingId) {
-      setPriests(prev =>
-        prev.map(p =>
+      setPriests((prev) =>
+        prev.map((p) =>
           p.id === editingId
             ? {
-              ...p,
-              ...formData,
-              age: calculateAge(formData.birthDate),
-            }
-            : p
-        )
+                ...p,
+                ...formData,
+                age: calculateAge(formData.birthDate),
+              }
+            : p,
+        ),
       );
       setEditingId(null);
     } else {
@@ -145,7 +144,7 @@ export function HealthTracker() {
         ...formData,
         age: calculateAge(formData.birthDate),
       };
-      setPriests(prev => [...prev, newRecord]);
+      setPriests((prev) => [...prev, newRecord]);
     }
 
     setFormData({
@@ -164,7 +163,7 @@ export function HealthTracker() {
 
   const handleDelete = useCallback((id: string) => {
     if (confirm('Delete this record?')) {
-      setPriests(prev => prev.filter(p => p.id !== id));
+      setPriests((prev) => prev.filter((p) => p.id !== id));
     }
   }, []);
 
@@ -185,7 +184,7 @@ export function HealthTracker() {
   }, []);
 
   const upcomingBirthdays = getUpcomingBirthdays();
-  const priestsNeedingCheckup = priests.filter(p => needsCheckup(p.lastCheckup));
+  const priestsNeedingCheckup = priests.filter((p) => needsCheckup(p.lastCheckup));
 
   let filteredPriests = priests;
   if (filter === 'birthdays') {
@@ -195,10 +194,9 @@ export function HealthTracker() {
   }
   if (search.trim()) {
     const q = search.toLowerCase();
-    filteredPriests = filteredPriests.filter(p =>
-      p.name.toLowerCase().includes(q) ||
-      p.position.toLowerCase().includes(q) ||
-      p.parish.toLowerCase().includes(q)
+    filteredPriests = filteredPriests.filter(
+      (p) =>
+        p.name.toLowerCase().includes(q) || p.position.toLowerCase().includes(q) || p.parish.toLowerCase().includes(q),
     );
   }
 
@@ -291,7 +289,7 @@ export function HealthTracker() {
         {/* Filters + Search */}
         <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3 mb-6">
           <div className="flex gap-2">
-            {(['all', 'birthdays', 'checkups'] as const).map(cat => (
+            {(['all', 'birthdays', 'checkups'] as const).map((cat) => (
               <button
                 key={cat}
                 onClick={() => setFilter(cat)}
@@ -310,7 +308,7 @@ export function HealthTracker() {
             <input
               type="text"
               value={search}
-              onChange={e => setSearch(e.target.value)}
+              onChange={(e) => setSearch(e.target.value)}
               placeholder="Search by name, position, parish..."
               className="w-full pl-9 pr-4 py-2 border border-slate-200 rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-rose-400 focus:border-transparent"
             />
@@ -331,7 +329,7 @@ export function HealthTracker() {
                 initial={{ scale: 0.95 }}
                 animate={{ scale: 1 }}
                 exit={{ scale: 0.95 }}
-                onClick={e => e.stopPropagation()}
+                onClick={(e) => e.stopPropagation()}
                 className="bg-white rounded-xl shadow-xl max-w-2xl w-full p-6 max-h-96 overflow-y-auto"
               >
                 <div className="flex items-center justify-between mb-6">
@@ -351,14 +349,14 @@ export function HealthTracker() {
                     <input
                       type="text"
                       value={formData.name}
-                      onChange={e => setFormData({ ...formData, name: e.target.value })}
+                      onChange={(e) => setFormData({ ...formData, name: e.target.value })}
                       placeholder="Full name"
                       className="px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-rose-500 focus:border-transparent outline-none"
                     />
                     <input
                       type="text"
                       value={formData.position}
-                      onChange={e => setFormData({ ...formData, position: e.target.value })}
+                      onChange={(e) => setFormData({ ...formData, position: e.target.value })}
                       placeholder="Position (e.g., Pastor, Vicar)"
                       className="px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-rose-500 focus:border-transparent outline-none"
                     />
@@ -368,14 +366,14 @@ export function HealthTracker() {
                     <input
                       type="text"
                       value={formData.parish}
-                      onChange={e => setFormData({ ...formData, parish: e.target.value })}
+                      onChange={(e) => setFormData({ ...formData, parish: e.target.value })}
                       placeholder="Parish"
                       className="px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-rose-500 focus:border-transparent outline-none"
                     />
                     <input
                       type="email"
                       value={formData.email}
-                      onChange={e => setFormData({ ...formData, email: e.target.value })}
+                      onChange={(e) => setFormData({ ...formData, email: e.target.value })}
                       placeholder="Email"
                       className="px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-rose-500 focus:border-transparent outline-none"
                     />
@@ -385,14 +383,14 @@ export function HealthTracker() {
                     <input
                       type="tel"
                       value={formData.phone}
-                      onChange={e => setFormData({ ...formData, phone: e.target.value })}
+                      onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
                       placeholder="Phone"
                       className="px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-rose-500 focus:border-transparent outline-none"
                     />
                     <input
                       type="date"
                       value={formData.birthDate}
-                      onChange={e => setFormData({ ...formData, birthDate: e.target.value })}
+                      onChange={(e) => setFormData({ ...formData, birthDate: e.target.value })}
                       className="px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-rose-500 focus:border-transparent outline-none"
                     />
                   </div>
@@ -403,7 +401,7 @@ export function HealthTracker() {
                       <input
                         type="date"
                         value={formData.lastCheckup}
-                        onChange={e => setFormData({ ...formData, lastCheckup: e.target.value })}
+                        onChange={(e) => setFormData({ ...formData, lastCheckup: e.target.value })}
                         className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-rose-500 focus:border-transparent outline-none"
                       />
                     </div>
@@ -411,7 +409,12 @@ export function HealthTracker() {
                       <label className="text-sm text-slate-600 mb-1 block">Health Status</label>
                       <select
                         value={formData.healthStatus}
-                        onChange={e => setFormData({ ...formData, healthStatus: e.target.value as 'good' | 'fair' | 'needs-attention' })}
+                        onChange={(e) =>
+                          setFormData({
+                            ...formData,
+                            healthStatus: e.target.value as 'good' | 'fair' | 'needs-attention',
+                          })
+                        }
                         className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-rose-500 focus:border-transparent outline-none"
                       >
                         <option value="good">Good</option>
@@ -425,7 +428,7 @@ export function HealthTracker() {
                     <label className="text-sm text-slate-600 mb-1 block">Notes</label>
                     <textarea
                       value={formData.notes}
-                      onChange={e => setFormData({ ...formData, notes: e.target.value })}
+                      onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
                       placeholder="Additional notes"
                       rows={3}
                       className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-rose-500 focus:border-transparent outline-none resize-none"
@@ -458,14 +461,28 @@ export function HealthTracker() {
             <table className="w-full text-sm">
               <thead>
                 <tr className="bg-slate-50 border-b border-slate-200">
-                  <th className="text-left px-4 py-3 text-xs font-bold text-slate-500 uppercase tracking-wider">Name</th>
-                  <th className="text-left px-4 py-3 text-xs font-bold text-slate-500 uppercase tracking-wider">Position</th>
-                  <th className="text-left px-4 py-3 text-xs font-bold text-slate-500 uppercase tracking-wider hidden md:table-cell">Parish</th>
-                  <th className="text-left px-4 py-3 text-xs font-bold text-slate-500 uppercase tracking-wider hidden sm:table-cell">Age</th>
-                  <th className="text-left px-4 py-3 text-xs font-bold text-slate-500 uppercase tracking-wider hidden lg:table-cell">Last Check-up</th>
-                  <th className="text-left px-4 py-3 text-xs font-bold text-slate-500 uppercase tracking-wider">Status</th>
+                  <th className="text-left px-4 py-3 text-xs font-bold text-slate-500 uppercase tracking-wider">
+                    Name
+                  </th>
+                  <th className="text-left px-4 py-3 text-xs font-bold text-slate-500 uppercase tracking-wider">
+                    Position
+                  </th>
+                  <th className="text-left px-4 py-3 text-xs font-bold text-slate-500 uppercase tracking-wider hidden md:table-cell">
+                    Parish
+                  </th>
+                  <th className="text-left px-4 py-3 text-xs font-bold text-slate-500 uppercase tracking-wider hidden sm:table-cell">
+                    Age
+                  </th>
+                  <th className="text-left px-4 py-3 text-xs font-bold text-slate-500 uppercase tracking-wider hidden lg:table-cell">
+                    Last Check-up
+                  </th>
+                  <th className="text-left px-4 py-3 text-xs font-bold text-slate-500 uppercase tracking-wider">
+                    Status
+                  </th>
                   {canManageRecords && (
-                    <th className="text-right px-4 py-3 text-xs font-bold text-slate-500 uppercase tracking-wider">Actions</th>
+                    <th className="text-right px-4 py-3 text-xs font-bold text-slate-500 uppercase tracking-wider">
+                      Actions
+                    </th>
                   )}
                 </tr>
               </thead>
@@ -496,11 +513,15 @@ export function HealthTracker() {
                       <td className="px-4 py-3 hidden lg:table-cell">
                         <span className="text-slate-600">{formatDate(new Date(priest.lastCheckup))}</span>
                         {needsCheckup(priest.lastCheckup) && (
-                          <span className="ml-2 text-[10px] bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded font-bold">Overdue</span>
+                          <span className="ml-2 text-[10px] bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded font-bold">
+                            Overdue
+                          </span>
                         )}
                       </td>
                       <td className="px-4 py-3">
-                        <span className={`inline-flex items-center gap-1 px-2 py-1 rounded-md text-[11px] font-bold border ${HEALTH_STATUS_COLORS[priest.healthStatus]}`}>
+                        <span
+                          className={`inline-flex items-center gap-1 px-2 py-1 rounded-md text-[11px] font-bold border ${HEALTH_STATUS_COLORS[priest.healthStatus]}`}
+                        >
                           {HEALTH_STATUS_ICONS[priest.healthStatus]} {priest.healthStatus.replace('-', ' ')}
                         </span>
                       </td>
@@ -508,13 +529,19 @@ export function HealthTracker() {
                         <td className="px-4 py-3 text-right">
                           <div className="flex items-center justify-end gap-1">
                             <button
-                              onClick={e => { e.stopPropagation(); handleEdit(priest); }}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleEdit(priest);
+                              }}
                               className="p-1.5 hover:bg-blue-50 rounded-lg transition-colors"
                             >
                               <Edit2 className="w-4 h-4 text-blue-500" />
                             </button>
                             <button
-                              onClick={e => { e.stopPropagation(); handleDelete(priest.id); }}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleDelete(priest.id);
+                              }}
                               className="p-1.5 hover:bg-rose-50 rounded-lg transition-colors"
                             >
                               <Trash2 className="w-4 h-4 text-rose-500" />
@@ -552,13 +579,15 @@ export function HealthTracker() {
                 initial={{ scale: 0.95 }}
                 animate={{ scale: 1 }}
                 exit={{ scale: 0.95 }}
-                onClick={e => e.stopPropagation()}
+                onClick={(e) => e.stopPropagation()}
                 className="bg-white rounded-xl shadow-xl max-w-2xl w-full p-6"
               >
                 <div className="flex items-start justify-between mb-4">
                   <div>
                     <h2 className="text-2xl font-bold text-slate-900">{selectedPriest.name}</h2>
-                    <p className="text-slate-600">{selectedPriest.position} • {selectedPriest.parish}</p>
+                    <p className="text-slate-600">
+                      {selectedPriest.position} • {selectedPriest.parish}
+                    </p>
                   </div>
                   <button
                     onClick={() => setSelectedPriest(null)}
@@ -571,12 +600,16 @@ export function HealthTracker() {
                 <div className="grid grid-cols-2 gap-6">
                   <div>
                     <p className="text-sm text-slate-600 font-medium">Birth Date</p>
-                    <p className="text-lg font-semibold text-slate-900 mt-1">{formatDate(new Date(selectedPriest.birthDate))}</p>
+                    <p className="text-lg font-semibold text-slate-900 mt-1">
+                      {formatDate(new Date(selectedPriest.birthDate))}
+                    </p>
                     <p className="text-sm text-slate-600 mt-1">Age: {selectedPriest.age} years</p>
                   </div>
                   <div>
                     <p className="text-sm text-slate-600 font-medium">Health Status</p>
-                    <p className={`text-lg font-semibold mt-1 ${HEALTH_STATUS_COLORS[selectedPriest.healthStatus].split(' ')[1]}`}>
+                    <p
+                      className={`text-lg font-semibold mt-1 ${HEALTH_STATUS_COLORS[selectedPriest.healthStatus].split(' ')[1]}`}
+                    >
                       {selectedPriest.healthStatus.replace('-', ' ').toUpperCase()}
                     </p>
                   </div>
@@ -590,7 +623,9 @@ export function HealthTracker() {
                   </div>
                   <div className="col-span-2">
                     <p className="text-sm text-slate-600 font-medium">Last Check-up</p>
-                    <p className="text-lg font-semibold text-slate-900 mt-1">{formatDate(new Date(selectedPriest.lastCheckup))}</p>
+                    <p className="text-lg font-semibold text-slate-900 mt-1">
+                      {formatDate(new Date(selectedPriest.lastCheckup))}
+                    </p>
                     {needsCheckup(selectedPriest.lastCheckup) && (
                       <p className="text-sm text-amber-700 bg-amber-50 px-3 py-2 rounded mt-2">
                         ⚠️ Health check-up is overdue. Please schedule immediately.

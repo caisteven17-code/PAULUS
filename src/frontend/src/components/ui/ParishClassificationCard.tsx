@@ -27,10 +27,10 @@ interface ParishClassificationCardProps {
  */
 const CLASS_THRESHOLDS: Record<EntityClass, { min: number; tax: number }> = {
   'Class A': { min: 2500000, tax: 0.12 },
-  'Class B': { min: 1500000, tax: 0.10 },
+  'Class B': { min: 1500000, tax: 0.1 },
   'Class C': { min: 750000, tax: 0.08 },
   'Class D': { min: 250000, tax: 0.03 },
-  'Class E': { min: 0,      tax: 0.00 },
+  'Class E': { min: 0, tax: 0.0 },
 };
 
 /**
@@ -40,7 +40,7 @@ const CLASS_THRESHOLDS: Record<EntityClass, { min: number; tax: number }> = {
 export function calculateSustainabilityStatus(
   currentClass: EntityClass,
   annualIncome: number,
-  isSubsidized: boolean
+  isSubsidized: boolean,
 ): {
   isSustainable: boolean;
   recommendedClass?: EntityClass;
@@ -51,7 +51,7 @@ export function calculateSustainabilityStatus(
   // Check if current income exceeds next class threshold
   const classOrder: EntityClass[] = ['Class E', 'Class D', 'Class C', 'Class B', 'Class A'];
   const currentIndex = classOrder.indexOf(currentClass);
-  
+
   if (currentIndex === 3) {
     // Already Class A, no higher class
     return { isSustainable: false };
@@ -87,12 +87,12 @@ export function ParishClassificationCard({
 }: ParishClassificationCardProps) {
   const sustainability = useMemo(
     () => calculateSustainabilityStatus(data.currentClass, data.annualIncome, data.isSubsidized),
-    [data.currentClass, data.annualIncome, data.isSubsidized]
+    [data.currentClass, data.annualIncome, data.isSubsidized],
   );
 
   const diocesesTax = useMemo(
     () => calculateDiocesesTax(data.currentClass, data.annualIncome),
-    [data.currentClass, data.annualIncome]
+    [data.currentClass, data.annualIncome],
   );
 
   const nextThreshold = useMemo(() => {
@@ -104,7 +104,7 @@ export function ParishClassificationCard({
   }, [data.currentClass]);
 
   const incomeToNextClass = nextThreshold ? nextThreshold - data.annualIncome : null;
-  const percentToNextClass = nextThreshold ? ((data.annualIncome / nextThreshold) * 100) : 0;
+  const percentToNextClass = nextThreshold ? (data.annualIncome / nextThreshold) * 100 : 0;
 
   return (
     <div className="space-y-4">
@@ -139,22 +139,18 @@ export function ParishClassificationCard({
                 <CheckCircle2 className="w-5 h-5 text-green-600" />
               )}
               <div>
-                <p className="font-bold text-gray-900">
-                  {data.isSubsidized ? 'Subsidized Parish' : 'Non-Subsidized'}
-                </p>
+                <p className="font-bold text-gray-900">{data.isSubsidized ? 'Subsidized Parish' : 'Non-Subsidized'}</p>
                 <p className="text-sm text-gray-600">
                   {data.subsidyLocked
                     ? 'Locked to Class D (Diocese Policy)'
                     : data.isSubsidized
-                    ? 'Receives diocesan financial support'
-                    : 'Self-sustaining entity'}
+                      ? 'Receives diocesan financial support'
+                      : 'Self-sustaining entity'}
                 </p>
               </div>
             </div>
             {data.subsidyLocked && (
-              <div className="px-3 py-1 bg-red-100 text-red-700 rounded-full text-xs font-bold">
-                Locked
-              </div>
+              <div className="px-3 py-1 bg-red-100 text-red-700 rounded-full text-xs font-bold">Locked</div>
             )}
           </div>
 
@@ -162,9 +158,7 @@ export function ParishClassificationCard({
           <div className="grid grid-cols-2 gap-4">
             <div className="p-4 bg-blue-50 rounded-lg border border-blue-200">
               <p className="text-xs text-blue-700 uppercase font-bold mb-1">Annual Collections</p>
-              <p className="text-2xl font-bold text-blue-900">
-                ₱{(data.annualIncome / 1000000).toFixed(2)}M
-              </p>
+              <p className="text-2xl font-bold text-blue-900">₱{(data.annualIncome / 1000000).toFixed(2)}M</p>
             </div>
 
             <div className="p-4 bg-emerald-50 rounded-lg border border-emerald-200">
@@ -183,9 +177,7 @@ export function ParishClassificationCard({
             <div className="space-y-2">
               <div className="flex items-center justify-between">
                 <p className="text-sm font-bold text-gray-700">Progress to Next Class Level</p>
-                <p className="text-sm font-bold text-gray-900">
-                  {percentToNextClass.toFixed(0)}%
-                </p>
+                <p className="text-sm font-bold text-gray-900">{percentToNextClass.toFixed(0)}%</p>
               </div>
               <div className="w-full bg-gray-200 rounded-full h-3 overflow-hidden">
                 <motion.div
@@ -215,7 +207,9 @@ export function ParishClassificationCard({
                 <div className="flex-1">
                   <p className="font-bold text-green-900">Sustainability Opportunity</p>
                   <p className="text-sm text-green-800 mt-1">
-                    This {data.currentClass} entity has consistently demonstrated collections above the {sustainability.recommendedClass} threshold. Consider reviewing subsidy status for potential reclassification after {sustainability.yearsConsistent} years of sustained performance.
+                    This {data.currentClass} entity has consistently demonstrated collections above the{' '}
+                    {sustainability.recommendedClass} threshold. Consider reviewing subsidy status for potential
+                    reclassification after {sustainability.yearsConsistent} years of sustained performance.
                   </p>
                   {onReclassifyClick && (
                     <button
@@ -237,10 +231,18 @@ export function ParishClassificationCard({
               <div className="space-y-2 text-sm">
                 <p className="font-bold text-blue-900">Classification Thresholds</p>
                 <ul className="text-blue-800 space-y-1">
-                  <li>• <strong>Class A:</strong> ≥ ₱2.5M annual</li>
-                  <li>• <strong>Class B:</strong> ≥ ₱1.5M annual</li>
-                  <li>• <strong>Class C:</strong> ≥ ₱750K annual</li>
-                  <li>• <strong>Class D:</strong> Below ₱750K (Typically subsidized)</li>
+                  <li>
+                    • <strong>Class A:</strong> ≥ ₱2.5M annual
+                  </li>
+                  <li>
+                    • <strong>Class B:</strong> ≥ ₱1.5M annual
+                  </li>
+                  <li>
+                    • <strong>Class C:</strong> ≥ ₱750K annual
+                  </li>
+                  <li>
+                    • <strong>Class D:</strong> Below ₱750K (Typically subsidized)
+                  </li>
                 </ul>
               </div>
             </div>
@@ -254,7 +256,8 @@ export function ParishClassificationCard({
                 <div className="space-y-2 text-sm">
                   <p className="font-bold text-amber-900">Subsidy Lock Policy</p>
                   <p className="text-amber-800">
-                    Class D (subsidized) parishes are automatically locked to their classification. To modify this status, contact the Diocese Finance Office with supporting financial documentation.
+                    Class D (subsidized) parishes are automatically locked to their classification. To modify this
+                    status, contact the Diocese Finance Office with supporting financial documentation.
                   </p>
                 </div>
               </div>

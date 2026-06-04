@@ -10,7 +10,7 @@ import { ALL_PARISHES } from '../../constants';
 const TIMEFRAME_LABELS: Record<Timeframe, string> = {
   '6m': 'Past 6 Months',
   '1y': 'Past 1 Year',
-  'all': 'All Time',
+  all: 'All Time',
 };
 
 const YEAR_OPTIONS = [2026, 2025, 2024, 2023, 2022] as const;
@@ -34,7 +34,7 @@ export function TopNav({
   onTimeframeChange,
   year = 2026,
   onYearChange,
-  onLogout
+  onLogout,
 }: TopNavProps) {
   const [showTimeframeDropdown, setShowTimeframeDropdown] = useState(false);
   const [isYearOpen, setIsYearOpen] = useState(false);
@@ -48,38 +48,34 @@ export function TopNav({
   if (role === 'priest' || role === 'school' || role === 'seminary') {
     const user = auth.currentUser;
     const entityLabel = role === 'school' ? 'School' : role === 'seminary' ? 'Seminary' : 'Parish';
-    
+
     // Resolve dynamic entity name
-    const entityName = user?.entityName?.toUpperCase() || (
-      role === 'school'
+    const entityName =
+      user?.entityName?.toUpperCase() ||
+      (role === 'school'
         ? 'SAN PABLO DIOCESAN CATHOLIC SCHOOL'
         : role === 'seminary'
           ? "ST. PETER'S COLLEGE SEMINARY"
-          : 'SAN ISIDRO LABRADOR PARISH'
-    );
-    
+          : 'SAN ISIDRO LABRADOR PARISH');
+
     // Resolve pastor/principal display name
-    const pastorName = user?.displayName || (
-      role === 'school'
-        ? 'Rev. Fr. John Doe'
-        : role === 'seminary'
-          ? 'Rev. Fr. James Smith'
-          : 'Not assigned'
-    );
-    
+    const pastorName =
+      user?.displayName ||
+      (role === 'school' ? 'Rev. Fr. John Doe' : role === 'seminary' ? 'Rev. Fr. James Smith' : 'Not assigned');
+
     // Resolve vicariate dynamically from predefined ALL_PARISHES list
-    const matchedParish = ALL_PARISHES.find(p => p.name.toLowerCase() === (user?.entityName || '').toLowerCase());
+    const matchedParish = ALL_PARISHES.find((p) => p.name.toLowerCase() === (user?.entityName || '').toLowerCase());
     const vicariateLabel = matchedParish ? `${matchedParish.vicariate} Vicariate` : 'St. John the Baptist Vicariate';
 
-    const metadata = role === 'school'
-      ? ['Cluster 1', `School Director: ${pastorName}`, 'Access: School']
-      : role === 'seminary'
-        ? [`Rector: ${pastorName}`, 'Access: Seminary']
-        : ['District not assigned', vicariateLabel, `Parish Priest: ${pastorName}`, 'Access: Parish Priest'];
+    const metadata =
+      role === 'school'
+        ? ['Cluster 1', `School Director: ${pastorName}`, 'Access: School']
+        : role === 'seminary'
+          ? [`Rector: ${pastorName}`, 'Access: Seminary']
+          : ['District not assigned', vicariateLabel, `Parish Priest: ${pastorName}`, 'Access: Parish Priest'];
 
-    const userInitial = pastorName.charAt(0).toUpperCase() || (
-      role === 'school' ? 'S' : role === 'seminary' ? 'R' : 'B'
-    );
+    const userInitial =
+      pastorName.charAt(0).toUpperCase() || (role === 'school' ? 'S' : role === 'seminary' ? 'R' : 'B');
 
     return (
       <header className="bg-black text-white border-b border-white/5 sticky top-0 z-50 min-h-[78px] flex items-center w-full">
@@ -110,7 +106,9 @@ export function TopNav({
                 <Calendar className="w-4 h-4 text-gold-400" />
                 <span className="hidden md:inline">{TIMEFRAME_LABELS[timeframe]}</span>
                 <span className="md:hidden">{timeframe}</span>
-                <ChevronDown className={`w-4 h-4 text-white/35 transition-transform ${showTimeframeDropdown ? 'rotate-180' : ''}`} />
+                <ChevronDown
+                  className={`w-4 h-4 text-white/35 transition-transform ${showTimeframeDropdown ? 'rotate-180' : ''}`}
+                />
               </button>
 
               {showTimeframeDropdown && (
@@ -132,12 +130,14 @@ export function TopNav({
             </div>
 
             <div className="relative hidden sm:block">
-              <button 
+              <button
                 onClick={() => setIsYearOpen(!isYearOpen)}
                 className="flex h-10 min-w-[100px] items-center justify-center gap-3 rounded-full border border-white/10 bg-white/5 px-4 text-sm font-black text-white hover:bg-white/10 transition-colors"
               >
                 <span>{year}</span>
-                <ChevronDown className={`w-4 h-4 text-white/35 transition-transform ${isYearOpen ? 'rotate-180' : ''}`} />
+                <ChevronDown
+                  className={`w-4 h-4 text-white/35 transition-transform ${isYearOpen ? 'rotate-180' : ''}`}
+                />
               </button>
 
               {isYearOpen && (
@@ -151,18 +151,16 @@ export function TopNav({
                       }}
                       className="w-full px-4 py-2.5 text-left text-sm font-medium hover:bg-gray-50 flex items-center justify-between transition-colors"
                     >
-                      <span className={year === y ? 'text-gold-600 font-bold' : 'text-gray-600'}>
-                        {y}
-                      </span>
+                      <span className={year === y ? 'text-gold-600 font-bold' : 'text-gray-600'}>{y}</span>
                       {year === y && <Check className="w-4 h-4 text-gold-600" />}
                     </button>
                   ))}
                 </div>
               )}
             </div>
-            
+
             <div className="relative">
-              <button 
+              <button
                 onClick={() => setIsAccountOpen(!isAccountOpen)}
                 className="flex h-11 w-11 lg:h-12 lg:w-12 items-center justify-center rounded-full border border-gold-200 bg-gold-500 text-black shadow-[0_0_24px_rgba(212,175,55,0.3)] hover:bg-gold-400 transition-colors cursor-pointer shrink-0"
               >
@@ -185,11 +183,12 @@ export function TopNav({
                     <button
                       onClick={() => {
                         setIsAccountOpen(false);
-                        const route = role === 'school'
-                          ? 'school-data-submission'
-                          : role === 'seminary'
-                          ? 'seminary-data-submission'
-                          : 'parish-data-submission';
+                        const route =
+                          role === 'school'
+                            ? 'school-data-submission'
+                            : role === 'seminary'
+                              ? 'seminary-data-submission'
+                              : 'parish-data-submission';
                         onNavigate?.(route);
                       }}
                       className="w-full px-4 py-2.5 text-left text-sm font-bold text-gray-700 hover:bg-gray-50 flex items-center gap-3 transition-colors"
@@ -225,7 +224,6 @@ export function TopNav({
           {/* Left Side: Empty (Logo moved to sidebar) */}
           <div></div>
 
-          
           {/* Right Side: Actions */}
           <div className="flex items-center gap-4">
             <div className="relative">
@@ -235,7 +233,9 @@ export function TopNav({
               >
                 <Calendar className="w-4 h-4 text-white/40" />
                 <span className="hidden sm:inline">{TIMEFRAME_LABELS[timeframe]}</span>
-                <ChevronDown className={`w-4 h-4 text-white/40 transition-transform ${showTimeframeDropdown ? 'rotate-180' : ''}`} />
+                <ChevronDown
+                  className={`w-4 h-4 text-white/40 transition-transform ${showTimeframeDropdown ? 'rotate-180' : ''}`}
+                />
               </button>
 
               {showTimeframeDropdown && (
@@ -257,12 +257,14 @@ export function TopNav({
             </div>
 
             <div className="relative">
-              <button 
+              <button
                 onClick={() => setIsYearOpen(!isYearOpen)}
                 className="flex items-center gap-2 bg-white/5 text-white px-4 py-2 rounded-xl text-xs font-bold hover:bg-white/10 transition-colors border border-white/10"
               >
                 <span>{year}</span>
-                <ChevronDown className={`w-4 h-4 text-white/40 transition-transform ${isYearOpen ? 'rotate-180' : ''}`} />
+                <ChevronDown
+                  className={`w-4 h-4 text-white/40 transition-transform ${isYearOpen ? 'rotate-180' : ''}`}
+                />
               </button>
 
               {isYearOpen && (
@@ -276,9 +278,7 @@ export function TopNav({
                       }}
                       className="w-full px-4 py-2.5 text-left text-sm font-medium hover:bg-gray-50 flex items-center justify-between transition-colors"
                     >
-                      <span className={year === y ? 'text-gold-600 font-bold' : 'text-gray-700'}>
-                        {y}
-                      </span>
+                      <span className={year === y ? 'text-gold-600 font-bold' : 'text-gray-700'}>{y}</span>
                       {year === y && <Check className="w-4 h-4 text-gold-600" />}
                     </button>
                   ))}
@@ -287,7 +287,7 @@ export function TopNav({
             </div>
 
             <div className="relative">
-              <button 
+              <button
                 onClick={() => setIsAccountOpen(!isAccountOpen)}
                 className="w-10 h-10 bg-gold-500 text-black rounded-full flex items-center justify-center hover:bg-gold-600 transition-colors cursor-pointer shadow-lg shadow-gold-500/20 border border-gold-600 shrink-0"
               >

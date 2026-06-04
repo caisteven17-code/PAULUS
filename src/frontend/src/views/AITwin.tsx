@@ -20,7 +20,7 @@ import {
   TrendingUp,
   User,
   Users,
-  Zap
+  Zap,
 } from 'lucide-react';
 import {
   Area,
@@ -32,7 +32,7 @@ import {
   ResponsiveContainer,
   Tooltip,
   XAxis,
-  YAxis
+  YAxis,
 } from 'recharts';
 
 type AITwinMode = 'parish' | 'priest' | 'seminary' | 'school';
@@ -62,7 +62,7 @@ const parishProfiles: FinancialTwinProfile[] = [
     monthlyExpenses: 60000,
     healthScore: 58,
     collectionsHistory: [44000, 45200, 46800, 47100, 48300, 49500],
-    expensesHistory: [57000, 58100, 58900, 59600, 60200, 61100]
+    expensesHistory: [57000, 58100, 58900, 59600, 60200, 61100],
   },
   {
     id: 2,
@@ -72,7 +72,7 @@ const parishProfiles: FinancialTwinProfile[] = [
     monthlyExpenses: 45000,
     healthScore: 41,
     collectionsHistory: [29000, 30100, 31400, 32900, 34700, 36100],
-    expensesHistory: [46100, 45800, 45400, 45200, 44700, 44500]
+    expensesHistory: [46100, 45800, 45400, 45200, 44700, 44500],
   },
   {
     id: 3,
@@ -82,7 +82,7 @@ const parishProfiles: FinancialTwinProfile[] = [
     monthlyExpenses: 70000,
     healthScore: 82,
     collectionsHistory: [74800, 76200, 77900, 79300, 80700, 82100],
-    expensesHistory: [67600, 68400, 69100, 70200, 71100, 71900]
+    expensesHistory: [67600, 68400, 69100, 70200, 71100, 71900],
   },
   {
     id: 4,
@@ -92,8 +92,8 @@ const parishProfiles: FinancialTwinProfile[] = [
     monthlyExpenses: 48000,
     healthScore: 65,
     collectionsHistory: [39600, 40800, 42300, 43700, 45200, 46800],
-    expensesHistory: [46200, 46900, 47400, 47800, 48200, 48600]
-  }
+    expensesHistory: [46200, 46900, 47400, 47800, 48200, 48600],
+  },
 ];
 
 const seminaryProfiles: FinancialTwinProfile[] = [
@@ -105,7 +105,7 @@ const seminaryProfiles: FinancialTwinProfile[] = [
     monthlyExpenses: 610000,
     healthScore: 74,
     collectionsHistory: [468000, 482000, 501000, 515000, 526000, 538000],
-    expensesHistory: [588000, 596000, 604000, 611000, 618000, 624000]
+    expensesHistory: [588000, 596000, 604000, 611000, 618000, 624000],
   },
   {
     id: 2,
@@ -115,8 +115,8 @@ const seminaryProfiles: FinancialTwinProfile[] = [
     monthlyExpenses: 455000,
     healthScore: 68,
     collectionsHistory: [384000, 392000, 401000, 407000, 414000, 423000],
-    expensesHistory: [438000, 442000, 449000, 453000, 458000, 462000]
-  }
+    expensesHistory: [438000, 442000, 449000, 453000, 458000, 462000],
+  },
 ];
 
 const schoolProfiles: FinancialTwinProfile[] = [
@@ -128,7 +128,7 @@ const schoolProfiles: FinancialTwinProfile[] = [
     monthlyExpenses: 805000,
     healthScore: 82,
     collectionsHistory: [812000, 828000, 842000, 856000, 874000, 892000],
-    expensesHistory: [782000, 789000, 796000, 802000, 809000, 816000]
+    expensesHistory: [782000, 789000, 796000, 802000, 809000, 816000],
   },
   {
     id: 2,
@@ -138,7 +138,7 @@ const schoolProfiles: FinancialTwinProfile[] = [
     monthlyExpenses: 468000,
     healthScore: 61,
     collectionsHistory: [398000, 405000, 414000, 421000, 427000, 435000],
-    expensesHistory: [448000, 454000, 459000, 463000, 469000, 474000]
+    expensesHistory: [448000, 454000, 459000, 463000, 469000, 474000],
   },
   {
     id: 3,
@@ -148,8 +148,8 @@ const schoolProfiles: FinancialTwinProfile[] = [
     monthlyExpenses: 585000,
     healthScore: 76,
     collectionsHistory: [572000, 584000, 596000, 604000, 616000, 628000],
-    expensesHistory: [560000, 566000, 573000, 581000, 589000, 596000]
-  }
+    expensesHistory: [560000, 566000, 573000, 581000, 589000, 596000],
+  },
 ];
 
 const financialTwinConfigs = {
@@ -159,11 +159,12 @@ const financialTwinConfigs = {
     pluralLower: 'parishes',
     selectTitle: 'Select Parish',
     title: 'Parish Cash Flow Simulator',
-    description: 'Run what-if financial scenarios using parish trend, volatility, and runway analytics as the baseline.',
+    description:
+      'Run what-if financial scenarios using parish trend, volatility, and runway analytics as the baseline.',
     incomeChangeLabel: 'Collections Change',
     externalSupportLabel: 'External Support',
     storageKey: 'church_sim_scenarios',
-    profiles: parishProfiles
+    profiles: parishProfiles,
   },
   seminary: {
     label: 'Seminary',
@@ -171,11 +172,12 @@ const financialTwinConfigs = {
     pluralLower: 'seminaries',
     selectTitle: 'Select Seminary',
     title: 'Seminary Financial Simulator',
-    description: 'Model formation income, subsidy exposure, operating costs, and runway scenarios for diocesan seminaries.',
+    description:
+      'Model formation income, subsidy exposure, operating costs, and runway scenarios for diocesan seminaries.',
     incomeChangeLabel: 'Formation Income Change',
     externalSupportLabel: 'Diocesan Subsidy',
     storageKey: 'seminary_twin_scenarios',
-    profiles: seminaryProfiles
+    profiles: seminaryProfiles,
   },
   school: {
     label: 'School',
@@ -183,12 +185,13 @@ const financialTwinConfigs = {
     pluralLower: 'schools',
     selectTitle: 'Select School',
     title: 'School Financial Simulator',
-    description: 'Model tuition income, enrollment-sensitive cash flow, operating costs, and support scenarios for diocesan schools.',
+    description:
+      'Model tuition income, enrollment-sensitive cash flow, operating costs, and support scenarios for diocesan schools.',
     incomeChangeLabel: 'Tuition Income Change',
     externalSupportLabel: 'Mission Support',
     storageKey: 'school_twin_scenarios',
-    profiles: schoolProfiles
-  }
+    profiles: schoolProfiles,
+  },
 } as const;
 
 interface ParishSimulationParams {
@@ -221,10 +224,31 @@ const priests = [
     yearsInPost: 6,
     strength: 'Stabilizes reporting discipline and donor trust quickly.',
     assignmentHistory: [
-      { parish: 'St. Dominic Parish', startHealth: 48, endHealth: 74, reporting: 88, volatilityReduction: 19, netGrowth: 15 },
-      { parish: 'Holy Family Parish', startHealth: 56, endHealth: 79, reporting: 92, volatilityReduction: 16, netGrowth: 14 },
-      { parish: 'San Isidro Labrador Parish', startHealth: 66, endHealth: 84, reporting: 90, volatilityReduction: 12, netGrowth: 10 }
-    ]
+      {
+        parish: 'St. Dominic Parish',
+        startHealth: 48,
+        endHealth: 74,
+        reporting: 88,
+        volatilityReduction: 19,
+        netGrowth: 15,
+      },
+      {
+        parish: 'Holy Family Parish',
+        startHealth: 56,
+        endHealth: 79,
+        reporting: 92,
+        volatilityReduction: 16,
+        netGrowth: 14,
+      },
+      {
+        parish: 'San Isidro Labrador Parish',
+        startHealth: 66,
+        endHealth: 84,
+        reporting: 90,
+        volatilityReduction: 12,
+        netGrowth: 10,
+      },
+    ],
   },
   {
     id: 'michael-santos',
@@ -238,8 +262,15 @@ const priests = [
     yearsInPost: 3,
     strength: 'Strong turnaround profile for volatile parishes.',
     assignmentHistory: [
-      { parish: 'Christ the King Parish', startHealth: 45, endHealth: 72, reporting: 82, volatilityReduction: 14, netGrowth: 18 }
-    ]
+      {
+        parish: 'Christ the King Parish',
+        startHealth: 45,
+        endHealth: 72,
+        reporting: 82,
+        volatilityReduction: 14,
+        netGrowth: 18,
+      },
+    ],
   },
   {
     id: 'rafael-mendoza',
@@ -252,8 +283,8 @@ const priests = [
     adaptability: 83,
     yearsInPost: 2,
     strength: 'Good fit for transition-heavy assignments and recovery plans.',
-    assignmentHistory: []
-  }
+    assignmentHistory: [],
+  },
 ];
 
 const reassignmentParishes = [
@@ -267,7 +298,7 @@ const reassignmentParishes = [
     stabilityNeed: 38,
     urgency: 22,
     leadershipComplexity: 45,
-    currentMomentum: 76
+    currentMomentum: 76,
   },
   {
     id: 'san-roque',
@@ -279,7 +310,7 @@ const reassignmentParishes = [
     stabilityNeed: 88,
     urgency: 84,
     leadershipComplexity: 70,
-    currentMomentum: 42
+    currentMomentum: 42,
   },
   {
     id: 'sto-rosario',
@@ -291,7 +322,7 @@ const reassignmentParishes = [
     stabilityNeed: 69,
     urgency: 61,
     leadershipComplexity: 58,
-    currentMomentum: 55
+    currentMomentum: 55,
   },
   {
     id: 'st-peter',
@@ -303,8 +334,8 @@ const reassignmentParishes = [
     stabilityNeed: 55,
     urgency: 44,
     leadershipComplexity: 52,
-    currentMomentum: 63
-  }
+    currentMomentum: 63,
+  },
 ];
 
 interface PriestSimulationParams {
@@ -325,14 +356,14 @@ interface PriestSavedScenario {
 const transitionSupportFactor = {
   standard: 0,
   assisted: 4,
-  intensive: 8
+  intensive: 8,
 } as const;
 
 const formatCurrency = (value: number) =>
   new Intl.NumberFormat('en-PH', {
     style: 'currency',
     currency: 'PHP',
-    maximumFractionDigits: 0
+    maximumFractionDigits: 0,
   }).format(value);
 
 const average = (values: number[]) => values.reduce((sum, value) => sum + value, 0) / Math.max(values.length, 1);
@@ -356,24 +387,22 @@ function calculateParishAnalytics(parish: FinancialTwinProfile) {
     monthlyNet,
     momentum,
     runwayMonths,
-    volatility
+    volatility,
   };
 }
 
-function calculatePriestAnalytics(priest: typeof priests[number]) {
+function calculatePriestAnalytics(priest: (typeof priests)[number]) {
   const evidenceCount = priest.assignmentHistory.length;
-  const averageTurnaround = evidenceCount > 0
-    ? average(priest.assignmentHistory.map((assignment) => assignment.endHealth - assignment.startHealth))
-    : 0;
-  const averageReporting = evidenceCount > 0
-    ? average(priest.assignmentHistory.map((assignment) => assignment.reporting))
-    : priest.reporting;
-  const averageVolatilityReduction = evidenceCount > 0
-    ? average(priest.assignmentHistory.map((assignment) => assignment.volatilityReduction))
-    : 0;
-  const averageNetGrowth = evidenceCount > 0
-    ? average(priest.assignmentHistory.map((assignment) => assignment.netGrowth))
-    : 0;
+  const averageTurnaround =
+    evidenceCount > 0
+      ? average(priest.assignmentHistory.map((assignment) => assignment.endHealth - assignment.startHealth))
+      : 0;
+  const averageReporting =
+    evidenceCount > 0 ? average(priest.assignmentHistory.map((assignment) => assignment.reporting)) : priest.reporting;
+  const averageVolatilityReduction =
+    evidenceCount > 0 ? average(priest.assignmentHistory.map((assignment) => assignment.volatilityReduction)) : 0;
+  const averageNetGrowth =
+    evidenceCount > 0 ? average(priest.assignmentHistory.map((assignment) => assignment.netGrowth)) : 0;
 
   return {
     averageNetGrowth,
@@ -381,7 +410,7 @@ function calculatePriestAnalytics(priest: typeof priests[number]) {
     averageTurnaround,
     averageVolatilityReduction,
     evidenceCount,
-    evidenceStrength: evidenceCount >= 2 ? 1 : evidenceCount === 1 ? 0.7 : 0.35
+    evidenceStrength: evidenceCount >= 2 ? 1 : evidenceCount === 1 ? 0.7 : 0.35,
   };
 }
 
@@ -405,7 +434,7 @@ function calculateParishResults(params: ParishSimulationParams, parish: Financia
     projectedData.push({
       month: `Month ${i}`,
       baseline: Math.max(0, baselineCash),
-      simulated: Math.max(0, currentCash)
+      simulated: Math.max(0, currentCash),
     });
   }
 
@@ -444,7 +473,8 @@ function calculateParishResults(params: ParishSimulationParams, parish: Financia
   } else if (params.collectionsChange > 10 || analytics.momentum > 5) {
     recommendation = `Recent income momentum is positive. The scenario assumes that ${entityLabel} growth programs and stakeholder engagement continue to support that trend.`;
   } else if (analytics.volatility > 0.12) {
-    recommendation = 'Income is historically volatile. Treat this scenario as sensitive to seasonal swings and compare it against submission and expense discipline before acting.';
+    recommendation =
+      'Income is historically volatile. Treat this scenario as sensitive to seasonal swings and compare it against submission and expense discipline before acting.';
   }
 
   return {
@@ -455,27 +485,31 @@ function calculateParishResults(params: ParishSimulationParams, parish: Financia
     riskBg,
     riskColor,
     riskLevel,
-    runwayMonths
+    runwayMonths,
   };
 }
 
-function calculatePriestScenario(priest: typeof priests[number], parish: typeof reassignmentParishes[number], params: PriestSimulationParams) {
+function calculatePriestScenario(
+  priest: (typeof priests)[number],
+  parish: (typeof reassignmentParishes)[number],
+  params: PriestSimulationParams,
+) {
   const priestAnalytics = calculatePriestAnalytics(priest);
   const supportBoost = transitionSupportFactor[params.transitionSupport];
   const fitScore = Math.round(
     clamp(
       priest.assignmentHealth * 0.16 +
-      priest.stewardship * 0.14 +
-      priestAnalytics.averageTurnaround * 1.2 +
-      priestAnalytics.averageVolatilityReduction * 0.9 +
-      priestAnalytics.averageNetGrowth * 0.8 +
-      priest.adaptability * 0.12 +
-      parish.stabilityNeed * 0.16 +
-      parish.urgency * 0.12 +
-      parish.growthPotential * 0.08 +
-      supportBoost +
-      priestAnalytics.evidenceStrength * 8
-    )
+        priest.stewardship * 0.14 +
+        priestAnalytics.averageTurnaround * 1.2 +
+        priestAnalytics.averageVolatilityReduction * 0.9 +
+        priestAnalytics.averageNetGrowth * 0.8 +
+        priest.adaptability * 0.12 +
+        parish.stabilityNeed * 0.16 +
+        parish.urgency * 0.12 +
+        parish.growthPotential * 0.08 +
+        supportBoost +
+        priestAnalytics.evidenceStrength * 8,
+    ),
   );
 
   const transitionRisk = Math.max(
@@ -487,8 +521,8 @@ function calculatePriestScenario(priest: typeof priests[number], parish: typeof 
         (100 - priest.adaptability) * 0.18 -
         priestAnalytics.averageVolatilityReduction * 0.35 -
         supportBoost * 1.8 -
-        params.handoffWeeks * 1.2
-    )
+        params.handoffWeeks * 1.2,
+    ),
   );
 
   const confidence = Math.min(
@@ -500,17 +534,30 @@ function calculatePriestScenario(priest: typeof priests[number], parish: typeof 
         priestAnalytics.evidenceCount * 7 +
         params.handoffWeeks * 1.5 +
         supportBoost * 0.8 -
-        parish.leadershipComplexity * 0.08
-    )
+        parish.leadershipComplexity * 0.08,
+    ),
   );
 
   const sourceDip = Math.max(
     4,
-    Math.round(18 - priest.yearsInPost * 1.2 - priestAnalytics.averageVolatilityReduction * 0.25 - supportBoost * 0.5 + params.handoffWeeks * 0.4)
+    Math.round(
+      18 -
+        priest.yearsInPost * 1.2 -
+        priestAnalytics.averageVolatilityReduction * 0.25 -
+        supportBoost * 0.5 +
+        params.handoffWeeks * 0.4,
+    ),
   );
   const targetLift = Math.max(
     6,
-    Math.round((fitScore - 50) * 0.3 + priestAnalytics.averageTurnaround * 0.4 + parish.growthPotential * 0.12 + parish.stabilityNeed * 0.08 - transitionRisk * 0.06 + supportBoost * 0.9)
+    Math.round(
+      (fitScore - 50) * 0.3 +
+        priestAnalytics.averageTurnaround * 0.4 +
+        parish.growthPotential * 0.12 +
+        parish.stabilityNeed * 0.08 -
+        transitionRisk * 0.06 +
+        supportBoost * 0.9,
+    ),
   );
 
   const months = Array.from({ length: params.timeline + 1 }, (_, index) => index);
@@ -523,13 +570,12 @@ function calculatePriestScenario(priest: typeof priests[number], parish: typeof 
       month: month === 0 ? 'Now' : `M${month}`,
       stayCase: priest.assignmentHealth + adoptionCurve * 2,
       sourceParish: Math.max(35, priest.assignmentHealth - sourceRecovery),
-      targetParish: Math.min(98, parish.healthScore + targetGain)
+      targetParish: Math.min(98, parish.healthScore + targetGain),
     };
   });
 
   const dioceseLift = Math.round(targetLift - sourceDip * 0.45);
-  const riskBand =
-    transitionRisk >= 72 ? 'High' : transitionRisk >= 52 ? 'Medium' : 'Low';
+  const riskBand = transitionRisk >= 72 ? 'High' : transitionRisk >= 52 ? 'Medium' : 'Low';
   const riskTone =
     riskBand === 'High'
       ? { text: 'text-rose-600', bg: 'bg-rose-50 border-rose-100' }
@@ -556,7 +602,7 @@ function calculatePriestScenario(priest: typeof priests[number], parish: typeof 
     riskBg: riskTone.bg,
     targetLift,
     transitionRisk,
-    vacatedParishDip: sourceDip
+    vacatedParishDip: sourceDip,
   };
 }
 
@@ -575,17 +621,17 @@ function ParishAITwin({ mode = 'parish' }: { mode?: FinancialAITwinMode }) {
     oneTimeIncome: 0,
     oneTimeExpense: 0,
     externalSupport: 0,
-    timeline: 12
+    timeline: 12,
   });
 
   const selectedParish = useMemo(
     () => profiles.find((parish) => parish.id === selectedParishId) || profiles[0],
-    [profiles, selectedParishId]
+    [profiles, selectedParishId],
   );
   const selectedParishAnalytics = useMemo(() => calculateParishAnalytics(selectedParish), [selectedParish]);
 
   const [simulationResults, setSimulationResults] = useState(() =>
-    calculateParishResults(params, selectedParish, config.labelLower)
+    calculateParishResults(params, selectedParish, config.labelLower),
   );
 
   useEffect(() => {
@@ -609,7 +655,7 @@ function ParishAITwin({ mode = 'parish' }: { mode?: FinancialAITwinMode }) {
       name,
       parishId: selectedParishId,
       params: { ...params },
-      timestamp: Date.now()
+      timestamp: Date.now(),
     };
 
     const updated = [nextScenario, ...savedScenarios];
@@ -637,7 +683,7 @@ function ParishAITwin({ mode = 'parish' }: { mode?: FinancialAITwinMode }) {
       oneTimeIncome: 0,
       oneTimeExpense: 0,
       externalSupport: 0,
-      timeline: 12
+      timeline: 12,
     });
   };
 
@@ -659,11 +705,17 @@ function ParishAITwin({ mode = 'parish' }: { mode?: FinancialAITwinMode }) {
           <p className="text-church-grey text-sm">{config.description}</p>
         </div>
         <div className="flex items-center gap-3">
-          <button onClick={handleReset} className="flex items-center gap-2 px-4 py-2 rounded-xl border border-church-grey/20 text-church-grey hover:bg-white transition-all text-sm font-bold">
+          <button
+            onClick={handleReset}
+            className="flex items-center gap-2 px-4 py-2 rounded-xl border border-church-grey/20 text-church-grey hover:bg-white transition-all text-sm font-bold"
+          >
             <RotateCcw className="w-4 h-4" />
             Reset
           </button>
-          <button onClick={handleSaveScenario} className="flex items-center gap-2 px-6 py-2 rounded-xl bg-church-black text-white hover:bg-church-grey transition-all text-sm font-bold shadow-lg shadow-black/10">
+          <button
+            onClick={handleSaveScenario}
+            className="flex items-center gap-2 px-6 py-2 rounded-xl bg-church-black text-white hover:bg-church-grey transition-all text-sm font-bold shadow-lg shadow-black/10"
+          >
             <Save className="w-4 h-4" />
             Save Scenario
           </button>
@@ -680,9 +732,15 @@ function ParishAITwin({ mode = 'parish' }: { mode?: FinancialAITwinMode }) {
               <h3 className="text-lg font-bold text-church-black">{config.selectTitle}</h3>
             </div>
             <div className="relative">
-              <select value={selectedParishId} onChange={(event) => setSelectedParishId(Number(event.target.value))} className="w-full pl-4 pr-10 py-4 bg-church-light border border-church-grey/10 rounded-2xl text-church-black focus:outline-none focus:ring-2 focus:ring-gold-500 appearance-none font-medium">
+              <select
+                value={selectedParishId}
+                onChange={(event) => setSelectedParishId(Number(event.target.value))}
+                className="w-full pl-4 pr-10 py-4 bg-church-light border border-church-grey/10 rounded-2xl text-church-black focus:outline-none focus:ring-2 focus:ring-gold-500 appearance-none font-medium"
+              >
                 {profiles.map((parish) => (
-                  <option key={parish.id} value={parish.id}>{parish.name}</option>
+                  <option key={parish.id} value={parish.id}>
+                    {parish.name}
+                  </option>
                 ))}
               </select>
               <div className="absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none text-church-grey">
@@ -690,14 +748,18 @@ function ParishAITwin({ mode = 'parish' }: { mode?: FinancialAITwinMode }) {
               </div>
             </div>
             <div className="grid grid-cols-2 gap-4">
-              <div className={`p-4 rounded-2xl border border-church-grey/5 flex flex-col gap-1 ${healthTone(selectedParish.healthScore)}`}>
+              <div
+                className={`p-4 rounded-2xl border border-church-grey/5 flex flex-col gap-1 ${healthTone(selectedParish.healthScore)}`}
+              >
                 <span className="text-[10px] font-bold uppercase tracking-wider opacity-60">Health Score</span>
                 <span className="text-2xl font-bold">{selectedParish.healthScore}</span>
               </div>
               <div className="p-4 rounded-2xl bg-church-light border border-church-grey/5 flex flex-col gap-1">
                 <span className="text-[10px] font-bold text-church-grey uppercase tracking-wider">Current Runway</span>
                 <span className="text-2xl font-bold text-church-black">
-                  {selectedParish.monthlyIncome >= selectedParish.monthlyExpenses ? 'âˆž' : `${Math.floor(selectedParish.cashBalance / (selectedParish.monthlyExpenses - selectedParish.monthlyIncome))}m`}
+                  {selectedParish.monthlyIncome >= selectedParish.monthlyExpenses
+                    ? 'âˆž'
+                    : `${Math.floor(selectedParish.cashBalance / (selectedParish.monthlyExpenses - selectedParish.monthlyIncome))}m`}
                 </span>
               </div>
             </div>
@@ -723,11 +785,21 @@ function ParishAITwin({ mode = 'parish' }: { mode?: FinancialAITwinMode }) {
                     {config.incomeChangeLabel}
                     <Info className="w-3.5 h-3.5 text-church-grey" />
                   </label>
-                  <span className={`text-sm font-bold ${params.collectionsChange >= 0 ? 'text-emerald-500' : 'text-rose-500'}`}>
-                    {params.collectionsChange > 0 ? '+' : ''}{params.collectionsChange}%
+                  <span
+                    className={`text-sm font-bold ${params.collectionsChange >= 0 ? 'text-emerald-500' : 'text-rose-500'}`}
+                  >
+                    {params.collectionsChange > 0 ? '+' : ''}
+                    {params.collectionsChange}%
                   </span>
                 </div>
-                <input type="range" min="-50" max="50" value={params.collectionsChange} onChange={(event) => setParams({ ...params, collectionsChange: Number(event.target.value) })} className="w-full h-2 bg-church-light rounded-lg appearance-none cursor-pointer accent-gold-500" />
+                <input
+                  type="range"
+                  min="-50"
+                  max="50"
+                  value={params.collectionsChange}
+                  onChange={(event) => setParams({ ...params, collectionsChange: Number(event.target.value) })}
+                  className="w-full h-2 bg-church-light rounded-lg appearance-none cursor-pointer accent-gold-500"
+                />
               </div>
 
               <div className="space-y-4">
@@ -736,41 +808,81 @@ function ParishAITwin({ mode = 'parish' }: { mode?: FinancialAITwinMode }) {
                     Expenses Change
                     <Info className="w-3.5 h-3.5 text-church-grey" />
                   </label>
-                  <span className={`text-sm font-bold ${params.expensesChange <= 0 ? 'text-emerald-500' : 'text-rose-500'}`}>
-                    {params.expensesChange > 0 ? '+' : ''}{params.expensesChange}%
+                  <span
+                    className={`text-sm font-bold ${params.expensesChange <= 0 ? 'text-emerald-500' : 'text-rose-500'}`}
+                  >
+                    {params.expensesChange > 0 ? '+' : ''}
+                    {params.expensesChange}%
                   </span>
                 </div>
-                <input type="range" min="-50" max="50" value={params.expensesChange} onChange={(event) => setParams({ ...params, expensesChange: Number(event.target.value) })} className="w-full h-2 bg-church-light rounded-lg appearance-none cursor-pointer accent-gold-500" />
+                <input
+                  type="range"
+                  min="-50"
+                  max="50"
+                  value={params.expensesChange}
+                  onChange={(event) => setParams({ ...params, expensesChange: Number(event.target.value) })}
+                  className="w-full h-2 bg-church-light rounded-lg appearance-none cursor-pointer accent-gold-500"
+                />
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div className="space-y-2">
-                  <label className="text-[10px] font-bold text-church-grey uppercase tracking-widest ml-1">One-time Income</label>
+                  <label className="text-[10px] font-bold text-church-grey uppercase tracking-widest ml-1">
+                    One-time Income
+                  </label>
                   <div className="relative">
                     <span className="absolute left-4 top-1/2 -translate-y-1/2 text-church-grey font-bold">P</span>
-                    <input type="number" value={params.oneTimeIncome || ''} onChange={(event) => setParams({ ...params, oneTimeIncome: Number(event.target.value) })} className="w-full pl-8 pr-4 py-3 bg-church-light border border-church-grey/10 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-gold-500 font-medium" placeholder="0" />
+                    <input
+                      type="number"
+                      value={params.oneTimeIncome || ''}
+                      onChange={(event) => setParams({ ...params, oneTimeIncome: Number(event.target.value) })}
+                      className="w-full pl-8 pr-4 py-3 bg-church-light border border-church-grey/10 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-gold-500 font-medium"
+                      placeholder="0"
+                    />
                   </div>
                 </div>
                 <div className="space-y-2">
-                  <label className="text-[10px] font-bold text-church-grey uppercase tracking-widest ml-1">One-time Expense</label>
+                  <label className="text-[10px] font-bold text-church-grey uppercase tracking-widest ml-1">
+                    One-time Expense
+                  </label>
                   <div className="relative">
                     <span className="absolute left-4 top-1/2 -translate-y-1/2 text-church-grey font-bold">P</span>
-                    <input type="number" value={params.oneTimeExpense || ''} onChange={(event) => setParams({ ...params, oneTimeExpense: Number(event.target.value) })} className="w-full pl-8 pr-4 py-3 bg-church-light border border-church-grey/10 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-gold-500 font-medium" placeholder="0" />
+                    <input
+                      type="number"
+                      value={params.oneTimeExpense || ''}
+                      onChange={(event) => setParams({ ...params, oneTimeExpense: Number(event.target.value) })}
+                      className="w-full pl-8 pr-4 py-3 bg-church-light border border-church-grey/10 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-gold-500 font-medium"
+                      placeholder="0"
+                    />
                   </div>
                 </div>
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div className="space-y-2">
-                  <label className="text-[10px] font-bold text-church-grey uppercase tracking-widest ml-1">{config.externalSupportLabel}</label>
+                  <label className="text-[10px] font-bold text-church-grey uppercase tracking-widest ml-1">
+                    {config.externalSupportLabel}
+                  </label>
                   <div className="relative">
                     <span className="absolute left-4 top-1/2 -translate-y-1/2 text-church-grey font-bold">P</span>
-                    <input type="number" value={params.externalSupport || ''} onChange={(event) => setParams({ ...params, externalSupport: Number(event.target.value) })} className="w-full pl-8 pr-4 py-3 bg-church-light border border-church-grey/10 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-gold-500 font-medium" placeholder="0" />
+                    <input
+                      type="number"
+                      value={params.externalSupport || ''}
+                      onChange={(event) => setParams({ ...params, externalSupport: Number(event.target.value) })}
+                      className="w-full pl-8 pr-4 py-3 bg-church-light border border-church-grey/10 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-gold-500 font-medium"
+                      placeholder="0"
+                    />
                   </div>
                 </div>
                 <div className="space-y-2">
-                  <label className="text-[10px] font-bold text-church-grey uppercase tracking-widest ml-1">Timeline (Months)</label>
-                  <select value={params.timeline} onChange={(event) => setParams({ ...params, timeline: Number(event.target.value) })} className="w-full px-4 py-3 bg-church-light border border-church-grey/10 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-gold-500 font-medium">
+                  <label className="text-[10px] font-bold text-church-grey uppercase tracking-widest ml-1">
+                    Timeline (Months)
+                  </label>
+                  <select
+                    value={params.timeline}
+                    onChange={(event) => setParams({ ...params, timeline: Number(event.target.value) })}
+                    className="w-full px-4 py-3 bg-church-light border border-church-grey/10 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-gold-500 font-medium"
+                  >
                     <option value={3}>3 Months</option>
                     <option value={6}>6 Months</option>
                     <option value={12}>12 Months</option>
@@ -779,7 +891,11 @@ function ParishAITwin({ mode = 'parish' }: { mode?: FinancialAITwinMode }) {
                 </div>
               </div>
 
-              <button onClick={handleRunSimulation} disabled={isSimulating} className="w-full py-4 bg-gold-500 text-church-black rounded-2xl font-bold hover:bg-gold-600 transition-all shadow-lg shadow-gold-500/20 flex items-center justify-center gap-3 disabled:opacity-50 disabled:cursor-not-allowed">
+              <button
+                onClick={handleRunSimulation}
+                disabled={isSimulating}
+                className="w-full py-4 bg-gold-500 text-church-black rounded-2xl font-bold hover:bg-gold-600 transition-all shadow-lg shadow-gold-500/20 flex items-center justify-center gap-3 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
                 {isSimulating ? (
                   <>
                     <div className="w-5 h-5 border-2 border-church-black/30 border-t-church-black rounded-full animate-spin" />
@@ -805,7 +921,9 @@ function ParishAITwin({ mode = 'parish' }: { mode?: FinancialAITwinMode }) {
                 </div>
                 <h3 className="text-lg font-bold text-church-black">Analytics-Based Scenario Results</h3>
               </div>
-              <div className={`px-4 py-2 rounded-xl flex items-center gap-2 font-bold text-sm ${simulationResults.riskBg} ${simulationResults.riskColor}`}>
+              <div
+                className={`px-4 py-2 rounded-xl flex items-center gap-2 font-bold text-sm ${simulationResults.riskBg} ${simulationResults.riskColor}`}
+              >
                 <AlertTriangle className="w-4 h-4" />
                 {simulationResults.riskLevel} Risk Level
               </div>
@@ -813,17 +931,31 @@ function ParishAITwin({ mode = 'parish' }: { mode?: FinancialAITwinMode }) {
 
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <div className="min-w-0 p-5 rounded-[24px] bg-church-light border border-church-grey/5 flex flex-col gap-2.5">
-                <span className="block text-[10px] font-bold text-church-grey uppercase tracking-widest leading-tight">New Cash Runway</span>
-                <span className="block max-w-full whitespace-nowrap text-[clamp(1.35rem,2.1vw,1.9rem)] leading-none font-bold text-church-black">{simulationResults.runwayMonths === -1 ? 'âˆž' : `${simulationResults.runwayMonths}m`}</span>
+                <span className="block text-[10px] font-bold text-church-grey uppercase tracking-widest leading-tight">
+                  New Cash Runway
+                </span>
+                <span className="block max-w-full whitespace-nowrap text-[clamp(1.35rem,2.1vw,1.9rem)] leading-none font-bold text-church-black">
+                  {simulationResults.runwayMonths === -1 ? 'âˆž' : `${simulationResults.runwayMonths}m`}
+                </span>
               </div>
               <div className="min-w-0 p-5 rounded-[24px] bg-church-light border border-church-grey/5 flex flex-col gap-2.5">
-                <span className="block text-[10px] font-bold text-church-grey uppercase tracking-widest leading-tight">Monthly Net Flow</span>
-                <span className={`block max-w-full whitespace-nowrap text-[clamp(1rem,1.5vw,1.45rem)] leading-none font-bold tracking-tight ${simulationResults.monthlyNet >= 0 ? 'text-emerald-500' : 'text-rose-500'}`}>{formatCurrency(Math.abs(simulationResults.monthlyNet))}</span>
+                <span className="block text-[10px] font-bold text-church-grey uppercase tracking-widest leading-tight">
+                  Monthly Net Flow
+                </span>
+                <span
+                  className={`block max-w-full whitespace-nowrap text-[clamp(1rem,1.5vw,1.45rem)] leading-none font-bold tracking-tight ${simulationResults.monthlyNet >= 0 ? 'text-emerald-500' : 'text-rose-500'}`}
+                >
+                  {formatCurrency(Math.abs(simulationResults.monthlyNet))}
+                </span>
               </div>
               <div className="min-w-0 p-5 rounded-[24px] bg-church-light border border-church-grey/5 flex flex-col gap-2.5">
-                <span className="block text-[10px] font-bold text-church-grey uppercase tracking-widest leading-tight">Final Balance</span>
+                <span className="block text-[10px] font-bold text-church-grey uppercase tracking-widest leading-tight">
+                  Final Balance
+                </span>
                 <span className="block max-w-full whitespace-nowrap text-[clamp(1rem,1.5vw,1.45rem)] leading-none font-bold tracking-tight text-church-black">
-                  {formatCurrency(simulationResults.projectedData[simulationResults.projectedData.length - 1].simulated)}
+                  {formatCurrency(
+                    simulationResults.projectedData[simulationResults.projectedData.length - 1].simulated,
+                  )}
                 </span>
               </div>
             </div>
@@ -839,10 +971,27 @@ function ParishAITwin({ mode = 'parish' }: { mode?: FinancialAITwinMode }) {
                   </defs>
                   <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#E5E7EB" />
                   <XAxis dataKey="month" tick={{ fontSize: 10, fontWeight: 600, fill: '#9CA3AF' }} dy={10} />
-                  <YAxis tick={{ fontSize: 10, fontWeight: 600, fill: '#9CA3AF' }} tickFormatter={(value) => `P${Math.round(value / 1000)}k`} />
+                  <YAxis
+                    tick={{ fontSize: 10, fontWeight: 600, fill: '#9CA3AF' }}
+                    tickFormatter={(value) => `P${Math.round(value / 1000)}k`}
+                  />
                   <Tooltip formatter={(value) => [formatCurrency(Number(value ?? 0)), '']} />
-                  <Area type="monotone" dataKey="baseline" stroke="#9CA3AF" strokeWidth={2} strokeDasharray="5 5" fill="transparent" />
-                  <Area type="monotone" dataKey="simulated" stroke="#D4AF37" strokeWidth={4} fillOpacity={1} fill="url(#parishTwinGradient)" />
+                  <Area
+                    type="monotone"
+                    dataKey="baseline"
+                    stroke="#9CA3AF"
+                    strokeWidth={2}
+                    strokeDasharray="5 5"
+                    fill="transparent"
+                  />
+                  <Area
+                    type="monotone"
+                    dataKey="simulated"
+                    stroke="#D4AF37"
+                    strokeWidth={4}
+                    fillOpacity={1}
+                    fill="url(#parishTwinGradient)"
+                  />
                 </AreaChart>
               </ResponsiveContainer>
             </div>
@@ -852,7 +1001,9 @@ function ParishAITwin({ mode = 'parish' }: { mode?: FinancialAITwinMode }) {
                 <Zap className="w-4 h-4 fill-current" />
                 <span className="text-[10px] font-bold uppercase tracking-widest">Analytics-Based Recommendation</span>
               </div>
-              <p className="text-sm text-church-black font-medium leading-relaxed">{simulationResults.recommendation}</p>
+              <p className="text-sm text-church-black font-medium leading-relaxed">
+                {simulationResults.recommendation}
+              </p>
             </div>
           </div>
 
@@ -870,19 +1021,31 @@ function ParishAITwin({ mode = 'parish' }: { mode?: FinancialAITwinMode }) {
             {savedScenarios.length > 0 ? (
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 {savedScenarios.map((scenario) => (
-                  <div key={scenario.id} className="p-5 rounded-2xl bg-church-light border border-church-grey/5 hover:border-gold-500/30 transition-all group">
+                  <div
+                    key={scenario.id}
+                    className="p-5 rounded-2xl bg-church-light border border-church-grey/5 hover:border-gold-500/30 transition-all group"
+                  >
                     <div className="flex justify-between items-start mb-3">
                       <div className="space-y-1">
-                        <h4 className="text-sm font-bold text-church-black group-hover:text-gold-600 transition-colors">{scenario.name}</h4>
+                        <h4 className="text-sm font-bold text-church-black group-hover:text-gold-600 transition-colors">
+                          {scenario.name}
+                        </h4>
                         <p className="text-[10px] text-church-grey font-medium">
-                          {profiles.find((parish) => parish.id === scenario.parishId)?.name} - {new Date(scenario.timestamp).toLocaleDateString()}
+                          {profiles.find((parish) => parish.id === scenario.parishId)?.name} -{' '}
+                          {new Date(scenario.timestamp).toLocaleDateString()}
                         </p>
                       </div>
-                      <button onClick={() => handleDeleteScenario(scenario.id)} className="p-2 text-church-grey hover:text-rose-500 transition-colors opacity-0 group-hover:opacity-100">
+                      <button
+                        onClick={() => handleDeleteScenario(scenario.id)}
+                        className="p-2 text-church-grey hover:text-rose-500 transition-colors opacity-0 group-hover:opacity-100"
+                      >
                         <Trash2 className="w-4 h-4" />
                       </button>
                     </div>
-                    <button onClick={() => handleLoadScenario(scenario)} className="w-full py-2.5 bg-white border border-church-grey/10 rounded-xl text-xs font-bold text-church-black hover:bg-gold-500 hover:text-white hover:border-gold-500 transition-all flex items-center justify-center gap-2">
+                    <button
+                      onClick={() => handleLoadScenario(scenario)}
+                      className="w-full py-2.5 bg-white border border-church-grey/10 rounded-xl text-xs font-bold text-church-black hover:bg-gold-500 hover:text-white hover:border-gold-500 transition-all flex items-center justify-center gap-2"
+                    >
                       Load Scenario
                       <ArrowRight className="w-3 h-3" />
                     </button>
@@ -896,7 +1059,9 @@ function ParishAITwin({ mode = 'parish' }: { mode?: FinancialAITwinMode }) {
                 </div>
                 <div className="space-y-1">
                   <p className="text-sm font-bold text-church-black">No saved scenarios yet</p>
-                  <p className="text-xs text-church-grey">Run a {config.labelLower} simulator scenario and save it to see it here.</p>
+                  <p className="text-xs text-church-grey">
+                    Run a {config.labelLower} simulator scenario and save it to see it here.
+                  </p>
                 </div>
               </div>
             )}
@@ -913,7 +1078,7 @@ function PriestAITwin() {
     targetParishId: reassignmentParishes[1].id,
     timeline: 12,
     transitionSupport: 'assisted',
-    handoffWeeks: 6
+    handoffWeeks: 6,
   });
   const [isSimulating, setIsSimulating] = useState(false);
   const [savedScenarios, setSavedScenarios] = useState<PriestSavedScenario[]>(() => {
@@ -923,11 +1088,11 @@ function PriestAITwin() {
 
   const selectedPriest = useMemo(
     () => priests.find((priest) => priest.id === selectedPriestId) || priests[0],
-    [selectedPriestId]
+    [selectedPriestId],
   );
   const selectedParish = useMemo(
     () => reassignmentParishes.find((parish) => parish.id === params.targetParishId) || reassignmentParishes[0],
-    [params.targetParishId]
+    [params.targetParishId],
   );
 
   const [results, setResults] = useState(() => calculatePriestScenario(selectedPriest, selectedParish, params));
@@ -947,7 +1112,7 @@ function PriestAITwin() {
     return reassignmentParishes
       .map((parish) => ({
         parish,
-        score: calculatePriestScenario(selectedPriest, parish, params).fitScore
+        score: calculatePriestScenario(selectedPriest, parish, params).fitScore,
       }))
       .sort((left, right) => right.score - left.score)
       .slice(0, 3);
@@ -970,7 +1135,7 @@ function PriestAITwin() {
       name,
       priestId: selectedPriestId,
       params: { ...params },
-      timestamp: Date.now()
+      timestamp: Date.now(),
     };
 
     const updated = [nextScenario, ...savedScenarios];
@@ -988,7 +1153,8 @@ function PriestAITwin() {
     setSelectedPriestId(scenario.priestId);
     setParams(scenario.params);
     const priest = priests.find((item) => item.id === scenario.priestId) || priests[0];
-    const parish = reassignmentParishes.find((item) => item.id === scenario.params.targetParishId) || reassignmentParishes[0];
+    const parish =
+      reassignmentParishes.find((item) => item.id === scenario.params.targetParishId) || reassignmentParishes[0];
     setResults(calculatePriestScenario(priest, parish, scenario.params));
   };
 
@@ -998,7 +1164,7 @@ function PriestAITwin() {
       targetParishId: reassignmentParishes[1].id,
       timeline: 12,
       transitionSupport: 'assisted',
-      handoffWeeks: 6
+      handoffWeeks: 6,
     });
   };
 
@@ -1011,14 +1177,23 @@ function PriestAITwin() {
             <span className="text-[10px] font-bold uppercase tracking-[0.2em]">Priest Decision Support</span>
           </div>
           <h1 className="text-3xl font-serif font-bold text-church-black">Priest Reassignment Simulation</h1>
-          <p className="text-church-grey text-sm">Model priest-to-parish reassignment impact using prior assignment analytics and current parish need indicators.</p>
+          <p className="text-church-grey text-sm">
+            Model priest-to-parish reassignment impact using prior assignment analytics and current parish need
+            indicators.
+          </p>
         </div>
         <div className="flex items-center gap-3">
-          <button onClick={resetScenario} className="flex items-center gap-2 px-4 py-2 rounded-xl border border-church-grey/20 text-church-grey hover:bg-white transition-all text-sm font-bold">
+          <button
+            onClick={resetScenario}
+            className="flex items-center gap-2 px-4 py-2 rounded-xl border border-church-grey/20 text-church-grey hover:bg-white transition-all text-sm font-bold"
+          >
             <RotateCcw className="w-4 h-4" />
             Reset
           </button>
-          <button onClick={saveScenario} className="flex items-center gap-2 px-6 py-2 rounded-xl bg-church-black text-white hover:bg-church-grey transition-all text-sm font-bold shadow-lg shadow-black/10">
+          <button
+            onClick={saveScenario}
+            className="flex items-center gap-2 px-6 py-2 rounded-xl bg-church-black text-white hover:bg-church-grey transition-all text-sm font-bold shadow-lg shadow-black/10"
+          >
             <Save className="w-4 h-4" />
             Save Scenario
           </button>
@@ -1038,18 +1213,32 @@ function PriestAITwin() {
             <div className="space-y-5">
               <div className="space-y-2">
                 <label className="text-[10px] font-bold text-church-grey uppercase tracking-widest ml-1">Priest</label>
-                <select value={selectedPriestId} onChange={(event) => setSelectedPriestId(event.target.value)} className="w-full px-4 py-4 bg-church-light border border-church-grey/10 rounded-2xl text-church-black focus:outline-none focus:ring-2 focus:ring-gold-500 font-medium">
+                <select
+                  value={selectedPriestId}
+                  onChange={(event) => setSelectedPriestId(event.target.value)}
+                  className="w-full px-4 py-4 bg-church-light border border-church-grey/10 rounded-2xl text-church-black focus:outline-none focus:ring-2 focus:ring-gold-500 font-medium"
+                >
                   {priests.map((priest) => (
-                    <option key={priest.id} value={priest.id}>{priest.name}</option>
+                    <option key={priest.id} value={priest.id}>
+                      {priest.name}
+                    </option>
                   ))}
                 </select>
               </div>
 
               <div className="space-y-2">
-                <label className="text-[10px] font-bold text-church-grey uppercase tracking-widest ml-1">Receiving Parish</label>
-                <select value={params.targetParishId} onChange={(event) => setParams({ ...params, targetParishId: event.target.value })} className="w-full px-4 py-4 bg-church-light border border-church-grey/10 rounded-2xl text-church-black focus:outline-none focus:ring-2 focus:ring-gold-500 font-medium">
+                <label className="text-[10px] font-bold text-church-grey uppercase tracking-widest ml-1">
+                  Receiving Parish
+                </label>
+                <select
+                  value={params.targetParishId}
+                  onChange={(event) => setParams({ ...params, targetParishId: event.target.value })}
+                  className="w-full px-4 py-4 bg-church-light border border-church-grey/10 rounded-2xl text-church-black focus:outline-none focus:ring-2 focus:ring-gold-500 font-medium"
+                >
                   {reassignmentParishes.map((parish) => (
-                    <option key={parish.id} value={parish.id}>{parish.name}</option>
+                    <option key={parish.id} value={parish.id}>
+                      {parish.name}
+                    </option>
                   ))}
                 </select>
               </div>
@@ -1057,21 +1246,32 @@ function PriestAITwin() {
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="p-5 rounded-[24px] bg-gold-50 border border-gold-100 space-y-1">
-                <span className="text-[10px] font-bold uppercase tracking-widest text-gold-700">Current Priest Profile</span>
+                <span className="text-[10px] font-bold uppercase tracking-widest text-gold-700">
+                  Current Priest Profile
+                </span>
                 <p className="text-base font-black text-church-black">{selectedPriest.currentParish}</p>
                 <p className="text-xs text-gray-600 font-semibold">{selectedPriest.strength}</p>
                 <p className="text-[10px] text-gray-500 font-bold uppercase tracking-widest pt-1">
-                  {selectedPriest.previousAssignments} previous assignment{selectedPriest.previousAssignments === 1 ? '' : 's'}
+                  {selectedPriest.previousAssignments} previous assignment
+                  {selectedPriest.previousAssignments === 1 ? '' : 's'}
                 </p>
               </div>
               <div className="p-5 rounded-[24px] bg-blue-50 border border-blue-100 space-y-1">
-                <span className="text-[10px] font-bold uppercase tracking-widest text-blue-700">Target Parish Context</span>
+                <span className="text-[10px] font-bold uppercase tracking-widest text-blue-700">
+                  Target Parish Context
+                </span>
                 <p className="text-base font-black text-church-black">{selectedParish.vicariate}</p>
-                <p className="text-xs text-gray-600 font-semibold">{selectedParish.parishClass} • Urgency {selectedParish.urgency}</p>
+                <p className="text-xs text-gray-600 font-semibold">
+                  {selectedParish.parishClass} • Urgency {selectedParish.urgency}
+                </p>
               </div>
             </div>
 
-            <button onClick={runSimulation} disabled={isSimulating} className="w-full py-4 bg-gold-500 text-church-black rounded-2xl font-bold hover:bg-gold-600 transition-all shadow-lg shadow-gold-500/20 flex items-center justify-center gap-3 disabled:opacity-50 disabled:cursor-not-allowed">
+            <button
+              onClick={runSimulation}
+              disabled={isSimulating}
+              className="w-full py-4 bg-gold-500 text-church-black rounded-2xl font-bold hover:bg-gold-600 transition-all shadow-lg shadow-gold-500/20 flex items-center justify-center gap-3 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
               {isSimulating ? (
                 <>
                   <div className="w-5 h-5 border-2 border-church-black/30 border-t-church-black rounded-full animate-spin" />
@@ -1085,13 +1285,15 @@ function PriestAITwin() {
               )}
             </button>
 
-            <div className={`rounded-2xl border px-4 py-3 ${
-              assignmentEvidenceLevel === 'full'
-                ? 'bg-emerald-50 border-emerald-100 text-emerald-700'
-                : assignmentEvidenceLevel === 'provisional'
-                  ? 'bg-amber-50 border-amber-100 text-amber-700'
-                  : 'bg-rose-50 border-rose-100 text-rose-700'
-            }`}>
+            <div
+              className={`rounded-2xl border px-4 py-3 ${
+                assignmentEvidenceLevel === 'full'
+                  ? 'bg-emerald-50 border-emerald-100 text-emerald-700'
+                  : assignmentEvidenceLevel === 'provisional'
+                    ? 'bg-amber-50 border-amber-100 text-amber-700'
+                    : 'bg-rose-50 border-rose-100 text-rose-700'
+              }`}
+            >
               <p className="text-[10px] font-black uppercase tracking-widest">
                 {assignmentEvidenceLevel === 'full'
                   ? 'Full assignment evidence'
@@ -1114,26 +1316,33 @@ function PriestAITwin() {
               <div className="w-10 h-10 rounded-2xl bg-purple-500/10 flex items-center justify-center">
                 <Target className="w-5 h-5 text-purple-600" />
               </div>
-              <h3 className="text-lg font-bold text-church-black">{hasFullRanking ? 'Best-Fit Parish Ranking' : 'Parish Ranking Availability'}</h3>
+              <h3 className="text-lg font-bold text-church-black">
+                {hasFullRanking ? 'Best-Fit Parish Ranking' : 'Parish Ranking Availability'}
+              </h3>
             </div>
 
             {hasFullRanking ? (
-            <div className="space-y-3">
-              {ranking.map((entry, index) => (
-                <div key={entry.parish.id} className={`p-4 rounded-2xl border ${index === 0 ? 'bg-gold-50 border-gold-100' : 'bg-church-light border-church-grey/5'}`}>
-                  <div className="flex items-center justify-between gap-4">
-                    <div>
-                      <p className="text-sm font-black text-church-black">{entry.parish.name}</p>
-                      <p className="text-[10px] font-bold uppercase tracking-widest text-gray-500">{entry.parish.vicariate} • {entry.parish.parishClass}</p>
-                    </div>
-                    <div className="text-right">
-                      <p className="text-2xl font-black text-church-black">{entry.score}</p>
-                      <p className="text-[10px] font-bold uppercase tracking-widest text-gray-500">Match Score</p>
+              <div className="space-y-3">
+                {ranking.map((entry, index) => (
+                  <div
+                    key={entry.parish.id}
+                    className={`p-4 rounded-2xl border ${index === 0 ? 'bg-gold-50 border-gold-100' : 'bg-church-light border-church-grey/5'}`}
+                  >
+                    <div className="flex items-center justify-between gap-4">
+                      <div>
+                        <p className="text-sm font-black text-church-black">{entry.parish.name}</p>
+                        <p className="text-[10px] font-bold uppercase tracking-widest text-gray-500">
+                          {entry.parish.vicariate} • {entry.parish.parishClass}
+                        </p>
+                      </div>
+                      <div className="text-right">
+                        <p className="text-2xl font-black text-church-black">{entry.score}</p>
+                        <p className="text-[10px] font-bold uppercase tracking-widest text-gray-500">Match Score</p>
+                      </div>
                     </div>
                   </div>
-                </div>
-              ))}
-            </div>
+                ))}
+              </div>
             ) : (
               <div className="rounded-[24px] border border-church-grey/10 bg-church-light px-5 py-6">
                 <p className="text-sm font-black text-church-black">
@@ -1142,7 +1351,8 @@ function PriestAITwin() {
                     : 'Best-fit ranking is hidden because this priest has fewer than 2 prior parish assignments.'}
                 </p>
                 <p className="mt-2 text-xs font-semibold text-gray-500">
-                  The reassignment simulator can still run, but ranking across multiple parishes is withheld until there is enough assignment history.
+                  The reassignment simulator can still run, but ranking across multiple parishes is withheld until there
+                  is enough assignment history.
                 </p>
               </div>
             )}
@@ -1158,10 +1368,15 @@ function PriestAITwin() {
                 </div>
                 <div className="min-w-0 pt-0.5">
                   <h3 className="text-lg font-bold text-church-black leading-tight">Reassignment Impact Summary</h3>
-                  <p className="mt-1 max-w-2xl text-xs text-gray-500 font-semibold leading-relaxed">Decision support only. Scenario outputs are computed from historical assignment analytics and current parish need indicators.</p>
+                  <p className="mt-1 max-w-2xl text-xs text-gray-500 font-semibold leading-relaxed">
+                    Decision support only. Scenario outputs are computed from historical assignment analytics and
+                    current parish need indicators.
+                  </p>
                 </div>
               </div>
-              <div className={`justify-self-start md:justify-self-end px-4 py-2 rounded-xl border font-bold text-sm flex items-center gap-2 ${results.riskBg} ${results.riskText}`}>
+              <div
+                className={`justify-self-start md:justify-self-end px-4 py-2 rounded-xl border font-bold text-sm flex items-center gap-2 ${results.riskBg} ${results.riskText}`}
+              >
                 <ShieldAlert className="w-4 h-4" />
                 {results.riskBand} Transition Risk
               </div>
@@ -1169,25 +1384,37 @@ function PriestAITwin() {
 
             <div className="grid grid-cols-1 md:grid-cols-4 gap-5">
               <div className="min-h-[190px] p-5 rounded-[24px] bg-church-light border border-church-grey/5 flex flex-col justify-between gap-4">
-                <span className="text-[10px] font-bold uppercase tracking-widest text-gray-500">Priest-Parish Match</span>
+                <span className="text-[10px] font-bold uppercase tracking-widest text-gray-500">
+                  Priest-Parish Match
+                </span>
                 <p className="text-3xl font-black text-church-black">{results.fitScore}</p>
               </div>
               <div className="min-h-[190px] p-5 rounded-[24px] bg-church-light border border-church-grey/5 flex flex-col justify-between gap-4">
-                <span className="text-[10px] font-bold uppercase tracking-widest text-gray-500">Expected Gain For New Parish</span>
+                <span className="text-[10px] font-bold uppercase tracking-widest text-gray-500">
+                  Expected Gain For New Parish
+                </span>
                 <p className="text-3xl font-black text-emerald-600">+{results.targetLift}</p>
               </div>
               <div className="min-h-[190px] p-5 rounded-[24px] bg-church-light border border-church-grey/5 flex flex-col justify-between gap-4">
-                <span className="text-[10px] font-bold uppercase tracking-widest text-gray-500">Expected Loss For Old Parish</span>
+                <span className="text-[10px] font-bold uppercase tracking-widest text-gray-500">
+                  Expected Loss For Old Parish
+                </span>
                 <p className="text-3xl font-black text-rose-600">-{results.vacatedParishDip}</p>
               </div>
               <div className="min-h-[190px] p-5 rounded-[24px] bg-church-light border border-church-grey/5 flex flex-col justify-between gap-4">
-                <span className="text-[10px] font-bold uppercase tracking-widest text-gray-500">Reliability Of This Scenario</span>
+                <span className="text-[10px] font-bold uppercase tracking-widest text-gray-500">
+                  Reliability Of This Scenario
+                </span>
                 <div className="space-y-1">
                   <p className="text-3xl font-black text-church-black">
                     {assignmentEvidenceLevel === 'insufficient' ? 'N/A' : `${results.confidence}%`}
                   </p>
                   <p className="text-[10px] font-bold uppercase tracking-widest text-gray-400">
-                    {assignmentEvidenceLevel === 'full' ? 'Validated' : assignmentEvidenceLevel === 'provisional' ? 'Provisional' : 'Withheld'}
+                    {assignmentEvidenceLevel === 'full'
+                      ? 'Validated'
+                      : assignmentEvidenceLevel === 'provisional'
+                        ? 'Provisional'
+                        : 'Withheld'}
                   </p>
                 </div>
               </div>
@@ -1201,9 +1428,31 @@ function PriestAITwin() {
                   <YAxis tick={{ fontSize: 10, fontWeight: 600, fill: '#9CA3AF' }} />
                   <Tooltip />
                   <Legend wrapperStyle={{ fontSize: '11px', fontWeight: 700 }} />
-                  <Line type="monotone" dataKey="stayCase" name="If Priest Stays" stroke="#111111" strokeDasharray="6 4" strokeWidth={2} dot={false} />
-                  <Line type="monotone" dataKey="sourceParish" name="Old Parish After Transfer" stroke="#EF4444" strokeWidth={3} dot={{ r: 2 }} />
-                  <Line type="monotone" dataKey="targetParish" name="New Parish After Transfer" stroke="#D4AF37" strokeWidth={4} dot={{ r: 2 }} />
+                  <Line
+                    type="monotone"
+                    dataKey="stayCase"
+                    name="If Priest Stays"
+                    stroke="#111111"
+                    strokeDasharray="6 4"
+                    strokeWidth={2}
+                    dot={false}
+                  />
+                  <Line
+                    type="monotone"
+                    dataKey="sourceParish"
+                    name="Old Parish After Transfer"
+                    stroke="#EF4444"
+                    strokeWidth={3}
+                    dot={{ r: 2 }}
+                  />
+                  <Line
+                    type="monotone"
+                    dataKey="targetParish"
+                    name="New Parish After Transfer"
+                    stroke="#D4AF37"
+                    strokeWidth={4}
+                    dot={{ r: 2 }}
+                  />
                 </LineChart>
               </ResponsiveContainer>
             </div>
@@ -1212,7 +1461,9 @@ function PriestAITwin() {
               <div className="p-6 rounded-[24px] bg-gold-500/5 border border-gold-500/10">
                 <div className="flex items-center gap-2 text-gold-600 mb-2">
                   <Zap className="w-4 h-4 fill-current" />
-                  <span className="text-[10px] font-bold uppercase tracking-widest">Analytics-Based Recommendation</span>
+                  <span className="text-[10px] font-bold uppercase tracking-widest">
+                    Analytics-Based Recommendation
+                  </span>
                 </div>
                 <p className="text-sm text-church-black font-medium leading-relaxed">
                   {assignmentEvidenceLevel === 'insufficient'
@@ -1230,9 +1481,21 @@ function PriestAITwin() {
                 <ul className="space-y-2 text-sm text-church-black font-medium">
                   <li>Priority review window: first 6 months after reassignment.</li>
                   <li>Compare the receiving parish gain against the vacated parish dip before endorsing transfer.</li>
-                  <li>Fit is computed from priest turnaround history, reporting discipline, stability improvement, and the receiving parish's urgency and stability need.</li>
-                  <li>{assignmentEvidenceLevel === 'full' ? 'This recommendation is based on sufficient prior assignment history.' : assignmentEvidenceLevel === 'provisional' ? 'This recommendation is provisional because only 1 prior parish assignment is available.' : 'This recommendation is directional only because prior assignment history is insufficient.'}</li>
-                  <li>Expected diocesan net lift: {results.dioceseLift > 0 ? `+${results.dioceseLift}` : results.dioceseLift} points.</li>
+                  <li>
+                    Fit is computed from priest turnaround history, reporting discipline, stability improvement, and the
+                    receiving parish's urgency and stability need.
+                  </li>
+                  <li>
+                    {assignmentEvidenceLevel === 'full'
+                      ? 'This recommendation is based on sufficient prior assignment history.'
+                      : assignmentEvidenceLevel === 'provisional'
+                        ? 'This recommendation is provisional because only 1 prior parish assignment is available.'
+                        : 'This recommendation is directional only because prior assignment history is insufficient.'}
+                  </li>
+                  <li>
+                    Expected diocesan net lift:{' '}
+                    {results.dioceseLift > 0 ? `+${results.dioceseLift}` : results.dioceseLift} points.
+                  </li>
                 </ul>
               </div>
             </div>
@@ -1252,19 +1515,31 @@ function PriestAITwin() {
             {savedScenarios.length > 0 ? (
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 {savedScenarios.map((scenario) => (
-                  <div key={scenario.id} className="p-5 rounded-2xl bg-church-light border border-church-grey/5 hover:border-gold-500/30 transition-all group">
+                  <div
+                    key={scenario.id}
+                    className="p-5 rounded-2xl bg-church-light border border-church-grey/5 hover:border-gold-500/30 transition-all group"
+                  >
                     <div className="flex justify-between items-start mb-3">
                       <div className="space-y-1">
-                        <h4 className="text-sm font-bold text-church-black group-hover:text-gold-600 transition-colors">{scenario.name}</h4>
+                        <h4 className="text-sm font-bold text-church-black group-hover:text-gold-600 transition-colors">
+                          {scenario.name}
+                        </h4>
                         <p className="text-[10px] text-church-grey font-medium">
-                          {(priests.find((priest) => priest.id === scenario.priestId) || priests[0]).name} • {new Date(scenario.timestamp).toLocaleDateString()}
+                          {(priests.find((priest) => priest.id === scenario.priestId) || priests[0]).name} •{' '}
+                          {new Date(scenario.timestamp).toLocaleDateString()}
                         </p>
                       </div>
-                      <button onClick={() => deleteScenario(scenario.id)} className="p-2 text-church-grey hover:text-rose-500 transition-colors opacity-0 group-hover:opacity-100">
+                      <button
+                        onClick={() => deleteScenario(scenario.id)}
+                        className="p-2 text-church-grey hover:text-rose-500 transition-colors opacity-0 group-hover:opacity-100"
+                      >
                         <Trash2 className="w-4 h-4" />
                       </button>
                     </div>
-                    <button onClick={() => loadScenario(scenario)} className="w-full py-2.5 bg-white border border-church-grey/10 rounded-xl text-xs font-bold text-church-black hover:bg-gold-500 hover:text-white hover:border-gold-500 transition-all flex items-center justify-center gap-2">
+                    <button
+                      onClick={() => loadScenario(scenario)}
+                      className="w-full py-2.5 bg-white border border-church-grey/10 rounded-xl text-xs font-bold text-church-black hover:bg-gold-500 hover:text-white hover:border-gold-500 transition-all flex items-center justify-center gap-2"
+                    >
                       Load Scenario
                       <ArrowRight className="w-3 h-3" />
                     </button>
@@ -1278,7 +1553,9 @@ function PriestAITwin() {
                 </div>
                 <div className="space-y-1">
                   <p className="text-sm font-bold text-church-black">No reassignment scenarios saved yet</p>
-                  <p className="text-xs text-church-grey">Run a transfer simulation and save it for the clergy review cycle.</p>
+                  <p className="text-xs text-church-grey">
+                    Run a transfer simulation and save it for the clergy review cycle.
+                  </p>
                 </div>
               </div>
             )}
@@ -1292,5 +1569,3 @@ function PriestAITwin() {
 export function AITwin({ mode = 'parish' }: AITwinProps) {
   return mode === 'priest' ? <PriestAITwin /> : <ParishAITwin mode={mode} />;
 }
-
-

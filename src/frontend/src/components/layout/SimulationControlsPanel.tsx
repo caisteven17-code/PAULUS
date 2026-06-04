@@ -16,7 +16,7 @@ import {
   Loader2,
 } from 'lucide-react';
 
-const MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'] as const;
+const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'] as const;
 
 interface SandboxState {
   projectedCollections: number;
@@ -61,7 +61,7 @@ const formatCurrency = (value: number) =>
   new Intl.NumberFormat('en-PH', {
     style: 'currency',
     currency: 'PHP',
-    maximumFractionDigits: 0
+    maximumFractionDigits: 0,
   }).format(value);
 
 const formatTime = (timestamp: number) => {
@@ -77,7 +77,7 @@ export function SimulationControlsPanel({
   currentSandboxState,
   onSandboxStateChange,
   onReset,
-  onSave
+  onSave,
 }: SimulationControlsPanelProps) {
   const [isCollapsed, setIsCollapsed] = useState(false);
   const [savedSandboxes, setSavedSandboxes] = useState<SavedSandbox[]>([]);
@@ -87,7 +87,7 @@ export function SimulationControlsPanel({
 
   // Period loader state
   const [periodMonth, setPeriodMonth] = useState<string>('Dec');
-  const [periodYear, setPeriodYear]   = useState<number>(2025);
+  const [periodYear, setPeriodYear] = useState<number>(2025);
   const [isLoadingPeriod, setIsLoadingPeriod] = useState(false);
   const [periodStatus, setPeriodStatus] = useState<{ ok: boolean; msg: string } | null>(null);
 
@@ -96,14 +96,17 @@ export function SimulationControlsPanel({
     setPeriodStatus(null);
     try {
       const res = await fetch(
-        `/api/financial/records?entityId=${encodeURIComponent(institutionName)}&entityType=${institutionType}`
+        `/api/financial/records?entityId=${encodeURIComponent(institutionName)}&entityType=${institutionType}`,
       );
       if (!res.ok) throw new Error('API error');
       const records: Array<{
-        month: string; year?: number;
-        collections: number; disbursements: number;
+        month: string;
+        year?: number;
+        collections: number;
+        disbursements: number;
         consumableCollections: number;
-        expenses_pastoral?: number; expenses_parish?: number;
+        expenses_pastoral?: number;
+        expenses_parish?: number;
         netReceipts?: number;
       }> = await res.json();
 
@@ -118,13 +121,14 @@ export function SimulationControlsPanel({
       }
 
       onSandboxStateChange({
-        projectedCollections:      record.collections,
-        projectedDisbursements:    record.expenses_pastoral  ?? Math.round(record.disbursements * 0.35),
-        projectedRemittances:      Math.round(record.consumableCollections * 0.12),
-        projectedExpenses:         record.expenses_parish    ?? Math.round(record.disbursements * 0.65),
-        projectedBudgetAllocation: record.netReceipts != null
-          ? Math.round(record.netReceipts * 0.8)
-          : Math.round((record.collections - record.disbursements) * 0.8),
+        projectedCollections: record.collections,
+        projectedDisbursements: record.expenses_pastoral ?? Math.round(record.disbursements * 0.35),
+        projectedRemittances: Math.round(record.consumableCollections * 0.12),
+        projectedExpenses: record.expenses_parish ?? Math.round(record.disbursements * 0.65),
+        projectedBudgetAllocation:
+          record.netReceipts != null
+            ? Math.round(record.netReceipts * 0.8)
+            : Math.round((record.collections - record.disbursements) * 0.8),
       });
 
       const yearNote = record.year ? ` ${record.year}` : '';
@@ -164,12 +168,12 @@ export function SimulationControlsPanel({
   // Track state changes in history
   useEffect(() => {
     if (!currentSandboxState) return;
-    
+
     // Create a unique key for the current state to avoid duplicates
     const stateKey = JSON.stringify(currentSandboxState);
     const lastSnapshot = stateHistory[0];
     const lastStateKey = lastSnapshot ? JSON.stringify(lastSnapshot.state) : null;
-    
+
     // Only add to history if state has actually changed
     if (stateKey !== lastStateKey) {
       setStateHistory((prev) => {
@@ -178,16 +182,16 @@ export function SimulationControlsPanel({
             id: `snapshot-${Date.now()}`,
             state: { ...currentSandboxState },
             timestamp: Date.now(),
-            label: `Snapshot at ${formatTime(Date.now())}`
+            label: `Snapshot at ${formatTime(Date.now())}`,
           },
-          ...prev
+          ...prev,
         ].slice(0, 20); // Keep last 20 snapshots
-        
+
         // Persist to sessionStorage
         if (typeof window !== 'undefined') {
           window.sessionStorage.setItem(HISTORY_KEY, JSON.stringify(updated));
         }
-        
+
         return updated;
       });
     }
@@ -199,15 +203,9 @@ export function SimulationControlsPanel({
     currentSandboxState.projectedRemittances -
     currentSandboxState.projectedExpenses;
 
-  const balanceDelta =
-    simulatedNet -
-    baselineNet +
-    (currentSandboxState.projectedBudgetAllocation * 0.15);
+  const balanceDelta = simulatedNet - baselineNet + currentSandboxState.projectedBudgetAllocation * 0.15;
 
-  const simulatedHealth = Math.max(
-    20,
-    Math.min(98, Math.round(baselineHealthScore + balanceDelta / 45000))
-  );
+  const simulatedHealth = Math.max(20, Math.min(98, Math.round(baselineHealthScore + balanceDelta / 45000)));
 
   const simulatedRisk: 'Low' | 'Moderate' | 'High' =
     simulatedNet < 0 || simulatedHealth < 60 ? 'High' : simulatedHealth < 75 ? 'Moderate' : 'Low';
@@ -220,7 +218,7 @@ export function SimulationControlsPanel({
 
   const advisoryMessage =
     simulatedNet >= baselineNet
-      ? 'The sandbox scenario improves the institution\'s net monthly position if those assumptions hold.'
+      ? "The sandbox scenario improves the institution's net monthly position if those assumptions hold."
       : 'The sandbox scenario weakens resilience. Review disbursements, remittances, expenses, or budget allocation before acting.';
 
   const handleLoadSandbox = (item: SavedSandbox) => {
@@ -270,10 +268,7 @@ export function SimulationControlsPanel({
           <h2 className="text-sm font-black text-white uppercase tracking-wide">Simulation</h2>
           <p className="mt-1 text-xs text-gray-300">{institutionName}</p>
         </div>
-        <button
-          onClick={() => setIsCollapsed(true)}
-          className="rounded-lg p-2 hover:bg-white/10 transition"
-        >
+        <button onClick={() => setIsCollapsed(true)} className="rounded-lg p-2 hover:bg-white/10 transition">
           <ChevronRight className="h-5 w-5 text-white" />
         </button>
       </div>
@@ -293,7 +288,9 @@ export function SimulationControlsPanel({
 
             {/* History Title */}
             <div className="pt-2">
-              <p className="text-[11px] font-black uppercase tracking-[0.22em] text-gray-500">Revert to Previous State</p>
+              <p className="text-[11px] font-black uppercase tracking-[0.22em] text-gray-500">
+                Revert to Previous State
+              </p>
               <p className="mt-1 text-xs text-gray-600">Load any snapshot from your session history</p>
             </div>
 
@@ -305,7 +302,9 @@ export function SimulationControlsPanel({
                     <div className="flex items-start justify-between gap-2">
                       <div className="min-w-0 flex-1">
                         <p className="text-xs font-bold text-gray-900 truncate">{snapshot.label}</p>
-                        <p className="mt-1 text-xs text-gray-500">Collections: {formatCurrency(snapshot.state.projectedCollections)}</p>
+                        <p className="mt-1 text-xs text-gray-500">
+                          Collections: {formatCurrency(snapshot.state.projectedCollections)}
+                        </p>
                       </div>
                       <div className="text-xs font-bold text-[#111111] bg-white px-2 py-1 rounded-full flex-shrink-0">
                         -{idx}
@@ -373,12 +372,8 @@ export function SimulationControlsPanel({
 
             {/* ── Period Loader ───────────────────────────────────────── */}
             <div className="space-y-2 pt-2 border-t border-gray-200">
-              <p className="text-[11px] font-black uppercase tracking-[0.22em] text-gray-500">
-                Load from Period
-              </p>
-              <p className="text-xs text-gray-500 leading-4">
-                Auto-fill fields with a specific month's recorded data.
-              </p>
+              <p className="text-[11px] font-black uppercase tracking-[0.22em] text-gray-500">Load from Period</p>
+              <p className="text-xs text-gray-500 leading-4">Auto-fill fields with a specific month's recorded data.</p>
               <div className="flex gap-2">
                 <select
                   value={periodMonth}
@@ -386,7 +381,9 @@ export function SimulationControlsPanel({
                   className="flex-1 rounded-[12px] border border-gray-200 bg-[#faf8f4] px-2 py-2 text-xs font-semibold text-gray-900 outline-none focus:border-[#d4af37]"
                 >
                   {MONTHS.map((m) => (
-                    <option key={m} value={m}>{m}</option>
+                    <option key={m} value={m}>
+                      {m}
+                    </option>
                   ))}
                 </select>
                 <select
@@ -395,7 +392,9 @@ export function SimulationControlsPanel({
                   className="w-20 rounded-[12px] border border-gray-200 bg-[#faf8f4] px-2 py-2 text-xs font-semibold text-gray-900 outline-none focus:border-[#d4af37]"
                 >
                   {[2024, 2025, 2026].map((y) => (
-                    <option key={y} value={y}>{y}</option>
+                    <option key={y} value={y}>
+                      {y}
+                    </option>
                   ))}
                 </select>
                 <button
@@ -403,9 +402,11 @@ export function SimulationControlsPanel({
                   disabled={isLoadingPeriod}
                   className="inline-flex items-center gap-1.5 rounded-[12px] bg-[#111111] px-3 py-2 text-xs font-black text-white transition hover:bg-[#282828] disabled:opacity-60"
                 >
-                  {isLoadingPeriod
-                    ? <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                    : <CalendarSearch className="h-3.5 w-3.5" />}
+                  {isLoadingPeriod ? (
+                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                  ) : (
+                    <CalendarSearch className="h-3.5 w-3.5" />
+                  )}
                   Load
                 </button>
               </div>
@@ -424,7 +425,7 @@ export function SimulationControlsPanel({
                 ['projectedDisbursements', 'Disbursements', 'text-blue-700'],
                 ['projectedRemittances', 'Remittances', 'text-purple-700'],
                 ['projectedExpenses', 'Expenses', 'text-rose-700'],
-                ['projectedBudgetAllocation', 'Budget', 'text-amber-700']
+                ['projectedBudgetAllocation', 'Budget', 'text-amber-700'],
               ].map(([key, label, color]) => (
                 <label key={key} className="space-y-1.5 block">
                   <div className="flex items-center justify-between">
@@ -440,7 +441,7 @@ export function SimulationControlsPanel({
                     onChange={(event) =>
                       onSandboxStateChange({
                         ...currentSandboxState,
-                        [key]: Number(event.target.value || 0)
+                        [key]: Number(event.target.value || 0),
                       })
                     }
                     className="w-full rounded-[12px] border border-gray-200 bg-white px-3 py-2 text-sm font-semibold text-gray-900 outline-none transition focus:border-[#d4af37] focus:ring-2 focus:ring-[#d4af37]/20"
@@ -457,9 +458,13 @@ export function SimulationControlsPanel({
                   <p className="text-[10px] font-bold uppercase text-gray-500">Baseline</p>
                   <p className="mt-2 text-xs font-black text-gray-900">{formatCurrency(baselineNet)}</p>
                 </div>
-                <div className={`rounded-[14px] bg-gradient-to-br ${simulatedNet >= baselineNet ? 'from-emerald-50 to-emerald-100' : 'from-rose-50 to-rose-100'} p-3 border ${simulatedNet >= baselineNet ? 'border-emerald-200' : 'border-rose-200'}`}>
+                <div
+                  className={`rounded-[14px] bg-gradient-to-br ${simulatedNet >= baselineNet ? 'from-emerald-50 to-emerald-100' : 'from-rose-50 to-rose-100'} p-3 border ${simulatedNet >= baselineNet ? 'border-emerald-200' : 'border-rose-200'}`}
+                >
                   <p className="text-[10px] font-bold uppercase text-gray-500">Scenario</p>
-                  <p className={`mt-2 text-xs font-black ${simulatedNet >= baselineNet ? 'text-emerald-700' : 'text-rose-700'}`}>
+                  <p
+                    className={`mt-2 text-xs font-black ${simulatedNet >= baselineNet ? 'text-emerald-700' : 'text-rose-700'}`}
+                  >
                     {formatCurrency(simulatedNet)}
                   </p>
                 </div>
@@ -468,7 +473,9 @@ export function SimulationControlsPanel({
               <div className="rounded-[14px] bg-gradient-to-r from-blue-50 to-indigo-50 p-3 border border-blue-200 space-y-2">
                 <div className="flex items-center justify-between">
                   <p className="text-xs font-bold text-blue-700">Health Score</p>
-                  <p className="text-sm font-black text-blue-900">{baselineHealthScore} → {simulatedHealth}</p>
+                  <p className="text-sm font-black text-blue-900">
+                    {baselineHealthScore} → {simulatedHealth}
+                  </p>
                 </div>
                 <div className="flex items-center justify-between">
                   <p className="text-xs font-bold text-blue-700">Simulated Risk</p>
@@ -489,9 +496,7 @@ export function SimulationControlsPanel({
             <div className="rounded-[14px] border border-dashed border-gray-300 bg-[#faf8f4] p-3 space-y-2">
               <div>
                 <p className="text-xs font-bold text-gray-900">Upload Financial Report</p>
-                <p className="text-xs text-gray-500 leading-4 mt-0.5">
-                  CSV values will override all fields below.
-                </p>
+                <p className="text-xs text-gray-500 leading-4 mt-0.5">CSV values will override all fields below.</p>
               </div>
               <label className="flex cursor-pointer items-center justify-center gap-2 rounded-[12px] border border-gray-200 bg-white px-3 py-2 text-xs font-black text-gray-700 transition hover:border-[#d4af37] hover:bg-[#faf8f4]">
                 <Upload className="h-3.5 w-3.5" />
@@ -534,22 +539,26 @@ export function SimulationControlsPanel({
                       }
 
                       // Aggregate all rows from the file
-                      let sumCollections = 0, sumConsumable = 0, sumDisbursements = 0;
-                      let sumPastoral = 0, sumParish = 0, sumNet = 0;
+                      let sumCollections = 0,
+                        sumConsumable = 0,
+                        sumDisbursements = 0;
+                      let sumPastoral = 0,
+                        sumParish = 0,
+                        sumNet = 0;
                       for (const r of records) {
-                        sumCollections   += r.collections;
-                        sumConsumable    += r.consumableCollections;
+                        sumCollections += r.collections;
+                        sumConsumable += r.consumableCollections;
                         sumDisbursements += r.disbursements;
-                        sumPastoral      += r.expenses_pastoral  ?? Math.round(r.disbursements * 0.35);
-                        sumParish        += r.expenses_parish    ?? Math.round(r.disbursements * 0.65);
-                        sumNet           += r.netReceipts        ?? (r.collections - r.disbursements);
+                        sumPastoral += r.expenses_pastoral ?? Math.round(r.disbursements * 0.35);
+                        sumParish += r.expenses_parish ?? Math.round(r.disbursements * 0.65);
+                        sumNet += r.netReceipts ?? r.collections - r.disbursements;
                       }
 
                       onSandboxStateChange({
-                        projectedCollections:      sumCollections,
-                        projectedDisbursements:    sumPastoral,
-                        projectedRemittances:      Math.round(sumConsumable * 0.12),
-                        projectedExpenses:         sumParish,
+                        projectedCollections: sumCollections,
+                        projectedDisbursements: sumPastoral,
+                        projectedRemittances: Math.round(sumConsumable * 0.12),
+                        projectedExpenses: sumParish,
                         projectedBudgetAllocation: Math.round(sumNet * 0.8),
                       });
 
@@ -577,7 +586,9 @@ export function SimulationControlsPanel({
 
             {/* Saved Instances */}
             <div className="space-y-2 pt-2 border-t border-gray-200">
-              <p className="text-[11px] font-black uppercase tracking-[0.22em] text-gray-500">Saved Scenarios ({savedSandboxes.length})</p>
+              <p className="text-[11px] font-black uppercase tracking-[0.22em] text-gray-500">
+                Saved Scenarios ({savedSandboxes.length})
+              </p>
               {savedSandboxes.length > 0 ? (
                 <div className="space-y-2">
                   {savedSandboxes.slice(0, 4).map((item) => (
@@ -588,7 +599,8 @@ export function SimulationControlsPanel({
                     >
                       <p className="text-xs font-bold text-gray-900 truncate">{item.name}</p>
                       <p className="mt-1 text-xs text-gray-500">
-                        {new Date(item.savedAt).toLocaleDateString('en-US')} at {new Date(item.savedAt).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}
+                        {new Date(item.savedAt).toLocaleDateString('en-US')} at{' '}
+                        {new Date(item.savedAt).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}
                       </p>
                     </button>
                   ))}

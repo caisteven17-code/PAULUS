@@ -22,28 +22,8 @@ import { AnalyticsController } from './controllers/analytics.controller';
       isGlobal: true,
     }),
   ],
-  controllers: [
-    AuthController,
-    EntityController,
-    FinancialController,
-    ProjectController,
-    AnalyticsController,
-  ],
-  providers: [
-    SupabaseService,
-    AppAuthService,
-    EntityService,
-    FinancialService,
-    ProjectService,
-    AnalyticsService,
-  ],
-  exports: [
-    SupabaseService,
-    AppAuthService,
-    EntityService,
-    FinancialService,
-    ProjectService,
-    AnalyticsService,
-  ],
+  controllers: [AuthController, EntityController, FinancialController, ProjectController, AnalyticsController],
+  providers: [SupabaseService, AppAuthService, EntityService, FinancialService, ProjectService, AnalyticsService],
+  exports: [SupabaseService, AppAuthService, EntityService, FinancialService, ProjectService, AnalyticsService],
 })
 export class AppModule {}

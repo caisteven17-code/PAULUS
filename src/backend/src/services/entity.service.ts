@@ -10,9 +10,9 @@ export class EntityService {
   constructor(private readonly supabaseService: SupabaseService) {}
 
   private tableFor(type: string | null): string | null {
-    if (type === 'parish')   return 'parishes';
+    if (type === 'parish') return 'parishes';
     if (type === 'seminary') return 'seminaries';
-    if (type === 'school')   return 'diocesan_schools';
+    if (type === 'school') return 'diocesan_schools';
     return null;
   }
 
@@ -30,8 +30,8 @@ export class EntityService {
 
   getAll(): { parishes: Parish[]; schools: DiocesanSchool[]; seminaries: Seminary[] } {
     return {
-      parishes:   this.getParishes(),
-      schools:    this.getSchools(),
+      parishes: this.getParishes(),
+      schools: this.getSchools(),
       seminaries: this.getSeminaries(),
     };
   }
@@ -45,16 +45,14 @@ export class EntityService {
 
       const { data, error } = await q;
       if (error || !data?.length) {
-        return type === 'parish'   ? this.getParishes()   :
-               type === 'seminary' ? this.getSeminaries() :
-                                     this.getSchools();
+        return type === 'parish' ? this.getParishes() : type === 'seminary' ? this.getSeminaries() : this.getSchools();
       }
       return data;
     }
 
     const [par, sem, sch] = await Promise.all([
-      this.supabaseService.supabaseServer.from('parishes')       .select('*').eq('status', 'active').order('name'),
-      this.supabaseService.supabaseServer.from('seminaries')     .select('*').eq('status', 'active').order('name'),
+      this.supabaseService.supabaseServer.from('parishes').select('*').eq('status', 'active').order('name'),
+      this.supabaseService.supabaseServer.from('seminaries').select('*').eq('status', 'active').order('name'),
       this.supabaseService.supabaseServer.from('diocesan_schools').select('*').eq('status', 'active').order('name'),
     ]);
 
@@ -63,9 +61,9 @@ export class EntityService {
     }
 
     return {
-      parishes:   par.data ?? [],
+      parishes: par.data ?? [],
       seminaries: sem.data ?? [],
-      schools:    sch.data ?? [],
+      schools: sch.data ?? [],
     };
   }
 

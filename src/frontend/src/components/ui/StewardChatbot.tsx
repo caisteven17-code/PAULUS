@@ -3,7 +3,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { MessageSquare, X, Send, Bot, User, Sparkles, Loader2, ChevronRight } from 'lucide-react';
-import { GoogleGenAI } from "@google/genai";
+import { GoogleGenAI } from '@google/genai';
 import { dataService } from '../../services/dataService';
 import { FinancialRecord } from '../../types';
 
@@ -24,14 +24,15 @@ export const StewardChatbot: React.FC<StewardChatbotProps> = ({ currentEntityId 
     {
       id: '1',
       role: 'assistant',
-      content: 'Greetings, Bishop. I am Steward, your AI financial assistant. How may I assist you with the diocese\'s financial health today?',
+      content:
+        "Greetings, Bishop. I am Steward, your AI financial assistant. How may I assist you with the diocese's financial health today?",
       timestamp: new Date(),
     },
   ]);
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
-  
+
   // Cache for scores and diagnostics to avoid redundant expensive calls
   const scoresCache = useRef<Record<string, any>>({});
   const diagnosticCache = useRef<Record<string, any>>({});
@@ -54,7 +55,7 @@ export const StewardChatbot: React.FC<StewardChatbotProps> = ({ currentEntityId 
       timestamp: new Date(),
     };
 
-    setMessages(prev => [...prev, userMessage]);
+    setMessages((prev) => [...prev, userMessage]);
     setInput('');
     setIsLoading(true);
 
@@ -66,14 +67,14 @@ export const StewardChatbot: React.FC<StewardChatbotProps> = ({ currentEntityId 
       content: '',
       timestamp: new Date(),
     };
-    setMessages(prev => [...prev, assistantMessage]);
+    setMessages((prev) => [...prev, assistantMessage]);
 
     try {
       // Fetch all records to calculate real health scores
       const allRecords = await dataService.getAllRecords();
-      
+
       // Get unique entities (filter out any undefined entityIds)
-      const entities = Array.from(new Set(allRecords.map(r => r.entityId).filter((id): id is string => id != null)));
+      const entities = Array.from(new Set(allRecords.map((r) => r.entityId).filter((id): id is string => id != null)));
 
       interface ScoreData {
         id: string;
@@ -90,11 +91,11 @@ export const StewardChatbot: React.FC<StewardChatbotProps> = ({ currentEntityId 
           // Check cache first
           if (scoresCache.current[id]) return scoresCache.current[id] as ScoreData;
 
-          const record = allRecords.find(r => r.entityId === id);
+          const record = allRecords.find((r) => r.entityId === id);
           const score = await dataService.calculateHealthScore(
             id,
             (record?.entityType as any) || 'parish',
-            record?.entityClass
+            record?.entityClass,
           );
 
           const scoreData: ScoreData = {
@@ -103,13 +104,13 @@ export const StewardChatbot: React.FC<StewardChatbotProps> = ({ currentEntityId 
             class: score.entityClass,
             analysis: score.analysis ?? '',
             recommendations: score.recommendations?.join('; '),
-            dimensions: JSON.stringify(score.dimensions)
+            dimensions: JSON.stringify(score.dimensions),
           };
 
           // Update cache
           scoresCache.current[id] = scoreData;
           return scoreData;
-        })
+        }),
       );
 
       // Fetch diagnostic for current entity (with caching)
@@ -118,7 +119,7 @@ export const StewardChatbot: React.FC<StewardChatbotProps> = ({ currentEntityId 
         if (diagnosticCache.current[currentEntityId]) {
           currentDiagnostic = diagnosticCache.current[currentEntityId];
         } else {
-          const entityRecords = allRecords.filter(r => r.entityId === currentEntityId);
+          const entityRecords = allRecords.filter((r) => r.entityId === currentEntityId);
           const latestMonth = entityRecords.length > 0 ? entityRecords[entityRecords.length - 1].month : 'Jan';
           const diag = await dataService.getDiagnostic(currentEntityId, latestMonth);
           currentDiagnostic = diag.analysis || '';
@@ -133,23 +134,28 @@ export const StewardChatbot: React.FC<StewardChatbotProps> = ({ currentEntityId 
       }
 
       const scoreSummary = scores
-        .map(s => `ENTITY: ${s.id}\nCLASS: ${s.class || 'Unknown'}\nSCORE: ${s.score}/100\nANALYSIS: ${s.analysis}\nRECOMMENDATIONS: ${s.recommendations}\nDIMENSIONS: ${s.dimensions}`)
+        .map(
+          (s) =>
+            `ENTITY: ${s.id}\nCLASS: ${s.class || 'Unknown'}\nSCORE: ${s.score}/100\nANALYSIS: ${s.analysis}\nRECOMMENDATIONS: ${s.recommendations}\nDIMENSIONS: ${s.dimensions}`,
+        )
         .join('\n---\n');
 
       const ai = new GoogleGenAI({ apiKey });
-      
+
       // Filter history to ensure it starts with a user message
       const history = messages.concat(userMessage);
-      const firstUserIndex = history.findIndex(m => m.role === 'user');
+      const firstUserIndex = history.findIndex((m) => m.role === 'user');
       const validHistory = firstUserIndex !== -1 ? history.slice(firstUserIndex) : [userMessage];
 
-      const currentContext = currentEntityId ? `The user is currently viewing data for: ${currentEntityId}. Prioritize information about this entity. Its AI Diagnostic is: "${currentDiagnostic}".` : '';
+      const currentContext = currentEntityId
+        ? `The user is currently viewing data for: ${currentEntityId}. Prioritize information about this entity. Its AI Diagnostic is: "${currentDiagnostic}".`
+        : '';
 
       const stream = await ai.models.generateContentStream({
-        model: "gemini-3-flash-preview",
-        contents: validHistory.map(m => ({
+        model: 'gemini-3-flash-preview',
+        contents: validHistory.map((m) => ({
           role: m.role === 'assistant' ? 'model' : 'user',
-          parts: [{ text: m.content }]
+          parts: [{ text: m.content }],
         })),
         config: {
           systemInstruction: `You are "Steward", a wise, compassionate, and helpful AI financial assistant for a Catholic Diocese. 
@@ -171,7 +177,7 @@ export const StewardChatbot: React.FC<StewardChatbotProps> = ({ currentEntityId 
           If a parish is not in the list, state that you don't have its specific data yet.
           
           Always prioritize the mission of the Church while ensuring financial stewardship.`,
-        }
+        },
       });
 
       let fullText = '';
@@ -182,9 +188,9 @@ export const StewardChatbot: React.FC<StewardChatbotProps> = ({ currentEntityId 
         if (chunkText) {
           fullText += chunkText;
           hasContent = true;
-          setMessages(prev => prev.map(msg => 
-            msg.id === assistantMessageId ? { ...msg, content: fullText } : msg
-          ));
+          setMessages((prev) =>
+            prev.map((msg) => (msg.id === assistantMessageId ? { ...msg, content: fullText } : msg)),
+          );
         }
       }
 
@@ -194,21 +200,26 @@ export const StewardChatbot: React.FC<StewardChatbotProps> = ({ currentEntityId 
     } catch (error) {
       console.error('Chat error:', error);
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-      setMessages(prev => prev.map(msg => 
-        msg.id === assistantMessageId 
-          ? { ...msg, content: `I apologize, Father. I encountered an error while trying to process your request. (${errorMessage}). Please try again later.` } 
-          : msg
-      ));
+      setMessages((prev) =>
+        prev.map((msg) =>
+          msg.id === assistantMessageId
+            ? {
+                ...msg,
+                content: `I apologize, Father. I encountered an error while trying to process your request. (${errorMessage}). Please try again later.`,
+              }
+            : msg,
+        ),
+      );
     } finally {
       setIsLoading(false);
     }
   };
 
   const suggestedPrompts = [
-    "How is San Roque Parish doing?",
-    "Why did collections drop last month?",
-    "Show me struggling parishes",
-    "What are your recommendations for the Eastern Vicariate?",
+    'How is San Roque Parish doing?',
+    'Why did collections drop last month?',
+    'Show me struggling parishes',
+    'What are your recommendations for the Eastern Vicariate?',
   ];
 
   return (
@@ -255,13 +266,17 @@ export const StewardChatbot: React.FC<StewardChatbotProps> = ({ currentEntityId 
             <div className="flex-1 overflow-y-auto p-4 space-y-4 scrollbar-thin">
               {messages.map((m) => (
                 <div key={m.id} className={`flex ${m.role === 'assistant' ? 'justify-start' : 'justify-end'}`}>
-                  <div className={`max-w-[80%] p-3 rounded-2xl ${
-                    m.role === 'assistant' 
-                      ? 'bg-gray-100 text-gray-800 rounded-tl-none' 
-                      : 'bg-church-green text-white rounded-tr-none'
-                  }`}>
+                  <div
+                    className={`max-w-[80%] p-3 rounded-2xl ${
+                      m.role === 'assistant'
+                        ? 'bg-gray-100 text-gray-800 rounded-tl-none'
+                        : 'bg-church-green text-white rounded-tr-none'
+                    }`}
+                  >
                     <p className="text-sm leading-relaxed">{m.content}</p>
-                    <p className={`text-[10px] mt-1 opacity-50 ${m.role === 'assistant' ? 'text-gray-500' : 'text-white'}`}>
+                    <p
+                      className={`text-[10px] mt-1 opacity-50 ${m.role === 'assistant' ? 'text-gray-500' : 'text-white'}`}
+                    >
                       {m.timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                     </p>
                   </div>

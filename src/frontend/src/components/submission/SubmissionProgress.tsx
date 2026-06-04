@@ -15,7 +15,7 @@ function getStepState(
   step: SubmissionStep,
   steps: SubmissionStep[],
   currentStepId: SubmissionStepId | null,
-  flowState: SubmissionFlowState
+  flowState: SubmissionFlowState,
 ) {
   if (!currentStepId || flowState === 'idle') return 'pending';
 
@@ -34,20 +34,12 @@ function getStepState(
   return 'pending';
 }
 
-export function SubmissionProgress({
-  steps,
-  currentStepId,
-  flowState,
-}: SubmissionProgressProps) {
+export function SubmissionProgress({ steps, currentStepId, flowState }: SubmissionProgressProps) {
   return (
     <Card className="space-y-4">
       <CardHeader className="mb-0">
-        <CardTitle className="text-sm md:text-base text-church-black tracking-[0.18em]">
-          Submission Progress
-        </CardTitle>
-        <p className="text-sm text-gray-500">
-          Track the current simulated submission step.
-        </p>
+        <CardTitle className="text-sm md:text-base text-church-black tracking-[0.18em]">Submission Progress</CardTitle>
+        <p className="text-sm text-gray-500">Track the current simulated submission step.</p>
       </CardHeader>
 
       <CardContent className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-3">
@@ -61,10 +53,10 @@ export function SubmissionProgress({
                 state === 'complete'
                   ? 'border-emerald-200 bg-emerald-50'
                   : state === 'active'
-                  ? 'border-gold-300 bg-gold-50'
-                  : state === 'warning'
-                  ? 'border-amber-200 bg-amber-50'
-                  : 'border-gray-200 bg-white'
+                    ? 'border-gold-300 bg-gold-50'
+                    : state === 'warning'
+                      ? 'border-amber-200 bg-amber-50'
+                      : 'border-gray-200 bg-white'
               }`}
             >
               <div className="flex items-start gap-3">

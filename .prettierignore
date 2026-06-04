@@ -1,0 +1,8 @@
+node_modules
+dist
+.next
+.next-build
+coverage
+*.min.js
+package-lock.json
+src/frontend/src/data/parishes-geocoded.json

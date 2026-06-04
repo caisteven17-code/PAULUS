@@ -82,7 +82,7 @@ export class FinancialGatewayController {
       baseUrl: SERVICE_URLS.financial,
       path: `/financial/templates${suffix}`,
     });
-    
+
     result.headers.forEach((value, key) => {
       if (key.toLowerCase() !== 'content-length') {
         response.setHeader(key, value);

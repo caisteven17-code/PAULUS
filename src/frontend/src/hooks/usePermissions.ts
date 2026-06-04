@@ -48,13 +48,41 @@ export function usePermissions() {
     const hasDioceseAccess = normalizedRole === 'bishop' || normalizedRole === 'admin';
     return {
       view_diocese: hasDioceseAccess,
-      view_parish: hasDioceseAccess || normalizedRole === 'priest' || normalizedRole === 'parish_priest' || normalizedRole === 'parish_secretary',
-      view_seminary: hasDioceseAccess || normalizedRole === 'seminary' || normalizedRole === 'seminary_rector' || normalizedRole === 'seminary_oeconomus',
-      view_school: hasDioceseAccess || normalizedRole === 'school' || normalizedRole === 'school_superintendent' || normalizedRole === 'finance_supervisor' || normalizedRole === 'finance_officer' || normalizedRole === 'school_principal',
+      view_parish:
+        hasDioceseAccess ||
+        normalizedRole === 'priest' ||
+        normalizedRole === 'parish_priest' ||
+        normalizedRole === 'parish_secretary',
+      view_seminary:
+        hasDioceseAccess ||
+        normalizedRole === 'seminary' ||
+        normalizedRole === 'seminary_rector' ||
+        normalizedRole === 'seminary_oeconomus',
+      view_school:
+        hasDioceseAccess ||
+        normalizedRole === 'school' ||
+        normalizedRole === 'school_superintendent' ||
+        normalizedRole === 'finance_supervisor' ||
+        normalizedRole === 'finance_officer' ||
+        normalizedRole === 'school_principal',
       view_projects: hasDioceseAccess,
-      view_parish_dashboard: hasDioceseAccess || normalizedRole === 'priest' || normalizedRole === 'parish_priest' || normalizedRole === 'parish_secretary',
-      view_seminary_dashboard: hasDioceseAccess || normalizedRole === 'seminary' || normalizedRole === 'seminary_rector' || normalizedRole === 'seminary_oeconomus',
-      view_school_dashboard: hasDioceseAccess || normalizedRole === 'school' || normalizedRole === 'school_superintendent' || normalizedRole === 'finance_supervisor' || normalizedRole === 'finance_officer' || normalizedRole === 'school_principal',
+      view_parish_dashboard:
+        hasDioceseAccess ||
+        normalizedRole === 'priest' ||
+        normalizedRole === 'parish_priest' ||
+        normalizedRole === 'parish_secretary',
+      view_seminary_dashboard:
+        hasDioceseAccess ||
+        normalizedRole === 'seminary' ||
+        normalizedRole === 'seminary_rector' ||
+        normalizedRole === 'seminary_oeconomus',
+      view_school_dashboard:
+        hasDioceseAccess ||
+        normalizedRole === 'school' ||
+        normalizedRole === 'school_superintendent' ||
+        normalizedRole === 'finance_supervisor' ||
+        normalizedRole === 'finance_officer' ||
+        normalizedRole === 'school_principal',
     };
   }, [customRoles, user]);
 

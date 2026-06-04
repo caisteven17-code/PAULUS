@@ -14,70 +14,70 @@ const MUNICIPALITY_TO_VICARIATE: Record<string, string> = {
   'San Pedro': 'Vicariate of San Pedro Apostol',
   'City of San Pedro': 'Vicariate of San Pedro Apostol',
   'San Pedro City': 'Vicariate of San Pedro Apostol',
-  
+
   // 2. Vicariate of San Isidro Labrador
-  'Biñan': 'Vicariate of San Isidro Labrador',
+  Biñan: 'Vicariate of San Isidro Labrador',
   'City of Biñan': 'Vicariate of San Isidro Labrador',
   'Biñan City': 'Vicariate of San Isidro Labrador',
-  
+
   // 3. Vicariate of Holy Family
   // Overlaps with San Pedro/Biñan, mapping to San Pedro for now
-  
+
   // 4. Vicariate of Sta. Rosa De Lima
   'Santa Rosa': 'Vicariate of Sta. Rosa De Lima',
   'City of Santa Rosa': 'Vicariate of Sta. Rosa De Lima',
   'Santa Rosa City': 'Vicariate of Sta. Rosa De Lima',
-  
+
   // 5. Vicariate of St. Polycarp
-  'Cabuyao': 'Vicariate of St. Polycarp',
+  Cabuyao: 'Vicariate of St. Polycarp',
   'City of Cabuyao': 'Vicariate of St. Polycarp',
   'Cabuyao City': 'Vicariate of St. Polycarp',
-  
+
   // 6. Vicariate of St. John the Baptist
-  'Calamba': 'Vicariate of St. John the Baptist',
+  Calamba: 'Vicariate of St. John the Baptist',
   'City of Calamba': 'Vicariate of St. John the Baptist',
   'Calamba City': 'Vicariate of St. John the Baptist',
-  
+
   // 7. Vicariate of Immaculate Conception
-  'Bay': 'Vicariate of Immaculate Conception',
+  Bay: 'Vicariate of Immaculate Conception',
   'Los Baños': 'Vicariate of Immaculate Conception',
   'Santa Cruz': 'Vicariate of Immaculate Conception',
-  
+
   // 8. Vicariate of St. Paul the First Hermit
   'San Pablo': 'Vicariate of St. Paul the First Hermit',
   'San Pablo City': 'Vicariate of St. Paul the First Hermit',
   'City of San Pablo': 'Vicariate of St. Paul the First Hermit',
-  'Alaminos': 'Vicariate of St. Paul the First Hermit',
-  'Rizal': 'Vicariate of St. Paul the First Hermit',
-  'Calauan': 'Vicariate of St. Paul the First Hermit',
-  
+  Alaminos: 'Vicariate of St. Paul the First Hermit',
+  Rizal: 'Vicariate of St. Paul the First Hermit',
+  Calauan: 'Vicariate of St. Paul the First Hermit',
+
   // 9. Vicariate of San Bartolome
-  'Nagcarlan': 'Vicariate of San Bartolome',
-  'Liliw': 'Vicariate of San Bartolome',
-  'Majayjay': 'Vicariate of San Bartolome',
-  'Magdalena': 'Vicariate of San Bartolome',
-  'Luisiana': 'Vicariate of San Bartolome',
-  'Cavinti': 'Vicariate of San Bartolome',
-  
+  Nagcarlan: 'Vicariate of San Bartolome',
+  Liliw: 'Vicariate of San Bartolome',
+  Majayjay: 'Vicariate of San Bartolome',
+  Magdalena: 'Vicariate of San Bartolome',
+  Luisiana: 'Vicariate of San Bartolome',
+  Cavinti: 'Vicariate of San Bartolome',
+
   // 10. Vicariate of San Antonio De Padua
-  'Pila': 'Vicariate of San Antonio De Padua',
-  'Victoria': 'Vicariate of San Antonio De Padua',
-  
+  Pila: 'Vicariate of San Antonio De Padua',
+  Victoria: 'Vicariate of San Antonio De Padua',
+
   // 11. Vicariate of Our Lady of Guadalupe
-  'Pagsanjan': 'Vicariate of Our Lady of Guadalupe',
-  'Lumban': 'Vicariate of Our Lady of Guadalupe',
-  'Kalayaan': 'Vicariate of Our Lady of Guadalupe',
-  'Paete': 'Vicariate of Our Lady of Guadalupe',
-  
+  Pagsanjan: 'Vicariate of Our Lady of Guadalupe',
+  Lumban: 'Vicariate of Our Lady of Guadalupe',
+  Kalayaan: 'Vicariate of Our Lady of Guadalupe',
+  Paete: 'Vicariate of Our Lady of Guadalupe',
+
   // 12. Vicariate of St. James
-  'Pakil': 'Vicariate of St. James',
-  'Pangil': 'Vicariate of St. James',
-  
+  Pakil: 'Vicariate of St. James',
+  Pangil: 'Vicariate of St. James',
+
   // 13. Vicariate of Sts. Peter and Paul
-  'Siniloan': 'Vicariate of Sts. Peter and Paul',
-  'Famy': 'Vicariate of Sts. Peter and Paul',
-  'Mabitac': 'Vicariate of Sts. Peter and Paul',
-  'Santa Maria': 'Vicariate of Sts. Peter and Paul'
+  Siniloan: 'Vicariate of Sts. Peter and Paul',
+  Famy: 'Vicariate of Sts. Peter and Paul',
+  Mabitac: 'Vicariate of Sts. Peter and Paul',
+  'Santa Maria': 'Vicariate of Sts. Peter and Paul',
 };
 
 // --- COLOR SCALE ---
@@ -88,7 +88,7 @@ const COLOR_SCALE = [
   'rgb(95,175,133)',
   'rgb(52,149,103)',
   'rgb(22,117,75)',
-  'rgb(10,76,42)'     // Darkest
+  'rgb(10,76,42)', // Darkest
 ];
 
 // Helper to format currency
@@ -99,14 +99,14 @@ const formatCurrency = (value: number) => {
     minimumFractionDigits: 0,
     maximumFractionDigits: 1,
     notation: 'compact',
-    compactDisplay: 'short'
+    compactDisplay: 'short',
   }).format(value);
 };
 
 // --- COMPONENT ---
 
 // Component to handle map zooming from outside
-function MapController({ bounds, center }: { bounds: any, center: any }) {
+function MapController({ bounds, center }: { bounds: any; center: any }) {
   const map = useMap();
   useEffect(() => {
     if (bounds) {
@@ -132,15 +132,15 @@ export const GeospatialHeatMap = React.memo(function GeospatialHeatMapComponent(
 
   // Calculate dynamic vicariate data based on provided data or parishesData
   const dynamicVicariateData = useMemo(() => {
-    const totals: Record<string, { collections: number, parishes: number }> = {};
-    const sourceData = (data && data.length > 0) ? data : parishesData;
-    
-    sourceData.forEach(p => {
+    const totals: Record<string, { collections: number; parishes: number }> = {};
+    const sourceData = data && data.length > 0 ? data : parishesData;
+
+    sourceData.forEach((p) => {
       if (!p.vicariate) return;
       if (!totals[p.vicariate]) {
         totals[p.vicariate] = { collections: 0, parishes: 0 };
       }
-      totals[p.vicariate].collections += (p.collections || 0);
+      totals[p.vicariate].collections += p.collections || 0;
       totals[p.vicariate].parishes += 1;
     });
     return totals;
@@ -151,44 +151,60 @@ export const GeospatialHeatMap = React.memo(function GeospatialHeatMapComponent(
     const fetchGeoJson = async () => {
       try {
         setLoading(true);
-        const response = await fetch('https://raw.githubusercontent.com/faeldon/philippines-json-maps/master/2019/geojson/municties/medres/municities-province-ph043400000.0.01.json');
+        const response = await fetch(
+          'https://raw.githubusercontent.com/faeldon/philippines-json-maps/master/2019/geojson/municties/medres/municities-province-ph043400000.0.01.json',
+        );
         if (!response.ok) throw new Error('Failed to load map data');
         const data = await response.json();
-        
+
         // Filter out features with null geometry just in case
         if (data && data.features) {
           data.features = data.features.filter((f: any) => f.geometry !== null);
         }
-        
+
         setGeoJsonData(data);
-        
+
         // Generate a single province polygon for clipping
         let provincePolygon: any = null;
         try {
           // @ts-ignore - turf.union signature changed in v7
           provincePolygon = turf.union(turf.featureCollection(data.features));
         } catch (e) {
-          console.error("Error generating province polygon:", e);
+          console.error('Error generating province polygon:', e);
         }
-        
+
         // Generate Vicariate polygons by unioning municipalities
         try {
           const vicariateGroups: Record<string, any[]> = {};
           data.features.forEach((muni: any) => {
             const muniName = muni.properties.ADM3_EN;
-            const normalizedName = muniName === 'City of San Pablo' ? 'San Pablo' : 
-                                   muniName === 'City of Calamba' ? 'Calamba' :
-                                   muniName === 'City of Biñan' ? 'Biñan' :
-                                   muniName === 'City of Cabuyao' ? 'Cabuyao' :
-                                   muniName === 'City of San Pedro' ? 'San Pedro' :
-                                   muniName === 'City of Santa Rosa' ? 'Santa Rosa' :
-                                   muniName === 'San Pablo City' ? 'San Pablo' :
-                                   muniName === 'Calamba City' ? 'Calamba' :
-                                   muniName === 'Biñan City' ? 'Biñan' :
-                                   muniName === 'Cabuyao City' ? 'Cabuyao' :
-                                   muniName === 'San Pedro City' ? 'San Pedro' :
-                                   muniName === 'Santa Rosa City' ? 'Santa Rosa' : muniName;
-            
+            const normalizedName =
+              muniName === 'City of San Pablo'
+                ? 'San Pablo'
+                : muniName === 'City of Calamba'
+                  ? 'Calamba'
+                  : muniName === 'City of Biñan'
+                    ? 'Biñan'
+                    : muniName === 'City of Cabuyao'
+                      ? 'Cabuyao'
+                      : muniName === 'City of San Pedro'
+                        ? 'San Pedro'
+                        : muniName === 'City of Santa Rosa'
+                          ? 'Santa Rosa'
+                          : muniName === 'San Pablo City'
+                            ? 'San Pablo'
+                            : muniName === 'Calamba City'
+                              ? 'Calamba'
+                              : muniName === 'Biñan City'
+                                ? 'Biñan'
+                                : muniName === 'Cabuyao City'
+                                  ? 'Cabuyao'
+                                  : muniName === 'San Pedro City'
+                                    ? 'San Pedro'
+                                    : muniName === 'Santa Rosa City'
+                                      ? 'Santa Rosa'
+                                      : muniName;
+
             const vicariate = MUNICIPALITY_TO_VICARIATE[normalizedName] || MUNICIPALITY_TO_VICARIATE[muniName];
             if (vicariate) {
               if (!vicariateGroups[vicariate]) vicariateGroups[vicariate] = [];
@@ -196,29 +212,31 @@ export const GeospatialHeatMap = React.memo(function GeospatialHeatMapComponent(
             }
           });
 
-          const vicariateFeatures = Object.entries(vicariateGroups).map(([name, features]) => {
-            if (features.length === 1) {
-              const feat = JSON.parse(JSON.stringify(features[0]));
-              feat.properties = { name, isVicariate: true };
-              return feat;
-            }
-            // @ts-ignore - turf.union signature changed in v7
-            const union = turf.union(turf.featureCollection(features));
-            if (union) {
-              union.properties = { name, isVicariate: true };
-              return union;
-            }
-            return null;
-          }).filter(f => f !== null);
+          const vicariateFeatures = Object.entries(vicariateGroups)
+            .map(([name, features]) => {
+              if (features.length === 1) {
+                const feat = JSON.parse(JSON.stringify(features[0]));
+                feat.properties = { name, isVicariate: true };
+                return feat;
+              }
+              // @ts-ignore - turf.union signature changed in v7
+              const union = turf.union(turf.featureCollection(features));
+              if (union) {
+                union.properties = { name, isVicariate: true };
+                return union;
+              }
+              return null;
+            })
+            .filter((f) => f !== null);
 
           setVicariateGeoJsonData(turf.featureCollection(vicariateFeatures));
         } catch (e) {
-          console.error("Error generating vicariate polygons:", e);
+          console.error('Error generating vicariate polygons:', e);
         }
-        
+
         // Generate Voronoi polygons for parishes
         try {
-          const sourceData = (data && data.length > 0) ? data : parishesData;
+          const sourceData = data && data.length > 0 ? data : parishesData;
           // 1. Create points for parishes
           const fallbackParishes = sourceData.filter((p: any) => p.lat === 14.1686 && p.lng === 121.3253);
           const fallbackCount = fallbackParishes.length;
@@ -229,7 +247,7 @@ export const GeospatialHeatMap = React.memo(function GeospatialHeatMapComponent(
             const isFallback = p.lat === 14.1686 && p.lng === 121.3253;
             let offsetLat = 0;
             let offsetLng = 0;
-            
+
             if (isFallback) {
               const angle = (fallbackIndex / fallbackCount) * 2 * Math.PI;
               // Use a slightly larger radius (0.08 degrees ~ 8.8km) to give them more space
@@ -241,11 +259,11 @@ export const GeospatialHeatMap = React.memo(function GeospatialHeatMapComponent(
               offsetLat = (Math.random() - 0.5) * 0.001;
               offsetLng = (Math.random() - 0.5) * 0.001;
             }
-            
+
             return turf.point([p.lng + offsetLng, p.lat + offsetLat], {
               ...p,
               id: p.name,
-              isParish: true
+              isParish: true,
             });
           });
 
@@ -259,11 +277,11 @@ export const GeospatialHeatMap = React.memo(function GeospatialHeatMapComponent(
 
           // 4. Clip each Voronoi polygon to the province boundary
           const clippedFeatures: any[] = [];
-          
+
           if (provincePolygon) {
             turf.featureEach(voronoiPolygons, (voronoiPoly, featureIndex) => {
               if (!voronoiPoly) return;
-              
+
               try {
                 // Intersect with the single province polygon
                 const intersection = turf.intersect(turf.featureCollection([voronoiPoly, provincePolygon]));
@@ -285,11 +303,11 @@ export const GeospatialHeatMap = React.memo(function GeospatialHeatMapComponent(
             setParishGeoJsonData(turf.featureCollection(clippedFeatures));
           }
         } catch (e) {
-          console.error("Error generating parish polygons:", e);
+          console.error('Error generating parish polygons:', e);
         }
       } catch (err) {
-        console.error("Error loading GeoJSON:", err);
-        setError("Failed to load map boundaries.");
+        console.error('Error loading GeoJSON:', err);
+        setError('Failed to load map boundaries.');
       } finally {
         setLoading(false);
       }
@@ -300,7 +318,7 @@ export const GeospatialHeatMap = React.memo(function GeospatialHeatMapComponent(
 
   // Calculate total diocese collections
   const totalDioceseCollections = useMemo(() => {
-    const sourceData = (data && data.length > 0) ? data : parishesData;
+    const sourceData = data && data.length > 0 ? data : parishesData;
     const total = sourceData.reduce((sum, p) => sum + (p.collections || 0), 0);
     return total > 0 ? total : 1; // Guard against division by zero
   }, [data]);
@@ -308,19 +326,16 @@ export const GeospatialHeatMap = React.memo(function GeospatialHeatMapComponent(
   // Get color based on value and max value
   const getColor = (value: number, max: number) => {
     if (!value || !max) return '#f3f4f6'; // Gray for no data
-    const index = Math.min(
-      Math.floor((value / max) * COLOR_SCALE.length),
-      COLOR_SCALE.length - 1
-    );
+    const index = Math.min(Math.floor((value / max) * COLOR_SCALE.length), COLOR_SCALE.length - 1);
     return COLOR_SCALE[index];
   };
 
   // Prepare data for the sidebar list
   const listData = useMemo(() => {
-    const sourceData = (data && data.length > 0) ? data : parishesData;
-    
+    const sourceData = data && data.length > 0 ? data : parishesData;
+
     if (viewMode === 'vicariate') {
-      const maxVal = Math.max(...Object.values(dynamicVicariateData).map(v => v.collections), 0);
+      const maxVal = Math.max(...Object.values(dynamicVicariateData).map((v) => v.collections), 0);
       return Object.entries(dynamicVicariateData)
         .map(([name, data]) => ({
           id: name,
@@ -328,11 +343,11 @@ export const GeospatialHeatMap = React.memo(function GeospatialHeatMapComponent(
           value: data.collections,
           percentage: (data.collections / totalDioceseCollections) * 100,
           color: getColor(data.collections, maxVal),
-          parishes: data.parishes
+          parishes: data.parishes,
         }))
         .sort((a, b) => b.value - a.value);
     } else {
-      const maxVal = Math.max(...sourceData.map(p => p.collections || 0), 0);
+      const maxVal = Math.max(...sourceData.map((p) => p.collections || 0), 0);
       return sourceData
         .map((p) => ({
           id: p.name,
@@ -342,7 +357,7 @@ export const GeospatialHeatMap = React.memo(function GeospatialHeatMapComponent(
           percentage: ((p.collections || 0) / totalDioceseCollections) * 100,
           color: getColor(p.collections || 0, maxVal),
           lat: p.lat,
-          lng: p.lng
+          lng: p.lng,
         }))
         .sort((a, b) => b.value - a.value);
     }
@@ -357,43 +372,57 @@ export const GeospatialHeatMap = React.memo(function GeospatialHeatMapComponent(
     if (feature.properties.isParish) {
       const parishName = feature.properties.name;
       const collections = feature.properties.collections;
-      const sourceData = (data && data.length > 0) ? data : parishesData;
-      const maxVal = Math.max(...sourceData.map(p => p.collections || 0), 0);
-      
+      const sourceData = data && data.length > 0 ? data : parishesData;
+      const maxVal = Math.max(...sourceData.map((p) => p.collections || 0), 0);
+
       fillColor = getColor(collections, maxVal);
       isHovered = hoveredRegion === parishName;
       fillOpacity = isHovered ? 0.9 : 0.7;
     } else if (feature.properties.isVicariate) {
       const vicariateName = feature.properties.name;
       isHovered = hoveredRegion === vicariateName;
-      
+
       if (dynamicVicariateData[vicariateName]) {
-        const maxVal = Math.max(...Object.values(dynamicVicariateData).map(v => v.collections), 0);
+        const maxVal = Math.max(...Object.values(dynamicVicariateData).map((v) => v.collections), 0);
         fillColor = getColor(dynamicVicariateData[vicariateName].collections, maxVal);
       }
-      
+
       fillOpacity = isHovered ? 0.9 : 0.7;
     } else {
       const muniName = feature.properties.ADM3_EN;
       // Handle naming differences between GeoJSON and our mapping
-      const normalizedName = muniName === 'City of San Pablo' ? 'San Pablo' : 
-                             muniName === 'City of Calamba' ? 'Calamba' :
-                             muniName === 'City of Biñan' ? 'Biñan' :
-                             muniName === 'City of Cabuyao' ? 'Cabuyao' :
-                             muniName === 'City of San Pedro' ? 'San Pedro' :
-                             muniName === 'City of Santa Rosa' ? 'Santa Rosa' : 
-                             muniName === 'San Pablo City' ? 'San Pablo' :
-                             muniName === 'Calamba City' ? 'Calamba' :
-                             muniName === 'Biñan City' ? 'Biñan' :
-                             muniName === 'Cabuyao City' ? 'Cabuyao' :
-                             muniName === 'San Pedro City' ? 'San Pedro' :
-                             muniName === 'Santa Rosa City' ? 'Santa Rosa' : muniName;
+      const normalizedName =
+        muniName === 'City of San Pablo'
+          ? 'San Pablo'
+          : muniName === 'City of Calamba'
+            ? 'Calamba'
+            : muniName === 'City of Biñan'
+              ? 'Biñan'
+              : muniName === 'City of Cabuyao'
+                ? 'Cabuyao'
+                : muniName === 'City of San Pedro'
+                  ? 'San Pedro'
+                  : muniName === 'City of Santa Rosa'
+                    ? 'Santa Rosa'
+                    : muniName === 'San Pablo City'
+                      ? 'San Pablo'
+                      : muniName === 'Calamba City'
+                        ? 'Calamba'
+                        : muniName === 'Biñan City'
+                          ? 'Biñan'
+                          : muniName === 'Cabuyao City'
+                            ? 'Cabuyao'
+                            : muniName === 'San Pedro City'
+                              ? 'San Pedro'
+                              : muniName === 'Santa Rosa City'
+                                ? 'Santa Rosa'
+                                : muniName;
 
       const vicariate = MUNICIPALITY_TO_VICARIATE[normalizedName] || MUNICIPALITY_TO_VICARIATE[muniName];
       isHovered = hoveredRegion === (viewMode === 'vicariate' ? vicariate : normalizedName);
 
       if (viewMode === 'vicariate' && vicariate && dynamicVicariateData[vicariate]) {
-        const maxVal = Math.max(...Object.values(dynamicVicariateData).map(v => v.collections), 0);
+        const maxVal = Math.max(...Object.values(dynamicVicariateData).map((v) => v.collections), 0);
         fillColor = getColor(dynamicVicariateData[vicariate].collections, maxVal);
       } else if (viewMode === 'parish') {
         fillColor = '#e5e7eb'; // Neutral gray for municipality boundaries
@@ -407,10 +436,10 @@ export const GeospatialHeatMap = React.memo(function GeospatialHeatMapComponent(
 
     return {
       fillColor,
-      weight: isHovered ? 2.5 : (feature.properties.isParish ? 1 : (feature.properties.isVicariate ? 2 : 1.5)),
+      weight: isHovered ? 2.5 : feature.properties.isParish ? 1 : feature.properties.isVicariate ? 2 : 1.5,
       opacity: 1,
       color: 'white',
-      fillOpacity
+      fillOpacity,
     };
   };
 
@@ -471,22 +500,36 @@ export const GeospatialHeatMap = React.memo(function GeospatialHeatMapComponent(
     } else {
       // Municipality
       const muniName = feature.properties.ADM3_EN;
-      const normalizedName = muniName === 'City of San Pablo' ? 'San Pablo' : 
-                             muniName === 'City of Calamba' ? 'Calamba' :
-                             muniName === 'City of Biñan' ? 'Biñan' :
-                             muniName === 'City of Cabuyao' ? 'Cabuyao' :
-                             muniName === 'City of San Pedro' ? 'San Pedro' :
-                             muniName === 'City of Santa Rosa' ? 'Santa Rosa' :
-                             muniName === 'San Pablo City' ? 'San Pablo' :
-                             muniName === 'Calamba City' ? 'Calamba' :
-                             muniName === 'Biñan City' ? 'Biñan' :
-                             muniName === 'Cabuyao City' ? 'Cabuyao' :
-                             muniName === 'San Pedro City' ? 'San Pedro' :
-                             muniName === 'Santa Rosa City' ? 'Santa Rosa' : muniName;
-      
+      const normalizedName =
+        muniName === 'City of San Pablo'
+          ? 'San Pablo'
+          : muniName === 'City of Calamba'
+            ? 'Calamba'
+            : muniName === 'City of Biñan'
+              ? 'Biñan'
+              : muniName === 'City of Cabuyao'
+                ? 'Cabuyao'
+                : muniName === 'City of San Pedro'
+                  ? 'San Pedro'
+                  : muniName === 'City of Santa Rosa'
+                    ? 'Santa Rosa'
+                    : muniName === 'San Pablo City'
+                      ? 'San Pablo'
+                      : muniName === 'Calamba City'
+                        ? 'Calamba'
+                        : muniName === 'Biñan City'
+                          ? 'Biñan'
+                          : muniName === 'Cabuyao City'
+                            ? 'Cabuyao'
+                            : muniName === 'San Pedro City'
+                              ? 'San Pedro'
+                              : muniName === 'Santa Rosa City'
+                                ? 'Santa Rosa'
+                                : muniName;
+
       name = normalizedName;
       const vicariate = MUNICIPALITY_TO_VICARIATE[normalizedName] || MUNICIPALITY_TO_VICARIATE[muniName] || 'Unknown';
-      
+
       if (viewMode === 'parish') {
         // Don't bind popups to municipalities in parish view
         return;
@@ -522,7 +565,7 @@ export const GeospatialHeatMap = React.memo(function GeospatialHeatMapComponent(
     layer.bindPopup(popupContent, {
       className: 'custom-popup',
       closeButton: false,
-      minWidth: 220
+      minWidth: 220,
     });
 
     layer.on({
@@ -538,7 +581,7 @@ export const GeospatialHeatMap = React.memo(function GeospatialHeatMapComponent(
       click: (e: any) => {
         const map = e.target._map;
         map.fitBounds(e.target.getBounds(), { padding: [50, 50], maxZoom: 13 });
-      }
+      },
     });
   };
 
@@ -548,7 +591,10 @@ export const GeospatialHeatMap = React.memo(function GeospatialHeatMapComponent(
       vicariateGeoJsonData.features.forEach((feat: any) => {
         if (feat.properties.name === id) {
           const bbox = turf.bbox(feat);
-          const bounds: any = [[bbox[1], bbox[0]], [bbox[3], bbox[2]]];
+          const bounds: any = [
+            [bbox[1], bbox[0]],
+            [bbox[3], bbox[2]],
+          ];
           setSelectedBounds(bounds);
           setSelectedCenter(null);
         }
@@ -557,29 +603,29 @@ export const GeospatialHeatMap = React.memo(function GeospatialHeatMapComponent(
     }
 
     if (viewMode === 'parish') {
-      const sourceData = (data && data.length > 0) ? data : parishesData;
-      const parishIndex = sourceData.findIndex(p => p.name === id);
+      const sourceData = data && data.length > 0 ? data : parishesData;
+      const parishIndex = sourceData.findIndex((p) => p.name === id);
       const parish = sourceData[parishIndex];
-      
+
       if (parish) {
         const isFallback = parish.lat === 14.1686 && parish.lng === 121.3253;
         let offsetLat = 0;
         let offsetLng = 0;
-        
+
         if (isFallback) {
           // Recalculate the offset angle for this specific fallback point
           const fallbackParishes = sourceData.filter((p: any) => p.lat === 14.1686 && p.lng === 121.3253);
           const fallbackCount = fallbackParishes.length;
           // Find the index of this parish among the fallback parishes
-          const fallbackIndex = fallbackParishes.findIndex(p => p.name === id);
-          
+          const fallbackIndex = fallbackParishes.findIndex((p) => p.name === id);
+
           if (fallbackIndex !== -1) {
             const angle = (fallbackIndex / fallbackCount) * 2 * Math.PI;
             offsetLat = Math.sin(angle) * 0.08;
             offsetLng = Math.cos(angle) * 0.08;
           }
         }
-        
+
         setSelectedCenter([parish.lat + offsetLat, parish.lng + offsetLng]);
         setSelectedBounds(null);
       }
@@ -587,20 +633,28 @@ export const GeospatialHeatMap = React.memo(function GeospatialHeatMapComponent(
     }
 
     if (!geoJsonLayerRef.current) return;
-    
-	    let boundsToZoom: any = null;
-    
+
+    let boundsToZoom: any = null;
+
     geoJsonLayerRef.current.eachLayer((layer: any) => {
       const muniName = layer.feature.properties.ADM3_EN;
-      const normalizedName = muniName === 'City of San Pablo' ? 'San Pablo' : 
-                             muniName === 'City of Calamba' ? 'Calamba' :
-                             muniName === 'City of Biñan' ? 'Biñan' :
-                             muniName === 'City of Cabuyao' ? 'Cabuyao' :
-                             muniName === 'City of San Pedro' ? 'San Pedro' :
-                             muniName === 'City of Santa Rosa' ? 'Santa Rosa' : muniName;
-      
+      const normalizedName =
+        muniName === 'City of San Pablo'
+          ? 'San Pablo'
+          : muniName === 'City of Calamba'
+            ? 'Calamba'
+            : muniName === 'City of Biñan'
+              ? 'Biñan'
+              : muniName === 'City of Cabuyao'
+                ? 'Cabuyao'
+                : muniName === 'City of San Pedro'
+                  ? 'San Pedro'
+                  : muniName === 'City of Santa Rosa'
+                    ? 'Santa Rosa'
+                    : muniName;
+
       const vicariate = MUNICIPALITY_TO_VICARIATE[normalizedName];
-      
+
       if (viewMode === 'vicariate' && vicariate === id) {
         if (!boundsToZoom) {
           boundsToZoom = layer.getBounds();
@@ -640,7 +694,6 @@ export const GeospatialHeatMap = React.memo(function GeospatialHeatMapComponent(
 
   return (
     <div className="flex flex-col h-full w-full bg-white rounded-xl border border-gray-200 overflow-hidden shadow-sm">
-      
       {/* TOOLBAR */}
       <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100 bg-white z-10">
         <div>
@@ -650,14 +703,12 @@ export const GeospatialHeatMap = React.memo(function GeospatialHeatMapComponent(
           </h2>
           <p className="text-sm text-gray-500 font-medium ml-7">Laguna Province</p>
         </div>
-        
+
         <div className="flex bg-gray-100 p-1 rounded-lg">
           <button
             onClick={() => setViewMode('vicariate')}
             className={`px-4 py-1.5 text-sm font-bold rounded-md transition-all ${
-              viewMode === 'vicariate' 
-                ? 'bg-white text-church-green shadow-sm' 
-                : 'text-gray-500 hover:text-gray-700'
+              viewMode === 'vicariate' ? 'bg-white text-church-green shadow-sm' : 'text-gray-500 hover:text-gray-700'
             }`}
           >
             Vicariate View
@@ -665,9 +716,7 @@ export const GeospatialHeatMap = React.memo(function GeospatialHeatMapComponent(
           <button
             onClick={() => setViewMode('parish')}
             className={`px-4 py-1.5 text-sm font-bold rounded-md transition-all ${
-              viewMode === 'parish' 
-                ? 'bg-white text-church-green shadow-sm' 
-                : 'text-gray-500 hover:text-gray-700'
+              viewMode === 'parish' ? 'bg-white text-church-green shadow-sm' : 'text-gray-500 hover:text-gray-700'
             }`}
           >
             Parish View
@@ -677,29 +726,28 @@ export const GeospatialHeatMap = React.memo(function GeospatialHeatMapComponent(
 
       {/* MAIN CONTENT */}
       <div className="flex flex-1 min-h-0 relative">
-        
         {/* MAP AREA */}
         <div className="flex-1 relative bg-[#dde8e4]">
-          <MapContainer 
+          <MapContainer
             center={[14.1686, 121.3253]} // Center of Laguna
-            zoom={10} 
+            zoom={10}
             style={{ height: '100%', width: '100%', background: 'transparent' }}
             zoomControl={false}
           >
             <MapController bounds={selectedBounds} center={selectedCenter} />
-            
+
             {/* Base Map - No Labels */}
             <TileLayer
               url="https://{s}.basemaps.cartocdn.com/light_nolabels/{z}/{x}/{y}{r}.png"
               attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>'
             />
-            
+
             {/* GeoJSON Layer for Vicariates */}
             {viewMode === 'vicariate' && vicariateGeoJsonData && (
-              <GeoJSON 
+              <GeoJSON
                 key="vicariate-layer"
                 ref={geoJsonLayerRef}
-                data={vicariateGeoJsonData} 
+                data={vicariateGeoJsonData}
                 style={style}
                 onEachFeature={onEachFeature}
               />
@@ -707,22 +755,12 @@ export const GeospatialHeatMap = React.memo(function GeospatialHeatMapComponent(
 
             {/* GeoJSON Layer for Municipalities (Only in Parish View as background) */}
             {viewMode === 'parish' && geoJsonData && (
-              <GeoJSON 
-                key="muni-layer"
-                data={geoJsonData} 
-                style={style}
-                onEachFeature={onEachFeature}
-              />
+              <GeoJSON key="muni-layer" data={geoJsonData} style={style} onEachFeature={onEachFeature} />
             )}
 
             {/* GeoJSON Layer for Parishes (Voronoi Polygons) */}
             {viewMode === 'parish' && parishGeoJsonData && (
-              <GeoJSON 
-                key="parish-layer"
-                data={parishGeoJsonData} 
-                style={style}
-                onEachFeature={onEachFeature}
-              />
+              <GeoJSON key="parish-layer" data={parishGeoJsonData} style={style} onEachFeature={onEachFeature} />
             )}
 
             {/* Labels Only Layer (on top of GeoJSON) */}
@@ -733,7 +771,9 @@ export const GeospatialHeatMap = React.memo(function GeospatialHeatMapComponent(
           </MapContainer>
 
           {/* Custom CSS for Leaflet Popups to match Tailwind styling */}
-          <style dangerouslySetInnerHTML={{__html: `
+          <style
+            dangerouslySetInnerHTML={{
+              __html: `
             .custom-popup .leaflet-popup-content-wrapper {
               border-radius: 8px;
               box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
@@ -745,7 +785,9 @@ export const GeospatialHeatMap = React.memo(function GeospatialHeatMapComponent(
             .leaflet-container {
               font-family: inherit;
             }
-          `}} />
+          `,
+            }}
+          />
         </div>
 
         {/* SIDEBAR */}
@@ -756,42 +798,38 @@ export const GeospatialHeatMap = React.memo(function GeospatialHeatMapComponent(
               Ranked by {viewMode === 'vicariate' ? 'Vicariate' : 'Parish'}
             </h3>
           </div>
-          
+
           <div className="flex-1 overflow-y-auto p-3 space-y-1 scrollbar-light">
             {listData.map((item, index) => (
-              <div 
+              <div
                 key={`${item.id}-${index}`}
                 onClick={() => handleSidebarClick(item.id)}
                 onMouseEnter={() => setHoveredRegion(item.id)}
                 onMouseLeave={() => setHoveredRegion(null)}
                 className={`p-2.5 rounded-lg cursor-pointer transition-all duration-200 border border-transparent ${
-                  hoveredRegion === item.id 
-                    ? 'bg-gray-50 border-gray-200 shadow-sm' 
-                    : 'hover:bg-gray-50'
+                  hoveredRegion === item.id ? 'bg-gray-50 border-gray-200 shadow-sm' : 'hover:bg-gray-50'
                 }`}
               >
                 <div className="flex justify-between items-baseline mb-1.5">
                   <span className="text-sm font-bold text-gray-800 truncate pr-2" title={item.name}>
                     {index + 1}. {(item.name || '').replace('Vicariate of ', '').replace(/ Parish$/, '')}
                   </span>
-                  <span className="text-xs font-black text-church-green shrink-0">
-                    {formatCurrency(item.value)}
-                  </span>
+                  <span className="text-xs font-black text-church-green shrink-0">{formatCurrency(item.value)}</span>
                 </div>
-                
+
                 {'vicariate' in item && viewMode === 'parish' && item.vicariate && (
                   <p className="text-[10px] text-gray-400 font-bold uppercase tracking-wider mb-2 truncate">
                     {(item.vicariate as string).replace('Vicariate of ', '')}
                   </p>
                 )}
-                
+
                 <div className="flex items-center gap-2">
                   <div className="flex-1 h-1.5 bg-gray-100 rounded-full overflow-hidden">
-                    <div 
+                    <div
                       className="h-full rounded-full transition-all duration-500"
-                      style={{ 
+                      style={{
                         width: `${Math.max(2, item.percentage)}%`,
-                        backgroundColor: item.color
+                        backgroundColor: item.color,
                       }}
                     />
                   </div>
@@ -819,7 +857,6 @@ export const GeospatialHeatMap = React.memo(function GeospatialHeatMapComponent(
             </div>
           </div>
         </div>
-
       </div>
     </div>
   );

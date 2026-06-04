@@ -15,10 +15,14 @@ export const DiagnosticCard: React.FC<DiagnosticCardProps> = ({ diagnostic, onCl
 
   const getSeverityColor = (severity?: string) => {
     switch (severity) {
-      case 'high': return 'bg-red-100 text-red-800 border-red-200';
-      case 'medium': return 'bg-orange-100 text-orange-800 border-orange-200';
-      case 'low': return 'bg-blue-100 text-blue-800 border-blue-200';
-      default: return 'bg-gray-100 text-gray-800 border-gray-200';
+      case 'high':
+        return 'bg-red-100 text-red-800 border-red-200';
+      case 'medium':
+        return 'bg-orange-100 text-orange-800 border-orange-200';
+      case 'low':
+        return 'bg-blue-100 text-blue-800 border-blue-200';
+      default:
+        return 'bg-gray-100 text-gray-800 border-gray-200';
     }
   };
 
@@ -30,23 +34,27 @@ export const DiagnosticCard: React.FC<DiagnosticCardProps> = ({ diagnostic, onCl
     >
       <div className="absolute top-0 left-0 w-1.5 h-full bg-gold-500 z-10"></div>
       <div className="p-5 flex items-start gap-4 relative z-20">
-        <div className={`w-12 h-12 rounded-2xl flex items-center justify-center shrink-0 shadow-xl transition-transform group-hover:scale-110 duration-500 ${diagnostic.severity === 'high' ? 'bg-red-50 text-red-600 shadow-red-100' : 'bg-gold-500 text-black shadow-gold-500/20'}`}>
+        <div
+          className={`w-12 h-12 rounded-2xl flex items-center justify-center shrink-0 shadow-xl transition-transform group-hover:scale-110 duration-500 ${diagnostic.severity === 'high' ? 'bg-red-50 text-red-600 shadow-red-100' : 'bg-gold-500 text-black shadow-gold-500/20'}`}
+        >
           <BrainCircuit size={24} />
         </div>
         <div className="flex-1">
           <div className="flex justify-between items-start">
             <div>
-              <h3 className="text-base font-bold text-gray-900">AI Diagnostic: {diagnostic.anomalyType || 'Anomaly Detected'}</h3>
+              <h3 className="text-base font-bold text-gray-900">
+                AI Diagnostic: {diagnostic.anomalyType || 'Anomaly Detected'}
+              </h3>
               <p className="text-xs text-gray-500">Analysis for {diagnostic.targetMonth}</p>
             </div>
-            <span className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase border ${getSeverityColor(diagnostic.severity)}`}>
+            <span
+              className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase border ${getSeverityColor(diagnostic.severity)}`}
+            >
               {diagnostic.severity} Severity
             </span>
           </div>
-          
-          <p className="mt-2 text-sm text-gray-700 leading-relaxed">
-            {diagnostic.analysis}
-          </p>
+
+          <p className="mt-2 text-sm text-gray-700 leading-relaxed">{diagnostic.analysis}</p>
 
           <div className="mt-4 flex items-center gap-4 text-sm">
             <div className="flex items-center gap-1 text-emerald-600 font-medium">

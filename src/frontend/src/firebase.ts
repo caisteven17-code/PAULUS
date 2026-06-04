@@ -50,17 +50,17 @@ type Unsubscriber = () => void;
 function mapSupabaseUser(supabaseUser: any): AuthUser {
   const meta = supabaseUser.user_metadata ?? supabaseUser.raw_user_meta_data ?? {};
   return {
-    id:          supabaseUser.id,
-    uid:         supabaseUser.id,
-    email:       supabaseUser.email ?? '',
-    role:        (meta.role as AppRole) ?? 'bishop',
-    accessRole:  meta.role,
-    roleId:      meta.role,
-    entityId:    meta.entityId    ?? meta.entity_id    ?? undefined,
-    entityName:  meta.entityName  ?? meta.entity_name  ?? undefined,
-    entityType:  meta.entityType  ?? meta.entity_type  ?? undefined,
+    id: supabaseUser.id,
+    uid: supabaseUser.id,
+    email: supabaseUser.email ?? '',
+    role: (meta.role as AppRole) ?? 'bishop',
+    accessRole: meta.role,
+    roleId: meta.role,
+    entityId: meta.entityId ?? meta.entity_id ?? undefined,
+    entityName: meta.entityName ?? meta.entity_name ?? undefined,
+    entityType: meta.entityType ?? meta.entity_type ?? undefined,
     displayName: meta.displayName ?? meta.display_name ?? supabaseUser.email ?? '',
-    status:      'active',
+    status: 'active',
   };
 }
 
@@ -86,35 +86,38 @@ export const auth = {
     }
 
     // ── 1. Check for live Supabase session first ──────────────────────────────
-    supabaseBrowser.auth.getSession().then(({ data }) => {
-      if (data.session?.user) {
-        const user = mapSupabaseUser(data.session.user);
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(user));
-        callback(user);
-        return;
-      }
-      // ── 2. Fall back to localStorage demo session ─────────────────────────
-      const stored = localStorage.getItem(STORAGE_KEY);
-      callback(stored ? (JSON.parse(stored) as AuthUser) : null);
-    }).catch(() => {
-      // Supabase unreachable — use localStorage fallback silently
-      const stored = localStorage.getItem(STORAGE_KEY);
-      callback(stored ? (JSON.parse(stored) as AuthUser) : null);
-    });
-
-    // ── 3. Subscribe to real-time Supabase auth changes ──────────────────────
-    const { data: { subscription } } = supabaseBrowser.auth.onAuthStateChange(
-      (_event, session) => {
-        if (session?.user) {
-          const user = mapSupabaseUser(session.user);
+    supabaseBrowser.auth
+      .getSession()
+      .then(({ data }) => {
+        if (data.session?.user) {
+          const user = mapSupabaseUser(data.session.user);
           localStorage.setItem(STORAGE_KEY, JSON.stringify(user));
           callback(user);
-        } else if (_event === 'SIGNED_OUT') {
-          localStorage.removeItem(STORAGE_KEY);
-          callback(null);
+          return;
         }
+        // ── 2. Fall back to localStorage demo session ─────────────────────────
+        const stored = localStorage.getItem(STORAGE_KEY);
+        callback(stored ? (JSON.parse(stored) as AuthUser) : null);
+      })
+      .catch(() => {
+        // Supabase unreachable — use localStorage fallback silently
+        const stored = localStorage.getItem(STORAGE_KEY);
+        callback(stored ? (JSON.parse(stored) as AuthUser) : null);
+      });
+
+    // ── 3. Subscribe to real-time Supabase auth changes ──────────────────────
+    const {
+      data: { subscription },
+    } = supabaseBrowser.auth.onAuthStateChange((_event, session) => {
+      if (session?.user) {
+        const user = mapSupabaseUser(session.user);
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(user));
+        callback(user);
+      } else if (_event === 'SIGNED_OUT') {
+        localStorage.removeItem(STORAGE_KEY);
+        callback(null);
       }
-    );
+    });
 
     return () => subscription.unsubscribe();
   },

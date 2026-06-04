@@ -52,10 +52,7 @@ export class FinancialController {
   }
 
   @Get('templates')
-  async generateTemplateCSV(
-    @Query('entityType') entityType: string,
-    @Res() res: Response,
-  ) {
+  async generateTemplateCSV(@Query('entityType') entityType: string, @Res() res: Response) {
     const csv = this.financialService.generateTemplateCSV(entityType ?? 'parish');
     res.setHeader('Content-Type', 'text/csv');
     res.setHeader('Content-Disposition', `attachment; filename="template-${entityType ?? 'parish'}.csv"`);

@@ -20,12 +20,18 @@ export const HealthDimensionBar: React.FC<HealthDimensionBarProps> = ({ label, s
 
   const getIcon = (name: string) => {
     switch (name.toLowerCase()) {
-      case 'liquidity': return <Droplets size={14} />;
-      case 'sustainability': return <Leaf size={14} />;
-      case 'efficiency': return <Zap size={14} />;
-      case 'stability': return <Shield size={14} />;
-      case 'growth': return <TrendingUp size={14} />;
-      default: return null;
+      case 'liquidity':
+        return <Droplets size={14} />;
+      case 'sustainability':
+        return <Leaf size={14} />;
+      case 'efficiency':
+        return <Zap size={14} />;
+      case 'stability':
+        return <Shield size={14} />;
+      case 'growth':
+        return <TrendingUp size={14} />;
+      default:
+        return null;
     }
   };
 
@@ -40,7 +46,9 @@ export const HealthDimensionBar: React.FC<HealthDimensionBarProps> = ({ label, s
     <div className="mb-5 group">
       <div className="flex justify-between items-end mb-2">
         <div className="flex items-center gap-2">
-          <div className={`w-7 h-7 rounded-lg flex items-center justify-center transition-transform group-hover:scale-110 ${getIconColor(score)}`}>
+          <div
+            className={`w-7 h-7 rounded-lg flex items-center justify-center transition-transform group-hover:scale-110 ${getIconColor(score)}`}
+          >
             {getIcon(label)}
           </div>
           <div className="flex flex-col">

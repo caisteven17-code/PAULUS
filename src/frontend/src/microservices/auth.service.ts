@@ -35,12 +35,12 @@ export interface AuthUser {
 function mapSupabaseUser(supabaseUser: any): AuthUser {
   const meta = supabaseUser.user_metadata ?? supabaseUser.raw_user_meta_data ?? {};
   return {
-    id:          supabaseUser.id,
-    email:       supabaseUser.email ?? '',
-    role:        (meta.role ?? 'bishop') as AppRole,
-    entityId:    meta.entityId    ?? meta.entity_id    ?? undefined,
-    entityName:  meta.entityName  ?? meta.entity_name  ?? undefined,
-    entityType:  meta.entityType  ?? meta.entity_type  ?? undefined,
+    id: supabaseUser.id,
+    email: supabaseUser.email ?? '',
+    role: (meta.role ?? 'bishop') as AppRole,
+    entityId: meta.entityId ?? meta.entity_id ?? undefined,
+    entityName: meta.entityName ?? meta.entity_name ?? undefined,
+    entityType: meta.entityType ?? meta.entity_type ?? undefined,
     displayName: meta.displayName ?? meta.display_name ?? supabaseUser.email ?? '',
   };
 }
@@ -55,7 +55,7 @@ export const authService = {
     if (error || !data.session) return null;
     return {
       token: data.session.access_token,
-      user:  mapSupabaseUser(data.user),
+      user: mapSupabaseUser(data.user),
     };
   },
 

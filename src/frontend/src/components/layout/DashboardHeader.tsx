@@ -26,7 +26,7 @@ export const DashboardHeader: React.FC<DashboardHeaderProps> = ({
   year = 2026,
   onYearChange,
   onSettingsClick,
-  onLogout
+  onLogout,
 }) => {
   const [isTimeframeOpen, setIsTimeframeOpen] = useState(false);
   const [isYearOpen, setIsYearOpen] = useState(false);
@@ -35,49 +35,34 @@ export const DashboardHeader: React.FC<DashboardHeaderProps> = ({
   const timeframeLabels = {
     '3m': 'Past 3 Months',
     '6m': 'Past 6 Months',
-    '12m': 'Past 12 Months'
+    '12m': 'Past 12 Months',
   };
 
   return (
     <header className="sticky top-0 z-40 bg-gradient-to-r from-black via-black to-black/95 border-b border-gold-500/30 px-6 lg:px-12 py-4 shadow-2xl">
       <div className="max-w-[1800px] mx-auto flex items-center justify-between gap-8">
-        
         {/* Logo & Title Section */}
         <div className="flex items-center gap-4 flex-shrink-0">
           <div className="w-12 h-12 bg-transparent border-2 border-gold-500 text-gold-500 rounded-lg flex items-center justify-center font-bold text-xl flex-shrink-0">
             ⛪
           </div>
           <div className="flex flex-col gap-0.5">
-            <p className="text-lg font-serif italic font-bold text-gold-400 leading-none tracking-wide">
-              {title}
-            </p>
-            <h1 className="text-sm font-black text-white uppercase tracking-widest leading-none">
-              {subtitle}
-            </h1>
-            <p className="text-xs text-gray-500 font-semibold mt-1">
-              {priestName}
-            </p>
+            <p className="text-lg font-serif italic font-bold text-gold-400 leading-none tracking-wide">{title}</p>
+            <h1 className="text-sm font-black text-white uppercase tracking-widest leading-none">{subtitle}</h1>
+            <p className="text-xs text-gray-500 font-semibold mt-1">{priestName}</p>
           </div>
         </div>
-
-
 
         {/* Controls Section */}
         <div className="flex items-center gap-3 flex-shrink-0">
           <div className="relative">
-            <button 
+            <button
               onClick={() => setIsTimeframeOpen(!isTimeframeOpen)}
               className="px-4 py-2 bg-white/10 backdrop-blur-sm hover:bg-gold-500/20 text-white text-xs font-bold uppercase tracking-wider rounded-lg border border-white/15 hover:border-gold-400/50 transition-all duration-300 hidden sm:flex items-center gap-2 group"
             >
-              <CalendarDays 
-                size={14} 
-                className="group-hover:text-gold-400 transition-colors" 
-              />
+              <CalendarDays size={14} className="group-hover:text-gold-400 transition-colors" />
               <span>{timeframeLabels[timeframe]}</span>
-              <ChevronDown 
-                size={14} 
-                className={`transition-transform ${isTimeframeOpen ? 'rotate-180' : ''}`}
-              />
+              <ChevronDown size={14} className={`transition-transform ${isTimeframeOpen ? 'rotate-180' : ''}`} />
             </button>
 
             {/* Dropdown Menu */}
@@ -105,15 +90,12 @@ export const DashboardHeader: React.FC<DashboardHeaderProps> = ({
 
           {/* Year Selector */}
           <div className="relative">
-            <button 
+            <button
               onClick={() => setIsYearOpen(!isYearOpen)}
               className="px-4 py-2 bg-white/10 backdrop-blur-sm hover:bg-gold-500/20 text-white text-xs font-bold uppercase tracking-wider rounded-lg border border-white/15 hover:border-gold-400/50 transition-all duration-300 hidden sm:flex items-center gap-2 group"
             >
               <span>{year}</span>
-              <ChevronDown 
-                size={14} 
-                className={`transition-transform ${isYearOpen ? 'rotate-180' : ''}`}
-              />
+              <ChevronDown size={14} className={`transition-transform ${isYearOpen ? 'rotate-180' : ''}`} />
             </button>
 
             {/* Year Dropdown Menu */}
@@ -138,9 +120,9 @@ export const DashboardHeader: React.FC<DashboardHeaderProps> = ({
               </div>
             )}
           </div>
-          
+
           <div className="relative">
-            <button 
+            <button
               onClick={() => setIsAccountOpen(!isAccountOpen)}
               className="w-10 h-10 bg-gradient-to-br from-gold-400 to-gold-600 text-black text-center rounded-full flex items-center justify-center font-bold text-sm flex-shrink-0 shadow-lg shadow-gold-500/40 border border-gold-300 cursor-pointer hover:shadow-gold-500/60 transition-all hover:scale-110"
             >
@@ -181,4 +163,3 @@ export const DashboardHeader: React.FC<DashboardHeaderProps> = ({
     </header>
   );
 };
-

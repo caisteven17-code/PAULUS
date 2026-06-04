@@ -1,7 +1,20 @@
 'use client';
 
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { Bell, Plus, Trash2, Edit2, X, Send, User, Calendar, Megaphone, Wallet, ClipboardList, CalendarDays } from 'lucide-react';
+import {
+  Bell,
+  Plus,
+  Trash2,
+  Edit2,
+  X,
+  Send,
+  User,
+  Calendar,
+  Megaphone,
+  Wallet,
+  ClipboardList,
+  CalendarDays,
+} from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { useAuth } from '../firebase';
 import { formatDate } from '../lib/format';
@@ -77,7 +90,8 @@ export function Announcements() {
           </div>
           <h2 className="text-2xl font-serif font-bold text-slate-950">Access Denied</h2>
           <p className="text-slate-500 text-sm leading-relaxed">
-            Your account role does not have viewing permissions for Diocesan Announcements. Please contact your diocesan administrator to request access.
+            Your account role does not have viewing permissions for Diocesan Announcements. Please contact your diocesan
+            administrator to request access.
           </p>
         </div>
       </div>
@@ -121,8 +135,8 @@ export function Announcements() {
                 priority: formData.priority,
                 category: formData.category,
               }
-            : announcement
-        )
+            : announcement,
+        ),
       );
     } else {
       const newAnnouncement: Announcement = {
@@ -172,7 +186,9 @@ export function Announcements() {
                 <Bell className="w-4 h-4 text-gold-500" />
                 <span className="text-[10px] font-black uppercase tracking-[0.28em]">Announcement Board</span>
               </div>
-              <h1 className="text-3xl md:text-5xl font-serif font-bold tracking-tight text-slate-950">Chancellor&apos;s Board</h1>
+              <h1 className="text-3xl md:text-5xl font-serif font-bold tracking-tight text-slate-950">
+                Chancellor&apos;s Board
+              </h1>
               <p className="mt-3 text-sm md:text-base text-slate-600 max-w-2xl leading-relaxed">
                 Central posting space for diocesan updates, directives, financial notices, and event reminders.
               </p>
@@ -194,9 +210,21 @@ export function Announcements() {
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-8">
             {[
-              { label: 'Total Posts', value: announcementCounts.total, tone: 'bg-slate-50 text-slate-700 border-slate-200' },
-              { label: 'Urgent Notices', value: announcementCounts.urgent, tone: 'bg-rose-50 text-rose-700 border-rose-200' },
-              { label: 'Event Updates', value: announcementCounts.events, tone: 'bg-emerald-50 text-emerald-700 border-emerald-200' },
+              {
+                label: 'Total Posts',
+                value: announcementCounts.total,
+                tone: 'bg-slate-50 text-slate-700 border-slate-200',
+              },
+              {
+                label: 'Urgent Notices',
+                value: announcementCounts.urgent,
+                tone: 'bg-rose-50 text-rose-700 border-rose-200',
+              },
+              {
+                label: 'Event Updates',
+                value: announcementCounts.events,
+                tone: 'bg-emerald-50 text-emerald-700 border-emerald-200',
+              },
             ].map((item) => (
               <div key={item.label} className={`rounded-3xl border px-5 py-4 ${item.tone}`}>
                 <p className="text-[10px] font-black uppercase tracking-[0.24em] opacity-70">{item.label}</p>
@@ -264,7 +292,9 @@ export function Announcements() {
 
                 <div className="space-y-5">
                   <div>
-                    <label className="block text-[11px] font-black uppercase tracking-[0.22em] text-slate-500 mb-3">Title</label>
+                    <label className="block text-[11px] font-black uppercase tracking-[0.22em] text-slate-500 mb-3">
+                      Title
+                    </label>
                     <input
                       type="text"
                       value={formData.title}
@@ -275,7 +305,9 @@ export function Announcements() {
                   </div>
 
                   <div>
-                    <label className="block text-[11px] font-black uppercase tracking-[0.22em] text-slate-500 mb-3">Content</label>
+                    <label className="block text-[11px] font-black uppercase tracking-[0.22em] text-slate-500 mb-3">
+                      Content
+                    </label>
                     <textarea
                       value={formData.content}
                       onChange={(event) => setFormData({ ...formData, content: event.target.value })}
@@ -287,10 +319,14 @@ export function Announcements() {
 
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
                     <div>
-                      <label className="block text-[11px] font-black uppercase tracking-[0.22em] text-slate-500 mb-3">Category</label>
+                      <label className="block text-[11px] font-black uppercase tracking-[0.22em] text-slate-500 mb-3">
+                        Category
+                      </label>
                       <select
                         value={formData.category}
-                        onChange={(event) => setFormData({ ...formData, category: event.target.value as Announcement['category'] })}
+                        onChange={(event) =>
+                          setFormData({ ...formData, category: event.target.value as Announcement['category'] })
+                        }
                         className="w-full px-5 py-4 border border-slate-200 rounded-2xl focus:ring-4 focus:ring-gold-500/10 focus:border-gold-500 outline-none text-sm font-medium"
                       >
                         <option value="general">General</option>
@@ -301,10 +337,14 @@ export function Announcements() {
                     </div>
 
                     <div>
-                      <label className="block text-[11px] font-black uppercase tracking-[0.22em] text-slate-500 mb-3">Priority</label>
+                      <label className="block text-[11px] font-black uppercase tracking-[0.22em] text-slate-500 mb-3">
+                        Priority
+                      </label>
                       <select
                         value={formData.priority}
-                        onChange={(event) => setFormData({ ...formData, priority: event.target.value as Announcement['priority'] })}
+                        onChange={(event) =>
+                          setFormData({ ...formData, priority: event.target.value as Announcement['priority'] })
+                        }
                         className="w-full px-5 py-4 border border-slate-200 rounded-2xl focus:ring-4 focus:ring-gold-500/10 focus:border-gold-500 outline-none text-sm font-medium"
                       >
                         <option value="low">Low</option>
@@ -370,7 +410,9 @@ export function Announcements() {
                         </div>
                         <div className="flex-1 min-w-0">
                           <div className="flex flex-wrap items-center gap-2 mb-3">
-                            <span className={`inline-flex items-center rounded-full border px-3 py-1 text-[10px] font-black uppercase tracking-[0.2em] ${priority.badge}`}>
+                            <span
+                              className={`inline-flex items-center rounded-full border px-3 py-1 text-[10px] font-black uppercase tracking-[0.2em] ${priority.badge}`}
+                            >
                               {priority.label}
                             </span>
                             <span className="inline-flex items-center rounded-full border border-slate-200 px-3 py-1 text-[10px] font-black uppercase tracking-[0.2em] text-slate-500">
@@ -441,14 +483,18 @@ export function Announcements() {
                 <div className="flex items-start justify-between gap-4 mb-6">
                   <div className="min-w-0">
                     <div className="flex flex-wrap items-center gap-2 mb-4">
-                      <span className={`inline-flex items-center rounded-full border px-3 py-1 text-[10px] font-black uppercase tracking-[0.2em] ${PRIORITY_STYLES[selectedAnnouncement.priority].badge}`}>
+                      <span
+                        className={`inline-flex items-center rounded-full border px-3 py-1 text-[10px] font-black uppercase tracking-[0.2em] ${PRIORITY_STYLES[selectedAnnouncement.priority].badge}`}
+                      >
                         {PRIORITY_STYLES[selectedAnnouncement.priority].label}
                       </span>
                       <span className="inline-flex items-center rounded-full border border-slate-200 px-3 py-1 text-[10px] font-black uppercase tracking-[0.2em] text-slate-500">
                         {CATEGORY_META[selectedAnnouncement.category].label}
                       </span>
                     </div>
-                    <h2 className="text-3xl font-serif font-bold text-slate-950 leading-tight">{selectedAnnouncement.title}</h2>
+                    <h2 className="text-3xl font-serif font-bold text-slate-950 leading-tight">
+                      {selectedAnnouncement.title}
+                    </h2>
                     <div className="flex flex-wrap items-center gap-4 mt-4 text-sm text-slate-500">
                       <div className="flex items-center gap-1.5">
                         <User className="w-4 h-4" />

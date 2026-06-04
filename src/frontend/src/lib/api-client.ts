@@ -62,12 +62,19 @@ function createPoller(
 
   const tick = async () => {
     if (!active) return;
-    try { callback(await fetcher()); } catch { /* ignore */ }
+    try {
+      callback(await fetcher());
+    } catch {
+      /* ignore */
+    }
   };
 
   tick(); // immediate first call
   const id = window.setInterval(tick, intervalMs);
-  return () => { active = false; window.clearInterval(id); };
+  return () => {
+    active = false;
+    window.clearInterval(id);
+  };
 }
 
 // ------------------------------------------------------------------
@@ -109,7 +116,7 @@ export const apiClient = {
   },
 
   async saveRecords(records: FinancialRecord[]): Promise<void> {
-    await Promise.all(records.map(r => this.saveRecord(r)));
+    await Promise.all(records.map((r) => this.saveRecord(r)));
   },
 
   async deleteRecord(id: string): Promise<void> {
@@ -126,8 +133,7 @@ export const apiClient = {
   },
 
   generateTemplateCSV(entityType = 'parish'): Promise<string> {
-    return fetch(`/api/financial/templates?entityType=${entityType}`, { credentials: 'include' })
-      .then(r => r.text());
+    return fetch(`/api/financial/templates?entityType=${entityType}`, { credentials: 'include' }).then((r) => r.text());
   },
 
   // ----------------------------------------------------------------
@@ -209,11 +215,7 @@ export const apiClient = {
     return createPoller(() => this.getAllRecords(), callback);
   },
 
-  subscribeToProjects(
-    callback: (projects: Project[]) => void,
-    entityId?: string,
-    entityType?: string,
-  ) {
+  subscribeToProjects(callback: (projects: Project[]) => void, entityId?: string, entityType?: string) {
     return createPoller(() => this.getProjects(entityId, entityType), callback);
   },
 

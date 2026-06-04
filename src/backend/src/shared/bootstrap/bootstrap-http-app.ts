@@ -10,10 +10,7 @@ const configureCors = (app: Awaited<ReturnType<typeof NestFactory.create>>) => {
   const localhostPattern = /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/i;
 
   app.enableCors({
-    origin: (
-      origin: string | undefined,
-      callback: (err: Error | null, allow?: boolean) => void,
-    ) => {
+    origin: (origin: string | undefined, callback: (err: Error | null, allow?: boolean) => void) => {
       if (!origin) {
         return callback(null, true);
       }
@@ -48,5 +45,7 @@ export const bootstrapHttpApp = async (
   }
 
   await app.listen(options.port);
-  console.log(`HTTP service running on http://127.0.0.1:${options.port}${options.globalPrefix ? `/${options.globalPrefix}` : ''}`);
+  console.log(
+    `HTTP service running on http://127.0.0.1:${options.port}${options.globalPrefix ? `/${options.globalPrefix}` : ''}`,
+  );
 };

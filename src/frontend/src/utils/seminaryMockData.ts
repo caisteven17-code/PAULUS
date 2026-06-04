@@ -13,7 +13,7 @@ export const generateSeminaryData = () => {
     // Realistic base values with some seasonal variation
     const enrollment = 85;
     const baseFee = 25000; // PHP
-    
+
     // Income
     const tuitionFees = enrollment * baseFee * (month === 'Jun' || month === 'Nov' ? 0.6 : 0.05); // Spikes at start of sem
     const boardFees = enrollment * 15000 * (month === 'Jun' || month === 'Nov' ? 0.6 : 0.05);
@@ -46,7 +46,20 @@ export const generateSeminaryData = () => {
     const purchases = 20000 + Math.random() * 30000;
     const othersExpenses = 15000;
 
-    const totalExpenses = salaries + benefits + labor + utilities + repairs + construction + lpg + supplies + profFee + incentives + bankCharges + purchases + othersExpenses;
+    const totalExpenses =
+      salaries +
+      benefits +
+      labor +
+      utilities +
+      repairs +
+      construction +
+      lpg +
+      supplies +
+      profFee +
+      incentives +
+      bankCharges +
+      purchases +
+      othersExpenses;
 
     return {
       month,
@@ -81,7 +94,7 @@ export const generateSeminaryData = () => {
       othersExpenses,
       totalExpenses,
       netSurplus: totalIncome - totalExpenses,
-      dependencyRatio: (donations + subsidyRCBSP) / totalIncome
+      dependencyRatio: (donations + subsidyRCBSP) / totalIncome,
     };
   });
 };

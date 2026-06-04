@@ -14,15 +14,23 @@ interface ProjectDashboardCardProps {
 export function ProjectDashboardCard({ project, onClick }: ProjectDashboardCardProps) {
   const progress = project.targetAmount > 0 ? (project.currentAmount / project.targetAmount) * 100 : 0;
   const progressWidth = Math.min(progress, 100);
-  const daysRemaining = Math.max(0, Math.ceil((new Date(project.endDate).getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24)));
+  const daysRemaining = Math.max(
+    0,
+    Math.ceil((new Date(project.endDate).getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24)),
+  );
   const statusLabel = project.status.replace('-', ' ');
   const getEntityIcon = (type: string) => {
     switch (type) {
-      case 'diocese': return <Building2 className="w-3 h-3" />;
-      case 'parish': return <Church className="w-3 h-3" />;
-      case 'seminary': return <GraduationCap className="w-3 h-3" />;
-      case 'school': return <School className="w-3 h-3" />;
-      default: return <Building2 className="w-3 h-3" />;
+      case 'diocese':
+        return <Building2 className="w-3 h-3" />;
+      case 'parish':
+        return <Church className="w-3 h-3" />;
+      case 'seminary':
+        return <GraduationCap className="w-3 h-3" />;
+      case 'school':
+        return <School className="w-3 h-3" />;
+      default:
+        return <Building2 className="w-3 h-3" />;
     }
   };
 
@@ -72,14 +80,20 @@ export function ProjectDashboardCard({ project, onClick }: ProjectDashboardCardP
           <div>
             <div className="flex justify-between items-end mb-4 gap-2">
               <div className="space-y-1 min-w-0">
-                <span className="text-[10px] text-gray-400 uppercase font-bold tracking-[0.2em] block truncate">Raised To Date</span>
+                <span className="text-[10px] text-gray-400 uppercase font-bold tracking-[0.2em] block truncate">
+                  Raised To Date
+                </span>
                 <div className="flex items-baseline gap-2 flex-wrap">
-                  <span className="text-3xl font-serif font-bold text-church-black leading-none">{formatCurrency(project.currentAmount)}</span>
+                  <span className="text-3xl font-serif font-bold text-church-black leading-none">
+                    {formatCurrency(project.currentAmount)}
+                  </span>
                   <span className="text-[10px] text-gray-400 font-bold uppercase tracking-widest">Recorded</span>
                 </div>
               </div>
               <div className="text-right shrink-0">
-                <span className="text-2xl font-serif font-bold text-gold-600 leading-none">{Math.round(progress)}%</span>
+                <span className="text-2xl font-serif font-bold text-gold-600 leading-none">
+                  {Math.round(progress)}%
+                </span>
               </div>
             </div>
             <div className="h-3 bg-gray-50 rounded-full overflow-hidden shadow-inner relative">
@@ -111,7 +125,9 @@ export function ProjectDashboardCard({ project, onClick }: ProjectDashboardCardP
                 <CalendarDays className="w-4 h-4" />
                 <p className="text-[9px] text-gray-400 uppercase font-bold tracking-[0.2em]">Start Date</p>
               </div>
-              <p className="text-base font-bold text-church-black">{new Date(project.startDate).toLocaleDateString()}</p>
+              <p className="text-base font-bold text-church-black">
+                {new Date(project.startDate).toLocaleDateString()}
+              </p>
             </div>
           </div>
         </div>
@@ -123,7 +139,9 @@ export function ProjectDashboardCard({ project, onClick }: ProjectDashboardCardP
             </div>
             <div>
               <span className="text-[10px] font-bold uppercase tracking-[0.2em] block leading-none">Managed By</span>
-              <span className="text-[8px] font-bold text-gray-300 uppercase tracking-widest mt-1 block">{project.entityId}</span>
+              <span className="text-[8px] font-bold text-gray-300 uppercase tracking-widest mt-1 block">
+                {project.entityId}
+              </span>
             </div>
           </div>
           <motion.div

@@ -1,7 +1,22 @@
 'use client';
 
 import React, { useState, useEffect, useMemo, useRef } from 'react';
-import { Plus, Pencil, Trash2, Search, Building2, School, GraduationCap, AlertTriangle, ArrowRight, Maximize2, Loader2, ShieldAlert, CheckCircle, Database } from 'lucide-react';
+import {
+  Plus,
+  Pencil,
+  Trash2,
+  Search,
+  Building2,
+  School,
+  GraduationCap,
+  AlertTriangle,
+  ArrowRight,
+  Maximize2,
+  Loader2,
+  ShieldAlert,
+  CheckCircle,
+  Database,
+} from 'lucide-react';
 import { Parish, Seminary, DiocesanSchool, EntityClass } from '../../types';
 import { VICARIATES, CLASSES, ALL_PARISHES, INITIAL_PARISHES } from '../../constants';
 import { dataService } from '../../services/dataService';
@@ -22,12 +37,7 @@ interface EntityManagementControlProps {
 
 const stripVicariatePrefix = (name: string) => name.replace('Vicariate of ', '');
 
-const DISTRICTS = [
-  'District I',
-  'District II',
-  'District III',
-  'District IV'
-];
+const DISTRICTS = ['District I', 'District II', 'District III', 'District IV'];
 
 const VICARIATE_TO_DISTRICT: Record<string, string> = {
   'Holy Family': 'District I',
@@ -74,39 +84,39 @@ const LAGUNA_CITIES_TOWNS = [
   'Santa Maria',
   'Santa Rosa City',
   'Siniloan',
-  'Victoria'
+  'Victoria',
 ];
 
 const CITY_TO_VICARIATE: Record<string, string> = {
-  'Alaminos': 'St. Paul the First Hermit',
-  'Bay': 'Immaculate Conception',
+  Alaminos: 'St. Paul the First Hermit',
+  Bay: 'Immaculate Conception',
   'Biñan City': 'San Isidro Labrador',
   'Cabuyao City': 'St. Polycarp',
   'Calamba City': 'St. John the Baptist',
-  'Calauan': 'St. Paul the First Hermit',
-  'Cavinti': 'San Bartolome',
-  'Famy': 'Sts. Peter and Paul',
-  'Kalayaan': 'Our Lady of Guadalupe',
-  'Liliw': 'San Bartolome',
+  Calauan: 'St. Paul the First Hermit',
+  Cavinti: 'San Bartolome',
+  Famy: 'Sts. Peter and Paul',
+  Kalayaan: 'Our Lady of Guadalupe',
+  Liliw: 'San Bartolome',
   'Los Baños': 'Immaculate Conception',
-  'Luisiana': 'San Bartolome',
-  'Mabitac': 'Sts. Peter and Paul',
-  'Magdalena': 'San Bartolome',
-  'Majayjay': 'San Bartolome',
-  'Nagcarlan': 'San Bartolome',
-  'Paete': 'Our Lady of Guadalupe',
-  'Pagsanjan': 'Our Lady of Guadalupe',
-  'Pakil': 'St. James',
-  'Pangil': 'St. James',
-  'Pila': 'San Antonio De Padua',
-  'Rizal': 'St. Paul the First Hermit',
+  Luisiana: 'San Bartolome',
+  Mabitac: 'Sts. Peter and Paul',
+  Magdalena: 'San Bartolome',
+  Majayjay: 'San Bartolome',
+  Nagcarlan: 'San Bartolome',
+  Paete: 'Our Lady of Guadalupe',
+  Pagsanjan: 'Our Lady of Guadalupe',
+  Pakil: 'St. James',
+  Pangil: 'St. James',
+  Pila: 'San Antonio De Padua',
+  Rizal: 'St. Paul the First Hermit',
   'San Pablo City': 'St. Paul the First Hermit',
   'San Pedro City': 'San Pedro Apostol',
   'Santa Cruz': 'Immaculate Conception',
   'Santa Maria': 'Sts. Peter and Paul',
   'Santa Rosa City': 'Sta. Rosa De Lima',
-  'Siniloan': 'Sts. Peter and Paul',
-  'Victoria': 'San Antonio De Padua'
+  Siniloan: 'Sts. Peter and Paul',
+  Victoria: 'San Antonio De Padua',
 };
 
 const getCityFromGoogleComponents = (components: any[]) => {
@@ -125,24 +135,26 @@ const getCityFromGoogleComponents = (components: any[]) => {
 
 const matchLagunaCity = (geocodedName: string): string | null => {
   if (!geocodedName) return null;
-  
-  const normalize = (str: string) => 
-    str.toLowerCase()
-       .normalize("NFD").replace(/[\u0300-\u036f]/g, "") // remove accents (e.g. ñ -> n)
-       .replace(/ñ/g, 'n')
-       .replace(/\bcity\b/g, '')
-       .replace(/\bof\b/g, '')
-       .replace(/[^a-z0-9]/g, '')
-       .trim();
+
+  const normalize = (str: string) =>
+    str
+      .toLowerCase()
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '') // remove accents (e.g. ñ -> n)
+      .replace(/ñ/g, 'n')
+      .replace(/\bcity\b/g, '')
+      .replace(/\bof\b/g, '')
+      .replace(/[^a-z0-9]/g, '')
+      .trim();
 
   const cleanGeocoded = normalize(geocodedName);
-  
+
   for (const city of LAGUNA_CITIES_TOWNS) {
     if (normalize(city) === cleanGeocoded) {
       return city;
     }
   }
-  
+
   // Substring fallback
   for (const city of LAGUNA_CITIES_TOWNS) {
     const cleanCity = normalize(city);
@@ -150,7 +162,7 @@ const matchLagunaCity = (geocodedName: string): string | null => {
       return city;
     }
   }
-  
+
   return null;
 };
 
@@ -162,7 +174,7 @@ interface DraggableMarkerProps {
 
 function DraggableMarker({ position, onDragEnd, draggable = true }: DraggableMarkerProps) {
   const markerRef = useRef<any>(null);
-  
+
   // Custom gold pin matching the app's brand colors (#D4AF37 and #1A1A1A)
   const goldPinIcon = useMemo(() => {
     return L.divIcon({
@@ -190,19 +202,22 @@ function DraggableMarker({ position, onDragEnd, draggable = true }: DraggableMar
         </div>
       `,
       iconSize: [28, 28],
-      iconAnchor: [14, 28]
+      iconAnchor: [14, 28],
     });
   }, []);
 
-  const eventHandlers = useMemo(() => ({
-    dragend() {
-      const marker = markerRef.current;
-      if (marker != null) {
-        const latLng = marker.getLatLng();
-        onDragEnd(latLng.lat, latLng.lng);
-      }
-    }
-  }), [onDragEnd]);
+  const eventHandlers = useMemo(
+    () => ({
+      dragend() {
+        const marker = markerRef.current;
+        if (marker != null) {
+          const latLng = marker.getLatLng();
+          onDragEnd(latLng.lat, latLng.lng);
+        }
+      },
+    }),
+    [onDragEnd],
+  );
 
   return (
     <Marker
@@ -231,7 +246,7 @@ export function EntityManagementControl({
   onUpdateSeminaries,
   onUpdateSchools,
   onNavigate,
-  accounts = []
+  accounts = [],
 }: EntityManagementControlProps) {
   const [activeSubTab, setActiveSubTab] = useState<'parishes' | 'seminaries' | 'schools'>('parishes');
   const [searchQuery, setSearchQuery] = useState('');
@@ -239,7 +254,7 @@ export function EntityManagementControl({
   const [editingEntity, setEditingEntity] = useState<any | null>(null);
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
   const [entityToDelete, setEntityToDelete] = useState<any | null>(null);
-  const [showSuccess, setShowSuccess] = useState<{show: boolean, message: string}>({ show: false, message: '' });
+  const [showSuccess, setShowSuccess] = useState<{ show: boolean; message: string }>({ show: false, message: '' });
 
   const [deleteState, setDeleteState] = useState<{
     isChecked: boolean;
@@ -258,7 +273,7 @@ export function EntityManagementControl({
     hasAccounts: false,
     hasProjects: false,
     isPredefined: false,
-    hasAny: false
+    hasAny: false,
   });
 
   useEffect(() => {
@@ -271,7 +286,7 @@ export function EntityManagementControl({
         hasAccounts: false,
         hasProjects: false,
         isPredefined: false,
-        hasAny: false
+        hasAny: false,
       });
       return;
     }
@@ -285,7 +300,7 @@ export function EntityManagementControl({
         hasAccounts: false,
         hasProjects: false,
         isPredefined: false,
-        hasAny: false
+        hasAny: false,
       });
 
       try {
@@ -297,11 +312,20 @@ export function EntityManagementControl({
         // 1. Pastor / Rector / Principal assignment
         let hasPastor = false;
         if (isParish) {
-          hasPastor = entityToDelete.pastor && entityToDelete.pastor.trim() !== '' && entityToDelete.pastor.toLowerCase() !== 'not assigned';
+          hasPastor =
+            entityToDelete.pastor &&
+            entityToDelete.pastor.trim() !== '' &&
+            entityToDelete.pastor.toLowerCase() !== 'not assigned';
         } else if (isSeminary) {
-          hasPastor = entityToDelete.rector && entityToDelete.rector.trim() !== '' && entityToDelete.rector.toLowerCase() !== 'not assigned';
+          hasPastor =
+            entityToDelete.rector &&
+            entityToDelete.rector.trim() !== '' &&
+            entityToDelete.rector.toLowerCase() !== 'not assigned';
         } else if (isSchool) {
-          hasPastor = entityToDelete.principal && entityToDelete.principal.trim() !== '' && entityToDelete.principal.toLowerCase() !== 'not assigned';
+          hasPastor =
+            entityToDelete.principal &&
+            entityToDelete.principal.trim() !== '' &&
+            entityToDelete.principal.toLowerCase() !== 'not assigned';
         }
 
         // 2. Collections check
@@ -339,8 +363,9 @@ export function EntityManagementControl({
         // 6. Predefined check (to protect default template data)
         let isPredefined = false;
         if (isParish) {
-          isPredefined = ALL_PARISHES.some((p: any) => p.name?.toLowerCase() === name.toLowerCase()) ||
-                         INITIAL_PARISHES.some((p: any) => p.name?.toLowerCase() === name.toLowerCase());
+          isPredefined =
+            ALL_PARISHES.some((p: any) => p.name?.toLowerCase() === name.toLowerCase()) ||
+            INITIAL_PARISHES.some((p: any) => p.name?.toLowerCase() === name.toLowerCase());
         }
 
         setDeleteState({
@@ -351,7 +376,7 @@ export function EntityManagementControl({
           hasAccounts,
           hasProjects: hasDbProjects,
           isPredefined,
-          hasAny: hasPastor || hasCollections || hasDbRecords || hasAccounts || hasDbProjects || isPredefined
+          hasAny: hasPastor || hasCollections || hasDbRecords || hasAccounts || hasDbProjects || isPredefined,
         });
       } catch (err) {
         console.error('Error running dependency check:', err);
@@ -363,7 +388,7 @@ export function EntityManagementControl({
           hasAccounts: false,
           hasProjects: false,
           isPredefined: false,
-          hasAny: false
+          hasAny: false,
         });
       }
     };
@@ -389,7 +414,7 @@ export function EntityManagementControl({
     city: '',
     lat: undefined,
     lng: undefined,
-    district: undefined
+    district: undefined,
   });
 
   const [showMap, setShowMap] = useState(false);
@@ -431,13 +456,13 @@ export function EntityManagementControl({
       (lowerName.includes('tinity') && lowerName.includes('pansol')) ||
       (lowerName.includes('trinty') && lowerName.includes('pansol'))
     ) {
-      setFormState(prev => ({
+      setFormState((prev) => ({
         ...prev,
         name: 'Holy Trinity Parish',
         lat: 14.18014,
         lng: 121.18536,
         city: 'Calamba City',
-        address: 'Pansol, Calamba City, Laguna'
+        address: 'Pansol, Calamba City, Laguna',
       }));
       setGeocodingStatus('Coordinates retrieved successfully (high-precision override)!');
       setIsMapLocked(true);
@@ -453,19 +478,22 @@ export function EntityManagementControl({
         try {
           const cityPart = formState.city ? `, ${formState.city}` : '';
           const query = encodeURIComponent(nameToSearch + cityPart + ', Laguna, Philippines');
-          const response = await fetch(`https://maps.googleapis.com/maps/api/geocode/json?address=${query}&key=${googleKey}`);
+          const response = await fetch(
+            `https://maps.googleapis.com/maps/api/geocode/json?address=${query}&key=${googleKey}`,
+          );
           if (response.ok) {
             const data = await response.json();
             if (data.status === 'OK' && data.results && data.results.length > 0) {
-              const filtered = data.results.filter((item: any) => 
-                (item.formatted_address || '').toLowerCase().includes('laguna') &&
-                !(item.formatted_address || '').toLowerCase().includes('quezon')
+              const filtered = data.results.filter(
+                (item: any) =>
+                  (item.formatted_address || '').toLowerCase().includes('laguna') &&
+                  !(item.formatted_address || '').toLowerCase().includes('quezon'),
               );
               if (filtered.length > 0) {
                 const target = filtered[0];
                 const lat = target.geometry.location.lat;
                 const lng = target.geometry.location.lng;
-                
+
                 let matchedCity = '';
                 if (target.address_components) {
                   const googleCity = getCityFromGoogleComponents(target.address_components);
@@ -474,14 +502,16 @@ export function EntityManagementControl({
                   }
                 }
 
-                setFormState(prev => ({
+                setFormState((prev) => ({
                   ...prev,
                   lat,
                   lng,
-                  ...(matchedCity ? { 
-                    city: matchedCity, 
-                    address: `${matchedCity}, Laguna`
-                  } : {})
+                  ...(matchedCity
+                    ? {
+                        city: matchedCity,
+                        address: `${matchedCity}, Laguna`,
+                      }
+                    : {}),
                 }));
                 setGeocodingStatus('Coordinates retrieved successfully (via Google Maps)!');
                 setIsMapLocked(true);
@@ -510,8 +540,8 @@ export function EntityManagementControl({
 
       let response = await fetch(url, {
         headers: {
-          'User-Agent': 'CapstoneParishGeocoding/1.0 (contact@diocese-sanpablo.ph)'
-        }
+          'User-Agent': 'CapstoneParishGeocoding/1.0 (contact@diocese-sanpablo.ph)',
+        },
       });
 
       if (!response.ok) throw new Error('Network response was not ok');
@@ -522,23 +552,30 @@ export function EntityManagementControl({
         const target = filtered[0];
         const lat = parseFloat(target.lat);
         const lng = parseFloat(target.lon);
-        
+
         let matchedCity = '';
         if (target.address) {
-          const osmCity = target.address.city || target.address.town || target.address.municipality || target.address.village || target.address.suburb;
+          const osmCity =
+            target.address.city ||
+            target.address.town ||
+            target.address.municipality ||
+            target.address.village ||
+            target.address.suburb;
           if (osmCity) {
             matchedCity = matchLagunaCity(osmCity) || '';
           }
         }
 
-        setFormState(prev => ({
+        setFormState((prev) => ({
           ...prev,
           lat,
           lng,
-          ...(matchedCity ? { 
-            city: matchedCity, 
-            address: `${matchedCity}, Laguna`
-          } : {})
+          ...(matchedCity
+            ? {
+                city: matchedCity,
+                address: `${matchedCity}, Laguna`,
+              }
+            : {}),
         }));
         setGeocodingStatus('Coordinates retrieved successfully!');
         setIsMapLocked(true);
@@ -554,8 +591,8 @@ export function EntityManagementControl({
 
       response = await fetch(url, {
         headers: {
-          'User-Agent': 'CapstoneParishGeocoding/1.0 (contact@diocese-sanpablo.ph)'
-        }
+          'User-Agent': 'CapstoneParishGeocoding/1.0 (contact@diocese-sanpablo.ph)',
+        },
       });
 
       if (response.ok) {
@@ -565,23 +602,30 @@ export function EntityManagementControl({
           const target = filtered[0];
           const lat = parseFloat(target.lat);
           const lng = parseFloat(target.lon);
-          
+
           let matchedCity = '';
           if (target.address) {
-            const osmCity = target.address.city || target.address.town || target.address.municipality || target.address.village || target.address.suburb;
+            const osmCity =
+              target.address.city ||
+              target.address.town ||
+              target.address.municipality ||
+              target.address.village ||
+              target.address.suburb;
             if (osmCity) {
               matchedCity = matchLagunaCity(osmCity) || '';
             }
           }
 
-          setFormState(prev => ({
+          setFormState((prev) => ({
             ...prev,
             lat,
             lng,
-            ...(matchedCity ? { 
-              city: matchedCity, 
-              address: `${matchedCity}, Laguna`
-            } : {})
+            ...(matchedCity
+              ? {
+                  city: matchedCity,
+                  address: `${matchedCity}, Laguna`,
+                }
+              : {}),
           }));
           setGeocodingStatus('Location found in Laguna! Drag pin to adjust if needed.');
           setIsMapLocked(true);
@@ -598,8 +642,8 @@ export function EntityManagementControl({
 
       response = await fetch(url, {
         headers: {
-          'User-Agent': 'CapstoneParishGeocoding/1.0 (contact@diocese-sanpablo.ph)'
-        }
+          'User-Agent': 'CapstoneParishGeocoding/1.0 (contact@diocese-sanpablo.ph)',
+        },
       });
 
       if (response.ok) {
@@ -609,23 +653,30 @@ export function EntityManagementControl({
           const target = filtered[0];
           const lat = parseFloat(target.lat);
           const lng = parseFloat(target.lon);
-          
+
           let matchedCity = '';
           if (target.address) {
-            const osmCity = target.address.city || target.address.town || target.address.municipality || target.address.village || target.address.suburb;
+            const osmCity =
+              target.address.city ||
+              target.address.town ||
+              target.address.municipality ||
+              target.address.village ||
+              target.address.suburb;
             if (osmCity) {
               matchedCity = matchLagunaCity(osmCity) || '';
             }
           }
 
-          setFormState(prev => ({
+          setFormState((prev) => ({
             ...prev,
             lat,
             lng,
-            ...(matchedCity ? { 
-              city: matchedCity, 
-              address: `${matchedCity}, Laguna`
-            } : {})
+            ...(matchedCity
+              ? {
+                  city: matchedCity,
+                  address: `${matchedCity}, Laguna`,
+                }
+              : {}),
           }));
           setGeocodingStatus('Location found in Laguna! Drag pin on map to adjust.');
           setIsMapLocked(true);
@@ -636,23 +687,26 @@ export function EntityManagementControl({
       }
 
       // 4. If all searches fail, center the map on Laguna as fallback and prompt user to do manual pinning
-      setFormState(prev => ({
+      setFormState((prev) => ({
         ...prev,
         lat: 14.1686,
-        lng: 121.3253
+        lng: 121.3253,
       }));
-      setGeocodingStatus('Parish location not found in Laguna! Coordinates centered on Laguna. Please drag the map pin to manually locate it.');
+      setGeocodingStatus(
+        'Parish location not found in Laguna! Coordinates centered on Laguna. Please drag the map pin to manually locate it.',
+      );
       setIsMapLocked(false);
       setShowMap(true);
-
     } catch (error) {
       console.error('Error during geocoding:', error);
-      setFormState(prev => ({
+      setFormState((prev) => ({
         ...prev,
         lat: 14.1686,
-        lng: 121.3253
+        lng: 121.3253,
       }));
-      setGeocodingStatus('Could not retrieve coordinates. Coordinates centered on Laguna. Please unlock and drag map pin.');
+      setGeocodingStatus(
+        'Could not retrieve coordinates. Coordinates centered on Laguna. Please unlock and drag map pin.',
+      );
       setIsMapLocked(false);
       setShowMap(true);
     } finally {
@@ -684,12 +738,14 @@ export function EntityManagementControl({
       (lowerName.includes('tinity') && lowerName.includes('pansol')) ||
       (lowerName.includes('trinty') && lowerName.includes('pansol'))
     ) {
-      setSuggestions([{
-        display_name: 'Holy Trinity Parish, Pansol, Calamba City, Laguna',
-        lat: '14.18014',
-        lon: '121.18536',
-        city: 'Calamba City'
-      }]);
+      setSuggestions([
+        {
+          display_name: 'Holy Trinity Parish, Pansol, Calamba City, Laguna',
+          lat: '14.18014',
+          lon: '121.18536',
+          city: 'Calamba City',
+        },
+      ]);
       return;
     }
 
@@ -697,18 +753,22 @@ export function EntityManagementControl({
       setIsFetchingSuggestions(true);
       try {
         // 0. Double Safety Net: If Google API Key is provided, fetch suggestions via Google Geocoding API!
-        const googleKey = process.env.NEXT_PUBLIC_GOOGLE_MAPS_PLATFORM_KEY || process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY;
+        const googleKey =
+          process.env.NEXT_PUBLIC_GOOGLE_MAPS_PLATFORM_KEY || process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY;
         if (googleKey && googleKey.trim() !== '') {
           try {
             const cityPart = formState.city ? `, ${formState.city}` : '';
             const query = encodeURIComponent(formState.name + cityPart + ', Laguna, Philippines');
-            const response = await fetch(`https://maps.googleapis.com/maps/api/geocode/json?address=${query}&key=${googleKey}`);
+            const response = await fetch(
+              `https://maps.googleapis.com/maps/api/geocode/json?address=${query}&key=${googleKey}`,
+            );
             if (response.ok) {
               const data = await response.json();
               if (data.status === 'OK' && data.results) {
-                const physicalOnly = data.results.filter((item: any) => 
-                  (item.formatted_address || '').toLowerCase().includes('laguna') &&
-                  !(item.formatted_address || '').toLowerCase().includes('quezon')
+                const physicalOnly = data.results.filter(
+                  (item: any) =>
+                    (item.formatted_address || '').toLowerCase().includes('laguna') &&
+                    !(item.formatted_address || '').toLowerCase().includes('quezon'),
                 );
                 const mapped = physicalOnly.slice(0, 5).map((item: any) => {
                   let matchedCity = '';
@@ -722,7 +782,7 @@ export function EntityManagementControl({
                     display_name: `${item.formatted_address.split(',')[0]}, ${item.formatted_address}`,
                     lat: item.geometry.location.lat.toString(),
                     lon: item.geometry.location.lng.toString(),
-                    city: matchedCity
+                    city: matchedCity,
                   };
                 });
                 setSuggestions(mapped);
@@ -742,18 +802,27 @@ export function EntityManagementControl({
           `https://nominatim.openstreetmap.org/search?format=json&addressdetails=1&q=${query}&limit=15&countrycodes=ph`,
           {
             headers: {
-              'User-Agent': 'CapstoneParishGeocoding/1.0 (contact@diocese-sanpablo.ph)'
-            }
-          }
+              'User-Agent': 'CapstoneParishGeocoding/1.0 (contact@diocese-sanpablo.ph)',
+            },
+          },
         );
         if (response.ok) {
           const data = await response.json();
-          const physicalOnly = (data || []).filter((item: any) => item.class !== 'boundary' && item.type !== 'administrative');
-          const lagunaOnly = physicalOnly.filter((item: any) => (item.display_name || '').toLowerCase().includes('laguna'));
+          const physicalOnly = (data || []).filter(
+            (item: any) => item.class !== 'boundary' && item.type !== 'administrative',
+          );
+          const lagunaOnly = physicalOnly.filter((item: any) =>
+            (item.display_name || '').toLowerCase().includes('laguna'),
+          );
           const mapped = lagunaOnly.slice(0, 5).map((item: any) => {
             let matchedCity = '';
             if (item.address) {
-              const osmCity = item.address.city || item.address.town || item.address.municipality || item.address.village || item.address.suburb;
+              const osmCity =
+                item.address.city ||
+                item.address.town ||
+                item.address.municipality ||
+                item.address.village ||
+                item.address.suburb;
               if (osmCity) {
                 matchedCity = matchLagunaCity(osmCity) || '';
               }
@@ -762,7 +831,7 @@ export function EntityManagementControl({
               display_name: item.display_name,
               lat: item.lat,
               lon: item.lon,
-              city: matchedCity
+              city: matchedCity,
             };
           });
           setSuggestions(mapped);
@@ -820,7 +889,7 @@ export function EntityManagementControl({
         city: extractedCity,
         lat: entity.lat !== undefined ? Number(entity.lat) : undefined,
         lng: entity.lng !== undefined ? Number(entity.lng) : undefined,
-        district: entity.district || VICARIATE_TO_DISTRICT[entity.vicariate || VICARIATES[0]] || DISTRICTS[0]
+        district: entity.district || VICARIATE_TO_DISTRICT[entity.vicariate || VICARIATES[0]] || DISTRICTS[0],
       });
       setLastGeocodedName(entity.name || '');
       setShowMap(entity.lat !== undefined && entity.lng !== undefined);
@@ -835,7 +904,7 @@ export function EntityManagementControl({
         city: '',
         lat: undefined,
         lng: undefined,
-        district: ''
+        district: '',
       });
       setLastGeocodedName('');
       setShowMap(false);
@@ -851,12 +920,12 @@ export function EntityManagementControl({
     e.preventDefault();
     const id = editingEntity ? editingEntity.id : Math.random().toString(36).substr(2, 9);
     const type = activeSubTab === 'parishes' ? 'parish' : activeSubTab === 'seminaries' ? 'seminary' : 'school';
-    
+
     const baseData = {
       name: formState.name,
       vicariate: formState.vicariate,
       class: formState.class,
-      address: formState.address
+      address: formState.address,
     };
 
     let payload: any = { type };
@@ -875,7 +944,7 @@ export function EntityManagementControl({
         lat: formState.lat,
         lng: formState.lng,
         district: formState.district,
-        status: 'active'
+        status: 'active',
       };
     } else if (activeSubTab === 'seminaries') {
       payload = {
@@ -886,7 +955,7 @@ export function EntityManagementControl({
         enrollment: editingEntity?.enrollment || 0,
         capacity: editingEntity?.capacity || 0,
         staff: editingEntity?.staff || 0,
-        status: 'active'
+        status: 'active',
       };
     } else {
       payload = {
@@ -898,7 +967,7 @@ export function EntityManagementControl({
         enrollment: editingEntity?.enrollment || 0,
         capacity: editingEntity?.capacity || 0,
         staff: editingEntity?.staff || 0,
-        status: 'active'
+        status: 'active',
       };
     }
 
@@ -907,11 +976,11 @@ export function EntityManagementControl({
       const res = await fetch('/api/admin/entities', {
         method,
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload)
+        body: JSON.stringify(payload),
       });
       if (!res.ok) throw new Error('API save failed');
       const savedEntity = await res.json();
-      
+
       const mappedEntity: any = {
         id: savedEntity.id || id,
         name: savedEntity.name,
@@ -920,18 +989,18 @@ export function EntityManagementControl({
         address: savedEntity.address,
         status: savedEntity.status || 'active',
         district: savedEntity.district,
-        collections: savedEntity.collections
+        collections: savedEntity.collections,
       };
-      
+
       if (activeSubTab === 'parishes') {
         mappedEntity.pastor = savedEntity.pastor;
         mappedEntity.contactNumber = savedEntity.contact_number || savedEntity.contactNumber;
         mappedEntity.email = savedEntity.email;
         mappedEntity.lat = savedEntity.lat !== undefined ? Number(savedEntity.lat) : undefined;
         mappedEntity.lng = savedEntity.lng !== undefined ? Number(savedEntity.lng) : undefined;
-        
+
         if (editingEntity) {
-          onUpdateParishes(parishes.map(p => p.id === editingEntity.id ? mappedEntity : p));
+          onUpdateParishes(parishes.map((p) => (p.id === editingEntity.id ? mappedEntity : p)));
           setShowSuccess({ show: true, message: 'Parish updated successfully!' });
         } else {
           onUpdateParishes([...parishes, mappedEntity]);
@@ -944,7 +1013,7 @@ export function EntityManagementControl({
         mappedEntity.staff = savedEntity.staff;
 
         if (editingEntity) {
-          onUpdateSeminaries(seminaries.map(s => s.id === editingEntity.id ? mappedEntity : s));
+          onUpdateSeminaries(seminaries.map((s) => (s.id === editingEntity.id ? mappedEntity : s)));
           setShowSuccess({ show: true, message: 'Seminary updated successfully!' });
         } else {
           onUpdateSeminaries([...seminaries, mappedEntity]);
@@ -958,7 +1027,7 @@ export function EntityManagementControl({
         mappedEntity.staff = savedEntity.staff;
 
         if (editingEntity) {
-          onUpdateSchools(schools.map(s => s.id === editingEntity.id ? mappedEntity : s));
+          onUpdateSchools(schools.map((s) => (s.id === editingEntity.id ? mappedEntity : s)));
           setShowSuccess({ show: true, message: 'School updated successfully!' });
         } else {
           onUpdateSchools([...schools, mappedEntity]);
@@ -973,11 +1042,11 @@ export function EntityManagementControl({
         vicariate: formState.vicariate,
         class: formState.class,
         address: formState.address,
-        status: 'active' as const
+        status: 'active' as const,
       };
-      
+
       if (activeSubTab === 'parishes') {
-        const newParish: Parish = { 
+        const newParish: Parish = {
           ...baseDataLocal,
           class: formState.class as EntityClass,
           pastor: editingEntity?.pastor || '',
@@ -985,43 +1054,43 @@ export function EntityManagementControl({
           email: editingEntity?.email || '',
           lat: formState.lat,
           lng: formState.lng,
-          district: formState.district
+          district: formState.district,
         };
         if (editingEntity) {
-          onUpdateParishes(parishes.map(p => p.id === id ? newParish : p));
+          onUpdateParishes(parishes.map((p) => (p.id === id ? newParish : p)));
           setShowSuccess({ show: true, message: 'Parish updated successfully (Offline Mode)!' });
         } else {
           onUpdateParishes([...parishes, newParish]);
           setShowSuccess({ show: true, message: 'Parish created successfully (Offline Mode)!' });
         }
       } else if (activeSubTab === 'seminaries') {
-        const newSeminary: Seminary = { 
+        const newSeminary: Seminary = {
           ...baseDataLocal,
           class: formState.class as EntityClass,
           rector: editingEntity?.rector || '',
           enrollment: editingEntity?.enrollment || 0,
           capacity: editingEntity?.capacity || 0,
-          staff: editingEntity?.staff || 0
+          staff: editingEntity?.staff || 0,
         };
         if (editingEntity) {
-          onUpdateSeminaries(seminaries.map(s => s.id === id ? newSeminary : s));
+          onUpdateSeminaries(seminaries.map((s) => (s.id === id ? newSeminary : s)));
           setShowSuccess({ show: true, message: 'Seminary updated successfully (Offline Mode)!' });
         } else {
           onUpdateSeminaries([...seminaries, newSeminary]);
           setShowSuccess({ show: true, message: 'Seminary created successfully (Offline Mode)!' });
         }
       } else {
-        const newSchool: DiocesanSchool = { 
+        const newSchool: DiocesanSchool = {
           ...baseDataLocal,
           class: formState.class as EntityClass,
           principal: editingEntity?.principal || '',
           level: editingEntity?.level || 'K-12',
           enrollment: editingEntity?.enrollment || 0,
           capacity: editingEntity?.capacity || 0,
-          staff: editingEntity?.staff || 0
+          staff: editingEntity?.staff || 0,
         };
         if (editingEntity) {
-          onUpdateSchools(schools.map(s => s.id === id ? newSchool : s));
+          onUpdateSchools(schools.map((s) => (s.id === id ? newSchool : s)));
           setShowSuccess({ show: true, message: 'School updated successfully (Offline Mode)!' });
         } else {
           onUpdateSchools([...schools, newSchool]);
@@ -1036,45 +1105,45 @@ export function EntityManagementControl({
 
   const handleDelete = async () => {
     if (!entityToDelete) return;
-    
+
     const isParish = activeSubTab === 'parishes';
     const isSeminary = activeSubTab === 'seminaries';
     const isSchool = activeSubTab === 'schools';
     const type = isParish ? 'parish' : isSeminary ? 'seminary' : 'school';
-    
+
     const hardDelete = !deleteState.hasAny;
 
     try {
       const res = await fetch('/api/admin/entities', {
         method: 'DELETE',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ type, id: entityToDelete.id, hard: hardDelete })
+        body: JSON.stringify({ type, id: entityToDelete.id, hard: hardDelete }),
       });
-      
+
       if (!res.ok) throw new Error('API delete failed');
-      
+
       if (isParish) {
         if (hardDelete) {
-          onUpdateParishes(parishes.filter(p => p.id !== entityToDelete.id));
+          onUpdateParishes(parishes.filter((p) => p.id !== entityToDelete.id));
           setShowSuccess({ show: true, message: 'Parish permanently deleted!' });
         } else {
-          onUpdateParishes(parishes.map(p => p.id === entityToDelete.id ? { ...p, status: 'inactive' } : p));
+          onUpdateParishes(parishes.map((p) => (p.id === entityToDelete.id ? { ...p, status: 'inactive' } : p)));
           setShowSuccess({ show: true, message: 'Parish archived successfully to protect historical data!' });
         }
       } else if (isSeminary) {
         if (hardDelete) {
-          onUpdateSeminaries(seminaries.filter(s => s.id !== entityToDelete.id));
+          onUpdateSeminaries(seminaries.filter((s) => s.id !== entityToDelete.id));
           setShowSuccess({ show: true, message: 'Seminary permanently deleted!' });
         } else {
-          onUpdateSeminaries(seminaries.map(s => s.id === entityToDelete.id ? { ...s, status: 'inactive' } : s));
+          onUpdateSeminaries(seminaries.map((s) => (s.id === entityToDelete.id ? { ...s, status: 'inactive' } : s)));
           setShowSuccess({ show: true, message: 'Seminary archived successfully!' });
         }
       } else {
         if (hardDelete) {
-          onUpdateSchools(schools.filter(s => s.id !== entityToDelete.id));
+          onUpdateSchools(schools.filter((s) => s.id !== entityToDelete.id));
           setShowSuccess({ show: true, message: 'School permanently deleted!' });
         } else {
-          onUpdateSchools(schools.map(s => s.id === entityToDelete.id ? { ...s, status: 'inactive' } : s));
+          onUpdateSchools(schools.map((s) => (s.id === entityToDelete.id ? { ...s, status: 'inactive' } : s)));
           setShowSuccess({ show: true, message: 'School archived successfully!' });
         }
       }
@@ -1082,26 +1151,26 @@ export function EntityManagementControl({
       console.error('Error during deletion, falling back to local memory:', err);
       if (isParish) {
         if (hardDelete) {
-          onUpdateParishes(parishes.filter(p => p.id !== entityToDelete.id));
+          onUpdateParishes(parishes.filter((p) => p.id !== entityToDelete.id));
           setShowSuccess({ show: true, message: 'Parish permanently deleted (Offline Mode)!' });
         } else {
-          onUpdateParishes(parishes.map(p => p.id === entityToDelete.id ? { ...p, status: 'inactive' } : p));
+          onUpdateParishes(parishes.map((p) => (p.id === entityToDelete.id ? { ...p, status: 'inactive' } : p)));
           setShowSuccess({ show: true, message: 'Parish archived successfully (Offline Mode)!' });
         }
       } else if (isSeminary) {
         if (hardDelete) {
-          onUpdateSeminaries(seminaries.filter(s => s.id !== entityToDelete.id));
+          onUpdateSeminaries(seminaries.filter((s) => s.id !== entityToDelete.id));
           setShowSuccess({ show: true, message: 'Seminary permanently deleted (Offline Mode)!' });
         } else {
-          onUpdateSeminaries(seminaries.map(s => s.id === entityToDelete.id ? { ...s, status: 'inactive' } : s));
+          onUpdateSeminaries(seminaries.map((s) => (s.id === entityToDelete.id ? { ...s, status: 'inactive' } : s)));
           setShowSuccess({ show: true, message: 'Seminary archived successfully (Offline Mode)!' });
         }
       } else {
         if (hardDelete) {
-          onUpdateSchools(schools.filter(s => s.id !== entityToDelete.id));
+          onUpdateSchools(schools.filter((s) => s.id !== entityToDelete.id));
           setShowSuccess({ show: true, message: 'School permanently deleted (Offline Mode)!' });
         } else {
-          onUpdateSchools(schools.map(s => s.id === entityToDelete.id ? { ...s, status: 'inactive' } : s));
+          onUpdateSchools(schools.map((s) => (s.id === entityToDelete.id ? { ...s, status: 'inactive' } : s)));
           setShowSuccess({ show: true, message: 'School archived successfully (Offline Mode)!' });
         }
       }
@@ -1116,16 +1185,16 @@ export function EntityManagementControl({
     const query = searchQuery.toLowerCase();
     if (activeSubTab === 'parishes') {
       return parishes
-        .filter(p => p.status !== 'inactive')
-        .filter(p => p.name.toLowerCase().includes(query) || p.vicariate.toLowerCase().includes(query));
+        .filter((p) => p.status !== 'inactive')
+        .filter((p) => p.name.toLowerCase().includes(query) || p.vicariate.toLowerCase().includes(query));
     } else if (activeSubTab === 'seminaries') {
       return seminaries
-        .filter(s => s.status !== 'inactive')
-        .filter(s => s.name.toLowerCase().includes(query) || s.vicariate.toLowerCase().includes(query));
+        .filter((s) => s.status !== 'inactive')
+        .filter((s) => s.name.toLowerCase().includes(query) || s.vicariate.toLowerCase().includes(query));
     } else {
       return schools
-        .filter(s => s.status !== 'inactive')
-        .filter(s => s.name.toLowerCase().includes(query) || s.vicariate.toLowerCase().includes(query));
+        .filter((s) => s.status !== 'inactive')
+        .filter((s) => s.name.toLowerCase().includes(query) || s.vicariate.toLowerCase().includes(query));
     }
   };
 
@@ -1143,7 +1212,8 @@ export function EntityManagementControl({
                 <div className="space-y-2">
                   <h3 className="text-xl font-bold text-gray-900">Analyzing Dependencies</h3>
                   <p className="text-xs text-gray-500 leading-relaxed">
-                    Checking financial reports, historical collections, projects, and active personnel assignments for <span className="font-bold text-gray-900">"{entityToDelete?.name}"</span>...
+                    Checking financial reports, historical collections, projects, and active personnel assignments for{' '}
+                    <span className="font-bold text-gray-900">"{entityToDelete?.name}"</span>...
                   </p>
                 </div>
               </div>
@@ -1156,17 +1226,26 @@ export function EntityManagementControl({
                 <div className="space-y-2">
                   <h3 className="text-2xl font-bold text-gray-900">Safe Archive Required</h3>
                   <p className="text-xs text-gray-500 leading-relaxed">
-                    Historical dependency records were detected for <span className="font-bold text-gray-900">"{entityToDelete?.name}"</span>. 
-                    To protect multi-year aggregates, audit history, and reporting integrity, this entry will be safely archived and hidden from active views.
+                    Historical dependency records were detected for{' '}
+                    <span className="font-bold text-gray-900">"{entityToDelete?.name}"</span>. To protect multi-year
+                    aggregates, audit history, and reporting integrity, this entry will be safely archived and hidden
+                    from active views.
                   </p>
                 </div>
-                
+
                 <div className="bg-amber-50/50 rounded-2xl p-4 border border-amber-100 text-left space-y-2 max-h-[160px] overflow-y-auto scrollbar-thin">
-                  <span className="text-[10px] font-bold text-amber-600 uppercase tracking-widest block mb-1">Detected Dependencies:</span>
+                  <span className="text-[10px] font-bold text-amber-600 uppercase tracking-widest block mb-1">
+                    Detected Dependencies:
+                  </span>
                   {deleteState.hasPastor && (
                     <div className="flex items-center gap-2 text-xs font-semibold text-gray-700">
                       <span className="text-amber-500 text-xs">⛪</span>
-                      <span>Assigned Pastor: <span className="text-gray-900 font-bold">{entityToDelete.pastor || entityToDelete.rector || entityToDelete.principal}</span></span>
+                      <span>
+                        Assigned Pastor:{' '}
+                        <span className="text-gray-900 font-bold">
+                          {entityToDelete.pastor || entityToDelete.rector || entityToDelete.principal}
+                        </span>
+                      </span>
                     </div>
                   )}
                   {deleteState.hasCollections && (
@@ -1196,13 +1275,13 @@ export function EntityManagementControl({
                 </div>
 
                 <div className="flex gap-3 pt-2">
-                  <button 
+                  <button
                     onClick={() => setIsDeleteModalOpen(false)}
                     className="flex-1 px-6 py-3 border border-gray-200 rounded-xl font-bold text-gray-500 hover:bg-gray-50 transition-colors text-sm"
                   >
                     Cancel
                   </button>
-                  <button 
+                  <button
                     onClick={handleDelete}
                     className="flex-1 px-6 py-3 bg-[#D4AF37] hover:bg-[#B5952F] text-white rounded-xl font-bold transition-colors shadow-lg shadow-[#D4AF37]/20 text-sm"
                   >
@@ -1219,13 +1298,15 @@ export function EntityManagementControl({
                 <div className="space-y-2">
                   <h3 className="text-2xl font-bold text-gray-900">Delete Permanently</h3>
                   <p className="text-xs text-gray-500 leading-relaxed">
-                    No active dependencies, projects, or historical financial records were detected for <span className="font-bold text-gray-900">"{entityToDelete?.name}"</span>.
+                    No active dependencies, projects, or historical financial records were detected for{' '}
+                    <span className="font-bold text-gray-900">"{entityToDelete?.name}"</span>.
                   </p>
                   <p className="text-[11px] text-gray-400 mt-1 leading-relaxed">
-                    Since this entry appears to be a clean record (e.g. created by accident due to a typo), it will be **permanently erased** from the system. This cannot be undone.
+                    Since this entry appears to be a clean record (e.g. created by accident due to a typo), it will be
+                    **permanently erased** from the system. This cannot be undone.
                   </p>
                 </div>
-                
+
                 <div className="bg-emerald-50/50 rounded-2xl p-4 border border-emerald-100/50 text-left">
                   <div className="flex items-center gap-2 text-xs font-bold text-emerald-700">
                     <CheckCircle className="w-4 h-4 text-emerald-500 flex-shrink-0" />
@@ -1234,13 +1315,13 @@ export function EntityManagementControl({
                 </div>
 
                 <div className="flex gap-3 pt-2">
-                  <button 
+                  <button
                     onClick={() => setIsDeleteModalOpen(false)}
                     className="flex-1 px-6 py-3 border border-gray-200 rounded-xl font-bold text-gray-500 hover:bg-gray-50 transition-colors text-sm"
                   >
                     Cancel
                   </button>
-                  <button 
+                  <button
                     onClick={handleDelete}
                     className="flex-1 px-6 py-3 bg-rose-500 text-white rounded-xl font-bold hover:bg-rose-600 transition-colors shadow-lg shadow-rose-500/20 text-sm"
                   >
@@ -1256,7 +1337,9 @@ export function EntityManagementControl({
       {/* Add/Edit Modal */}
       {isModalOpen && (
         <div className="fixed inset-0 bg-black/40 z-[110] flex items-center justify-center p-4 backdrop-blur-sm animate-in fade-in duration-200">
-          <div className={`bg-white rounded-3xl shadow-2xl w-full ${activeSubTab === 'parishes' ? 'max-w-4xl' : 'max-w-md'} max-h-[90vh] overflow-hidden flex flex-col animate-in zoom-in-95 duration-200 border border-gray-100`}>
+          <div
+            className={`bg-white rounded-3xl shadow-2xl w-full ${activeSubTab === 'parishes' ? 'max-w-4xl' : 'max-w-md'} max-h-[90vh] overflow-hidden flex flex-col animate-in zoom-in-95 duration-200 border border-gray-100`}
+          >
             <div className="bg-[#1A1A1A] p-8 text-white relative overflow-hidden shrink-0">
               <div className="absolute top-0 right-0 w-32 h-32 bg-[#D4AF37]/10 rounded-full -mr-16 -mt-16 blur-2xl"></div>
               <h3 className="text-2xl font-bold relative z-10">
@@ -1266,9 +1349,9 @@ export function EntityManagementControl({
                 Enter the details for the {activeSubTab.slice(0, -1)} below.
               </p>
             </div>
-            
-            <form 
-              onSubmit={handleSave} 
+
+            <form
+              onSubmit={handleSave}
               onKeyDown={(e) => {
                 // Prevent standard Enter key form submission from inside input fields
                 if (e.key === 'Enter' && (e.target as HTMLElement).tagName === 'INPUT') {
@@ -1288,14 +1371,16 @@ export function EntityManagementControl({
                   {/* Left Column: Parish Details */}
                   <div className="space-y-5">
                     <div>
-                      <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-2 ml-1">Name <span className="text-rose-500 font-bold ml-0.5">*</span></label>
+                      <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-2 ml-1">
+                        Name <span className="text-rose-500 font-bold ml-0.5">*</span>
+                      </label>
                       <div className="relative">
-                        <input 
-                          type="text" 
+                        <input
+                          type="text"
                           required
                           id="parish-name-input"
                           value={formState.name}
-                          onChange={(e) => setFormState({...formState, name: e.target.value})}
+                          onChange={(e) => setFormState({ ...formState, name: e.target.value })}
                           placeholder="e.g. St. Jude Parish"
                           className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-gray-900 focus:outline-none focus:border-[#D4AF37] focus:ring-1 focus:ring-[#D4AF37] transition-all placeholder:text-gray-400"
                         />
@@ -1304,13 +1389,13 @@ export function EntityManagementControl({
                             Searching...
                           </span>
                         )}
-                        
+
                         {suggestions.length > 0 && (
                           <div className="absolute left-0 right-0 top-[calc(100%+4px)] bg-white border border-gray-100 rounded-2xl shadow-xl z-[120] max-h-[220px] overflow-y-auto pr-1 py-2 divide-y divide-gray-50 scrollbar-thin animate-in slide-in-from-top-2 duration-150">
                             {suggestions.map((sug, idx) => {
                               const displayName = sug.display_name.split(',')[0];
                               const addressDetails = sug.display_name.split(',').slice(1, 4).join(',').trim();
-                              
+
                               return (
                                 <button
                                   key={idx}
@@ -1318,15 +1403,17 @@ export function EntityManagementControl({
                                   onClick={() => {
                                     const lat = parseFloat(sug.lat);
                                     const lng = parseFloat(sug.lon);
-                                    setFormState(prev => ({
+                                    setFormState((prev) => ({
                                       ...prev,
                                       name: displayName,
                                       lat,
                                       lng,
-                                      ...(sug.city ? { 
-                                        city: sug.city, 
-                                        address: `${sug.city}, Laguna`
-                                      } : {})
+                                      ...(sug.city
+                                        ? {
+                                            city: sug.city,
+                                            address: `${sug.city}, Laguna`,
+                                          }
+                                        : {}),
                                     }));
                                     setLastGeocodedName(displayName);
                                     setGeocodingStatus('Coordinates set successfully from suggestion!');
@@ -1350,30 +1437,36 @@ export function EntityManagementControl({
                     </div>
 
                     <div>
-                      <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-2 ml-1">City / Town <span className="text-rose-500 font-bold ml-0.5">*</span></label>
+                      <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-2 ml-1">
+                        City / Town <span className="text-rose-500 font-bold ml-0.5">*</span>
+                      </label>
                       <div className="relative">
-                        <select 
+                        <select
                           required
                           value={formState.city || ''}
                           onChange={(e) => {
                             const selectedCity = e.target.value;
-                            setFormState(prev => ({
+                            setFormState((prev) => ({
                               ...prev,
                               city: selectedCity,
-                              address: selectedCity ? `${selectedCity}, Laguna` : ''
+                              address: selectedCity ? `${selectedCity}, Laguna` : '',
                             }));
                           }}
                           className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-gray-900 focus:outline-none focus:border-[#D4AF37] focus:ring-1 focus:ring-[#D4AF37] transition-all appearance-none font-medium text-sm"
                         >
-                          <option value="" disabled hidden>Select City or Town...</option>
+                          <option value="" disabled hidden>
+                            Select City or Town...
+                          </option>
                           {(() => {
                             const list = [...LAGUNA_CITIES_TOWNS];
                             if (formState.city && !list.includes(formState.city)) {
                               list.push(formState.city);
                               list.sort();
                             }
-                            return list.map(city => (
-                              <option key={city} value={city}>{city}</option>
+                            return list.map((city) => (
+                              <option key={city} value={city}>
+                                {city}
+                              </option>
                             ));
                           })()}
                         </select>
@@ -1382,27 +1475,33 @@ export function EntityManagementControl({
                         </div>
                       </div>
                     </div>
-                    
+
                     <div>
-                      <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-2 ml-1">Vicariate <span className="text-rose-500 font-bold ml-0.5">*</span></label>
+                      <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-2 ml-1">
+                        Vicariate <span className="text-rose-500 font-bold ml-0.5">*</span>
+                      </label>
                       <div className="relative">
-                        <select 
+                        <select
                           required
                           value={formState.vicariate}
                           onChange={(e) => {
                             const vicVal = e.target.value;
-                            const autoDist = vicVal ? (VICARIATE_TO_DISTRICT[vicVal] || DISTRICTS[0]) : '';
-                            setFormState(prev => ({
+                            const autoDist = vicVal ? VICARIATE_TO_DISTRICT[vicVal] || DISTRICTS[0] : '';
+                            setFormState((prev) => ({
                               ...prev,
                               vicariate: vicVal,
-                              district: autoDist
+                              district: autoDist,
                             }));
                           }}
                           className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-gray-900 focus:outline-none focus:border-[#D4AF37] focus:ring-1 focus:ring-[#D4AF37] transition-all appearance-none"
                         >
-                          <option value="" disabled hidden>Select Vicariate...</option>
-                          {VICARIATES.map(v => (
-                            <option key={v} value={v}>{stripVicariatePrefix(v)}</option>
+                          <option value="" disabled hidden>
+                            Select Vicariate...
+                          </option>
+                          {VICARIATES.map((v) => (
+                            <option key={v} value={v}>
+                              {stripVicariatePrefix(v)}
+                            </option>
                           ))}
                         </select>
                         <div className="absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none">
@@ -1412,17 +1511,23 @@ export function EntityManagementControl({
                     </div>
 
                     <div>
-                      <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-2 ml-1">District <span className="text-rose-500 font-bold ml-0.5">*</span></label>
+                      <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-2 ml-1">
+                        District <span className="text-rose-500 font-bold ml-0.5">*</span>
+                      </label>
                       <div className="relative">
-                        <select 
+                        <select
                           required
                           value={formState.district || ''}
-                          onChange={(e) => setFormState({...formState, district: e.target.value})}
+                          onChange={(e) => setFormState({ ...formState, district: e.target.value })}
                           className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-gray-900 focus:outline-none focus:border-[#D4AF37] focus:ring-1 focus:ring-[#D4AF37] transition-all appearance-none"
                         >
-                          <option value="" disabled hidden>Select District...</option>
-                          {DISTRICTS.map(d => (
-                            <option key={d} value={d}>{d}</option>
+                          <option value="" disabled hidden>
+                            Select District...
+                          </option>
+                          {DISTRICTS.map((d) => (
+                            <option key={d} value={d}>
+                              {d}
+                            </option>
                           ))}
                         </select>
                         <div className="absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none">
@@ -1440,14 +1545,21 @@ export function EntityManagementControl({
                     <div className="space-y-4">
                       <div className="flex gap-4">
                         <div className="flex-1">
-                          <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-2 ml-1">Latitude <span className="text-rose-500 font-bold ml-0.5">*</span></label>
-                          <input 
-                            type="number" 
+                          <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-2 ml-1">
+                            Latitude <span className="text-rose-500 font-bold ml-0.5">*</span>
+                          </label>
+                          <input
+                            type="number"
                             step="any"
                             required
                             disabled={isMapLocked}
                             value={formState.lat !== undefined ? formState.lat : ''}
-                            onChange={(e) => setFormState({...formState, lat: e.target.value === '' ? undefined : Number(e.target.value)})}
+                            onChange={(e) =>
+                              setFormState({
+                                ...formState,
+                                lat: e.target.value === '' ? undefined : Number(e.target.value),
+                              })
+                            }
                             placeholder="e.g. 14.1686"
                             className={`w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-gray-900 focus:outline-none focus:border-[#D4AF37] focus:ring-1 focus:ring-[#D4AF37] transition-all placeholder:text-gray-400 text-xs ${
                               isMapLocked ? 'opacity-60 cursor-not-allowed bg-gray-100/50' : ''
@@ -1455,14 +1567,21 @@ export function EntityManagementControl({
                           />
                         </div>
                         <div className="flex-1">
-                          <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-2 ml-1">Longitude <span className="text-rose-500 font-bold ml-0.5">*</span></label>
-                          <input 
-                            type="number" 
+                          <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-2 ml-1">
+                            Longitude <span className="text-rose-500 font-bold ml-0.5">*</span>
+                          </label>
+                          <input
+                            type="number"
                             step="any"
                             required
                             disabled={isMapLocked}
                             value={formState.lng !== undefined ? formState.lng : ''}
-                            onChange={(e) => setFormState({...formState, lng: e.target.value === '' ? undefined : Number(e.target.value)})}
+                            onChange={(e) =>
+                              setFormState({
+                                ...formState,
+                                lng: e.target.value === '' ? undefined : Number(e.target.value),
+                              })
+                            }
                             placeholder="e.g. 121.3253"
                             className={`w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-gray-900 focus:outline-none focus:border-[#D4AF37] focus:ring-1 focus:ring-[#D4AF37] transition-all placeholder:text-gray-400 text-xs ${
                               isMapLocked ? 'opacity-60 cursor-not-allowed bg-gray-100/50' : ''
@@ -1473,9 +1592,11 @@ export function EntityManagementControl({
 
                       <div className="flex flex-col gap-2">
                         <div className="flex items-center justify-between mt-1 px-1">
-                          <span className={`text-[10px] font-bold uppercase tracking-wider flex items-center gap-1 ${
-                            isMapLocked ? 'text-gray-400' : 'text-amber-600 animate-pulse'
-                          }`}>
+                          <span
+                            className={`text-[10px] font-bold uppercase tracking-wider flex items-center gap-1 ${
+                              isMapLocked ? 'text-gray-400' : 'text-amber-600 animate-pulse'
+                            }`}
+                          >
                             {isMapLocked ? '🔒 Coordinates Locked' : '🔓 Coordinates Editable'}
                           </span>
                           {isMapLocked && (
@@ -1503,13 +1624,17 @@ export function EntityManagementControl({
                           </button>
                         </div>
                         {geocodingStatus && (
-                          <div className={`text-[10px] font-bold px-3 py-2 rounded-xl border leading-relaxed ${
-                            geocodingStatus.includes('Retrieving')
-                              ? 'text-gray-600 bg-gray-50/50 border-gray-100'
-                              : geocodingStatus.includes('not found') || geocodingStatus.includes('Could not') || geocodingStatus.includes('Please enter')
-                                ? 'text-rose-700 bg-rose-50/50 border-rose-100'
-                                : 'text-emerald-700 bg-emerald-50/50 border-emerald-100'
-                          }`}>
+                          <div
+                            className={`text-[10px] font-bold px-3 py-2 rounded-xl border leading-relaxed ${
+                              geocodingStatus.includes('Retrieving')
+                                ? 'text-gray-600 bg-gray-50/50 border-gray-100'
+                                : geocodingStatus.includes('not found') ||
+                                    geocodingStatus.includes('Could not') ||
+                                    geocodingStatus.includes('Please enter')
+                                  ? 'text-rose-700 bg-rose-50/50 border-rose-100'
+                                  : 'text-emerald-700 bg-emerald-50/50 border-emerald-100'
+                            }`}
+                          >
                             {geocodingStatus}
                           </div>
                         )}
@@ -1517,36 +1642,39 @@ export function EntityManagementControl({
                     </div>
 
                     <div className="w-full h-[220px] rounded-xl overflow-hidden border border-gray-200 relative z-20 shrink-0">
-                      <MapContainer 
+                      <MapContainer
                         center={[
-                          formState.lat !== undefined ? formState.lat : 14.1686, 
-                          formState.lng !== undefined ? formState.lng : 121.3253
-                        ]} 
-                        zoom={13} 
+                          formState.lat !== undefined ? formState.lat : 14.1686,
+                          formState.lng !== undefined ? formState.lng : 121.3253,
+                        ]}
+                        zoom={13}
                         style={{ height: '100%', width: '100%' }}
                         zoomControl={true}
-                        maxBounds={[ [13.90, 120.90], [14.45, 121.75] ]}
+                        maxBounds={[
+                          [13.9, 120.9],
+                          [14.45, 121.75],
+                        ]}
                       >
-                        <UpdateMapCenter 
+                        <UpdateMapCenter
                           center={[
-                            formState.lat !== undefined ? formState.lat : 14.1686, 
-                            formState.lng !== undefined ? formState.lng : 121.3253
-                          ]} 
+                            formState.lat !== undefined ? formState.lat : 14.1686,
+                            formState.lng !== undefined ? formState.lng : 121.3253,
+                          ]}
                         />
                         <TileLayer
                           url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
                           attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
                         />
-                        <DraggableMarker 
+                        <DraggableMarker
                           position={[
-                            formState.lat !== undefined ? formState.lat : 14.1686, 
-                            formState.lng !== undefined ? formState.lng : 121.3253
+                            formState.lat !== undefined ? formState.lat : 14.1686,
+                            formState.lng !== undefined ? formState.lng : 121.3253,
                           ]}
                           onDragEnd={(lat, lng) => {
                             // Clamp manual pinning coordinates to Laguna Province bounds
-                            const clampedLat = Math.max(13.90, Math.min(14.45, lat));
-                            const clampedLng = Math.max(120.90, Math.min(121.75, lng));
-                            setFormState(prev => ({ ...prev, lat: clampedLat, lng: clampedLng }));
+                            const clampedLat = Math.max(13.9, Math.min(14.45, lat));
+                            const clampedLng = Math.max(120.9, Math.min(121.75, lng));
+                            setFormState((prev) => ({ ...prev, lat: clampedLat, lng: clampedLng }));
                           }}
                           draggable={!isMapLocked}
                         />
@@ -1558,37 +1686,45 @@ export function EntityManagementControl({
                 /* Non-parish: Single column (Seminaries / Schools) */
                 <div className="space-y-5 flex-1 overflow-y-auto pr-2 scrollbar-thin">
                   <div>
-                    <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-2 ml-1">Name <span className="text-rose-500 font-bold ml-0.5">*</span></label>
-                    <input 
-                      type="text" 
+                    <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-2 ml-1">
+                      Name <span className="text-rose-500 font-bold ml-0.5">*</span>
+                    </label>
+                    <input
+                      type="text"
                       required
                       value={formState.name}
-                      onChange={(e) => setFormState({...formState, name: e.target.value})}
+                      onChange={(e) => setFormState({ ...formState, name: e.target.value })}
                       placeholder={`e.g. ${activeSubTab === 'seminaries' ? 'Holy Cross Seminary' : 'San Pablo School'}`}
                       className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-gray-900 focus:outline-none focus:border-[#D4AF37] focus:ring-1 focus:ring-[#D4AF37] transition-all placeholder:text-gray-400"
                     />
                   </div>
-                  
+
                   <div>
-                    <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-2 ml-1">Vicariate <span className="text-rose-500 font-bold ml-0.5">*</span></label>
+                    <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-2 ml-1">
+                      Vicariate <span className="text-rose-500 font-bold ml-0.5">*</span>
+                    </label>
                     <div className="relative">
-                      <select 
+                      <select
                         required
                         value={formState.vicariate}
                         onChange={(e) => {
                           const vicVal = e.target.value;
-                          const autoDist = vicVal ? (VICARIATE_TO_DISTRICT[vicVal] || DISTRICTS[0]) : '';
-                          setFormState(prev => ({
+                          const autoDist = vicVal ? VICARIATE_TO_DISTRICT[vicVal] || DISTRICTS[0] : '';
+                          setFormState((prev) => ({
                             ...prev,
                             vicariate: vicVal,
-                            district: autoDist
+                            district: autoDist,
                           }));
                         }}
                         className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-gray-900 focus:outline-none focus:border-[#D4AF37] focus:ring-1 focus:ring-[#D4AF37] transition-all appearance-none"
                       >
-                        <option value="" disabled hidden>Select Vicariate...</option>
-                        {VICARIATES.map(v => (
-                          <option key={v} value={v}>{stripVicariatePrefix(v)}</option>
+                        <option value="" disabled hidden>
+                          Select Vicariate...
+                        </option>
+                        {VICARIATES.map((v) => (
+                          <option key={v} value={v}>
+                            {stripVicariatePrefix(v)}
+                          </option>
                         ))}
                       </select>
                       <div className="absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none">
@@ -1598,28 +1734,30 @@ export function EntityManagementControl({
                   </div>
 
                   <div>
-                    <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-2 ml-1">Address <span className="text-rose-500 font-bold ml-0.5">*</span></label>
-                    <input 
-                      type="text" 
+                    <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-2 ml-1">
+                      Address <span className="text-rose-500 font-bold ml-0.5">*</span>
+                    </label>
+                    <input
+                      type="text"
                       required
                       value={formState.address}
-                      onChange={(e) => setFormState({...formState, address: e.target.value})}
+                      onChange={(e) => setFormState({ ...formState, address: e.target.value })}
                       placeholder="Full address"
                       className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-gray-900 focus:outline-none focus:border-[#D4AF37] focus:ring-1 focus:ring-[#D4AF37] transition-all placeholder:text-gray-400"
                     />
                   </div>
                 </div>
               )}
-              
+
               <div className="flex gap-3 pt-4 border-t border-gray-100 shrink-0">
-                <button 
+                <button
                   type="button"
                   onClick={() => setIsModalOpen(false)}
                   className="flex-1 px-6 py-3 border border-gray-200 rounded-xl font-bold text-gray-500 hover:bg-gray-50 transition-colors text-sm"
                 >
                   Cancel
                 </button>
-                <button 
+                <button
                   type="submit"
                   className="flex-1 px-6 py-3 bg-[#D4AF37] text-white rounded-xl font-bold hover:bg-[#B5952F] transition-colors shadow-lg shadow-[#D4AF37]/20 text-sm"
                 >
@@ -1651,41 +1789,44 @@ export function EntityManagementControl({
 
             {/* Map Area */}
             <div className="flex-1 w-full h-full relative z-10 bg-gray-50">
-              <MapContainer 
+              <MapContainer
                 center={[
-                  formState.lat !== undefined ? formState.lat : 14.1686, 
-                  formState.lng !== undefined ? formState.lng : 121.3253
-                ]} 
-                zoom={14} 
+                  formState.lat !== undefined ? formState.lat : 14.1686,
+                  formState.lng !== undefined ? formState.lng : 121.3253,
+                ]}
+                zoom={14}
                 style={{ height: '100%', width: '100%' }}
                 zoomControl={true}
-                maxBounds={[ [13.90, 120.90], [14.45, 121.75] ]}
+                maxBounds={[
+                  [13.9, 120.9],
+                  [14.45, 121.75],
+                ]}
               >
-                <UpdateMapCenter 
+                <UpdateMapCenter
                   center={[
-                    formState.lat !== undefined ? formState.lat : 14.1686, 
-                    formState.lng !== undefined ? formState.lng : 121.3253
-                  ]} 
+                    formState.lat !== undefined ? formState.lat : 14.1686,
+                    formState.lng !== undefined ? formState.lng : 121.3253,
+                  ]}
                 />
                 <TileLayer
                   url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
                   attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
                 />
-                <DraggableMarker 
+                <DraggableMarker
                   position={[
-                    formState.lat !== undefined ? formState.lat : 14.1686, 
-                    formState.lng !== undefined ? formState.lng : 121.3253
+                    formState.lat !== undefined ? formState.lat : 14.1686,
+                    formState.lng !== undefined ? formState.lng : 121.3253,
                   ]}
                   onDragEnd={(lat, lng) => {
                     // Clamp manual pinning coordinates to Laguna Province bounds
-                    const clampedLat = Math.max(13.90, Math.min(14.45, lat));
-                    const clampedLng = Math.max(120.90, Math.min(121.75, lng));
-                    setFormState(prev => ({ ...prev, lat: clampedLat, lng: clampedLng }));
+                    const clampedLat = Math.max(13.9, Math.min(14.45, lat));
+                    const clampedLng = Math.max(120.9, Math.min(121.75, lng));
+                    setFormState((prev) => ({ ...prev, lat: clampedLat, lng: clampedLng }));
                   }}
                   draggable={true}
                 />
               </MapContainer>
-              
+
               {/* Floating coordinates indicator in large map */}
               <div className="absolute bottom-4 left-4 bg-white/95 backdrop-blur shadow-xl border border-gray-100 rounded-2xl p-4 z-[1000] flex gap-4 text-xs font-bold text-gray-800">
                 <div>
@@ -1702,14 +1843,14 @@ export function EntityManagementControl({
 
             {/* Footer */}
             <div className="p-6 bg-gray-50 border-t border-gray-100 flex gap-3 shrink-0 justify-end">
-              <button 
+              <button
                 type="button"
                 onClick={() => setIsLargeMapOpen(false)}
                 className="px-6 py-2.5 border border-gray-200 rounded-xl font-bold text-gray-500 hover:bg-gray-100 transition-colors text-xs"
               >
                 Cancel
               </button>
-              <button 
+              <button
                 type="button"
                 onClick={() => setIsLargeMapOpen(false)}
                 className="px-6 py-2.5 bg-[#D4AF37] hover:bg-[#B5952F] text-white rounded-xl font-bold transition-colors shadow-lg shadow-[#D4AF37]/20 text-xs"
@@ -1728,7 +1869,7 @@ export function EntityManagementControl({
         </div>
         <div className="flex items-center gap-4">
           <div className="flex p-1 bg-gray-100 rounded-xl">
-            <button 
+            <button
               onClick={() => setActiveSubTab('parishes')}
               className={`flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-bold transition-all ${
                 activeSubTab === 'parishes' ? 'bg-white text-[#D4AF37] shadow-sm' : 'text-gray-400 hover:text-gray-600'
@@ -1737,16 +1878,18 @@ export function EntityManagementControl({
               <Building2 className="w-3.5 h-3.5" />
               Parishes
             </button>
-            <button 
+            <button
               onClick={() => setActiveSubTab('seminaries')}
               className={`flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-bold transition-all ${
-                activeSubTab === 'seminaries' ? 'bg-white text-[#D4AF37] shadow-sm' : 'text-gray-400 hover:text-gray-600'
+                activeSubTab === 'seminaries'
+                  ? 'bg-white text-[#D4AF37] shadow-sm'
+                  : 'text-gray-400 hover:text-gray-600'
               }`}
             >
               <GraduationCap className="w-3.5 h-3.5" />
               Seminaries
             </button>
-            <button 
+            <button
               onClick={() => setActiveSubTab('schools')}
               className={`flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-bold transition-all ${
                 activeSubTab === 'schools' ? 'bg-white text-[#D4AF37] shadow-sm' : 'text-gray-400 hover:text-gray-600'
@@ -1756,7 +1899,7 @@ export function EntityManagementControl({
               Schools
             </button>
           </div>
-          <button 
+          <button
             onClick={() => handleOpenModal()}
             className="bg-[#D4AF37] hover:bg-[#B5952F] text-white px-6 py-2.5 rounded-xl font-bold flex items-center gap-2 transition-all shadow-lg shadow-[#D4AF37]/20 whitespace-nowrap"
           >
@@ -1768,8 +1911,8 @@ export function EntityManagementControl({
 
       <div className="relative mb-8">
         <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
-        <input 
-          type="text" 
+        <input
+          type="text"
           placeholder={`Search ${activeSubTab}...`}
           value={searchQuery}
           onChange={(e) => setSearchQuery(e.target.value)}
@@ -1781,9 +1924,13 @@ export function EntityManagementControl({
         <table className="w-full text-left border-collapse">
           <thead>
             <tr className="border-b border-gray-100">
-              <th className="pb-4 text-[10px] font-bold text-gray-400 uppercase tracking-widest pl-4">Name & Address</th>
+              <th className="pb-4 text-[10px] font-bold text-gray-400 uppercase tracking-widest pl-4">
+                Name & Address
+              </th>
               <th className="pb-4 text-[10px] font-bold text-gray-400 uppercase tracking-widest">Vicariate</th>
-              <th className="pb-4 text-[10px] font-bold text-gray-400 uppercase tracking-widest text-right pr-4">Actions</th>
+              <th className="pb-4 text-[10px] font-bold text-gray-400 uppercase tracking-widest text-right pr-4">
+                Actions
+              </th>
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-50">
@@ -1794,7 +1941,10 @@ export function EntityManagementControl({
                     <span className="text-gray-900 font-bold text-sm flex items-center gap-1.5">
                       {item.name}
                       {activeSubTab === 'parishes' && item.lat && item.lng && (
-                        <span className="inline-flex items-center text-[10px] text-emerald-600 bg-emerald-50 px-1.5 py-0.5 rounded font-bold border border-emerald-100" title={`Geocoded: ${item.lat}, ${item.lng}`}>
+                        <span
+                          className="inline-flex items-center text-[10px] text-emerald-600 bg-emerald-50 px-1.5 py-0.5 rounded font-bold border border-emerald-100"
+                          title={`Geocoded: ${item.lat}, ${item.lng}`}
+                        >
                           🧭 GEO
                         </span>
                       )}
@@ -1809,14 +1959,14 @@ export function EntityManagementControl({
                 </td>
                 <td className="py-5 text-right pr-4">
                   <div className="flex items-center justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                    <button 
+                    <button
                       onClick={() => handleOpenModal(item)}
                       className="text-[#D4AF37] hover:bg-[#FDF6E3] p-2 rounded-xl transition-all"
                       title="Edit"
                     >
                       <Pencil className="w-4 h-4" />
                     </button>
-                    <button 
+                    <button
                       onClick={() => {
                         setEntityToDelete(item);
                         setIsDeleteModalOpen(true);

@@ -12,12 +12,7 @@ interface UploadConfirmationModalProps {
   onConfirm: () => void;
 }
 
-export function UploadConfirmationModal({
-  isOpen,
-  file,
-  onClose,
-  onConfirm,
-}: UploadConfirmationModalProps) {
+export function UploadConfirmationModal({ isOpen, file, onClose, onConfirm }: UploadConfirmationModalProps) {
   return (
     <AnimatePresence>
       {isOpen && (
@@ -35,9 +30,7 @@ export function UploadConfirmationModal({
                 </div>
                 <div>
                   <h3 className="text-lg font-bold text-church-black">Confirm Upload</h3>
-                  <p className="mt-1 text-sm text-gray-500">
-                    Are you sure you want to upload this financial report?
-                  </p>
+                  <p className="mt-1 text-sm text-gray-500">Are you sure you want to upload this financial report?</p>
                 </div>
               </div>
               <button

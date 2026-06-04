@@ -53,11 +53,7 @@ export const dataService = {
     await apiClient.deleteRecord(id);
   },
 
-  parseCSV(
-    csvText: string,
-    entityId = 'default',
-    entityType: any = 'parish',
-  ): Promise<FinancialRecord[]> {
+  parseCSV(csvText: string, entityId = 'default', entityType: any = 'parish'): Promise<FinancialRecord[]> {
     return apiClient.parseCSV(csvText, entityId, entityType);
   },
 
@@ -134,11 +130,7 @@ export const dataService = {
   // ------------------------------------------------------------------
   // Subscriptions
   // ------------------------------------------------------------------
-  subscribeToRecords(
-    entityId: string,
-    entityType: string,
-    callback: (records: FinancialRecord[]) => void,
-  ) {
+  subscribeToRecords(entityId: string, entityType: string, callback: (records: FinancialRecord[]) => void) {
     return apiClient.subscribeToRecords(entityId, entityType as any, callback);
   },
 
@@ -146,11 +138,7 @@ export const dataService = {
     return apiClient.subscribeToAllRecords(callback);
   },
 
-  subscribeToProjects(
-    callback: (projects: Project[]) => void,
-    entityId?: string,
-    entityType?: string,
-  ) {
+  subscribeToProjects(callback: (projects: Project[]) => void, entityId?: string, entityType?: string) {
     return apiClient.subscribeToProjects(callback, entityId, entityType);
   },
 

@@ -64,16 +64,15 @@ export function FiestaManagementModal({
     }
 
     if (editingId) {
-      setFiestas(fiestas.map(f => 
-        f.id === editingId 
-          ? { ...f, ...formData }
-          : f
-      ));
+      setFiestas(fiestas.map((f) => (f.id === editingId ? { ...f, ...formData } : f)));
     } else {
-      setFiestas([...fiestas, {
-        id: Date.now().toString(),
-        ...formData,
-      }]);
+      setFiestas([
+        ...fiestas,
+        {
+          id: Date.now().toString(),
+          ...formData,
+        },
+      ]);
     }
 
     resetForm();
@@ -92,7 +91,7 @@ export function FiestaManagementModal({
   };
 
   const handleDelete = (id: string) => {
-    setFiestas(fiestas.filter(f => f.id !== id));
+    setFiestas(fiestas.filter((f) => f.id !== id));
   };
 
   const handleSave = () => {
@@ -128,10 +127,7 @@ export function FiestaManagementModal({
             <h2 className="text-2xl font-bold text-gray-900">Fiesta Management</h2>
             <p className="text-sm text-gray-600">{entityName} - Configure patron saints and fiesta dates</p>
           </div>
-          <button
-            onClick={onClose}
-            className="text-gray-400 hover:text-gray-600 transition-colors"
-          >
+          <button onClick={onClose} className="text-gray-400 hover:text-gray-600 transition-colors">
             <X className="w-6 h-6" />
           </button>
         </div>
@@ -143,7 +139,10 @@ export function FiestaManagementModal({
             <AlertCircle className="w-5 h-5 text-blue-600 flex-shrink-0 mt-0.5" />
             <div className="text-sm text-blue-700">
               <p className="font-bold mb-1">About Fiesta Impact</p>
-              <p>Fiesta dates help the system understand seasonal patterns in your collections. This improves forecasting accuracy.</p>
+              <p>
+                Fiesta dates help the system understand seasonal patterns in your collections. This improves forecasting
+                accuracy.
+              </p>
             </div>
           </div>
 
@@ -179,12 +178,18 @@ export function FiestaManagementModal({
                         )}
                       </div>
                       <div className="flex items-center gap-3 text-sm text-gray-600">
-                        <span>📅 {new Date(fiesta.date).toLocaleDateString('en-PH', { month: 'short', day: 'numeric' })}</span>
-                        <span className={`px-2 py-1 rounded border text-xs font-bold ${impactColors[fiesta.expectedImpact]}`}>
+                        <span>
+                          📅 {new Date(fiesta.date).toLocaleDateString('en-PH', { month: 'short', day: 'numeric' })}
+                        </span>
+                        <span
+                          className={`px-2 py-1 rounded border text-xs font-bold ${impactColors[fiesta.expectedImpact]}`}
+                        >
                           {impactLabels[fiesta.expectedImpact]}
                         </span>
                         {fiesta.estimatedCollectionIncrease && fiesta.estimatedCollectionIncrease > 0 && (
-                          <span className="text-green-700 font-bold">+₱{fiesta.estimatedCollectionIncrease.toLocaleString()}</span>
+                          <span className="text-green-700 font-bold">
+                            +₱{fiesta.estimatedCollectionIncrease.toLocaleString()}
+                          </span>
                         )}
                       </div>
                     </div>
@@ -218,9 +223,7 @@ export function FiestaManagementModal({
                 if (isAddingNew) resetForm();
               }}
               className={`w-full flex items-center justify-center gap-2 py-3 rounded-lg font-bold transition-colors ${
-                isAddingNew
-                  ? 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                  : 'bg-gold-500 text-black hover:bg-gold-600'
+                isAddingNew ? 'bg-gray-100 text-gray-700 hover:bg-gray-200' : 'bg-gold-500 text-black hover:bg-gold-600'
               }`}
             >
               <Plus className="w-5 h-5" />
@@ -234,9 +237,7 @@ export function FiestaManagementModal({
                 className="mt-6 space-y-4 p-4 bg-gray-50 rounded-lg"
               >
                 <div>
-                  <label className="block text-sm font-bold text-gray-700 mb-2">
-                    Primary Patron Saint *
-                  </label>
+                  <label className="block text-sm font-bold text-gray-700 mb-2">Primary Patron Saint *</label>
                   <input
                     type="text"
                     value={formData.primaryPatron}
@@ -260,9 +261,7 @@ export function FiestaManagementModal({
                 </div>
 
                 <div>
-                  <label className="block text-sm font-bold text-gray-700 mb-2">
-                    Fiesta Date *
-                  </label>
+                  <label className="block text-sm font-bold text-gray-700 mb-2">Fiesta Date *</label>
                   <input
                     type="date"
                     value={formData.date}
@@ -272,9 +271,7 @@ export function FiestaManagementModal({
                 </div>
 
                 <div>
-                  <label className="block text-sm font-bold text-gray-700 mb-2">
-                    Expected Collection Impact
-                  </label>
+                  <label className="block text-sm font-bold text-gray-700 mb-2">Expected Collection Impact</label>
                   <div className="grid grid-cols-3 gap-2">
                     {(['low', 'medium', 'high'] as const).map((impact) => (
                       <button
@@ -299,11 +296,15 @@ export function FiestaManagementModal({
                   <input
                     type="number"
                     value={formData.estimatedCollectionIncrease}
-                    onChange={(e) => setFormData({ ...formData, estimatedCollectionIncrease: parseFloat(e.target.value) || 0 })}
+                    onChange={(e) =>
+                      setFormData({ ...formData, estimatedCollectionIncrease: parseFloat(e.target.value) || 0 })
+                    }
                     placeholder="e.g., 50000"
                     className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-gold-500"
                   />
-                  <p className="text-xs text-gray-500 mt-1">Leave blank to estimate automatically based on impact level</p>
+                  <p className="text-xs text-gray-500 mt-1">
+                    Leave blank to estimate automatically based on impact level
+                  </p>
                 </div>
 
                 <div className="flex gap-3 pt-2">

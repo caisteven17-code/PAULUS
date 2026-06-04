@@ -1,16 +1,7 @@
 'use client';
 
 import React, { useEffect, useState } from 'react';
-import {
-  ArrowRight,
-  Building2,
-  Database,
-  Landmark,
-  Play,
-  School,
-  ShieldCheck,
-  Sparkles,
-} from 'lucide-react';
+import { ArrowRight, Building2, Database, Landmark, Play, School, ShieldCheck, Sparkles } from 'lucide-react';
 import { ALL_PARISHES, INITIAL_SEMINARIES, INITIAL_SCHOOLS } from '../constants';
 
 type InstitutionType = 'parish' | 'seminary' | 'school';
@@ -67,7 +58,7 @@ const institutionTypeMeta: Record<
     icon: Landmark,
     accent: 'text-amber-700',
     accentSoft: 'bg-amber-50',
-    border: 'border-amber-200'
+    border: 'border-amber-200',
   },
   seminary: {
     label: 'Seminary',
@@ -76,7 +67,7 @@ const institutionTypeMeta: Record<
     icon: Building2,
     accent: 'text-emerald-700',
     accentSoft: 'bg-emerald-50',
-    border: 'border-emerald-200'
+    border: 'border-emerald-200',
   },
   school: {
     label: 'School',
@@ -85,8 +76,8 @@ const institutionTypeMeta: Record<
     icon: School,
     accent: 'text-sky-700',
     accentSoft: 'bg-sky-50',
-    border: 'border-sky-200'
-  }
+    border: 'border-sky-200',
+  },
 };
 
 const institutionProfiles: InstitutionProfile[] = [
@@ -100,7 +91,7 @@ const institutionProfiles: InstitutionProfile[] = [
     currentBalance: 1860000,
     monthlyCollections: 548000,
     trend: '+8.4%',
-    insight: 'Consistent collection growth and disciplined parish operating expenses.'
+    insight: 'Consistent collection growth and disciplined parish operating expenses.',
   },
   {
     id: 'parish-san-roque',
@@ -112,7 +103,7 @@ const institutionProfiles: InstitutionProfile[] = [
     currentBalance: 690000,
     monthlyCollections: 284000,
     trend: '-3.2%',
-    insight: 'Tight reserves and weak net surplus make this parish sensitive to shocks.'
+    insight: 'Tight reserves and weak net surplus make this parish sensitive to shocks.',
   },
   {
     id: 'parish-st-john-baptist',
@@ -124,7 +115,7 @@ const institutionProfiles: InstitutionProfile[] = [
     currentBalance: 1290000,
     monthlyCollections: 431000,
     trend: '+4.9%',
-    insight: 'Healthy balance position, but discretionary spending is rising faster than inflows.'
+    insight: 'Healthy balance position, but discretionary spending is rising faster than inflows.',
   },
   {
     id: 'seminary-st-peter',
@@ -136,7 +127,7 @@ const institutionProfiles: InstitutionProfile[] = [
     currentBalance: 4920000,
     monthlyCollections: 1230000,
     trend: '+6.1%',
-    insight: 'Stable cash position supported by subsidy continuity and predictable donor base.'
+    insight: 'Stable cash position supported by subsidy continuity and predictable donor base.',
   },
   {
     id: 'seminary-formation-center',
@@ -148,7 +139,7 @@ const institutionProfiles: InstitutionProfile[] = [
     currentBalance: 2810000,
     monthlyCollections: 918000,
     trend: '+1.8%',
-    insight: 'Operating margin remains positive, but support dependence is increasing.'
+    insight: 'Operating margin remains positive, but support dependence is increasing.',
   },
   {
     id: 'school-liceo',
@@ -160,7 +151,7 @@ const institutionProfiles: InstitutionProfile[] = [
     currentBalance: 6480000,
     monthlyCollections: 1840000,
     trend: '+9.7%',
-    insight: 'Strong tuition performance and reserve growth provide good simulation headroom.'
+    insight: 'Strong tuition performance and reserve growth provide good simulation headroom.',
   },
   {
     id: 'school-canossa',
@@ -172,15 +163,15 @@ const institutionProfiles: InstitutionProfile[] = [
     currentBalance: 2140000,
     monthlyCollections: 921000,
     trend: '-1.1%',
-    insight: 'Enrollment-sensitive collections create pressure on school operating flexibility.'
-  }
+    insight: 'Enrollment-sensitive collections create pressure on school operating flexibility.',
+  },
 ];
 
 const formatCurrency = (value: number) =>
   new Intl.NumberFormat('en-PH', {
     style: 'currency',
     currency: 'PHP',
-    maximumFractionDigits: 0
+    maximumFractionDigits: 0,
   }).format(value);
 
 const getRiskTone = (risk: string) => {
@@ -285,7 +276,6 @@ export function DigitalTwin({ onLaunch }: DigitalTwinProps) {
   return (
     <div className="min-h-[calc(100vh-80px)] bg-[#f7f3ec]">
       <div className="mx-auto max-w-[1600px] px-4 py-6 md:px-8 md:py-8 space-y-8">
-
         {/* ── Hero Banner ─────────────────────────────────────────────────── */}
         <section className="overflow-hidden rounded-[36px] border border-black/5 bg-gradient-to-br from-[#1f1f1f] via-[#2c2c2c] to-[#111111] text-white shadow-2xl">
           <div className="grid gap-8 px-6 py-8 md:grid-cols-[minmax(0,1.3fr)_minmax(320px,0.8fr)] md:px-10 md:py-10">
@@ -298,7 +288,8 @@ export function DigitalTwin({ onLaunch }: DigitalTwinProps) {
                 Enter another institution&apos;s dashboard without changing official records.
               </h1>
               <p className="max-w-3xl text-sm leading-7 text-white/70 md:text-base">
-                Select a parish, seminary, or school, then launch its actual dashboard interface inside a protected bishop-only simulation workspace.
+                Select a parish, seminary, or school, then launch its actual dashboard interface inside a protected
+                bishop-only simulation workspace.
               </p>
             </div>
             <div className="rounded-[32px] border border-[#d8b56a]/25 bg-white/95 p-6 text-gray-900 shadow-xl">
@@ -309,7 +300,8 @@ export function DigitalTwin({ onLaunch }: DigitalTwinProps) {
                 <div>
                   <h2 className="text-lg font-black text-gray-900">Sandbox Protection Rules</h2>
                   <p className="mt-1 text-sm leading-6 text-gray-600">
-                    Simulation values and uploaded files stay inside this Digital Twin page. They do not overwrite the official database or primary dashboards.
+                    Simulation values and uploaded files stay inside this Digital Twin page. They do not overwrite the
+                    official database or primary dashboards.
                   </p>
                 </div>
               </div>
@@ -319,7 +311,6 @@ export function DigitalTwin({ onLaunch }: DigitalTwinProps) {
 
         {/* ── Three-Column Grid ────────────────────────────────────────────── */}
         <section className="grid gap-6 xl:grid-cols-[280px_minmax(0,1fr)_320px]">
-
           {/* ── LEFT: Setup ─────────────────────────────────────────────── */}
           <div className="space-y-5">
             <div className="rounded-[32px] border border-black/5 bg-white p-6 shadow-sm">
@@ -336,7 +327,9 @@ export function DigitalTwin({ onLaunch }: DigitalTwinProps) {
               <div className="space-y-5">
                 {/* Institution type picker */}
                 <div className="space-y-2">
-                  <label className="text-[11px] font-black uppercase tracking-[0.24em] text-gray-500">Institution Type</label>
+                  <label className="text-[11px] font-black uppercase tracking-[0.24em] text-gray-500">
+                    Institution Type
+                  </label>
                   <div className="space-y-2">
                     {(Object.keys(institutionTypeMeta) as InstitutionType[]).map((type) => {
                       const meta = institutionTypeMeta[type];
@@ -347,10 +340,14 @@ export function DigitalTwin({ onLaunch }: DigitalTwinProps) {
                           key={type}
                           onClick={() => setInstitutionType(type)}
                           className={`flex w-full items-center gap-3 rounded-[18px] border px-4 py-3 text-left transition-all ${
-                            isActive ? `${meta.accentSoft} ${meta.border} shadow-sm` : 'border-gray-200 bg-white hover:border-gray-300'
+                            isActive
+                              ? `${meta.accentSoft} ${meta.border} shadow-sm`
+                              : 'border-gray-200 bg-white hover:border-gray-300'
                           }`}
                         >
-                          <div className={`rounded-xl p-2 ${isActive ? meta.accentSoft : 'bg-gray-100'} ${meta.accent}`}>
+                          <div
+                            className={`rounded-xl p-2 ${isActive ? meta.accentSoft : 'bg-gray-100'} ${meta.accent}`}
+                          >
                             <Icon className="h-4 w-4" />
                           </div>
                           <div>
@@ -376,7 +373,9 @@ export function DigitalTwin({ onLaunch }: DigitalTwinProps) {
                     className="w-full rounded-[18px] border border-gray-200 bg-[#faf8f4] px-4 py-3 text-sm font-semibold text-gray-900 outline-none transition focus:border-[#d4af37]"
                   >
                     {filteredInstitutions.map((inst) => (
-                      <option key={inst.id} value={inst.id}>{inst.name}</option>
+                      <option key={inst.id} value={inst.id}>
+                        {inst.name}
+                      </option>
                     ))}
                   </select>
                 </div>
@@ -412,11 +411,15 @@ export function DigitalTwin({ onLaunch }: DigitalTwinProps) {
                 <div className="rounded-[32px] border border-black/5 bg-white p-6 shadow-sm">
                   <div className="flex items-start justify-between gap-4">
                     <div>
-                      <p className="text-[10px] font-black uppercase tracking-[0.25em] text-gray-500">Selected Institution</p>
+                      <p className="text-[10px] font-black uppercase tracking-[0.25em] text-gray-500">
+                        Selected Institution
+                      </p>
                       <h3 className="mt-2 text-2xl font-black text-gray-900">{selectedInstitution.name}</h3>
                       <p className="mt-1 text-sm text-gray-500">{selectedInstitution.location}</p>
                     </div>
-                    <div className={`shrink-0 rounded-full border px-3 py-1.5 text-xs font-black ${getRiskTone(selectedInstitution.risk)}`}>
+                    <div
+                      className={`shrink-0 rounded-full border px-3 py-1.5 text-xs font-black ${getRiskTone(selectedInstitution.risk)}`}
+                    >
                       {selectedInstitution.risk} Risk
                     </div>
                   </div>
@@ -430,11 +433,15 @@ export function DigitalTwin({ onLaunch }: DigitalTwinProps) {
                     </div>
                     <div className="rounded-[18px] bg-[#faf8f4] p-3 text-center">
                       <p className="text-[10px] font-black uppercase tracking-[0.2em] text-gray-400">Collections</p>
-                      <p className="mt-1 text-sm font-black text-gray-900">{formatCurrency(selectedInstitution.monthlyCollections)}</p>
+                      <p className="mt-1 text-sm font-black text-gray-900">
+                        {formatCurrency(selectedInstitution.monthlyCollections)}
+                      </p>
                     </div>
                     <div className="rounded-[18px] bg-[#faf8f4] p-3 text-center">
                       <p className="text-[10px] font-black uppercase tracking-[0.2em] text-gray-400">Trend</p>
-                      <p className={`mt-1 text-sm font-black ${selectedInstitution.trend.startsWith('+') ? 'text-emerald-700' : 'text-rose-700'}`}>
+                      <p
+                        className={`mt-1 text-sm font-black ${selectedInstitution.trend.startsWith('+') ? 'text-emerald-700' : 'text-rose-700'}`}
+                      >
                         {selectedInstitution.trend}
                       </p>
                     </div>
@@ -445,14 +452,19 @@ export function DigitalTwin({ onLaunch }: DigitalTwinProps) {
                 <div className="rounded-[32px] border border-dashed border-gray-200 bg-white px-6 py-8 text-center shadow-sm">
                   <p className="text-sm font-black text-gray-700">Ready to launch</p>
                   <p className="mt-1 text-xs leading-5 text-gray-400">
-                    Click <strong>Launch</strong> on the left to open this institution's exact dashboard — the same interface the institution sees. Use the year/period selectors at the top to navigate across time.
+                    Click <strong>Launch</strong> on the left to open this institution's exact dashboard — the same
+                    interface the institution sees. Use the year/period selectors at the top to navigate across time.
                   </p>
                 </div>
               </>
             ) : (
               <div className="rounded-[32px] border border-dashed border-gray-300 bg-white px-6 py-20 text-center shadow-sm">
-                <p className="text-lg font-black text-gray-900">Launch an institution to open its actual dashboard interface.</p>
-                <p className="mt-2 text-sm text-gray-500">The main panel will switch to the selected parish, school, or seminary dashboard.</p>
+                <p className="text-lg font-black text-gray-900">
+                  Launch an institution to open its actual dashboard interface.
+                </p>
+                <p className="mt-2 text-sm text-gray-500">
+                  The main panel will switch to the selected parish, school, or seminary dashboard.
+                </p>
               </div>
             )}
           </div>
@@ -473,10 +485,7 @@ export function DigitalTwin({ onLaunch }: DigitalTwinProps) {
               <div className="space-y-3">
                 {savedSessions.length > 0 ? (
                   savedSessions.map((item) => (
-                    <div
-                      key={item.id}
-                      className="rounded-[22px] border border-gray-200 bg-[#faf8f4] p-4"
-                    >
+                    <div key={item.id} className="rounded-[22px] border border-gray-200 bg-[#faf8f4] p-4">
                       <div className="flex items-start justify-between gap-2">
                         <div className="min-w-0">
                           <p className="truncate text-sm font-black text-gray-900">{item.name}</p>
@@ -514,7 +523,6 @@ export function DigitalTwin({ onLaunch }: DigitalTwinProps) {
               </div>
             </div>
           </div>
-
         </section>
       </div>
     </div>

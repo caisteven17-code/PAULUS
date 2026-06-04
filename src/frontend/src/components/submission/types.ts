@@ -2,13 +2,7 @@
 
 export type SubmissionInstitutionType = 'parish' | 'seminary' | 'school';
 
-export type SubmissionStepId =
-  | 'upload'
-  | 'cleaning'
-  | 'anomaly'
-  | 'validation'
-  | 'loading'
-  | 'success';
+export type SubmissionStepId = 'upload' | 'cleaning' | 'anomaly' | 'validation' | 'loading' | 'success';
 
 export type SubmissionFlowState = 'idle' | 'running' | 'success' | 'anomaly';
 

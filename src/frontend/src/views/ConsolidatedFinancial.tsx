@@ -3,7 +3,21 @@
 import React, { useState, useMemo, useCallback } from 'react';
 import { FileText, Download, Filter, TrendingUp, DollarSign } from 'lucide-react';
 import { motion } from 'motion/react';
-import { LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
+import {
+  LineChart,
+  Line,
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  Legend,
+  ResponsiveContainer,
+  PieChart,
+  Pie,
+  Cell,
+} from 'recharts';
 import { formatCurrency } from '../lib/format';
 
 interface ConsolidatedRecord {
@@ -110,7 +124,7 @@ export function ConsolidatedFinancial() {
       trend: 3.2,
     },
     {
-      name: 'St. Peter\'s College Seminary',
+      name: "St. Peter's College Seminary",
       type: 'seminary',
       collections: 420000,
       disbursements: 350000,
@@ -139,9 +153,7 @@ export function ConsolidatedFinancial() {
   ];
 
   const filteredEntityData = useMemo(() => {
-    return entityFilter === 'all'
-      ? mockEntityData
-      : mockEntityData.filter(e => e.type === entityFilter);
+    return entityFilter === 'all' ? mockEntityData : mockEntityData.filter((e) => e.type === entityFilter);
   }, [entityFilter]);
 
   const summaryStats = useMemo(() => {
@@ -160,9 +172,9 @@ export function ConsolidatedFinancial() {
 
   const entityDistribution = useMemo(() => {
     const data = [
-      { name: 'Parishes', value: mockEntityData.filter(e => e.type === 'parish').length },
-      { name: 'Schools', value: mockEntityData.filter(e => e.type === 'school').length },
-      { name: 'Seminaries', value: mockEntityData.filter(e => e.type === 'seminary').length },
+      { name: 'Parishes', value: mockEntityData.filter((e) => e.type === 'parish').length },
+      { name: 'Schools', value: mockEntityData.filter((e) => e.type === 'school').length },
+      { name: 'Seminaries', value: mockEntityData.filter((e) => e.type === 'seminary').length },
     ];
     return data;
   }, []);
@@ -170,9 +182,9 @@ export function ConsolidatedFinancial() {
   const handleExport = useCallback(() => {
     const timestamp = new Date().toISOString().split('T')[0];
     const filename = `consolidated-financial-statement-${timestamp}.csv`;
-    
+
     let csv = 'Period,Total Collections,Total Disbursements,Net Position,Parishes,Schools,Seminaries\n';
-    mockConsolidatedData.forEach(record => {
+    mockConsolidatedData.forEach((record) => {
       csv += `${record.period},"${record.totalCollections}","${record.totalDisbursements}","${record.netPosition}",${record.parishCount},${record.schoolCount},${record.seminaryCount}\n`;
     });
 
@@ -263,7 +275,7 @@ export function ConsolidatedFinancial() {
 
         {/* View Controls */}
         <div className="flex gap-2 mb-6">
-          {(['summary', 'detailed', 'comparison'] as const).map(type => (
+          {(['summary', 'detailed', 'comparison'] as const).map((type) => (
             <button
               key={type}
               onClick={() => setViewType(type)}
@@ -375,7 +387,7 @@ export function ConsolidatedFinancial() {
           <div className="space-y-6">
             {/* Entity Filter */}
             <div className="flex gap-2">
-              {(['all', 'parish', 'school', 'seminary'] as const).map(type => (
+              {(['all', 'parish', 'school', 'seminary'] as const).map((type) => (
                 <button
                   key={type}
                   onClick={() => setEntityFilter(type)}
@@ -415,13 +427,17 @@ export function ConsolidatedFinancial() {
                         </td>
                         <td className="px-6 py-4 text-right text-slate-900">{formatCurrency(entity.collections)}</td>
                         <td className="px-6 py-4 text-right text-slate-900">{formatCurrency(entity.disbursements)}</td>
-                        <td className="px-6 py-4 text-right font-semibold text-emerald-600">{formatCurrency(entity.netPosition)}</td>
+                        <td className="px-6 py-4 text-right font-semibold text-emerald-600">
+                          {formatCurrency(entity.netPosition)}
+                        </td>
                         <td className="px-6 py-4 text-right">
                           <span className="px-3 py-1 rounded-full bg-slate-100 text-slate-900 text-xs font-semibold">
                             {entity.healthScore.toFixed(1)}
                           </span>
                         </td>
-                        <td className={`px-6 py-4 text-right font-semibold ${entity.trend > 0 ? 'text-emerald-600' : 'text-rose-600'}`}>
+                        <td
+                          className={`px-6 py-4 text-right font-semibold ${entity.trend > 0 ? 'text-emerald-600' : 'text-rose-600'}`}
+                        >
                           {entity.trend > 0 ? '↑' : '↓'} {Math.abs(entity.trend).toFixed(1)}%
                         </td>
                       </tr>

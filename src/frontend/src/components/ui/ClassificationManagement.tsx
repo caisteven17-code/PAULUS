@@ -34,11 +34,11 @@ export function ClassificationManagement({
     let filtered = classifications;
 
     if (filter === 'subsidized') {
-      filtered = filtered.filter(c => c.isSubsidized);
+      filtered = filtered.filter((c) => c.isSubsidized);
     } else if (filter === 'sustainable') {
-      filtered = filtered.filter(c => c.recommendedAction === 'reclassify');
+      filtered = filtered.filter((c) => c.recommendedAction === 'reclassify');
     } else if (filter === 'locked') {
-      filtered = filtered.filter(c => c.subsidyLocked);
+      filtered = filtered.filter((c) => c.subsidyLocked);
     }
 
     if (sortBy === 'name') {
@@ -46,19 +46,28 @@ export function ClassificationManagement({
     } else if (sortBy === 'income') {
       filtered.sort((a, b) => b.annualIncome - a.annualIncome);
     } else if (sortBy === 'class') {
-      const classOrder: Record<string, number> = { 'Class A': 5, 'Class B': 4, 'Class C': 3, 'Class D': 2, 'Class E': 1 };
+      const classOrder: Record<string, number> = {
+        'Class A': 5,
+        'Class B': 4,
+        'Class C': 3,
+        'Class D': 2,
+        'Class E': 1,
+      };
       filtered.sort((a, b) => (classOrder[b.currentClass] ?? 0) - (classOrder[a.currentClass] ?? 0));
     }
 
     return filtered;
   }, [classifications, filter, sortBy]);
 
-  const stats = useMemo(() => ({
-    total: classifications.length,
-    subsidized: classifications.filter(c => c.isSubsidized).length,
-    sustainable: classifications.filter(c => c.recommendedAction === 'reclassify').length,
-    locked: classifications.filter(c => c.subsidyLocked).length,
-  }), [classifications]);
+  const stats = useMemo(
+    () => ({
+      total: classifications.length,
+      subsidized: classifications.filter((c) => c.isSubsidized).length,
+      sustainable: classifications.filter((c) => c.recommendedAction === 'reclassify').length,
+      locked: classifications.filter((c) => c.subsidyLocked).length,
+    }),
+    [classifications],
+  );
 
   return (
     <div className="space-y-4 md:space-y-6">
@@ -107,17 +116,21 @@ export function ClassificationManagement({
       {/* Filters & Sort */}
       <div className="space-y-2 md:space-y-3">
         <div className="flex flex-wrap gap-2">
-          {(['all', 'subsidized', 'sustainable', 'locked'] as const).map(f => (
+          {(['all', 'subsidized', 'sustainable', 'locked'] as const).map((f) => (
             <button
               key={f}
               onClick={() => setFilter(f)}
               className={`px-3 md:px-4 py-1.5 md:py-2 rounded-lg font-bold text-xs md:text-sm transition-all hover:scale-105 ${
-                filter === f
-                  ? 'bg-gold-500 text-black shadow-md'
-                  : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+                filter === f ? 'bg-gold-500 text-black shadow-md' : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
               }`}
             >
-              {f === 'all' ? 'All Entities' : f === 'subsidized' ? 'Subsidized' : f === 'sustainable' ? 'Sustainable' : 'Locked'}
+              {f === 'all'
+                ? 'All Entities'
+                : f === 'subsidized'
+                  ? 'Subsidized'
+                  : f === 'sustainable'
+                    ? 'Sustainable'
+                    : 'Locked'}
             </button>
           ))}
         </div>
@@ -163,7 +176,9 @@ export function ClassificationManagement({
                     <div>
                       <p className="font-bold text-gray-900 text-[11px] md:text-sm">{record.entityName}</p>
                       {record.lastReviewed && (
-                        <p className="text-[9px] md:text-xs text-gray-500">Reviewed: {new Date(record.lastReviewed).toLocaleDateString()}</p>
+                        <p className="text-[9px] md:text-xs text-gray-500">
+                          Reviewed: {new Date(record.lastReviewed).toLocaleDateString()}
+                        </p>
                       )}
                     </div>
                   </td>
@@ -186,7 +201,9 @@ export function ClassificationManagement({
                       ) : (
                         <>
                           <div className="w-2 h-2 bg-green-500 rounded-full"></div>
-                          <span className="hidden sm:inline text-[10px] md:text-xs font-bold text-green-700">Indep.</span>
+                          <span className="hidden sm:inline text-[10px] md:text-xs font-bold text-green-700">
+                            Indep.
+                          </span>
                           <span className="sm:hidden text-[10px] font-bold text-green-700">I</span>
                         </>
                       )}
@@ -251,10 +268,18 @@ export function ClassificationManagement({
       <div className="bg-gray-50 border border-gray-200 rounded-lg p-4 md:p-5 space-y-2 md:space-y-3">
         <p className="font-bold text-gray-900 text-sm md:text-base">How to Use Classification Management:</p>
         <ul className="text-[11px] md:text-xs text-gray-700 space-y-1 md:space-y-1.5">
-          <li>🔒 <strong>Locked:</strong> Class D subsidized parishes locked by policy</li>
-          <li>⚠️ <strong>Sustainable:</strong> Entities showing income above current class threshold</li>
-          <li>📊 <strong>Filter:</strong> View specific groups quickly</li>
-          <li>💾 <strong>Last Reviewed:</strong> Track when classification was last audited</li>
+          <li>
+            🔒 <strong>Locked:</strong> Class D subsidized parishes locked by policy
+          </li>
+          <li>
+            ⚠️ <strong>Sustainable:</strong> Entities showing income above current class threshold
+          </li>
+          <li>
+            📊 <strong>Filter:</strong> View specific groups quickly
+          </li>
+          <li>
+            💾 <strong>Last Reviewed:</strong> Track when classification was last audited
+          </li>
         </ul>
       </div>
     </div>

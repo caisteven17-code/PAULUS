@@ -1,11 +1,6 @@
 'use client';
 
-import {
-  AnomalySimulationMode,
-  SubmissionInstitutionType,
-  SubmissionStep,
-  SubmissionTemplate,
-} from './types';
+import { AnomalySimulationMode, SubmissionInstitutionType, SubmissionStep, SubmissionTemplate } from './types';
 
 export const submissionSteps: SubmissionStep[] = [
   { id: 'upload', label: 'Uploading Report', description: 'Preparing your file inside the submission sandbox.' },
@@ -13,7 +8,11 @@ export const submissionSteps: SubmissionStep[] = [
   { id: 'anomaly', label: 'Anomaly Check', description: 'Checking for unusual or suspicious financial values.' },
   { id: 'validation', label: 'Data Validation', description: 'Validating required structure and business rules.' },
   { id: 'loading', label: 'Loading to Database', description: 'Simulating save to the temporary submission pipeline.' },
-  { id: 'success', label: 'Report Submitted Successfully', description: 'Submission flow completed in frontend-only mode.' },
+  {
+    id: 'success',
+    label: 'Report Submitted Successfully',
+    description: 'Submission flow completed in frontend-only mode.',
+  },
 ];
 
 const parishTemplateContent = [
@@ -42,7 +41,8 @@ export const submissionTemplates: Record<SubmissionInstitutionType, SubmissionTe
     id: 'template-parish-financial-report',
     type: 'parish',
     title: 'Parish Financial Report Template',
-    description: 'Monthly parish financial submission template for collections, disbursements, and related report fields.',
+    description:
+      'Monthly parish financial submission template for collections, disbursements, and related report fields.',
     fileName: 'parish-financial-report-template.csv',
     version: 'v1.0',
     updatedAt: 'May 2026',
@@ -62,7 +62,8 @@ export const submissionTemplates: Record<SubmissionInstitutionType, SubmissionTe
     id: 'template-school-financial-report',
     type: 'school',
     title: 'School Financial Report Template',
-    description: 'School monthly submission template for tuition income, support funds, expenses, and budget allocations.',
+    description:
+      'School monthly submission template for tuition income, support funds, expenses, and budget allocations.',
     fileName: 'school-financial-report-template.csv',
     version: 'v1.0',
     updatedAt: 'May 2026',
@@ -77,9 +78,12 @@ export const institutionHeadingMap: Record<SubmissionInstitutionType, string> = 
 };
 
 export const institutionDescriptionMap: Record<SubmissionInstitutionType, string> = {
-  parish: 'Download the parish template and simulate a monthly financial report submission without touching production analytics.',
-  seminary: 'Download the seminary template and test the full frontend submission flow using temporary mock processing states.',
-  school: 'Download the school template and simulate a frontend-only report submission for finance review and validation.',
+  parish:
+    'Download the parish template and simulate a monthly financial report submission without touching production analytics.',
+  seminary:
+    'Download the seminary template and test the full frontend submission flow using temporary mock processing states.',
+  school:
+    'Download the school template and simulate a frontend-only report submission for finance review and validation.',
 };
 
 export const acceptedSubmissionFormats = '.xlsx,.xls,.csv,.pdf';

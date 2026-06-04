@@ -21,7 +21,10 @@ export class AuthGatewayController {
   }
 
   @Post('logout')
-  async logout(@Headers('authorization') authorization: string | undefined, @Res({ passthrough: true }) response: Response) {
+  async logout(
+    @Headers('authorization') authorization: string | undefined,
+    @Res({ passthrough: true }) response: Response,
+  ) {
     const result = await requestDownstream<unknown>({
       baseUrl: SERVICE_URLS.auth,
       path: '/auth/logout',
@@ -35,7 +38,10 @@ export class AuthGatewayController {
   }
 
   @Get('me')
-  async me(@Headers('authorization') authorization: string | undefined, @Res({ passthrough: true }) response: Response) {
+  async me(
+    @Headers('authorization') authorization: string | undefined,
+    @Res({ passthrough: true }) response: Response,
+  ) {
     const result = await requestDownstream<unknown>({
       baseUrl: SERVICE_URLS.auth,
       path: '/auth/me',

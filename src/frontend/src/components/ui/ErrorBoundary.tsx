@@ -43,9 +43,7 @@ export class ErrorBoundary extends React.Component<Props, State> {
                 We encountered an unexpected error. Please try refreshing the page.
               </p>
               <details className="text-xs text-gray-500 bg-gray-100 p-3 rounded mb-6 max-h-40 overflow-y-auto">
-                <summary className="cursor-pointer font-semibold text-gray-700 mb-2">
-                  Error Details
-                </summary>
+                <summary className="cursor-pointer font-semibold text-gray-700 mb-2">Error Details</summary>
                 <pre className="whitespace-pre-wrap break-words">{this.state.error?.message}</pre>
               </details>
               <button

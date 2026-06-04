@@ -75,7 +75,7 @@ export function ParishClassificationLogic({
    * Analyze and classify all parishes
    */
   const classificationAnalysis = useMemo(() => {
-    return parishes.map(parish => {
+    return parishes.map((parish) => {
       const recommendedClass = getRecommendedClass(parish.annualCollections);
       const subsidyNeeded = needsSubsidy(parish.annualCollections);
       const subsidyAmount = calculateSubsidyAmount(parish.annualCollections);
@@ -96,16 +96,19 @@ export function ParishClassificationLogic({
   /**
    * Generate summary statistics
    */
-  const stats = useMemo(() => ({
-    total: classificationAnalysis.length,
-    needingSubsidy: classificationAnalysis.filter(p => p.subsidyNeeded).length,
-    selfSufficient: classificationAnalysis.filter(p => !p.subsidyNeeded).length,
-    needingReclassification: classificationAnalysis.filter(p => p.needsReclassification).length,
-    totalSubsidyNeeded: classificationAnalysis.reduce((sum, p) => sum + (p.subsidyAmount || 0), 0),
-  }), [classificationAnalysis]);
+  const stats = useMemo(
+    () => ({
+      total: classificationAnalysis.length,
+      needingSubsidy: classificationAnalysis.filter((p) => p.subsidyNeeded).length,
+      selfSufficient: classificationAnalysis.filter((p) => !p.subsidyNeeded).length,
+      needingReclassification: classificationAnalysis.filter((p) => p.needsReclassification).length,
+      totalSubsidyNeeded: classificationAnalysis.reduce((sum, p) => sum + (p.subsidyAmount || 0), 0),
+    }),
+    [classificationAnalysis],
+  );
 
   const handleApplyClassification = (parishId: string, newClass: EntityClass) => {
-    const parish = classificationAnalysis.find(p => p.id === parishId);
+    const parish = classificationAnalysis.find((p) => p.id === parishId);
     if (parish && onClassificationChange) {
       onClassificationChange(parishId, newClass, parish.subsidyNeeded);
     }
@@ -164,9 +167,7 @@ export function ParishClassificationLogic({
         <div className="flex items-center justify-between gap-4">
           <div>
             <p className="text-xs text-amber-700 uppercase font-bold mb-1">Total Annual Subsidy Budget Required</p>
-            <p className="text-3xl font-black text-amber-900">
-              ₱{(stats.totalSubsidyNeeded / 1000000).toFixed(2)}M
-            </p>
+            <p className="text-3xl font-black text-amber-900">₱{(stats.totalSubsidyNeeded / 1000000).toFixed(2)}M</p>
           </div>
           <AlertCircle className="w-12 h-12 text-amber-600 flex-shrink-0" />
         </div>
@@ -225,10 +226,10 @@ export function ParishClassificationLogic({
                         parish.recommendedClass === 'Class A'
                           ? 'bg-emerald-100 text-emerald-900'
                           : parish.recommendedClass === 'Class B'
-                          ? 'bg-blue-100 text-blue-900'
-                          : parish.recommendedClass === 'Class C'
-                          ? 'bg-yellow-100 text-yellow-900'
-                          : 'bg-red-100 text-red-900'
+                            ? 'bg-blue-100 text-blue-900'
+                            : parish.recommendedClass === 'Class C'
+                              ? 'bg-yellow-100 text-yellow-900'
+                              : 'bg-red-100 text-red-900'
                       }`}
                     >
                       {parish.recommendedClass}
@@ -249,9 +250,7 @@ export function ParishClassificationLogic({
                   </td>
                   <td className="px-4 py-3 text-center">
                     {parish.subsidyNeeded ? (
-                      <span className="text-red-700 font-bold">
-                        ₱{(parish.subsidyAmount! / 1000000).toFixed(2)}M
-                      </span>
+                      <span className="text-red-700 font-bold">₱{(parish.subsidyAmount! / 1000000).toFixed(2)}M</span>
                     ) : (
                       <span className="text-green-700 text-xs font-bold">None</span>
                     )}
@@ -282,7 +281,7 @@ export function ParishClassificationLogic({
         >
           <h4 className="font-bold text-blue-900 mb-4">Classification Thresholds</h4>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-            {(['classA', 'classB', 'classC', 'classD'] as const).map(cls => (
+            {(['classA', 'classB', 'classC', 'classD'] as const).map((cls) => (
               <div key={cls}>
                 <label className="text-xs font-bold text-blue-700 mb-1 block">
                   {cls.replace('class', 'Class ')} Minimum (₱)

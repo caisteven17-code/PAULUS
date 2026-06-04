@@ -15,18 +15,12 @@ async function bootstrap() {
 
   app.use(cookieParser());
   app.enableCors({
-    origin: (
-      origin: string | undefined,
-      callback: (err: Error | null, allow?: boolean) => void,
-    ) => {
+    origin: (origin: string | undefined, callback: (err: Error | null, allow?: boolean) => void) => {
       if (!origin) {
         return callback(null, true);
       }
 
-      if (
-        configuredOrigins.includes(origin) ||
-        localhostPattern.test(origin)
-      ) {
+      if (configuredOrigins.includes(origin) || localhostPattern.test(origin)) {
         return callback(null, true);
       }
 

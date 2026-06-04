@@ -22,11 +22,7 @@ export class AnalyticsController {
   }
 
   @Get('diagnostic')
-  async getDiagnostic(
-    @Query('entityId') entityId: string,
-    @Query('month') month: string,
-    @Res() Res: Response,
-  ) {
+  async getDiagnostic(@Query('entityId') entityId: string, @Query('month') month: string, @Res() Res: Response) {
     if (!entityId || !month) {
       return Res.status(HttpStatus.BAD_REQUEST).json({ error: 'entityId and month are required.' });
     }

@@ -75,7 +75,9 @@ export function ExpenseEntryModal({ isOpen, onClose, onSubmit, projectId, projec
           >
             <div className="p-6 md:p-8 border-b border-gray-100 flex justify-between items-center bg-white sticky top-0 z-20 shrink-0">
               <div className="min-w-0">
-                <h2 className="text-xl md:text-2xl font-serif font-bold text-church-black tracking-tight truncate">Record Disbursement</h2>
+                <h2 className="text-xl md:text-2xl font-serif font-bold text-church-black tracking-tight truncate">
+                  Record Disbursement
+                </h2>
                 <p className="text-xs md:text-sm text-gray-500 font-medium mt-1 truncate">Project: {projectName}</p>
               </div>
               <button
@@ -161,7 +163,9 @@ export function ExpenseEntryModal({ isOpen, onClose, onSubmit, projectId, projec
                     <div className="relative">
                       <select
                         value={formData.paymentMethod}
-                        onChange={(e) => setFormData({ ...formData, paymentMethod: e.target.value as ProjectExpense['paymentMethod'] })}
+                        onChange={(e) =>
+                          setFormData({ ...formData, paymentMethod: e.target.value as ProjectExpense['paymentMethod'] })
+                        }
                         className="w-full px-5 py-4 bg-gray-50/50 border border-gray-200 rounded-2xl text-sm font-medium focus:outline-none focus:ring-4 focus:ring-gold-500/10 focus:border-gold-500 focus:bg-white transition-all appearance-none cursor-pointer"
                       >
                         <option value="Cash">Cash</option>
@@ -203,7 +207,9 @@ export function ExpenseEntryModal({ isOpen, onClose, onSubmit, projectId, projec
                       className="block w-full text-sm text-gray-500 file:mr-4 file:rounded-xl file:border-0 file:bg-white file:px-4 file:py-2.5 file:text-xs file:font-bold file:uppercase file:tracking-widest file:text-gold-700 hover:file:bg-gold-100"
                     />
                     <p className="mt-3 text-[10px] font-medium uppercase tracking-wider text-gray-500">
-                      {formData.proofFileName ? `Selected: ${formData.proofFileName}` : 'Attach a receipt image or PDF if available'}
+                      {formData.proofFileName
+                        ? `Selected: ${formData.proofFileName}`
+                        : 'Attach a receipt image or PDF if available'}
                     </p>
                   </div>
                 </div>

@@ -16,26 +16,26 @@ export interface FinancialRecord {
   collections: number;
   consumableCollections: number;
   disbursements: number;
-  
+
   // Detailed fields based on actual dataset
   sacraments_rate?: number;
   sacraments_arancel?: number;
   sacraments_parishShare?: number;
   sacraments_overAbove?: number;
-  
+
   collections_mass?: number;
   collections_other?: number;
   collections_otherReceipts?: number;
-  
+
   expenses_pastoral?: number;
   expenses_parish?: number;
-  
+
   netReceipts?: number;
-  
+
   others_massIntentionsNotClaimed?: number;
   others_massIntentionsClaimed?: number;
   others_specialCollections?: number;
-  
+
   pastoralParishFundTotalNetReceipts?: number;
 
   timestamp?: any;
@@ -139,13 +139,13 @@ export interface DiagnosticResult {
   timestamp: any;
 }
 
-export type ProjectCategory = 
-  | 'Building/Construction' 
-  | 'Equipment' 
-  | 'Programs/Outreach' 
-  | 'Education' 
-  | 'Emergency/Relief' 
-  | 'Liturgical' 
+export type ProjectCategory =
+  | 'Building/Construction'
+  | 'Equipment'
+  | 'Programs/Outreach'
+  | 'Education'
+  | 'Emergency/Relief'
+  | 'Liturgical'
   | 'Operational'
   | 'Infrastructure'
   | 'Heritage'

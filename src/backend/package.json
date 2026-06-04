@@ -12,6 +12,9 @@
     "dev:analytics": "npm run build && dotenv -e ../../.env -- node dist/apps/analytics-service/main.js",
     "dev:all": "npm run build && dotenv -e ../../.env -- concurrently -n gateway,auth,entity,financial,project,analytics -c cyan,green,yellow,blue,magenta,gray \"node dist/apps/api-gateway/main.js\" \"node dist/apps/auth-service/main.js\" \"node dist/apps/entity-service/main.js\" \"node dist/apps/financial-service/main.js\" \"node dist/apps/project-service/main.js\" \"node dist/apps/analytics-service/main.js\"",
     "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "format": "prettier --write \"src/**/*.ts\"",
+    "format:check": "prettier --check \"src/**/*.ts\"",
     "start": "npm run start:all",
     "start:gateway": "dotenv -e ../../.env -- node dist/apps/api-gateway/main.js",
     "start:auth": "dotenv -e ../../.env -- node dist/apps/auth-service/main.js",
@@ -43,6 +46,7 @@
     "@types/nodemailer": "^7.0.1",
     "concurrently": "^9.2.1",
     "dotenv-cli": "^8.0.0",
+    "prettier": "^3.4.2",
     "tsx": "^4.21.0",
     "typescript": "^5.9.3"
   }

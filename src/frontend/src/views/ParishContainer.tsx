@@ -16,14 +16,7 @@ interface ParishContainerProps {
   onLogout: () => void;
 }
 
-export function ParishContainer({
-  role,
-  timeframe,
-  year,
-  onYearChange,
-  onNavigate,
-  onLogout,
-}: ParishContainerProps) {
+export function ParishContainer({ role, timeframe, year, onYearChange, onNavigate, onLogout }: ParishContainerProps) {
   const [activeSubtab, setActiveSubtab] = useState<'dashboard' | 'health' | 'aitwin'>('dashboard');
 
   const subtabs = [
@@ -46,9 +39,7 @@ export function ParishContainer({
                   key={tab.id}
                   onClick={() => setActiveSubtab(tab.id)}
                   className={`px-4 py-3 flex items-center gap-2 text-sm font-medium whitespace-nowrap transition-colors relative ${
-                    isActive
-                      ? 'text-church-green'
-                      : 'text-church-grey hover:text-church-green/70'
+                    isActive ? 'text-church-green' : 'text-church-grey hover:text-church-green/70'
                   }`}
                   whileHover={{ scale: 1.05 }}
                   whileTap={{ scale: 0.95 }}
@@ -77,8 +68,8 @@ export function ParishContainer({
         transition={{ duration: 0.3 }}
         className="flex-1 overflow-auto"
       >
-        {activeSubtab === 'dashboard' && (
-          role === 'priest' ? (
+        {activeSubtab === 'dashboard' &&
+          (role === 'priest' ? (
             <PriestDashboard
               role={role}
               dashboardContext="parish"
@@ -99,8 +90,7 @@ export function ParishContainer({
               onNavigate={onNavigate}
               onLogout={onLogout}
             />
-          )
-        )}
+          ))}
         {activeSubtab === 'health' && <HealthTracker />}
         {activeSubtab === 'aitwin' && <AITwin />}
       </motion.div>

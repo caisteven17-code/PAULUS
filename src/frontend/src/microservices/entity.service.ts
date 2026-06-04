@@ -23,8 +23,8 @@ export const entityService = {
 
   getAll(): { parishes: Parish[]; schools: DiocesanSchool[]; seminaries: Seminary[] } {
     return {
-      parishes:   this.getParishes(),
-      schools:    this.getSchools(),
+      parishes: this.getParishes(),
+      schools: this.getSchools(),
       seminaries: this.getSeminaries(),
     };
   },

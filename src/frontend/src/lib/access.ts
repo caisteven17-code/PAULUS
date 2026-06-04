@@ -31,9 +31,7 @@ export const ACCESS_ROLE_TO_APP_ROLE: Record<AccessRole, AppRole> = {
   school_principal: 'school',
 };
 
-const roleNameToId = new Map(
-  INITIAL_ROLES.map((role) => [role.name.toLowerCase(), role.id as AccessRole])
-);
+const roleNameToId = new Map(INITIAL_ROLES.map((role) => [role.name.toLowerCase(), role.id as AccessRole]));
 
 const legacyRoleToAccessRole: Record<string, AccessRole> = {
   bishop: 'bishop',
@@ -48,7 +46,7 @@ const legacyRoleToAccessRole: Record<string, AccessRole> = {
   finance_supervisor: 'finance_supervisor',
   finance_officer: 'finance_officer',
   school_principal: 'school_principal',
-  
+
   // Legacy aliases
   admin: 'diocesan_oeconomus',
   diocese_admin: 'diocesan_oeconomus',
@@ -83,7 +81,12 @@ export function getAppRole(role?: string): AppRole {
           if (match.permissions.view_diocese) return 'bishop';
           if (match.permissions.view_parish) return 'parish_priest';
           if (match.permissions.view_seminary) return 'seminary';
-          if (match.permissions.view_school || match.permissions.view_school_cluster || match.permissions.view_school_all) return 'school';
+          if (
+            match.permissions.view_school ||
+            match.permissions.view_school_cluster ||
+            match.permissions.view_school_all
+          )
+            return 'school';
         }
       }
     } catch (e) {

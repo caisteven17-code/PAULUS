@@ -1,16 +1,7 @@
 'use client';
 
 import React, { useMemo, useState } from 'react';
-import {
-  AlertCircle,
-  ArrowLeft,
-  Clock3,
-  FileText,
-  CheckCircle2,
-  ShieldCheck,
-  Calendar,
-  Zap,
-} from 'lucide-react';
+import { AlertCircle, ArrowLeft, Clock3, FileText, CheckCircle2, ShieldCheck, Calendar, Zap } from 'lucide-react';
 import { motion } from 'motion/react';
 import { Card, CardContent } from '../components/ui/Card';
 import { FinancialRecord } from '../types';
@@ -50,7 +41,20 @@ interface ParishDataSubmissionProps {
 
 const wait = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
-const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+const MONTHS = [
+  'January',
+  'February',
+  'March',
+  'April',
+  'May',
+  'June',
+  'July',
+  'August',
+  'September',
+  'October',
+  'November',
+  'December',
+];
 
 const roleBadgeMap: Record<SubmissionInstitutionType, string> = {
   parish: 'Parish Level',
@@ -105,7 +109,7 @@ export function ParishDataSubmission({
   const [showWarningModal, setShowWarningModal] = useState(false);
   const [selectedMonth, setSelectedMonth] = useState<number>(new Date().getMonth());
   const [statusMessage, setStatusMessage] = useState(
-    'No submission has started yet. Download a template or choose a report file to begin.'
+    'No submission has started yet. Download a template or choose a report file to begin.',
   );
 
   const fileSizeLabel = selectedFile ? formatFileSize(selectedFile.size) : '';
@@ -157,7 +161,7 @@ export function ParishDataSubmission({
     setStatusMessage(
       file
         ? 'Valid file selected. Review the file details, then confirm the upload to start the simulated submission process.'
-        : 'No submission has started yet. Download a template or choose a report file to begin.'
+        : 'No submission has started yet. Download a template or choose a report file to begin.',
     );
   };
 
@@ -185,7 +189,7 @@ export function ParishDataSubmission({
     setStatusMessage(
       keepFile && selectedFile
         ? 'You can review the same file again or replace it before another simulated submission.'
-        : 'No submission has started yet. Download a template or choose a report file to begin.'
+        : 'No submission has started yet. Download a template or choose a report file to begin.',
     );
 
     if (!keepFile) {
@@ -224,7 +228,7 @@ export function ParishDataSubmission({
 
     setFlowState('success');
     setStatusMessage(
-      'The simulated submission completed successfully. No real database, analytics, or official records were changed.'
+      'The simulated submission completed successfully. No real database, analytics, or official records were changed.',
     );
     onImport?.([]);
     setShowSuccessModal(true);
@@ -252,9 +256,7 @@ export function ParishDataSubmission({
                 {roleBadgeMap[institutionType]}
               </span>
             </div>
-            <h1 className="truncate text-lg font-serif font-black text-church-green sm:text-xl">
-              {heading}
-            </h1>
+            <h1 className="truncate text-lg font-serif font-black text-church-green sm:text-xl">{heading}</h1>
             <p className="truncate text-[10px] font-bold uppercase tracking-[0.18em] text-gray-400 sm:text-xs">
               {parishName} • {vicariate}
             </p>
@@ -342,9 +344,7 @@ export function ParishDataSubmission({
                     <AlertCircle className="mt-0.5 h-5 w-5 shrink-0 text-blue-600" />
                     <div>
                       <p className="text-sm font-bold text-blue-800">Accepted files</p>
-                      <p className="mt-1 text-sm leading-relaxed text-blue-700">
-                        XLSX, XLS, CSV, PDF
-                      </p>
+                      <p className="mt-1 text-sm leading-relaxed text-blue-700">XLSX, XLS, CSV, PDF</p>
                     </div>
                   </div>
                 </div>
@@ -354,9 +354,7 @@ export function ParishDataSubmission({
                     <CheckCircle2 className="mt-0.5 h-5 w-5 shrink-0 text-emerald-600" />
                     <div>
                       <p className="text-sm font-bold text-emerald-800">Submission year</p>
-                      <p className="mt-1 text-sm leading-relaxed text-emerald-700">
-                        Reporting cycle {year}
-                      </p>
+                      <p className="mt-1 text-sm leading-relaxed text-emerald-700">Reporting cycle {year}</p>
                     </div>
                   </div>
                 </div>
@@ -375,7 +373,8 @@ export function ParishDataSubmission({
                 <div className="space-y-1.5">
                   <h3 className="text-2xl font-serif font-black text-church-black">What-If Submission Period</h3>
                   <p className="text-sm text-gray-600 leading-relaxed">
-                    Explore different months to understand deadlines and submission requirements. Select any period to preview what-if scenarios.
+                    Explore different months to understand deadlines and submission requirements. Select any period to
+                    preview what-if scenarios.
                   </p>
                 </div>
               </div>
@@ -401,15 +400,17 @@ export function ParishDataSubmission({
                 <div className="sm:col-span-2 grid grid-cols-2 sm:grid-cols-2 gap-3">
                   <div className="rounded-[1.2rem] border-2 border-gold-200 bg-gradient-to-br from-gold-50 to-white p-3.5">
                     <p className="text-[10px] font-black uppercase tracking-[0.15em] text-gray-500">Selected Period</p>
-                    <p className="mt-2 text-base font-serif font-bold text-gold-800">
-                      {submissionWhatIf.month}
-                    </p>
+                    <p className="mt-2 text-base font-serif font-bold text-gold-800">{submissionWhatIf.month}</p>
                     <p className="text-xs font-semibold text-gold-600">{year}</p>
                   </div>
 
-                  <div className={`rounded-[1.2rem] border-2 p-3.5 ${submissionWhatIf.isOverdue ? 'border-red-300 bg-gradient-to-br from-red-50 to-white' : 'border-emerald-200 bg-gradient-to-br from-emerald-50 to-white'}`}>
+                  <div
+                    className={`rounded-[1.2rem] border-2 p-3.5 ${submissionWhatIf.isOverdue ? 'border-red-300 bg-gradient-to-br from-red-50 to-white' : 'border-emerald-200 bg-gradient-to-br from-emerald-50 to-white'}`}
+                  >
                     <p className="text-[10px] font-black uppercase tracking-[0.15em] text-gray-500">Status</p>
-                    <p className={`mt-2 text-base font-serif font-bold ${submissionWhatIf.isOverdue ? 'text-red-700' : submissionWhatIf.isCurrentMonth ? 'text-emerald-700' : 'text-gray-700'}`}>
+                    <p
+                      className={`mt-2 text-base font-serif font-bold ${submissionWhatIf.isOverdue ? 'text-red-700' : submissionWhatIf.isCurrentMonth ? 'text-emerald-700' : 'text-gray-700'}`}
+                    >
                       {submissionWhatIf.status}
                     </p>
                   </div>
@@ -417,43 +418,53 @@ export function ParishDataSubmission({
               </div>
 
               <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-                <div className={`rounded-[1.1rem] border-2 p-4 transition-all ${submissionWhatIf.isOverdue ? 'border-red-300 bg-gradient-to-br from-red-50 to-white shadow-sm hover:shadow-md' : 'border-gold-200 bg-gradient-to-br from-gold-50 to-white shadow-sm hover:shadow-md'}`}>
+                <div
+                  className={`rounded-[1.1rem] border-2 p-4 transition-all ${submissionWhatIf.isOverdue ? 'border-red-300 bg-gradient-to-br from-red-50 to-white shadow-sm hover:shadow-md' : 'border-gold-200 bg-gradient-to-br from-gold-50 to-white shadow-sm hover:shadow-md'}`}
+                >
                   <p className="text-[10px] font-black uppercase tracking-[0.15em] text-gray-600">Deadline</p>
-                  <p className={`mt-2.5 text-base font-serif font-bold leading-tight ${submissionWhatIf.isOverdue ? 'text-red-700' : 'text-gold-800'}`}>
+                  <p
+                    className={`mt-2.5 text-base font-serif font-bold leading-tight ${submissionWhatIf.isOverdue ? 'text-red-700' : 'text-gold-800'}`}
+                  >
                     {submissionWhatIf.deadline.split(' ')[0]} {submissionWhatIf.deadline.split(' ')[1]}
                   </p>
                 </div>
 
-                <div className={`rounded-[1.1rem] border-2 p-4 transition-all ${submissionWhatIf.daysRemaining <= 5 && !submissionWhatIf.isOverdue ? 'border-orange-300 bg-gradient-to-br from-orange-50 to-white shadow-sm hover:shadow-md' : 'border-emerald-200 bg-gradient-to-br from-emerald-50 to-white shadow-sm hover:shadow-md'}`}>
+                <div
+                  className={`rounded-[1.1rem] border-2 p-4 transition-all ${submissionWhatIf.daysRemaining <= 5 && !submissionWhatIf.isOverdue ? 'border-orange-300 bg-gradient-to-br from-orange-50 to-white shadow-sm hover:shadow-md' : 'border-emerald-200 bg-gradient-to-br from-emerald-50 to-white shadow-sm hover:shadow-md'}`}
+                >
                   <p className="text-[10px] font-black uppercase tracking-[0.15em] text-gray-600">Days Remaining</p>
-                  <p className={`mt-2.5 text-2xl font-serif font-black ${submissionWhatIf.isOverdue ? 'text-red-700' : submissionWhatIf.daysRemaining <= 5 ? 'text-orange-700' : 'text-emerald-700'}`}>
-                    {submissionWhatIf.isOverdue ? '−' : ''}{submissionWhatIf.daysRemaining}
+                  <p
+                    className={`mt-2.5 text-2xl font-serif font-black ${submissionWhatIf.isOverdue ? 'text-red-700' : submissionWhatIf.daysRemaining <= 5 ? 'text-orange-700' : 'text-emerald-700'}`}
+                  >
+                    {submissionWhatIf.isOverdue ? '−' : ''}
+                    {submissionWhatIf.daysRemaining}
                   </p>
                 </div>
 
                 <div className="rounded-[1.1rem] border-2 border-blue-200 bg-gradient-to-br from-blue-50 to-white p-4 shadow-sm hover:shadow-md transition-all">
                   <p className="text-[10px] font-black uppercase tracking-[0.15em] text-gray-600">Cycle Year</p>
-                  <p className="mt-2.5 text-2xl font-serif font-black text-blue-700">
-                    {year}
-                  </p>
+                  <p className="mt-2.5 text-2xl font-serif font-black text-blue-700">{year}</p>
                 </div>
 
                 <div className="rounded-[1.1rem] border-2 border-gray-200 bg-gradient-to-br from-gray-50 to-white p-4 shadow-sm hover:shadow-md transition-all">
                   <p className="text-[10px] font-black uppercase tracking-[0.15em] text-gray-600">Submission Mode</p>
-                  <p className="mt-2.5 text-base font-serif font-bold text-gray-700">
-                    Test
-                  </p>
+                  <p className="mt-2.5 text-base font-serif font-bold text-gray-700">Test</p>
                 </div>
               </div>
 
               {submissionWhatIf.isOverdue && (
-                <motion.div initial={{ opacity: 0, y: -4 }} animate={{ opacity: 1, y: 0 }} className="rounded-[1.2rem] border-2 border-red-300 bg-gradient-to-r from-red-50 via-red-50 to-white p-4">
+                <motion.div
+                  initial={{ opacity: 0, y: -4 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  className="rounded-[1.2rem] border-2 border-red-300 bg-gradient-to-r from-red-50 via-red-50 to-white p-4"
+                >
                   <div className="flex items-start gap-3">
                     <AlertCircle className="mt-0.5 h-5 w-5 shrink-0 text-red-600" />
                     <div>
                       <p className="font-semibold text-red-900">Overdue Period</p>
                       <p className="mt-1 text-sm text-red-800">
-                        This submission period is {submissionWhatIf.daysRemaining} days overdue. Late submissions may require special approval from your diocese.
+                        This submission period is {submissionWhatIf.daysRemaining} days overdue. Late submissions may
+                        require special approval from your diocese.
                       </p>
                     </div>
                   </div>
@@ -461,13 +472,18 @@ export function ParishDataSubmission({
               )}
 
               {submissionWhatIf.isCurrentMonth && (
-                <motion.div initial={{ opacity: 0, y: -4 }} animate={{ opacity: 1, y: 0 }} className="rounded-[1.2rem] border-2 border-emerald-300 bg-gradient-to-r from-emerald-50 via-emerald-50 to-white p-4">
+                <motion.div
+                  initial={{ opacity: 0, y: -4 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  className="rounded-[1.2rem] border-2 border-emerald-300 bg-gradient-to-r from-emerald-50 via-emerald-50 to-white p-4"
+                >
                   <div className="flex items-start gap-3">
                     <CheckCircle2 className="mt-0.5 h-5 w-5 shrink-0 text-emerald-600" />
                     <div>
                       <p className="font-semibold text-emerald-900">Active Period</p>
                       <p className="mt-1 text-sm text-emerald-800">
-                        This is the current submission period. Upload your financial data for the ongoing month of {submissionWhatIf.month}.
+                        This is the current submission period. Upload your financial data for the ongoing month of{' '}
+                        {submissionWhatIf.month}.
                       </p>
                     </div>
                   </div>
@@ -475,13 +491,19 @@ export function ParishDataSubmission({
               )}
 
               {submissionWhatIf.isUpcoming && (
-                <motion.div initial={{ opacity: 0, y: -4 }} animate={{ opacity: 1, y: 0 }} className="rounded-[1.2rem] border-2 border-blue-300 bg-gradient-to-r from-blue-50 via-blue-50 to-white p-4">
+                <motion.div
+                  initial={{ opacity: 0, y: -4 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  className="rounded-[1.2rem] border-2 border-blue-300 bg-gradient-to-r from-blue-50 via-blue-50 to-white p-4"
+                >
                   <div className="flex items-start gap-3">
                     <Clock3 className="mt-0.5 h-5 w-5 shrink-0 text-blue-600" />
                     <div>
                       <p className="font-semibold text-blue-900">Upcoming Period</p>
                       <p className="mt-1 text-sm text-blue-800">
-                        {submissionWhatIf.month} is your next submission period. Begin preparing your financial reports now to ensure timely submission by {submissionWhatIf.deadline.split(' ')[0]} {submissionWhatIf.deadline.split(' ')[1]}.
+                        {submissionWhatIf.month} is your next submission period. Begin preparing your financial reports
+                        now to ensure timely submission by {submissionWhatIf.deadline.split(' ')[0]}{' '}
+                        {submissionWhatIf.deadline.split(' ')[1]}.
                       </p>
                     </div>
                   </div>
@@ -489,13 +511,18 @@ export function ParishDataSubmission({
               )}
 
               {!submissionWhatIf.isCurrentMonth && !submissionWhatIf.isUpcoming && !submissionWhatIf.isOverdue && (
-                <motion.div initial={{ opacity: 0, y: -4 }} animate={{ opacity: 1, y: 0 }} className="rounded-[1.2rem] border-2 border-amber-300 bg-gradient-to-r from-amber-50 via-amber-50 to-white p-4">
+                <motion.div
+                  initial={{ opacity: 0, y: -4 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  className="rounded-[1.2rem] border-2 border-amber-300 bg-gradient-to-r from-amber-50 via-amber-50 to-white p-4"
+                >
                   <div className="flex items-start gap-3">
                     <FileText className="mt-0.5 h-5 w-5 shrink-0 text-amber-600" />
                     <div>
                       <p className="font-semibold text-amber-900">Future Period</p>
                       <p className="mt-1 text-sm text-amber-800">
-                        You're exploring a future submission period ({submissionWhatIf.month}). Use this to test workflows and understand deadline requirements in advance.
+                        You're exploring a future submission period ({submissionWhatIf.month}). Use this to test
+                        workflows and understand deadline requirements in advance.
                       </p>
                     </div>
                   </div>
@@ -534,11 +561,7 @@ export function ParishDataSubmission({
         </div>
 
         <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }}>
-          <SubmissionProgress
-            steps={submissionSteps}
-            currentStepId={currentStepId}
-            flowState={flowState}
-          />
+          <SubmissionProgress steps={submissionSteps} currentStepId={currentStepId} flowState={flowState} />
         </motion.div>
       </div>
 
