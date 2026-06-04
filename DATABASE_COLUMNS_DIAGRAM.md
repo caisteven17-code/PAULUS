@@ -127,6 +127,16 @@ erDiagram
         text ip_address
         timestamptz occurred_at
     }
+    diocese_priest_assignments {
+        uuid id PK
+        uuid profile_id FK
+        uuid institution_id FK
+        text role_id FK
+        date start_date
+        date end_date
+        text status
+        text decree_reference
+    }
 
     %% PARISHES OPERATIONAL SCHEMA
     parishes_details {
@@ -159,7 +169,7 @@ erDiagram
         numeric other_collections_total
         numeric donations
         numeric interest_income
-        numeric subsidy_inflow
+        numeric subsidy_from_rbscp
         numeric special_collections
         numeric second_collections
         numeric charge_over_above
@@ -226,7 +236,7 @@ erDiagram
         numeric tuition_revenues
         numeric miscellaneous_fees
         numeric other_income
-        numeric subsidy_inflow
+        numeric subsidy_from_rbscp
         numeric faculty_payroll
         numeric admin_staff_payroll
         numeric utilities
@@ -256,15 +266,12 @@ erDiagram
         numeric seminary_fees
         numeric mass_collections
         numeric other_sources
-        numeric subsidy_inflow
-        numeric tuition_fees
-        numeric board_lodging_fees
+        numeric subsidy_from_rbscp
         numeric drm_modules
         numeric sra_reading_lab
         numeric retreat
         numeric honorarium_fee
         numeric miscellaneous_fees
-        numeric daily_food
         numeric food_others
         numeric gasoline_seminary
         numeric gasoline_vocation
@@ -278,14 +285,11 @@ erDiagram
         numeric lpg
         numeric repairs_maintenance
         numeric equipment_furniture
-        numeric utilities
         numeric labor
         numeric professional_driver_fee
-        numeric salaries_wages
-        numeric contribution_benefits
         numeric cash_incentives
         numeric transportation_bank_charges
-        numeric other_expenses
+        numeric total_expenses
         numeric net_surplus
         numeric dependency_ratio
     }
@@ -299,6 +303,9 @@ erDiagram
     diocese_donations }|--|| diocese_projects : "project_id"
     diocese_project_expenses }|--|| diocese_projects : "project_id"
     diocese_audit_logs }|--o| diocese_institutions : "institution_id"
+    diocese_priest_assignments }|--|| diocese_profiles : "profile_id"
+    diocese_priest_assignments }|--|| diocese_institutions : "institution_id"
+    diocese_priest_assignments }|--|| diocese_roles : "role_id"
 
     %% Sub-type mappings (1:1 extensions of central institutions)
     parishes_details ||--|| diocese_institutions : "extends"
@@ -332,14 +339,32 @@ erDiagram
         uuid institution_id
         text institution_name
         text entity_type
-        text vicariate
-        text district
-        text cluster
         text class
-        text head_administrator
         numeric lat
         numeric lng
         boolean is_active
+    }
+    dim_parishes {
+        integer institution_key PK, FK
+        text vicariate
+        text district
+        text cluster
+        text pastor
+        text primary_patron
+        text secondary_patron
+        date fiesta_date
+        text address
+    }
+    dim_schools {
+        integer institution_key PK, FK
+        text principal
+        text level
+        text address
+    }
+    dim_seminaries {
+        integer institution_key PK, FK
+        text rector
+        text address
     }
     dim_date {
         integer date_key PK
@@ -357,9 +382,18 @@ erDiagram
         text category_description
         text applies_to
     }
+    dim_priests {
+        integer priest_key PK
+        uuid profile_id
+        text full_name
+        text email
+        text contact_number
+        boolean is_active
+    }
     fact_parish_monthly_financials {
         integer institution_key PK, FK
         integer date_key PK, FK
+        integer submission_key FK
         numeric sacraments_total
         numeric confirmation_total
         numeric mass_intentions_total
@@ -372,7 +406,7 @@ erDiagram
         numeric other_collections_total
         numeric donations
         numeric interest_income
-        numeric subsidy_inflow
+        numeric subsidy_from_rbscp
         numeric special_collections
         numeric second_collections
         numeric charge_over_above
@@ -393,6 +427,8 @@ erDiagram
         numeric beginning_balance
         numeric ending_balance_before_remit
         numeric ending_balance_after_remit
+        numeric total_inflow
+        numeric total_outflow
         numeric net_receipts
         numeric pastoral_parish_fund_total_net_receipts
         smallint typhoon_days_count
@@ -403,16 +439,19 @@ erDiagram
     fact_school_monthly_financials {
         integer institution_key PK, FK
         integer date_key PK, FK
+        integer submission_key FK
         numeric tuition_revenues
         numeric miscellaneous_fees
         numeric other_income
-        numeric subsidy_inflow
+        numeric subsidy_from_rbscp
         numeric faculty_payroll
         numeric admin_staff_payroll
         numeric utilities
         numeric facilities_maintenance
         numeric supplies
         numeric other_expenses
+        numeric total_inflow
+        numeric total_outflow
         numeric net_receipts
         smallint typhoon_days_count
         smallint major_events_count
@@ -421,19 +460,17 @@ erDiagram
     fact_seminary_monthly_financials {
         integer institution_key PK, FK
         integer date_key PK, FK
+        integer submission_key FK
         numeric donations
         numeric seminary_fees
         numeric mass_collections
         numeric other_sources
-        numeric subsidy_inflow
-        numeric tuition_fees
-        numeric board_lodging_fees
+        numeric subsidy_from_rbscp
         numeric drm_modules
         numeric sra_reading_lab
         numeric retreat
         numeric honorarium_fee
         numeric miscellaneous_fees
-        numeric daily_food
         numeric food_others
         numeric gasoline_seminary
         numeric gasoline_vocation
@@ -447,14 +484,11 @@ erDiagram
         numeric lpg
         numeric repairs_maintenance
         numeric equipment_furniture
-        numeric utilities
         numeric labor
         numeric professional_driver_fee
-        numeric salaries_wages
-        numeric contribution_benefits
         numeric cash_incentives
         numeric transportation_bank_charges
-        numeric other_expenses
+        numeric total_expenses
         numeric net_surplus
         numeric dependency_ratio
         smallint typhoon_days_count
@@ -509,6 +543,14 @@ erDiagram
         numeric allocated_subsidy
         timestamptz run_at
     }
+    fact_priest_assignments {
+        integer priest_key PK, FK
+        integer institution_key PK, FK
+        integer start_date_key PK, FK
+        integer end_date_key FK
+        text status
+        boolean is_active
+    }
 
     %% WAREHOUSE LINKAGES
     fact_parish_monthly_financials }|--|| dim_institutions : "institution_key"
@@ -530,6 +572,15 @@ erDiagram
     fact_health_snapshots }|--|| dim_date : "date_key"
 
     fact_subsidy_allocations }|--|| dim_institutions : "institution_key"
+    fact_priest_assignments }|--|| dim_priests : "priest_key"
+    fact_priest_assignments }|--|| dim_institutions : "institution_key"
+    fact_priest_assignments }|--|| dim_date : "start_date_key"
+    fact_priest_assignments }|--|| dim_date : "end_date_key"
+
+    %% OUTRIGGER DIMENSIONS MAPPINGS (1:1 extensions)
+    dim_parishes ||--|| dim_institutions : "extends"
+    dim_schools ||--|| dim_institutions : "extends"
+    dim_seminaries ||--|| dim_institutions : "extends"
 ```
 
 ---

@@ -37,7 +37,10 @@ A transform step rolls operational rows up into `fact_monthly_financials` / `fac
 `role_id` (text FK → `diocese.roles.id`) · `permission_id` (text FK → `diocese.permissions.id`) · `granted` (bool, default true) — PK (`role_id`, `permission_id`)[cite: 2]
 
 ### `diocese.profiles` ✅
-`id` (uuid PK = auth uid) · `full_name` (text) · `email` (text unique) · `role_id` (text FK → `diocese.roles.id`) · `institution_id` (uuid FK → `diocese.institutions.id`) · `contact_number` (text) · `is_active` (bool) · `last_login_at` (timestamptz)[cite: 2]
+`id` (uuid PK = auth uid) · `full_name` (text) · `email` (text unique) · `role_id` (text FK → `diocese.roles.id`) · `institution_id` (uuid FK → `diocese.institutions.id`) · `contact_number` (text) · `is_active` (bool) · `last_login_at` (timestamptz)
+
+### `diocese.priest_assignments` 🆕
+`id` (uuid PK) · `profile_id` (uuid FK → `diocese.profiles.id`) · `institution_id` (uuid FK → `diocese.institutions.id`) · `role_id` (text FK → `diocese.roles.id`) · `start_date` (date) · `end_date` (date, nullable) · `status` (text: active/completed/transferred) · `decree_reference` (text, nullable)[cite: 2]
 
 ### `diocese.projects` ✅ *(project.service.ts mapper — exact)*
 `id` (uuid PK) · `institution_id` (uuid FK → `diocese.institutions.id`) · `name` (text) · `description` (text) · `fund_usage` (text) · `category` (text) · `status` (text: active/completed/on-hold) · `target_amount` (numeric) · `current_amount` (numeric) · `total_expenses` (numeric) · `start_date` (date) · `end_date` (date) · `beneficiaries` (text) · `contact_person` (text) · `cover_image` (text) · `health_score` (numeric) · `success_probability` (numeric) · `recommendation` (text)[cite: 2]
@@ -119,32 +122,43 @@ A transform step rolls operational rows up into `fact_monthly_financials` / `fac
 
 ### `seminaries.financial_records` ✅ *(SEMINARY TEMPLATE + seminaryMockData.ts)*
 **Header:** `id` (uuid PK) · `institution_id` (uuid FK → `diocese.institutions.id`) · `entity_class` (text) · `month` (text) · `year` (smallint) · `status` (text) · `record_timestamp` (timestamptz)[cite: 2]  
-**Receipts:** `donations` (numeric) · `seminary_fees` (numeric) · `mass_collections` (numeric) · `other_sources` (numeric) · `subsidy_inflow` *(standardized from central allocations)* (numeric)[cite: 2]  
+**Receipts:** `donations` (numeric) · `seminary_fees` (numeric) · `mass_collections` (numeric) · `other_sources` (numeric) · `subsidy_from_rbscp` *(standardized from central allocations)* (numeric)[cite: 2]  
 **Fees Breakdown:** `tuition_fees` (numeric) · `board_lodging_fees` (numeric) · `drm_modules` (numeric) · `sra_reading_lab` (numeric) · `retreat` (numeric) · `honorarium_fee` (numeric) · `miscellaneous_fees` (numeric)[cite: 2]  
 **Expenses (22 operational criteria elements):** `daily_food` · `food_others` · `gasoline_seminary` · `gasoline_vocation` · `permits_licenses` · `office_supplies` · `kitchen_equipment` · `medical_supplies` · `liturgical_supplies` · `construction_materials` · `other_supplies` · `lpg` · `repairs_maintenance` · `equipment_furniture` · `utilities` · `labor` · `professional_driver_fee` · `salaries_wages` · `contribution_benefits` · `cash_incentives` · `transportation_bank_charges` · `other_expenses` *(All distinct numeric fields)*[cite: 2]  
-**Derived/Metrics:** `net_surplus` (numeric) · `dependency_ratio` *(computed during transformation layer loading = (donations + subsidy_inflow) / total_inflow)*[cite: 2]
+**Derived/Metrics:** `total_expenses` (numeric) · `net_surplus` (numeric) · `dependency_ratio` *(computed during transformation layer loading = (donations + subsidy_from_rbscp) / total_inflow)*[cite: 2]
 
 ---
 
 ## 5. `analytics` Schema — Consolidated Star Schema
 
 ### Dimensions
-**`dim_institutions`** ✅ — `institution_key` (serial PK) · `institution_id` (uuid) · `institution_name` · `entity_type` · `vicariate` · `district` · `cluster` · `class` · `head_administrator` · `lat` · `lng` · `is_active`[cite: 2]
+**`dim_institutions`** ✅ — `institution_key` (serial PK) · `institution_id` (uuid) · `institution_name` · `entity_type` · `class` · `lat` · `lng` · `is_active` (bool)
+
+**`dim_parishes`** 🆕 — `institution_key` (int PK & FK → `dim_institutions.institution_key`) · `vicariate` (text) · `district` (text) · `cluster` (text) · `pastor` (text) · `primary_patron` (text) · `secondary_patron` (text, nullable) · `fiesta_date` (date) · `address` (text)
+
+**`dim_schools`** 🆕 — `institution_key` (int PK & FK → `dim_institutions.institution_key`) · `principal` (text) · `level` (text) · `address` (text)
+
+**`dim_seminaries`** 🆕 — `institution_key` (int PK & FK → `dim_institutions.institution_key`) · `rector` (text) · `address` (text)
 
 **`dim_date`** — `date_key` (int PK `YYYYMM`) · `month_name` · `month_number` · `month_short` · `year` · `quarter` · `academic_year_period` (bool: handles non-profit tuition cycles) · `is_fiesta_season` (bool)[cite: 2]
 
 **`dim_expense_categories`** — `category_key` (int PK) · `category_name` · `category_description` · `applies_to` (text framework seed references)[cite: 2]
 
+**`dim_priests`** 🆕 — `priest_key` (serial PK) · `profile_id` (uuid) · `full_name` (text) · `email` (text) · `contact_number` (text) · `is_active` (bool)[cite: 2]
+
 ### Core Facts (The Transformation Layer Target)
 
 **`fact_parish_monthly_financials`** 🆕
-`institution_key` (int FK) · `date_key` (int FK) · `sacraments_total` (numeric) · `confirmation_total` (numeric) · `mass_intentions_total` (numeric) · `mass_intentions_claimed` (numeric) · `mass_intentions_unclaimed` (numeric) · `mass_collection_weekday` (numeric) · `mass_collection_sunday` (numeric) · `mass_collection_saturday` (numeric) · `consumable_collections` (numeric) · `other_collections_total` (numeric) · `donations` (numeric) · `interest_income` (numeric) · `subsidy_inflow` (numeric) · `special_collections` (numeric) · `second_collections` (numeric) · `charge_over_above` (numeric) · `other_receipts` (numeric) · `priest_share` (numeric) · `mass_stipend` (numeric) · `other_pastoral_expenses` (numeric) · `salaries_wages_benefits` (numeric) · `govt_contributions` (numeric) · `utilities` (numeric) · `communications` (numeric) · `other_rectory_expenses` (numeric) · `construction_receipts` (numeric) · `construction_expenses` (numeric) · `remittance_to_diocese` (numeric) · `bishops_fund_share` (numeric) · `special_collections_remittance` (numeric) · `beginning_balance` (numeric) · `ending_balance_before_remit` (numeric) · `ending_balance_after_remit` (numeric) · `net_receipts` (numeric) · `pastoral_parish_fund_total_net_receipts` (numeric) · `typhoon_days_count` (smallint) · `major_events_count` (smallint) · `has_fiesta` (bool) · `total_rainfall_mm` (numeric) — PK (`institution_key`, `date_key`)
+`institution_key` (int FK) · `date_key` (int FK) · `sacraments_total` (numeric) · `confirmation_total` (numeric) · `mass_intentions_total` (numeric) · `mass_intentions_claimed` (numeric) · `mass_intentions_unclaimed` (numeric) · `mass_collection_weekday` (numeric) · `mass_collection_sunday` (numeric) · `mass_collection_saturday` (numeric) · `consumable_collections` (numeric) · `other_collections_total` (numeric) · `donations` (numeric) · `interest_income` (numeric) · `subsidy_inflow` (numeric) · `special_collections` (numeric) · `second_collections` (numeric) · `charge_over_above` (numeric) · `other_receipts` (numeric) · `priest_share` (numeric) · `mass_stipend` (numeric) · `other_pastoral_expenses` (numeric) · `salaries_wages_benefits` (numeric) · `govt_contributions` (numeric) · `utilities` (numeric) · `communications` (numeric) · `other_rectory_expenses` (numeric) · `construction_receipts` (numeric) · `construction_expenses` (numeric) · `remittance_to_diocese` (numeric) · `bishops_fund_share` (numeric) · `special_collections_remittance` (numeric) · `beginning_balance` (numeric) · `ending_balance_before_remit` (numeric) · `ending_balance_after_remit` (numeric) · `total_inflow` (numeric) · `total_outflow` (numeric) · `net_receipts` (numeric) · `pastoral_parish_fund_total_net_receipts` (numeric) · `typhoon_days_count` (smallint) · `major_events_count` (smallint) · `has_fiesta` (bool) · `total_rainfall_mm` (numeric) — PK (`institution_key`, `date_key`)
 
 **`fact_school_monthly_financials`** 🆕
-`institution_key` (int FK) · `date_key` (int FK) · `tuition_revenues` (numeric) · `miscellaneous_fees` (numeric) · `other_income` (numeric) · `subsidy_inflow` (numeric) · `faculty_payroll` (numeric) · `admin_staff_payroll` (numeric) · `utilities` (numeric) · `facilities_maintenance` (numeric) · `supplies` (numeric) · `other_expenses` (numeric) · `net_receipts` (numeric) · `typhoon_days_count` (smallint) · `major_events_count` (smallint) · `total_rainfall_mm` (numeric) — PK (`institution_key`, `date_key`)
+`institution_key` (int FK) · `date_key` (int FK) · `tuition_revenues` (numeric) · `miscellaneous_fees` (numeric) · `other_income` (numeric) · `subsidy_inflow` (numeric) · `faculty_payroll` (numeric) · `admin_staff_payroll` (numeric) · `utilities` (numeric) · `facilities_maintenance` (numeric) · `supplies` (numeric) · `other_expenses` (numeric) · `total_inflow` (numeric) · `total_outflow` (numeric) · `net_receipts` (numeric) · `typhoon_days_count` (smallint) · `major_events_count` (smallint) · `total_rainfall_mm` (numeric) — PK (`institution_key`, `date_key`)
 
 **`fact_seminary_monthly_financials`** 🆕
-`institution_key` (int FK) · `date_key` (int FK) · `donations` (numeric) · `seminary_fees` (numeric) · `mass_collections` (numeric) · `other_sources` (numeric) · `subsidy_inflow` (numeric) · `tuition_fees` (numeric) · `board_lodging_fees` (numeric) · `drm_modules` (numeric) · `sra_reading_lab` (numeric) · `retreat` (numeric) · `honorarium_fee` (numeric) · `miscellaneous_fees` (numeric) · `daily_food` (numeric) · `food_others` (numeric) · `gasoline_seminary` (numeric) · `gasoline_vocation` (numeric) · `permits_licenses` (numeric) · `office_supplies` (numeric) · `kitchen_equipment` (numeric) · `medical_supplies` (numeric) · `liturgical_supplies` (numeric) · `construction_materials` (numeric) · `other_supplies` (numeric) · `lpg` (numeric) · `repairs_maintenance` (numeric) · `equipment_furniture` (numeric) · `utilities` (numeric) · `labor` (numeric) · `professional_driver_fee` (numeric) · `salaries_wages` (numeric) · `contribution_benefits` (numeric) · `cash_incentives` (numeric) · `transportation_bank_charges` (numeric) · `other_expenses` (numeric) · `net_surplus` (numeric) · `dependency_ratio` (numeric) · `typhoon_days_count` (smallint) · `major_events_count` (smallint) · `total_rainfall_mm` (numeric) — PK (`institution_key`, `date_key`)[cite: 2]
+`institution_key` (int FK) · `date_key` (int FK) · `donations` (numeric) · `seminary_fees` (numeric) · `mass_collections` (numeric) · `other_sources` (numeric) · `subsidy_from_rbscp` (numeric) · `drm_modules` (numeric) · `sra_reading_lab` (numeric) · `retreat` (numeric) · `honorarium_fee` (numeric) · `miscellaneous_fees` (numeric) · `food_others` (numeric) · `gasoline_seminary` (numeric) · `gasoline_vocation` (numeric) · `permits_licenses` (numeric) · `office_supplies` (numeric) · `kitchen_equipment` (numeric) · `medical_supplies` (numeric) · `liturgical_supplies` (numeric) · `construction_materials` (numeric) · `other_supplies` (numeric) · `lpg` (numeric) · `repairs_maintenance` (numeric) · `equipment_furniture` (numeric) · `labor` (numeric) · `professional_driver_fee` (numeric) · `cash_incentives` (numeric) · `transportation_bank_charges` (numeric) · `total_expenses` (numeric) · `net_surplus` (numeric) · `dependency_ratio` (numeric) · `typhoon_days_count` (smallint) · `major_events_count` (smallint) · `total_rainfall_mm` (numeric) — PK (`institution_key`, `date_key`)
+
+**`fact_priest_assignments`** 🆕
+`priest_key` (int FK) · `institution_key` (int FK) · `start_date_key` (int FK) · `end_date_key` (int FK, nullable) · `status` (text) · `is_active` (bool) — PK (`priest_key`, `institution_key`, `start_date_key`)[cite: 2]
 
 ### Analytical / ML Engine Inference Layer
 **`fact_financial_forecasts`** ✅ — `forecast_id` (uuid PK) · `institution_key` (int FK) · `date_key` (int FK) · `metric_type` (text: collections/disbursements) · `predicted_value` (numeric) · `lower_confidence` (numeric) · `upper_confidence` (numeric) · `model` (text champion reference identifier) · `generated_at` (timestamptz)[cite: 2]
@@ -205,5 +219,5 @@ The current backend implementation code (`financial.service.ts`) communicates vi
 | **`parishes`**[cite: 2] | 4[cite: 2] | Normalization parameters matching physical submission components precisely[cite: 2]. |
 | **`schools`**[cite: 2] | 2[cite: 2] | Provisions unified with Star layout requirements to capture school fiscal loops safely[cite: 2]. |
 | **`seminaries`**[cite: 2] | 2[cite: 2] | Integrates metrics for resource analytics[cite: 2]. |
-| **`analytics`**[cite: 2] | 9[cite: 2] | Dimensions, facts, and inference fields updated to store daily reference summaries directly[cite: 2]. |
+| **`analytics`**[cite: 2] | 6 | Dimensions, facts, and inference fields updated to store daily reference summaries directly[cite: 2]. |
 | **`reference`**[cite: 2] | 2[cite: 2] | Daily weather indices and liturgical event dimensions configured for the model analytics engine[cite: 2]. |
