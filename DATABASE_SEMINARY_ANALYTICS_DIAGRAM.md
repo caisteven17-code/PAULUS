@@ -82,16 +82,8 @@ erDiagram
         numeric seminary_fees
         numeric mass_collections
         numeric other_sources
-        numeric subsidy_inflow
-        numeric tuition_fees
-        numeric board_lodging_fees
-        numeric daily_food
-        numeric utilities
-        numeric salaries_wages
-        numeric contribution_benefits
-        numeric other_expenses
-        numeric total_inflow
-        numeric total_outflow
+        numeric subsidy_from_rbscp
+        numeric total_expenses
         numeric net_surplus
         numeric dependency_ratio
         smallint typhoon_days_count

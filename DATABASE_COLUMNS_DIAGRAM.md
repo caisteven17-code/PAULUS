@@ -169,7 +169,7 @@ erDiagram
         numeric other_collections_total
         numeric donations
         numeric interest_income
-        numeric subsidy_inflow
+        numeric subsidy_from_rbscp
         numeric special_collections
         numeric second_collections
         numeric charge_over_above
@@ -236,7 +236,7 @@ erDiagram
         numeric tuition_revenues
         numeric miscellaneous_fees
         numeric other_income
-        numeric subsidy_inflow
+        numeric subsidy_from_rbscp
         numeric faculty_payroll
         numeric admin_staff_payroll
         numeric utilities
@@ -266,15 +266,12 @@ erDiagram
         numeric seminary_fees
         numeric mass_collections
         numeric other_sources
-        numeric subsidy_inflow
-        numeric tuition_fees
-        numeric board_lodging_fees
+        numeric subsidy_from_rbscp
         numeric drm_modules
         numeric sra_reading_lab
         numeric retreat
         numeric honorarium_fee
         numeric miscellaneous_fees
-        numeric daily_food
         numeric food_others
         numeric gasoline_seminary
         numeric gasoline_vocation
@@ -288,14 +285,11 @@ erDiagram
         numeric lpg
         numeric repairs_maintenance
         numeric equipment_furniture
-        numeric utilities
         numeric labor
         numeric professional_driver_fee
-        numeric salaries_wages
-        numeric contribution_benefits
         numeric cash_incentives
         numeric transportation_bank_charges
-        numeric other_expenses
+        numeric total_expenses
         numeric net_surplus
         numeric dependency_ratio
     }
@@ -412,7 +406,7 @@ erDiagram
         numeric other_collections_total
         numeric donations
         numeric interest_income
-        numeric subsidy_inflow
+        numeric subsidy_from_rbscp
         numeric special_collections
         numeric second_collections
         numeric charge_over_above
@@ -449,7 +443,7 @@ erDiagram
         numeric tuition_revenues
         numeric miscellaneous_fees
         numeric other_income
-        numeric subsidy_inflow
+        numeric subsidy_from_rbscp
         numeric faculty_payroll
         numeric admin_staff_payroll
         numeric utilities
@@ -471,15 +465,12 @@ erDiagram
         numeric seminary_fees
         numeric mass_collections
         numeric other_sources
-        numeric subsidy_inflow
-        numeric tuition_fees
-        numeric board_lodging_fees
+        numeric subsidy_from_rbscp
         numeric drm_modules
         numeric sra_reading_lab
         numeric retreat
         numeric honorarium_fee
         numeric miscellaneous_fees
-        numeric daily_food
         numeric food_others
         numeric gasoline_seminary
         numeric gasoline_vocation
@@ -493,16 +484,11 @@ erDiagram
         numeric lpg
         numeric repairs_maintenance
         numeric equipment_furniture
-        numeric utilities
         numeric labor
         numeric professional_driver_fee
-        numeric salaries_wages
-        numeric contribution_benefits
         numeric cash_incentives
         numeric transportation_bank_charges
-        numeric other_expenses
-        numeric total_inflow
-        numeric total_outflow
+        numeric total_expenses
         numeric net_surplus
         numeric dependency_ratio
         smallint typhoon_days_count

@@ -215,10 +215,10 @@ Purpose: preserves detailed seminary FS receipt, expense, balance, and memo line
 
 ### `seminaries.financial_records` ✅ *(SEMINARY TEMPLATE + seminaryMockData.ts)*
 **Header:** `id` (uuid PK) · `institution_id` (uuid FK → `diocese.institutions.id`) · `submission_batch_id` (uuid FK → `operations.submission_batches.id`) · `entity_class` (text) · `month` (text) · `year` (smallint) · `status` (text) · `version_no` (int default 1) · `is_current_version` (bool default true) · `record_timestamp` (timestamptz)[cite: 2]  
-**Receipts:** `donations` (numeric) · `seminary_fees` (numeric) · `mass_collections` (numeric) · `other_sources` (numeric) · `subsidy_inflow` *(standardized from central allocations)* (numeric)[cite: 2]  
+**Receipts:** `donations` (numeric) · `seminary_fees` (numeric) · `mass_collections` (numeric) · `other_sources` (numeric) · `subsidy_from_rbscp` *(standardized from central allocations)* (numeric)[cite: 2]  
 **Fees Breakdown:** `tuition_fees` (numeric) · `board_lodging_fees` (numeric) · `drm_modules` (numeric) · `sra_reading_lab` (numeric) · `retreat` (numeric) · `honorarium_fee` (numeric) · `miscellaneous_fees` (numeric)[cite: 2]  
 **Expenses (22 operational criteria elements):** `daily_food` · `food_others` · `gasoline_seminary` · `gasoline_vocation` · `permits_licenses` · `office_supplies` · `kitchen_equipment` · `medical_supplies` · `liturgical_supplies` · `construction_materials` · `other_supplies` · `lpg` · `repairs_maintenance` · `equipment_furniture` · `utilities` · `labor` · `professional_driver_fee` · `salaries_wages` · `contribution_benefits` · `cash_incentives` · `transportation_bank_charges` · `other_expenses` *(All distinct numeric fields)*[cite: 2]  
-**Derived/Metrics:** `net_surplus` (numeric) · `dependency_ratio` *(computed during transformation layer loading = (donations + subsidy_inflow) / total_inflow)*[cite: 2]
+**Derived/Metrics:** `total_expenses` (numeric) · `net_surplus` (numeric) · `dependency_ratio` *(computed during transformation layer loading = (donations + subsidy_from_rbscp) / total_inflow)*[cite: 2]
 
 ---
 
@@ -366,7 +366,7 @@ Fact tables, outriggers, and account dimensions dedicated to seminaries.
 
 #### Fact Tables
 **`seminary_analytics.fact_seminary_monthly_financials`** 🆕 — Consolidated seminary monthly financial report, stored as one analytics-ready row per seminary per month:
-`seminary_key` (int FK → `seminary_analytics.dim_seminaries.seminary_key`) · `date_key` (int FK → `shared_analytics.dim_date.date_key`) · `submission_key` (int FK → `shared_analytics.dim_submission.submission_key`) · `donations` (numeric) · `seminary_fees` (numeric) · `mass_collections` (numeric) · `other_sources` (numeric) · `subsidy_inflow` (numeric) · `tuition_fees` (numeric) · `board_lodging_fees` (numeric) · `daily_food` (numeric) · `utilities` (numeric) · `salaries_wages` (numeric) · `contribution_benefits` (numeric) · `other_expenses` (numeric) · `total_inflow` (numeric) · `total_outflow` (numeric) · `net_surplus` (numeric) · `dependency_ratio` (numeric) · `typhoon_days_count` (smallint) · `major_events_count` (smallint) · `total_rainfall_mm` (numeric) — PK (`seminary_key`, `date_key`)
+`seminary_key` (int FK → `seminary_analytics.dim_seminaries.seminary_key`) · `date_key` (int FK → `shared_analytics.dim_date.date_key`) · `submission_key` (int FK → `shared_analytics.dim_submission.submission_key`) · `donations` (numeric) · `seminary_fees` (numeric) · `mass_collections` (numeric) · `other_sources` (numeric) · `subsidy_from_rbscp` (numeric) · `total_expenses` (numeric) · `net_surplus` (numeric) · `dependency_ratio` (numeric) · `typhoon_days_count` (smallint) · `major_events_count` (smallint) · `total_rainfall_mm` (numeric) — PK (`seminary_key`, `date_key`)
 
 **`seminary_analytics.fact_seminary_financial_breakdowns`** 🆕 — Granular account-level breakdown facts supporting drill-down and the roll-up into the monthly consolidated report:
 `seminary_key` (int FK → `seminary_analytics.dim_seminaries.seminary_key`) · `date_key` (int FK → `shared_analytics.dim_date.date_key`) · `submission_key` (int FK → `shared_analytics.dim_submission.submission_key`, nullable if backfilled) · `seminary_account_key` (int FK → `seminary_analytics.dim_seminary_fs_account.seminary_account_key`) · `amount` (numeric) — PK (`seminary_key`, `date_key`, `seminary_account_key`)
