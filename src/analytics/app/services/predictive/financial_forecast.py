@@ -23,6 +23,7 @@ from app.services.supabase_client import get_table
 
 # ── Candidate trainers ────────────────────────────────────────────────────────
 
+
 def _prophet_trainer(train: np.ndarray, holdout: np.ndarray) -> np.ndarray:
     from prophet import Prophet
 
@@ -41,8 +42,11 @@ def _sarima_trainer(train: np.ndarray, holdout: np.ndarray) -> np.ndarray:
 
     n_hold = len(holdout)
     model = SARIMAX(
-        train, order=(1, 1, 1), seasonal_order=(1, 1, 1, 12),
-        enforce_stationarity=False, enforce_invertibility=False,
+        train,
+        order=(1, 1, 1),
+        seasonal_order=(1, 1, 1, 12),
+        enforce_stationarity=False,
+        enforce_invertibility=False,
     )
     fitted = model.fit(disp=False)
     forecast = fitted.forecast(steps=n_hold)
@@ -73,7 +77,7 @@ def _xgboost_trainer(train: np.ndarray, holdout: np.ndarray) -> np.ndarray:
     def make_features(series: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
         X, y = [], []
         for i in range(lags, len(series)):
-            X.append(series[i - lags: i])
+            X.append(series[i - lags : i])
             y.append(series[i])
         return np.array(X), np.array(y)
 
@@ -108,11 +112,14 @@ _CANDIDATES = {
 }
 
 
-def _generate_forecast(champion: str, full_series: np.ndarray, periods: int) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+def _generate_forecast(
+    champion: str, full_series: np.ndarray, periods: int
+) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
     """Return (yhat, lower, upper) for `periods` steps using the champion model."""
     try:
         if champion == "Prophet":
             from prophet import Prophet
+
             dates = pd.date_range(end=pd.Timestamp.today(), periods=len(full_series), freq="MS")
             df_p = pd.DataFrame({"ds": dates, "y": full_series})
             m = Prophet(yearly_seasonality=True, weekly_seasonality=False, daily_seasonality=False)
@@ -126,9 +133,13 @@ def _generate_forecast(champion: str, full_series: np.ndarray, periods: int) -> 
 
         elif champion == "SARIMA":
             from statsmodels.tsa.statespace.sarimax import SARIMAX
+
             model = SARIMAX(
-                full_series, order=(1, 1, 1), seasonal_order=(1, 1, 1, 12),
-                enforce_stationarity=False, enforce_invertibility=False,
+                full_series,
+                order=(1, 1, 1),
+                seasonal_order=(1, 1, 1, 12),
+                enforce_stationarity=False,
+                enforce_invertibility=False,
             )
             fitted = model.fit(disp=False)
             pred = fitted.get_forecast(steps=periods)
@@ -138,10 +149,13 @@ def _generate_forecast(champion: str, full_series: np.ndarray, periods: int) -> 
 
         elif champion == "Holt-Winters":
             from statsmodels.tsa.holtwinters import ExponentialSmoothing
+
             seasonal = "add" if len(full_series) >= 24 else None
             model = ExponentialSmoothing(
-                full_series, trend="add",
-                seasonal=seasonal, seasonal_periods=12 if seasonal else None,
+                full_series,
+                trend="add",
+                seasonal=seasonal,
+                seasonal_periods=12 if seasonal else None,
             )
             fitted = model.fit(optimized=True)
             yhat = fitted.forecast(periods)
@@ -194,7 +208,13 @@ def _fetch_and_process(institution_id: str, entity_type: str, periods: int) -> d
         "entity_type": entity_type,
         "forecast_receipts": [],
         "forecast_expenses": [],
-        "champion": {"champion_model": "N/A", "metrics": {}, "all_candidates": {}, "wape": 1.0, "needs_retraining": True},
+        "champion": {
+            "champion_model": "N/A",
+            "metrics": {},
+            "all_candidates": {},
+            "wape": 1.0,
+            "needs_retraining": True,
+        },
         "signal": "stable",
         "timestamp": ts,
     }

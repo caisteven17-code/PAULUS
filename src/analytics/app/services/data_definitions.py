@@ -89,10 +89,10 @@ _SCHEMA_MAP = SCHEMA_MAP
 MONTH_ORDER = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
 
 # KPI thresholds (Diocese of San Pablo benchmarks)
-KPI_ANNUAL_COLLECTION_GROWTH_RATE_MIN = 0.1335   # 13.35%
-KPI_DISBURSEMENT_COLLECTION_RATIO_MAX = 0.9347   # 93.47%
-KPI_MOM_COLLECTION_CHANGE_MIN = 0.0984           # 9.84%
-KPI_NET_RECEIPT_DEFICIT_RATE_MAX = 0.4883        # 48.83%
+KPI_ANNUAL_COLLECTION_GROWTH_RATE_MIN = 0.1335  # 13.35%
+KPI_DISBURSEMENT_COLLECTION_RATIO_MAX = 0.9347  # 93.47%
+KPI_MOM_COLLECTION_CHANGE_MIN = 0.0984  # 9.84%
+KPI_NET_RECEIPT_DEFICIT_RATE_MAX = 0.4883  # 48.83%
 
 
 def safe_div(num: float, den: float, default: float = 0.0) -> float:
@@ -113,10 +113,9 @@ def month_sort_key(month_str: str) -> int:
 def build_date_index(df) -> "pd.DatetimeIndex":  # noqa: F821
     """Convert year + month columns to a DatetimeIndex."""
     import pandas as pd
+
     month_to_num = {m: i + 1 for i, m in enumerate(MONTH_ORDER)}
     df = df.copy()
     df["month_num"] = df["month"].map(month_to_num).fillna(1).astype(int)
-    df["date"] = pd.to_datetime(
-        df["year"].astype(str) + "-" + df["month_num"].astype(str).str.zfill(2) + "-01"
-    )
+    df["date"] = pd.to_datetime(df["year"].astype(str) + "-" + df["month_num"].astype(str).str.zfill(2) + "-01")
     return df.sort_values("date").reset_index(drop=True)

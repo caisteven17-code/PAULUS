@@ -35,10 +35,7 @@ def _fetch_and_process(institution_id: str, total_budget: float) -> dict[str, An
     raw_projects = proj_res.data or []
 
     don_res = (
-        get_table("diocese", "donations")
-        .select("project_id, amount")
-        .eq("institution_id", institution_id)
-        .execute()
+        get_table("diocese", "donations").select("project_id, amount").eq("institution_id", institution_id).execute()
     )
     donations = don_res.data or []
 
@@ -92,15 +89,17 @@ def _fetch_and_process(institution_id: str, total_budget: float) -> dict[str, An
         time_elapsed = safe_div(elapsed, total_d)
         progress_gap = completion - time_elapsed
 
-        feature_rows.append({
-            "project_id": pid,
-            "name": p.get("name", ""),
-            "target_amount": target,
-            "completion_ratio": completion,
-            "time_elapsed_ratio": time_elapsed,
-            "donation_count": float(don_count.get(pid, 0)),
-            "progress_gap": progress_gap,
-        })
+        feature_rows.append(
+            {
+                "project_id": pid,
+                "name": p.get("name", ""),
+                "target_amount": target,
+                "completion_ratio": completion,
+                "time_elapsed_ratio": time_elapsed,
+                "donation_count": float(don_count.get(pid, 0)),
+                "progress_gap": progress_gap,
+            }
+        )
         # Label: completion ratio as continuous target
         label_rows.append(completion)
 
@@ -157,17 +156,19 @@ def _fetch_and_process(institution_id: str, total_budget: float) -> dict[str, An
         ml = sp
         beta_estimate = round(_beta_triangle(opt, ml, pess), 4)
 
-        prioritized.append({
-            "project_id": pid,
-            "name": r["name"],
-            "success_probability": sp,
-            "priority_score": priority_score,
-            "target_amount": round(target, 2),
-            "optimistic_completion": round(opt, 4),
-            "most_likely_completion": round(ml, 4),
-            "pessimistic_completion": round(pess, 4),
-            "beta_estimate": beta_estimate,
-        })
+        prioritized.append(
+            {
+                "project_id": pid,
+                "name": r["name"],
+                "success_probability": sp,
+                "priority_score": priority_score,
+                "target_amount": round(target, 2),
+                "optimistic_completion": round(opt, 4),
+                "most_likely_completion": round(ml, 4),
+                "pessimistic_completion": round(pess, 4),
+                "beta_estimate": beta_estimate,
+            }
+        )
 
     prioritized.sort(key=lambda p: -p["priority_score"])
 

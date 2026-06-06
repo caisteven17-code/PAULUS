@@ -58,8 +58,7 @@ def _solve_seasonal_milp(
         prob = pulp.LpProblem("SeasonalStrategy", pulp.LpMaximize)
 
         invest_vars = {
-            s: pulp.LpVariable(f"invest_{s}", lowBound=0, upBound=max_preparation_per_season)
-            for s in seasons
+            s: pulp.LpVariable(f"invest_{s}", lowBound=0, upBound=max_preparation_per_season) for s in seasons
         }
 
         # Return rate: 20% of avg collection per unit invested (heuristic)
@@ -70,16 +69,10 @@ def _solve_seasonal_milp(
                 return_rates[s] = 0.35
 
         # Maximize: fixed collection + investment return
-        prob += pulp.lpSum(
-            season_avgs[s] + invest_vars[s] * return_rates[s]
-            for s in seasons
-        )
+        prob += pulp.lpSum(season_avgs[s] + invest_vars[s] * return_rates[s] for s in seasons)
 
         # Budget constraint
-        prob += pulp.lpSum(
-            invest_vars[s] * _SEASON_COST_WEIGHT.get(s, 1.0)
-            for s in seasons
-        ) <= total_budget
+        prob += pulp.lpSum(invest_vars[s] * _SEASON_COST_WEIGHT.get(s, 1.0) for s in seasons) <= total_budget
 
         prob.solve(pulp.PULP_CBC_CMD(msg=0))
 
@@ -196,14 +189,16 @@ def _fetch_and_process(
     for season, avg in season_avgs.items():
         invest = allocation.get(season, 0.0)
         vs_baseline = round(safe_div(avg - baseline, baseline) * 100, 2)
-        recommendations.append({
-            "season": season,
-            "avg_collection": round(avg, 2),
-            "vs_baseline_pct": vs_baseline,
-            "recommended_investment": invest,
-            "expected_uplift_pct": round(invest * 0.20 / (avg or 1) * 100, 2),
-            "priority": "High" if avg >= baseline * 1.1 else ("Medium" if avg >= baseline * 0.9 else "Low"),
-        })
+        recommendations.append(
+            {
+                "season": season,
+                "avg_collection": round(avg, 2),
+                "vs_baseline_pct": vs_baseline,
+                "recommended_investment": invest,
+                "expected_uplift_pct": round(invest * 0.20 / (avg or 1) * 100, 2),
+                "priority": "High" if avg >= baseline * 1.1 else ("Medium" if avg >= baseline * 0.9 else "Low"),
+            }
+        )
 
     recommendations.sort(key=lambda r: -r["avg_collection"])
 
@@ -230,5 +225,8 @@ async def get_seasonal_strategy(
         raise ValueError(f"Unknown entity type: {entity_type}")
     return await asyncio.to_thread(
         _fetch_and_process,
-        institution_id, entity_type, total_budget, max_preparation_per_season,
+        institution_id,
+        entity_type,
+        total_budget,
+        max_preparation_per_season,
     )

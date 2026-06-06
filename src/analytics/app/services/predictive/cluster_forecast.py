@@ -79,10 +79,7 @@ def _fetch_and_process() -> dict[str, Any]:
     ts = datetime.now(timezone.utc).isoformat()
 
     inst_res = (
-        get_table("diocese", "institutions")
-        .select("id, institution_type")
-        .eq("institution_type", "parish")
-        .execute()
+        get_table("diocese", "institutions").select("id, institution_type").eq("institution_type", "parish").execute()
     )
     institutions = inst_res.data or []
 
@@ -141,8 +138,12 @@ def _fetch_and_process() -> dict[str, Any]:
     import xgboost as xgb
 
     clf = xgb.XGBClassifier(
-        n_estimators=100, max_depth=3, learning_rate=0.1,
-        use_label_encoder=False, eval_metric="mlogloss", random_state=42,
+        n_estimators=100,
+        max_depth=3,
+        learning_rate=0.1,
+        use_label_encoder=False,
+        eval_metric="mlogloss",
+        random_state=42,
     )
 
     n = len(rows)
@@ -166,8 +167,7 @@ def _fetch_and_process() -> dict[str, Any]:
     tm_norm = (tm / row_sums).tolist()
 
     transition_matrix = {
-        _CLUSTER_LABELS[i]: {_CLUSTER_LABELS[j]: round(float(tm_norm[i][j]), 4) for j in range(4)}
-        for i in range(4)
+        _CLUSTER_LABELS[i]: {_CLUSTER_LABELS[j]: round(float(tm_norm[i][j]), 4) for j in range(4)} for i in range(4)
     }
 
     movement_summary = {lbl: 0 for lbl in _CLUSTER_LABELS}
@@ -177,12 +177,14 @@ def _fetch_and_process() -> dict[str, Any]:
         predicted_label = _IDX_TO_LABEL.get(int(predicted_clusters[i]), "Stable")
         movement_summary[predicted_label] = movement_summary.get(predicted_label, 0) + 1
         proba = predicted_proba[i] if isinstance(predicted_proba[i], list) else [0.25] * 4
-        parish_predictions.append({
-            "institution_id": r["institution_id"],
-            "current_cluster": current_label,
-            "predicted_cluster": predicted_label,
-            "probability": round(float(max(proba)), 4),
-        })
+        parish_predictions.append(
+            {
+                "institution_id": r["institution_id"],
+                "current_cluster": current_label,
+                "predicted_cluster": predicted_label,
+                "probability": round(float(max(proba)), 4),
+            }
+        )
 
     return {
         "data_sufficient": True,

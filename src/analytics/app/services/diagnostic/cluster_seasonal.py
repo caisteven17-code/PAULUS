@@ -184,14 +184,16 @@ def _fetch_and_process(entity_id: str, entity_type: str) -> dict[str, Any]:
     trend_val = float(trend_comp.iloc[-1]) - float(trend_comp.iloc[0])
     trend_dir = "up" if trend_val > 0 else "down" if trend_val < 0 else "stable"
 
-    narrative = _llm_narrative({
-        "anomaly_count": anomaly_count,
-        "total_periods": n,
-        "change_point_count": len(cp_dates),
-        "top_feature": top_feature,
-        "precision": precision,
-        "trend": trend_dir,
-    })
+    narrative = _llm_narrative(
+        {
+            "anomaly_count": anomaly_count,
+            "total_periods": n,
+            "change_point_count": len(cp_dates),
+            "top_feature": top_feature,
+            "precision": precision,
+            "trend": trend_dir,
+        }
+    )
 
     return {
         "data_sufficient": True,

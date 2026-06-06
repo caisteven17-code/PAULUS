@@ -131,36 +131,37 @@ def _fetch_and_process(institution_id: str) -> dict[str, Any]:
 
         # Schedule variance in days (negative = behind schedule)
         _expected_amount_by_now = target * time_elapsed_pct  # noqa: F841
-        schedule_variance_days = float(
-            (completion_pct - time_elapsed_pct) * total_days
-        ) if total_days > 0 else 0.0
+        schedule_variance_days = float((completion_pct - time_elapsed_pct) * total_days) if total_days > 0 else 0.0
 
         is_at_risk = (budget_variance > 0.3) or (progress_gap < -0.15)
 
-        features_list.append({
-            "project_id": pid,
-            "budget_variance": budget_variance,
-            "schedule_variance_days": schedule_variance_days,
-            "progress_gap": progress_gap,
-            "completion_pct": completion_pct,
-            "time_elapsed_pct": time_elapsed_pct,
-        })
+        features_list.append(
+            {
+                "project_id": pid,
+                "budget_variance": budget_variance,
+                "schedule_variance_days": schedule_variance_days,
+                "progress_gap": progress_gap,
+                "completion_pct": completion_pct,
+                "time_elapsed_pct": time_elapsed_pct,
+            }
+        )
 
-        projects_detail.append({
-            "project_id": pid,
-            "name": p.get("name", ""),
-            "is_at_risk": is_at_risk,
-            "budget_variance": round(budget_variance, 4),
-            "schedule_variance_days": round(schedule_variance_days, 1),
-            "progress_gap": round(progress_gap, 4),
-            "completion_pct": round(completion_pct * 100, 2),
-        })
+        projects_detail.append(
+            {
+                "project_id": pid,
+                "name": p.get("name", ""),
+                "is_at_risk": is_at_risk,
+                "budget_variance": round(budget_variance, 4),
+                "schedule_variance_days": round(schedule_variance_days, 1),
+                "progress_gap": round(progress_gap, 4),
+                "completion_pct": round(completion_pct * 100, 2),
+            }
+        )
 
     at_risk_projects = [p for p in projects_detail if p["is_at_risk"]]
 
     # SHAP on project features
-    feature_names = ["budget_variance", "schedule_variance_days", "progress_gap",
-                     "completion_pct", "time_elapsed_pct"]
+    feature_names = ["budget_variance", "schedule_variance_days", "progress_gap", "completion_pct", "time_elapsed_pct"]
     X = np.array([[f[k] for k in feature_names] for f in features_list])
     # Target: is_at_risk as 0/1
     y = np.array([1.0 if p["is_at_risk"] else 0.0 for p in projects_detail])
@@ -224,13 +225,15 @@ def _fetch_and_process(institution_id: str) -> dict[str, Any]:
     avg_bv = float(np.mean([f["budget_variance"] for f in features_list])) if features_list else 0.0
     avg_sv = float(np.mean([f["schedule_variance_days"] for f in features_list])) if features_list else 0.0
 
-    narrative = _llm_narrative({
-        "total": len(raw_projects),
-        "at_risk": len(at_risk_projects),
-        "avg_budget_variance": avg_bv,
-        "avg_schedule_variance": avg_sv,
-        "top_risk_driver": top_risk_driver,
-    })
+    narrative = _llm_narrative(
+        {
+            "total": len(raw_projects),
+            "at_risk": len(at_risk_projects),
+            "avg_budget_variance": avg_bv,
+            "avg_schedule_variance": avg_sv,
+            "top_risk_driver": top_risk_driver,
+        }
+    )
 
     return {
         "data_sufficient": True,

@@ -38,8 +38,11 @@ def _sarima_trainer(train: np.ndarray, holdout: np.ndarray) -> np.ndarray:
 
     n = len(holdout)
     model = SARIMAX(
-        train, order=(1, 1, 1), seasonal_order=(1, 1, 1, 12),
-        enforce_stationarity=False, enforce_invertibility=False,
+        train,
+        order=(1, 1, 1),
+        seasonal_order=(1, 1, 1, 12),
+        enforce_stationarity=False,
+        enforce_invertibility=False,
     )
     fitted = model.fit(disp=False)
     return np.array(fitted.forecast(steps=n))
@@ -51,8 +54,10 @@ def _holtwinters_trainer(train: np.ndarray, holdout: np.ndarray) -> np.ndarray:
     n = len(holdout)
     seasonal = "add" if len(train) >= 24 else None
     model = ExponentialSmoothing(
-        train, trend="add",
-        seasonal=seasonal, seasonal_periods=12 if seasonal else None,
+        train,
+        trend="add",
+        seasonal=seasonal,
+        seasonal_periods=12 if seasonal else None,
     )
     fitted = model.fit(optimized=True)
     return fitted.forecast(n)
@@ -67,7 +72,7 @@ def _xgboost_trainer(train: np.ndarray, holdout: np.ndarray) -> np.ndarray:
     def make_features(s: np.ndarray):
         X, y = [], []
         for i in range(lags, len(s)):
-            X.append(s[i - lags: i])
+            X.append(s[i - lags : i])
             y.append(s[i])
         return np.array(X), np.array(y)
 
@@ -123,7 +128,13 @@ def _fetch_and_process(institution_id: str, entity_type: str, periods: int) -> d
         "entity_id": institution_id,
         "entity_type": entity_type,
         "seasonal_forecast": [],
-        "champion": {"champion_model": "N/A", "metrics": {}, "all_candidates": {}, "wape": 1.0, "needs_retraining": True},
+        "champion": {
+            "champion_model": "N/A",
+            "metrics": {},
+            "all_candidates": {},
+            "wape": 1.0,
+            "needs_retraining": True,
+        },
         "kpis": {},
         "timestamp": ts,
     }

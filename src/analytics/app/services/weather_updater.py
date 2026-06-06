@@ -37,6 +37,7 @@ _SOURCE_ORDER = ["open_meteo", "nasa_power_ag", "nasa_power_sb"]
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
 
+
 def _load_champion_map(out_dir: Path) -> dict:
     champion_file = out_dir / "champion_map.json"
     if not champion_file.exists():
@@ -59,6 +60,7 @@ def _fetch_for_source(
         fetch_nasa_power_sb,
         fetch_open_meteo,
     )
+
     if source_name == "open_meteo":
         return fetch_open_meteo(lat, lon, start, end)
     if source_name == "nasa_power_ag":
@@ -77,14 +79,15 @@ def _merge_ibtracs(records: list[dict], typhoon_flags: dict) -> list[dict]:
     """Attach IBTrACS fields to each daily record in-place and return the list."""
     for r in records:
         flag = typhoon_flags.get(r["date"])
-        r["typhoon_day"]     = bool(flag)
-        r["storm_name"]      = flag["storm_name"]      if flag else None
-        r["max_wind_kt"]     = flag["max_wind_kt"]     if flag else None
+        r["typhoon_day"] = bool(flag)
+        r["storm_name"] = flag["storm_name"] if flag else None
+        r["max_wind_kt"] = flag["max_wind_kt"] if flag else None
         r["intensity_class"] = flag["intensity_class"] if flag else None
     return records
 
 
 # ── Main updater ──────────────────────────────────────────────────────────────
+
 
 def update(
     lookback_days: int = DEFAULT_LOOKBACK_DAYS,
@@ -98,12 +101,14 @@ def update(
     from app.services.weather_collector import MUNICIPALITIES
     from app.services.weather_ibtracs import get_typhoon_flags
 
-    end_date   = date.today() - timedelta(days=REANALYSIS_LAG_DAYS)
+    end_date = date.today() - timedelta(days=REANALYSIS_LAG_DAYS)
     start_date = end_date - timedelta(days=lookback_days - 1)
 
     logger.info(
         "Incremental update: %s → %s (%d days lookback)",
-        start_date, end_date, lookback_days,
+        start_date,
+        end_date,
+        lookback_days,
     )
 
     champion_data = _load_champion_map(out_dir)
@@ -117,13 +122,12 @@ def update(
     # Pre-load IBTrACS flags for the incremental window (re-uses the 7-day cache)
     try:
         typhoon_flags = get_typhoon_flags(start_date.year, end_date.year)
-        window_flags  = {d: v for d, v in typhoon_flags.items()
-                         if start_date.isoformat() <= d <= end_date.isoformat()}
+        window_flags = {d: v for d, v in typhoon_flags.items() if start_date.isoformat() <= d <= end_date.isoformat()}
         logger.info("IBTrACS: %d typhoon-day flags in update window", len(window_flags))
     except Exception as exc:
         logger.warning("IBTrACS unavailable (%s) — typhoon fields will be empty", exc)
         typhoon_flags = {}
-        window_flags  = {}
+        window_flags = {}
 
     # Build name→coords lookup from the canonical MUNICIPALITIES list
     muni_coords = {m["name"]: m for m in MUNICIPALITIES}
@@ -165,36 +169,43 @@ def update(
             _merge_ibtracs(records, typhoon_flags)
             logger.info("[%s] %d daily records from %s", name, len(records), source_used)
 
-        results.append({
-            "municipality":    name,
-            "latitude":        lat,
-            "longitude":       lon,
-            "champion_source": champion,
-            "source_used":     source_used,
-            "period_start":    start_date.isoformat(),
-            "period_end":      end_date.isoformat(),
-            "daily_records":   records,
-        })
+        results.append(
+            {
+                "municipality": name,
+                "latitude": lat,
+                "longitude": lon,
+                "champion_source": champion,
+                "source_used": source_used,
+                "period_start": start_date.isoformat(),
+                "period_end": end_date.isoformat(),
+                "daily_records": records,
+            }
+        )
 
         time.sleep(0.5)  # gentle rate limit between municipalities
 
     # Persist incremental output
     out_dir.mkdir(parents=True, exist_ok=True)
     out_path = out_dir / "laguna_weather_incremental.json"
-    out_path.write_text(json.dumps({
-        "generated_at":  datetime.utcnow().isoformat() + "Z",
-        "period_start":  start_date.isoformat(),
-        "period_end":    end_date.isoformat(),
-        "lookback_days": lookback_days,
-        "municipalities": results,
-    }, indent=2))
+    out_path.write_text(
+        json.dumps(
+            {
+                "generated_at": datetime.utcnow().isoformat() + "Z",
+                "period_start": start_date.isoformat(),
+                "period_end": end_date.isoformat(),
+                "lookback_days": lookback_days,
+                "municipalities": results,
+            },
+            indent=2,
+        )
+    )
 
     logger.info("Incremental output saved → %s", out_path)
     return {
         "municipalities": results,
-        "period_start":   start_date.isoformat(),
-        "period_end":     end_date.isoformat(),
-        "record_count":   sum(len(m["daily_records"]) for m in results),
+        "period_start": start_date.isoformat(),
+        "period_end": end_date.isoformat(),
+        "record_count": sum(len(m["daily_records"]) for m in results),
     }
 
 
@@ -207,17 +218,15 @@ if __name__ == "__main__":
 
     parser = argparse.ArgumentParser(description="Incremental weather updater for Laguna Province")
     parser.add_argument(
-        "--days", type=int, default=DEFAULT_LOOKBACK_DAYS,
-        help=f"Lookback window in days (default: {DEFAULT_LOOKBACK_DAYS})"
+        "--days",
+        type=int,
+        default=DEFAULT_LOOKBACK_DAYS,
+        help=f"Lookback window in days (default: {DEFAULT_LOOKBACK_DAYS})",
     )
     parser.add_argument(
-        "--out", type=str, default=str(DEFAULT_OUT_DIR),
-        help="Output directory (must contain champion_map.json)"
+        "--out", type=str, default=str(DEFAULT_OUT_DIR), help="Output directory (must contain champion_map.json)"
     )
-    parser.add_argument(
-        "--load", action="store_true",
-        help="Also load results into Supabase after fetching"
-    )
+    parser.add_argument("--load", action="store_true", help="Also load results into Supabase after fetching")
     args = parser.parse_args()
 
     result = update(lookback_days=args.days, out_dir=Path(args.out))
@@ -229,5 +238,6 @@ if __name__ == "__main__":
 
     if args.load:
         from app.services.weather_loader import load_incremental
+
         loaded = load_incremental(Path(args.out) / "laguna_weather_incremental.json")
         print(f"Loaded {loaded} records into reference.weather_observations")

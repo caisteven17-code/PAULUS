@@ -142,13 +142,13 @@ def _default_score(entity_id: str, entity_type: str) -> HealthScoreResponse:
 # ── Snapshot write-back ───────────────────────────────────────────────────────
 
 _DIM_MAP = {
-    "parish":   ("parish_analytics",   "dim_parishes",   "parish_key"),
-    "school":   ("school_analytics",   "dim_schools",    "school_key"),
+    "parish": ("parish_analytics", "dim_parishes", "parish_key"),
+    "school": ("school_analytics", "dim_schools", "school_key"),
     "seminary": ("seminary_analytics", "dim_seminaries", "seminary_key"),
 }
 _FACT_MAP = {
-    "parish":   ("parish_analytics",   "fact_parish_health_snapshots",   "parish_key"),
-    "school":   ("school_analytics",   "fact_school_health_snapshots",   "school_key"),
+    "parish": ("parish_analytics", "fact_parish_health_snapshots", "parish_key"),
+    "school": ("school_analytics", "fact_school_health_snapshots", "school_key"),
     "seminary": ("seminary_analytics", "fact_seminary_health_snapshots", "seminary_key"),
 }
 
@@ -157,24 +157,50 @@ def _write_snapshot(institution_id: str, entity_type: str, score: HealthScoreRes
     """Persist a health snapshot to the analytics star schema. Silently no-ops on any failure."""
     try:
         # 1. Resolve institution name from diocese.institutions
-        inst_row = get_supabase().schema("diocese").table("institutions").select("name").eq("id", institution_id).maybe_single().execute()
+        inst_row = (
+            get_supabase()
+            .schema("diocese")
+            .table("institutions")
+            .select("name")
+            .eq("id", institution_id)
+            .maybe_single()
+            .execute()
+        )
         inst_name = inst_row.data["name"] if inst_row.data else institution_id
 
         # 2. Ensure dim_institutions row exists and get institution_key
-        di = get_table("shared_analytics", "dim_institutions").select("institution_key").eq("institution_id", institution_id).maybe_single().execute()
+        di = (
+            get_table("shared_analytics", "dim_institutions")
+            .select("institution_key")
+            .eq("institution_id", institution_id)
+            .maybe_single()
+            .execute()
+        )
         if di.data:
             institution_key = di.data["institution_key"]
         else:
-            ins = get_table("shared_analytics", "dim_institutions").insert({
-                "institution_id": institution_id,
-                "institution_name": inst_name,
-                "institution_type": entity_type,
-            }).execute()
+            ins = (
+                get_table("shared_analytics", "dim_institutions")
+                .insert(
+                    {
+                        "institution_id": institution_id,
+                        "institution_name": inst_name,
+                        "institution_type": entity_type,
+                    }
+                )
+                .execute()
+            )
             institution_key = ins.data[0]["institution_key"]
 
         # 3. Ensure type-specific dim row exists and get entity_key
         dim_schema, dim_table, dim_pk = _DIM_MAP[entity_type]
-        dd = get_table(dim_schema, dim_table).select(dim_pk).eq("institution_key", institution_key).maybe_single().execute()
+        dd = (
+            get_table(dim_schema, dim_table)
+            .select(dim_pk)
+            .eq("institution_key", institution_key)
+            .maybe_single()
+            .execute()
+        )
         if dd.data:
             entity_key = dd.data[dim_pk]
         else:
@@ -187,12 +213,19 @@ def _write_snapshot(institution_id: str, entity_type: str, score: HealthScoreRes
 
         # 5. Insert or update fact snapshot for this (entity_key, date_key)
         fact_schema, fact_table, fact_fk = _FACT_MAP[entity_type]
-        existing = get_table(fact_schema, fact_table).select("snapshot_id").eq(fact_fk, entity_key).eq("date_key", date_key).maybe_single().execute()
+        existing = (
+            get_table(fact_schema, fact_table)
+            .select("snapshot_id")
+            .eq(fact_fk, entity_key)
+            .eq("date_key", date_key)
+            .maybe_single()
+            .execute()
+        )
         payload = {
-            "composite_score":    float(score.composite_score),
-            "liquidity_score":    float(score.dimensions.liquidity),
+            "composite_score": float(score.composite_score),
+            "liquidity_score": float(score.dimensions.liquidity),
             "sustainability_score": float(score.dimensions.sustainability),
-            "stability_score":    float(score.dimensions.stability),
+            "stability_score": float(score.dimensions.stability),
         }
         if existing.data:
             get_table(fact_schema, fact_table).update(payload).eq("snapshot_id", existing.data["snapshot_id"]).execute()
@@ -201,6 +234,7 @@ def _write_snapshot(institution_id: str, entity_type: str, score: HealthScoreRes
 
     except Exception as exc:
         import logging
+
         logging.getLogger(__name__).warning("Health snapshot write-back failed: %s", exc)
 
 
@@ -301,8 +335,7 @@ async def get_diocese_summary() -> dict:
     institutions = get_table("diocese", "institutions").select("id, name, institution_type").execute()
 
     valid = [
-        inst for inst in (institutions.data or [])
-        if inst.get("institution_type", "parish").lower() in _SCHEMA_MAP
+        inst for inst in (institutions.data or []) if inst.get("institution_type", "parish").lower() in _SCHEMA_MAP
     ]
 
     async def _score_one(inst: dict) -> dict | None:

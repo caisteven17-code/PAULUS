@@ -20,8 +20,6 @@ import type {
   ProjectExpense,
 } from '../types';
 
-
-
 export const dataService = {
   // ------------------------------------------------------------------
   // Financial records

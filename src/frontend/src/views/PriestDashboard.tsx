@@ -153,7 +153,6 @@ const CustomizedTick = (props: any) => {
   );
 };
 
-
 const AdvancedForecastChart = ({
   data,
   actualKey,
@@ -264,15 +263,48 @@ const AdvancedForecastChart = ({
           silent: true,
           data: [
             [
-              { xAxis: 'Jan', itemStyle: { color: '#F0F9FF', opacity: 0.4 }, label: { show: true, position: 'insideTopLeft', value: 'PAST', color: '#0EA5E9', fontSize: 8, fontWeight: 700 } },
+              {
+                xAxis: 'Jan',
+                itemStyle: { color: '#F0F9FF', opacity: 0.4 },
+                label: {
+                  show: true,
+                  position: 'insideTopLeft',
+                  value: 'PAST',
+                  color: '#0EA5E9',
+                  fontSize: 8,
+                  fontWeight: 700,
+                },
+              },
               { xAxis: pastEnd },
             ],
             [
-              { xAxis: pastEnd, itemStyle: { color: '#FFF7ED', opacity: 0.4 }, label: { show: true, position: 'insideTopLeft', value: 'PRESENT', color: '#F97316', fontSize: 8, fontWeight: 700 } },
+              {
+                xAxis: pastEnd,
+                itemStyle: { color: '#FFF7ED', opacity: 0.4 },
+                label: {
+                  show: true,
+                  position: 'insideTopLeft',
+                  value: 'PRESENT',
+                  color: '#F97316',
+                  fontSize: 8,
+                  fontWeight: 700,
+                },
+              },
               { xAxis: presentEnd },
             ],
             [
-              { xAxis: presentEnd, itemStyle: { color: '#F0FDF4', opacity: 0.4 }, label: { show: true, position: 'insideTopLeft', value: 'FUTURE', color: '#22C55E', fontSize: 8, fontWeight: 700 } },
+              {
+                xAxis: presentEnd,
+                itemStyle: { color: '#F0FDF4', opacity: 0.4 },
+                label: {
+                  show: true,
+                  position: 'insideTopLeft',
+                  value: 'FUTURE',
+                  color: '#22C55E',
+                  fontSize: 8,
+                  fontWeight: 700,
+                },
+              },
               { xAxis: futureEnd },
             ],
           ],
@@ -2706,13 +2738,31 @@ export function PriestDashboard({
                             extraCssText: 'border-radius:12px;border:none;box-shadow:0 10px 25px -5px rgba(0,0,0,0.1)',
                           },
                           grid: { top: 12, right: 16, left: 40, bottom: 30 },
-                          xAxis: { type: 'category', data: priestHealthScoreAnalysis.distribution.map((d) => d.label), axisLine: { show: false }, axisTick: { show: false }, axisLabel: { color: '#374151', fontSize: 10, fontWeight: 700 } },
-                          yAxis: { type: 'value', axisLine: { show: false }, axisTick: { show: false }, axisLabel: { color: '#6B7280', fontSize: 10 }, splitLine: { lineStyle: { color: '#E5E7EB' } }, minInterval: 1 },
-                          series: [{
-                            type: 'bar',
-                            data: priestHealthScoreAnalysis.distribution.map((d) => ({ value: d.count, itemStyle: { color: d.fill, borderRadius: [8, 8, 0, 0] } })),
-                            barWidth: 44,
-                          }],
+                          xAxis: {
+                            type: 'category',
+                            data: priestHealthScoreAnalysis.distribution.map((d) => d.label),
+                            axisLine: { show: false },
+                            axisTick: { show: false },
+                            axisLabel: { color: '#374151', fontSize: 10, fontWeight: 700 },
+                          },
+                          yAxis: {
+                            type: 'value',
+                            axisLine: { show: false },
+                            axisTick: { show: false },
+                            axisLabel: { color: '#6B7280', fontSize: 10 },
+                            splitLine: { lineStyle: { color: '#E5E7EB' } },
+                            minInterval: 1,
+                          },
+                          series: [
+                            {
+                              type: 'bar',
+                              data: priestHealthScoreAnalysis.distribution.map((d) => ({
+                                value: d.count,
+                                itemStyle: { color: d.fill, borderRadius: [8, 8, 0, 0] },
+                              })),
+                              barWidth: 44,
+                            },
+                          ],
                         }}
                         style={{ height: '100%', width: '100%' }}
                       />
@@ -2770,12 +2820,35 @@ export function PriestDashboard({
                             extraCssText: 'border-radius:12px;border:none;box-shadow:0 10px 25px -5px rgba(0,0,0,0.1)',
                           },
                           grid: { top: 12, right: 24, left: 40, bottom: 30 },
-                          xAxis: { type: 'value', name: 'Collection Growth %', min: -20, max: 25, axisLine: { show: false }, axisTick: { show: false }, axisLabel: { color: '#6B7280', fontSize: 10, formatter: (v: number) => `${v}%` }, splitLine: { lineStyle: { color: '#E5E7EB', type: 'dashed' } } },
-                          yAxis: { type: 'value', name: 'Health Score', min: 0, max: 100, axisLine: { show: false }, axisTick: { show: false }, axisLabel: { color: '#6B7280', fontSize: 10 }, splitLine: { lineStyle: { color: '#E5E7EB', type: 'dashed' } } },
+                          xAxis: {
+                            type: 'value',
+                            name: 'Collection Growth %',
+                            min: -20,
+                            max: 25,
+                            axisLine: { show: false },
+                            axisTick: { show: false },
+                            axisLabel: { color: '#6B7280', fontSize: 10, formatter: (v: number) => `${v}%` },
+                            splitLine: { lineStyle: { color: '#E5E7EB', type: 'dashed' } },
+                          },
+                          yAxis: {
+                            type: 'value',
+                            name: 'Health Score',
+                            min: 0,
+                            max: 100,
+                            axisLine: { show: false },
+                            axisTick: { show: false },
+                            axisLabel: { color: '#6B7280', fontSize: 10 },
+                            splitLine: { lineStyle: { color: '#E5E7EB', type: 'dashed' } },
+                          },
                           series: [
                             {
                               type: 'scatter',
-                              data: priestHealthScoreAnalysis.growthHealthRows.map((d) => [d.growthRate, d.healthScore, d.name, d.fill]),
+                              data: priestHealthScoreAnalysis.growthHealthRows.map((d) => [
+                                d.growthRate,
+                                d.healthScore,
+                                d.name,
+                                d.fill,
+                              ]),
                               itemStyle: { color: (params: any) => params.data[3] },
                               symbolSize: 10,
                               markLine: {
@@ -2902,22 +2975,39 @@ export function PriestDashboard({
                               formatter: (params: any[]) => {
                                 const p = params[0];
                                 const row = pastoralAssignmentAnalysis.trendData[p.dataIndex];
-                                const header = row ? `${p.axisValue} assignment duration (${row.priestCount} priest${row.priestCount === 1 ? '' : 's'})` : `${p.axisValue} assignment duration`;
+                                const header = row
+                                  ? `${p.axisValue} assignment duration (${row.priestCount} priest${row.priestCount === 1 ? '' : 's'})`
+                                  : `${p.axisValue} assignment duration`;
                                 return `<div style="font-size:11px"><strong>${header}</strong><br/>Avg Collections: ${formatCurrency(p.value)}</div>`;
                               },
-                              extraCssText: 'border-radius:12px;border:none;box-shadow:0 10px 25px -5px rgba(0,0,0,0.1)',
+                              extraCssText:
+                                'border-radius:12px;border:none;box-shadow:0 10px 25px -5px rgba(0,0,0,0.1)',
                             },
                             grid: { top: 8, right: 14, left: 45, bottom: 30 },
-                            xAxis: { type: 'category', data: pastoralAssignmentAnalysis.trendData.map((d) => d.period), axisLine: { show: false }, axisTick: { show: false }, axisLabel: { color: '#6B7280', fontSize: 10, fontWeight: 700 } },
-                            yAxis: { type: 'value', axisLine: { show: false }, axisTick: { show: false }, axisLabel: { color: '#6B7280', fontSize: 10, formatter: (v: number) => `${v / 1000}k` }, splitLine: { lineStyle: { color: '#E5E7EB', type: 'dashed' } } },
-                            series: [{
-                              type: 'line',
-                              data: pastoralAssignmentAnalysis.trendData.map((d) => d.averageCollections),
-                              smooth: true,
-                              lineStyle: { color: '#1a472a', width: 3 },
-                              itemStyle: { color: '#1a472a', borderColor: '#fff', borderWidth: 2 },
-                              symbolSize: 8,
-                            }],
+                            xAxis: {
+                              type: 'category',
+                              data: pastoralAssignmentAnalysis.trendData.map((d) => d.period),
+                              axisLine: { show: false },
+                              axisTick: { show: false },
+                              axisLabel: { color: '#6B7280', fontSize: 10, fontWeight: 700 },
+                            },
+                            yAxis: {
+                              type: 'value',
+                              axisLine: { show: false },
+                              axisTick: { show: false },
+                              axisLabel: { color: '#6B7280', fontSize: 10, formatter: (v: number) => `${v / 1000}k` },
+                              splitLine: { lineStyle: { color: '#E5E7EB', type: 'dashed' } },
+                            },
+                            series: [
+                              {
+                                type: 'line',
+                                data: pastoralAssignmentAnalysis.trendData.map((d) => d.averageCollections),
+                                smooth: true,
+                                lineStyle: { color: '#1a472a', width: 3 },
+                                itemStyle: { color: '#1a472a', borderColor: '#fff', borderWidth: 2 },
+                                symbolSize: 8,
+                              },
+                            ],
                           }}
                           style={{ height: '100%', width: '100%' }}
                         />
@@ -3035,17 +3125,31 @@ export function PriestDashboard({
                     },
                     legend: { data: ['Actual Collections'], top: 0 },
                     grid: { top: 30, right: 20, left: 55, bottom: 30 },
-                    xAxis: { type: 'category', data: fallbackMonthlyData.map((d) => d.month), axisLabel: { color: '#6B7280', fontSize: 10 }, axisLine: { show: false }, axisTick: { show: false } },
-                    yAxis: { type: 'value', axisLabel: { color: '#6B7280', fontSize: 10, formatter: (v: number) => `${v / 1000}k` }, axisLine: { show: false }, axisTick: { show: false }, splitLine: { lineStyle: { color: '#E5E7EB', type: 'dashed' } } },
-                    series: [{
-                      name: 'Actual Collections',
-                      type: 'line',
-                      data: fallbackMonthlyData.map((d) => d.actual),
-                      smooth: true,
-                      lineStyle: { color: '#1a472a', width: 3 },
-                      itemStyle: { color: '#1a472a' },
-                      symbolSize: 6,
-                    }],
+                    xAxis: {
+                      type: 'category',
+                      data: fallbackMonthlyData.map((d) => d.month),
+                      axisLabel: { color: '#6B7280', fontSize: 10 },
+                      axisLine: { show: false },
+                      axisTick: { show: false },
+                    },
+                    yAxis: {
+                      type: 'value',
+                      axisLabel: { color: '#6B7280', fontSize: 10, formatter: (v: number) => `${v / 1000}k` },
+                      axisLine: { show: false },
+                      axisTick: { show: false },
+                      splitLine: { lineStyle: { color: '#E5E7EB', type: 'dashed' } },
+                    },
+                    series: [
+                      {
+                        name: 'Actual Collections',
+                        type: 'line',
+                        data: fallbackMonthlyData.map((d) => d.actual),
+                        smooth: true,
+                        lineStyle: { color: '#1a472a', width: 3 },
+                        itemStyle: { color: '#1a472a' },
+                        symbolSize: 6,
+                      },
+                    ],
                   }}
                   style={{ height: '100%', width: '100%' }}
                 />
@@ -3101,15 +3205,42 @@ export function PriestDashboard({
                         tooltip: {
                           trigger: 'axis',
                           formatter: (params: any[]) => {
-                            const lines = params.filter((p) => p.value !== null).map((p) => `${p.marker} ${p.seriesName === 'score' ? 'Actual Score' : 'Forecasted Score'}: ${p.value}/100`).join('<br/>');
+                            const lines = params
+                              .filter((p) => p.value !== null)
+                              .map(
+                                (p) =>
+                                  `${p.marker} ${p.seriesName === 'score' ? 'Actual Score' : 'Forecasted Score'}: ${p.value}/100`,
+                              )
+                              .join('<br/>');
                             return `${params[0].axisValue}<br/>${lines}`;
                           },
                           extraCssText: 'border-radius:12px;border:none;box-shadow:0 4px 20px rgba(0,0,0,0.08)',
                         },
-                        legend: { top: 0, right: 0, textStyle: { fontSize: 10, fontWeight: 700 }, icon: 'circle', formatter: (v: string) => v === 'score' ? 'Actual Score' : 'Forecasted Score' },
+                        legend: {
+                          top: 0,
+                          right: 0,
+                          textStyle: { fontSize: 10, fontWeight: 700 },
+                          icon: 'circle',
+                          formatter: (v: string) => (v === 'score' ? 'Actual Score' : 'Forecasted Score'),
+                        },
                         grid: { top: 40, right: 30, left: 40, bottom: 30 },
-                        xAxis: { type: 'category', data: scoreData.map((d) => d.month), axisLabel: { color: '#6B7280', fontSize: 11 }, axisLine: { show: false }, axisTick: { show: false }, splitLine: { lineStyle: { color: '#E5E7EB', type: 'dashed' } } },
-                        yAxis: { type: 'value', min: 0, max: 100, axisLabel: { color: '#6B7280', fontSize: 11 }, axisLine: { show: false }, axisTick: { show: false }, splitLine: { lineStyle: { color: '#E5E7EB', type: 'dashed' } } },
+                        xAxis: {
+                          type: 'category',
+                          data: scoreData.map((d) => d.month),
+                          axisLabel: { color: '#6B7280', fontSize: 11 },
+                          axisLine: { show: false },
+                          axisTick: { show: false },
+                          splitLine: { lineStyle: { color: '#E5E7EB', type: 'dashed' } },
+                        },
+                        yAxis: {
+                          type: 'value',
+                          min: 0,
+                          max: 100,
+                          axisLabel: { color: '#6B7280', fontSize: 11 },
+                          axisLine: { show: false },
+                          axisTick: { show: false },
+                          splitLine: { lineStyle: { color: '#E5E7EB', type: 'dashed' } },
+                        },
                         series: [
                           {
                             name: 'score',
@@ -3124,8 +3255,30 @@ export function PriestDashboard({
                               silent: true,
                               symbol: 'none',
                               data: [
-                                { yAxis: 80, lineStyle: { color: '#10B981', type: 'dashed' }, label: { show: true, position: 'insideEndTop', formatter: 'Target (80)', color: '#10B981', fontSize: 9, fontWeight: 700 } },
-                                { xAxis: 'Jan', lineStyle: { color: '#D1D5DB', type: 'dashed' }, label: { show: true, position: 'start', formatter: 'Today', color: '#9CA3AF', fontSize: 9, fontWeight: 700 } },
+                                {
+                                  yAxis: 80,
+                                  lineStyle: { color: '#10B981', type: 'dashed' },
+                                  label: {
+                                    show: true,
+                                    position: 'insideEndTop',
+                                    formatter: 'Target (80)',
+                                    color: '#10B981',
+                                    fontSize: 9,
+                                    fontWeight: 700,
+                                  },
+                                },
+                                {
+                                  xAxis: 'Jan',
+                                  lineStyle: { color: '#D1D5DB', type: 'dashed' },
+                                  label: {
+                                    show: true,
+                                    position: 'start',
+                                    formatter: 'Today',
+                                    color: '#9CA3AF',
+                                    fontSize: 9,
+                                    fontWeight: 700,
+                                  },
+                                },
                               ],
                             },
                           },
@@ -3290,21 +3443,52 @@ export function PriestDashboard({
                           extraCssText: 'border-radius:12px;border:none;box-shadow:0 10px 25px -5px rgba(0,0,0,0.1)',
                         },
                         grid: { top: 14, right: 22, left: 55, bottom: 45 },
-                        xAxis: { type: 'value', name: 'Financial Risk', nameLocation: 'middle', nameGap: 28, min: 0, max: 100, axisLine: { show: false }, axisTick: { show: false }, axisLabel: { color: '#6B7280', fontSize: 10, formatter: (v: number) => `${v}%` }, splitLine: { lineStyle: { color: '#E5E7EB', type: 'dashed' } } },
-                        yAxis: { type: 'value', name: 'Improvement Target %', nameLocation: 'middle', nameGap: 40, nameRotate: 90, min: 0, max: 35, axisLine: { show: false }, axisTick: { show: false }, axisLabel: { color: '#6B7280', fontSize: 10, formatter: (v: number) => `${v}%` }, splitLine: { lineStyle: { color: '#E5E7EB', type: 'dashed' } } },
-                        series: [{
-                          type: 'scatter',
-                          data: prescriptiveActionData.rows.map((d) => [d.financialRisk, d.expectedImprovement, d.name, d.fill, d.action]),
-                          itemStyle: { color: (params: any) => params.data[3] },
-                          symbolSize: 10,
-                          markLine: {
-                            silent: true,
-                            symbol: 'none',
-                            lineStyle: { color: '#94A3B8', type: 'dashed' },
-                            data: [{ xAxis: 50 }, { yAxis: 15 }],
-                            label: { show: false },
+                        xAxis: {
+                          type: 'value',
+                          name: 'Financial Risk',
+                          nameLocation: 'middle',
+                          nameGap: 28,
+                          min: 0,
+                          max: 100,
+                          axisLine: { show: false },
+                          axisTick: { show: false },
+                          axisLabel: { color: '#6B7280', fontSize: 10, formatter: (v: number) => `${v}%` },
+                          splitLine: { lineStyle: { color: '#E5E7EB', type: 'dashed' } },
+                        },
+                        yAxis: {
+                          type: 'value',
+                          name: 'Improvement Target %',
+                          nameLocation: 'middle',
+                          nameGap: 40,
+                          nameRotate: 90,
+                          min: 0,
+                          max: 35,
+                          axisLine: { show: false },
+                          axisTick: { show: false },
+                          axisLabel: { color: '#6B7280', fontSize: 10, formatter: (v: number) => `${v}%` },
+                          splitLine: { lineStyle: { color: '#E5E7EB', type: 'dashed' } },
+                        },
+                        series: [
+                          {
+                            type: 'scatter',
+                            data: prescriptiveActionData.rows.map((d) => [
+                              d.financialRisk,
+                              d.expectedImprovement,
+                              d.name,
+                              d.fill,
+                              d.action,
+                            ]),
+                            itemStyle: { color: (params: any) => params.data[3] },
+                            symbolSize: 10,
+                            markLine: {
+                              silent: true,
+                              symbol: 'none',
+                              lineStyle: { color: '#94A3B8', type: 'dashed' },
+                              data: [{ xAxis: 50 }, { yAxis: 15 }],
+                              label: { show: false },
+                            },
                           },
-                        }],
+                        ],
                       }}
                       style={{ height: '100%', width: '100%' }}
                     />
@@ -3332,13 +3516,31 @@ export function PriestDashboard({
                           extraCssText: 'border-radius:12px;border:none;box-shadow:0 10px 25px -5px rgba(0,0,0,0.1)',
                         },
                         grid: { top: 10, right: 14, left: 40, bottom: 30 },
-                        xAxis: { type: 'category', data: prescriptiveActionData.summary.map((d) => d.action), axisLine: { show: false }, axisTick: { show: false }, axisLabel: { color: '#374151', fontSize: 10, fontWeight: 700 } },
-                        yAxis: { type: 'value', axisLine: { show: false }, axisTick: { show: false }, axisLabel: { color: '#6B7280', fontSize: 10 }, splitLine: { lineStyle: { color: '#E5E7EB', type: 'dashed' } }, minInterval: 1 },
-                        series: [{
-                          type: 'bar',
-                          data: prescriptiveActionData.summary.map((d) => ({ value: d.count, itemStyle: { color: d.fill, borderRadius: [8, 8, 0, 0] } })),
-                          barWidth: 36,
-                        }],
+                        xAxis: {
+                          type: 'category',
+                          data: prescriptiveActionData.summary.map((d) => d.action),
+                          axisLine: { show: false },
+                          axisTick: { show: false },
+                          axisLabel: { color: '#374151', fontSize: 10, fontWeight: 700 },
+                        },
+                        yAxis: {
+                          type: 'value',
+                          axisLine: { show: false },
+                          axisTick: { show: false },
+                          axisLabel: { color: '#6B7280', fontSize: 10 },
+                          splitLine: { lineStyle: { color: '#E5E7EB', type: 'dashed' } },
+                          minInterval: 1,
+                        },
+                        series: [
+                          {
+                            type: 'bar',
+                            data: prescriptiveActionData.summary.map((d) => ({
+                              value: d.count,
+                              itemStyle: { color: d.fill, borderRadius: [8, 8, 0, 0] },
+                            })),
+                            barWidth: 36,
+                          },
+                        ],
                       }}
                       style={{ height: '100%', width: '100%' }}
                     />

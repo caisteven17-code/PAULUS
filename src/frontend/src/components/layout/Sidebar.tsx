@@ -605,10 +605,16 @@ export function Sidebar({ activeTab = '', onNavigate, role, timeframe = '6m', on
             return (
               <button
                 onClick={() => onNavigate('consolidated')}
-                className={'w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-300 group ' + (isActive ? 'bg-white/10 text-gold-400 shadow-sm' : 'text-white/50 hover:bg-white/5 hover:text-white')}
+                className={
+                  'w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-300 group ' +
+                  (isActive ? 'bg-white/10 text-gold-400 shadow-sm' : 'text-white/50 hover:bg-white/5 hover:text-white')
+                }
               >
                 <BarChart3
-                  className={'w-4 h-4 transition-colors ' + (isActive ? 'text-gold-400' : 'text-white/20 group-hover:text-white/40')}
+                  className={
+                    'w-4 h-4 transition-colors ' +
+                    (isActive ? 'text-gold-400' : 'text-white/20 group-hover:text-white/40')
+                  }
                 />
                 <span className="text-xs font-bold tracking-wide">Consolidated</span>
                 {isActive && (

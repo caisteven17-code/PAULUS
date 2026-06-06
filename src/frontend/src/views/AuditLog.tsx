@@ -441,11 +441,13 @@ export function AuditLog() {
       .then((data: AuditEntry[] | null) => {
         if (data && data.length > 0) setLogs(data);
       })
-      .catch(() => { /* keep fallback RAW_LOGS */ })
+      .catch(() => {
+        /* keep fallback RAW_LOGS */
+      })
       .finally(() => setIsLoading(false));
   }, []);
 
-    const [search, setSearch] = useState('');
+  const [search, setSearch] = useState('');
   const [activeFilter, setActiveFilter] = useState<LogCategory>('all');
   const [showAnalytics, setShowAnalytics] = useState(false);
 
@@ -509,9 +511,11 @@ export function AuditLog() {
 
   const topUsersData = useMemo(() => {
     const counts: Record<string, number> = {};
-    logs.filter((l) => !l.isSystem).forEach((l) => {
-      counts[l.user] = (counts[l.user] || 0) + 1;
-    });
+    logs
+      .filter((l) => !l.isSystem)
+      .forEach((l) => {
+        counts[l.user] = (counts[l.user] || 0) + 1;
+      });
     return Object.entries(counts)
       .sort((a, b) => b[1] - a[1])
       .slice(0, 5)
@@ -705,17 +709,31 @@ export function AuditLog() {
                         splitLine: { lineStyle: { color: '#F3F4F6' } },
                         minInterval: 1,
                       },
-                      series: [{
-                        name: 'Events',
-                        type: 'line',
-                        data: activityTrendData.map((d) => d.events),
-                        smooth: true,
-                        symbol: 'circle',
-                        symbolSize: 8,
-                        lineStyle: { color: '#1a472a', width: 2.5 },
-                        itemStyle: { color: '#1a472a' },
-                        areaStyle: { color: { type: 'linear', x: 0, y: 0, x2: 0, y2: 1, colorStops: [{ offset: 0, color: 'rgba(26,71,42,0.15)' }, { offset: 1, color: 'rgba(26,71,42,0)' }] } },
-                      }],
+                      series: [
+                        {
+                          name: 'Events',
+                          type: 'line',
+                          data: activityTrendData.map((d) => d.events),
+                          smooth: true,
+                          symbol: 'circle',
+                          symbolSize: 8,
+                          lineStyle: { color: '#1a472a', width: 2.5 },
+                          itemStyle: { color: '#1a472a' },
+                          areaStyle: {
+                            color: {
+                              type: 'linear',
+                              x: 0,
+                              y: 0,
+                              x2: 0,
+                              y2: 1,
+                              colorStops: [
+                                { offset: 0, color: 'rgba(26,71,42,0.15)' },
+                                { offset: 1, color: 'rgba(26,71,42,0)' },
+                              ],
+                            },
+                          },
+                        },
+                      ],
                     }}
                   />
                 </div>
@@ -731,14 +749,16 @@ export function AuditLog() {
                     option={{
                       color: categoryData.map((c) => c.color),
                       tooltip: { trigger: 'item', formatter: '{b}: {c}' },
-                      series: [{
-                        type: 'pie',
-                        radius: ['40%', '70%'],
-                        center: ['50%', '50%'],
-                        padAngle: 3,
-                        data: categoryData.map((c) => ({ name: c.name, value: c.value })),
-                        label: { show: false },
-                      }],
+                      series: [
+                        {
+                          type: 'pie',
+                          radius: ['40%', '70%'],
+                          center: ['50%', '50%'],
+                          padAngle: 3,
+                          data: categoryData.map((c) => ({ name: c.name, value: c.value })),
+                          label: { show: false },
+                        },
+                      ],
                     }}
                   />
                   <div className="grid grid-cols-2 gap-x-3 gap-y-1 mt-2">
@@ -766,14 +786,31 @@ export function AuditLog() {
                       color: severityData.map((d) => d.color),
                       tooltip: { trigger: 'axis', axisPointer: { type: 'shadow' } },
                       grid: { top: 5, right: 20, left: 60, bottom: 5 },
-                      xAxis: { type: 'value', axisLine: { show: false }, axisTick: { show: false }, axisLabel: { fontSize: 9, color: '#9CA3AF' }, minInterval: 1 },
-                      yAxis: { type: 'category', data: severityData.map((d) => d.name), axisLine: { show: false }, axisTick: { show: false }, axisLabel: { fontSize: 10, color: '#6B7280', fontWeight: 'bold' } },
-                      series: [{
-                        name: 'Events',
-                        type: 'bar',
-                        data: severityData.map((d, i) => ({ value: d.count, itemStyle: { color: d.color, borderRadius: [0, 6, 6, 0] } })),
-                        barMaxWidth: 18,
-                      }],
+                      xAxis: {
+                        type: 'value',
+                        axisLine: { show: false },
+                        axisTick: { show: false },
+                        axisLabel: { fontSize: 9, color: '#9CA3AF' },
+                        minInterval: 1,
+                      },
+                      yAxis: {
+                        type: 'category',
+                        data: severityData.map((d) => d.name),
+                        axisLine: { show: false },
+                        axisTick: { show: false },
+                        axisLabel: { fontSize: 10, color: '#6B7280', fontWeight: 'bold' },
+                      },
+                      series: [
+                        {
+                          name: 'Events',
+                          type: 'bar',
+                          data: severityData.map((d, i) => ({
+                            value: d.count,
+                            itemStyle: { color: d.color, borderRadius: [0, 6, 6, 0] },
+                          })),
+                          barMaxWidth: 18,
+                        },
+                      ],
                     }}
                   />
                 </div>
@@ -790,14 +827,31 @@ export function AuditLog() {
                       color: ['#D4AF37'],
                       tooltip: { trigger: 'axis', axisPointer: { type: 'shadow' } },
                       grid: { top: 5, right: 20, left: 80, bottom: 5 },
-                      xAxis: { type: 'value', axisLine: { show: false }, axisTick: { show: false }, axisLabel: { fontSize: 9, color: '#9CA3AF' }, minInterval: 1 },
-                      yAxis: { type: 'category', data: topUsersData.map((d) => d.name), axisLine: { show: false }, axisTick: { show: false }, axisLabel: { fontSize: 9, color: '#6B7280', fontWeight: 'bold' } },
-                      series: [{
-                        name: 'Actions',
-                        type: 'bar',
-                        data: topUsersData.map((d) => ({ value: d.actions, itemStyle: { color: '#D4AF37', borderRadius: [0, 6, 6, 0] } })),
-                        barMaxWidth: 18,
-                      }],
+                      xAxis: {
+                        type: 'value',
+                        axisLine: { show: false },
+                        axisTick: { show: false },
+                        axisLabel: { fontSize: 9, color: '#9CA3AF' },
+                        minInterval: 1,
+                      },
+                      yAxis: {
+                        type: 'category',
+                        data: topUsersData.map((d) => d.name),
+                        axisLine: { show: false },
+                        axisTick: { show: false },
+                        axisLabel: { fontSize: 9, color: '#6B7280', fontWeight: 'bold' },
+                      },
+                      series: [
+                        {
+                          name: 'Actions',
+                          type: 'bar',
+                          data: topUsersData.map((d) => ({
+                            value: d.actions,
+                            itemStyle: { color: '#D4AF37', borderRadius: [0, 6, 6, 0] },
+                          })),
+                          barMaxWidth: 18,
+                        },
+                      ],
                     }}
                   />
                 </div>

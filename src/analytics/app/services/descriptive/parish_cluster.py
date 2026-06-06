@@ -114,10 +114,7 @@ def _fetch_and_process() -> dict[str, Any]:
 
     # Fetch all parish institutions
     inst_res = (
-        get_table("diocese", "institutions")
-        .select("id, institution_type")
-        .eq("institution_type", "parish")
-        .execute()
+        get_table("diocese", "institutions").select("id, institution_type").eq("institution_type", "parish").execute()
     )
     institutions = inst_res.data or []
 

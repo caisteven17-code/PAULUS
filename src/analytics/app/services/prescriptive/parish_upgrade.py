@@ -87,10 +87,7 @@ def _solve_milp(parishes: list[dict], budget: float, upgrade_cost_per_parish: fl
         # Fallback: greedy selection by priority
         sortable = [p for p in parishes if p.get("target_cluster")]
         sortable.sort(
-            key=lambda p: (
-                0 if p["cluster_label"] == "At-Risk" else
-                1 if p["cluster_label"] == "Stable" else 2
-            )
+            key=lambda p: 0 if p["cluster_label"] == "At-Risk" else 1 if p["cluster_label"] == "Stable" else 2
         )
         selected = []
         remaining_budget = budget
@@ -105,10 +102,7 @@ def _fetch_and_process(budget: float = 500000.0, upgrade_cost: float = 50000.0) 
     ts = datetime.now(timezone.utc).isoformat()
 
     inst_res = (
-        get_table("diocese", "institutions")
-        .select("id, institution_type")
-        .eq("institution_type", "parish")
-        .execute()
+        get_table("diocese", "institutions").select("id, institution_type").eq("institution_type", "parish").execute()
     )
     institutions = inst_res.data or []
 
@@ -163,25 +157,25 @@ def _fetch_and_process(budget: float = 500000.0, upgrade_cost: float = 50000.0) 
 
         if n >= 12:
             cy = float(np.sum(r[-12:]))
-            py = float(np.sum(r[-24:-12])) if n >= 24 else float(np.sum(r[:max(1, n - 12)]))
+            py = float(np.sum(r[-24:-12])) if n >= 24 else float(np.sum(r[: max(1, n - 12)]))
             growth = safe_div(cy - py, py or 1)
         elif n >= 2:
             growth = safe_div(r[-1] - r[0], abs(r[0]) or 1)
         else:
             growth = 0.0
 
-        deficit      = int(np.sum(e > r))
+        deficit = int(np.sum(e > r))
         deficit_rate = safe_div(deficit, n)
-        cluster      = _rule_cluster(avg, growth, deficit_rate, cv)
-        target       = _upgrade_cluster(cluster)
+        cluster = _rule_cluster(avg, growth, deficit_rate, cv)
+        target = _upgrade_cluster(cluster)
 
         return {
             "institution_id": iid,
             "avg_collection": round(avg, 2),
-            "cluster_label":  cluster,
+            "cluster_label": cluster,
             "target_cluster": target,
-            "growth_rate":    round(growth, 4),
-            "deficit_rate":   round(deficit_rate, 4),
+            "growth_rate": round(growth, 4),
+            "deficit_rate": round(deficit_rate, 4),
         }
 
     parishes = run_parallel(_worker, institutions)

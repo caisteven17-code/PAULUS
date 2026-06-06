@@ -954,11 +954,27 @@ function ParishAITwin({ mode = 'parish' }: { mode?: FinancialAITwinMode }) {
                 style={{ height: '420px', width: '100%' }}
                 option={{
                   color: ['#6366f1', '#8b5cf6', '#06b6d4', '#10b981', '#f59e0b', '#ef4444'],
-                  tooltip: { trigger: 'axis', formatter: (params: any) => params.map((p: any) => `${p.seriesName}: ${formatCurrency(Number(p.value ?? 0))}`).join('<br/>') },
+                  tooltip: {
+                    trigger: 'axis',
+                    formatter: (params: any) =>
+                      params.map((p: any) => `${p.seriesName}: ${formatCurrency(Number(p.value ?? 0))}`).join('<br/>'),
+                  },
                   legend: { data: ['Baseline', 'Simulated'] },
                   grid: { left: 60, right: 20, bottom: 30, top: 40 },
-                  xAxis: { type: 'category', data: simulationResults.projectedData.map((d) => d.month), axisLabel: { fontSize: 10, fontWeight: 'bold', color: '#9CA3AF' } },
-                  yAxis: { type: 'value', axisLabel: { formatter: (v: number) => `P${Math.round(v / 1000)}k`, fontSize: 10, fontWeight: 'bold', color: '#9CA3AF' } },
+                  xAxis: {
+                    type: 'category',
+                    data: simulationResults.projectedData.map((d) => d.month),
+                    axisLabel: { fontSize: 10, fontWeight: 'bold', color: '#9CA3AF' },
+                  },
+                  yAxis: {
+                    type: 'value',
+                    axisLabel: {
+                      formatter: (v: number) => `P${Math.round(v / 1000)}k`,
+                      fontSize: 10,
+                      fontWeight: 'bold',
+                      color: '#9CA3AF',
+                    },
+                  },
                   series: [
                     {
                       name: 'Baseline',
@@ -976,7 +992,19 @@ function ParishAITwin({ mode = 'parish' }: { mode?: FinancialAITwinMode }) {
                       smooth: true,
                       lineStyle: { color: '#D4AF37', width: 4 },
                       itemStyle: { color: '#D4AF37' },
-                      areaStyle: { color: { type: 'linear', x: 0, y: 0, x2: 0, y2: 1, colorStops: [{ offset: 0, color: 'rgba(212,175,55,0.3)' }, { offset: 1, color: 'rgba(212,175,55,0)' }] } },
+                      areaStyle: {
+                        color: {
+                          type: 'linear',
+                          x: 0,
+                          y: 0,
+                          x2: 0,
+                          y2: 1,
+                          colorStops: [
+                            { offset: 0, color: 'rgba(212,175,55,0.3)' },
+                            { offset: 1, color: 'rgba(212,175,55,0)' },
+                          ],
+                        },
+                      },
                     },
                   ],
                 }}
@@ -1413,9 +1441,16 @@ function PriestAITwin() {
                 option={{
                   color: ['#6366f1', '#8b5cf6', '#06b6d4', '#10b981', '#f59e0b', '#ef4444'],
                   tooltip: { trigger: 'axis' },
-                  legend: { data: ['If Priest Stays', 'Old Parish After Transfer', 'New Parish After Transfer'], textStyle: { fontSize: 11, fontWeight: 'bold' } },
+                  legend: {
+                    data: ['If Priest Stays', 'Old Parish After Transfer', 'New Parish After Transfer'],
+                    textStyle: { fontSize: 11, fontWeight: 'bold' },
+                  },
                   grid: { left: 50, right: 20, bottom: 30, top: 50 },
-                  xAxis: { type: 'category', data: results.projectedData.map((d) => d.month), axisLabel: { fontSize: 10, fontWeight: 'bold', color: '#9CA3AF' } },
+                  xAxis: {
+                    type: 'category',
+                    data: results.projectedData.map((d) => d.month),
+                    axisLabel: { fontSize: 10, fontWeight: 'bold', color: '#9CA3AF' },
+                  },
                   yAxis: { type: 'value', axisLabel: { fontSize: 10, fontWeight: 'bold', color: '#9CA3AF' } },
                   series: [
                     {

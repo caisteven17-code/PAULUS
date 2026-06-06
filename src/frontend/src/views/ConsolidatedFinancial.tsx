@@ -31,20 +31,108 @@ const COLORS = ['#1a472a', '#D4AF37', '#4F46E5', '#06B6D4', '#EC4899'];
 
 // ── Fallback mock data (used as initial state and on API failure) ─────────────
 const FALLBACK_CONSOLIDATED: ConsolidatedRecord[] = [
-  { period: 'Jan', totalCollections: 24800000, totalDisbursements: 19200000, netPosition: 5600000, parishCount: 22, schoolCount: 5, seminaryCount: 5 },
-  { period: 'Feb', totalCollections: 22950000, totalDisbursements: 18450000, netPosition: 4500000, parishCount: 22, schoolCount: 5, seminaryCount: 5 },
-  { period: 'Mar', totalCollections: 23540000, totalDisbursements: 18720000, netPosition: 4820000, parishCount: 22, schoolCount: 5, seminaryCount: 5 },
-  { period: 'Apr', totalCollections: 28600000, totalDisbursements: 20400000, netPosition: 8200000, parishCount: 22, schoolCount: 5, seminaryCount: 5 },
-  { period: 'May', totalCollections: 24720000, totalDisbursements: 19560000, netPosition: 5160000, parishCount: 22, schoolCount: 5, seminaryCount: 5 },
+  {
+    period: 'Jan',
+    totalCollections: 24800000,
+    totalDisbursements: 19200000,
+    netPosition: 5600000,
+    parishCount: 22,
+    schoolCount: 5,
+    seminaryCount: 5,
+  },
+  {
+    period: 'Feb',
+    totalCollections: 22950000,
+    totalDisbursements: 18450000,
+    netPosition: 4500000,
+    parishCount: 22,
+    schoolCount: 5,
+    seminaryCount: 5,
+  },
+  {
+    period: 'Mar',
+    totalCollections: 23540000,
+    totalDisbursements: 18720000,
+    netPosition: 4820000,
+    parishCount: 22,
+    schoolCount: 5,
+    seminaryCount: 5,
+  },
+  {
+    period: 'Apr',
+    totalCollections: 28600000,
+    totalDisbursements: 20400000,
+    netPosition: 8200000,
+    parishCount: 22,
+    schoolCount: 5,
+    seminaryCount: 5,
+  },
+  {
+    period: 'May',
+    totalCollections: 24720000,
+    totalDisbursements: 19560000,
+    netPosition: 5160000,
+    parishCount: 22,
+    schoolCount: 5,
+    seminaryCount: 5,
+  },
 ];
 
 const FALLBACK_ENTITIES: EntitySummary[] = [
-  { name: 'San Pablo Cathedral', type: 'parish', collections: 1250000, disbursements: 950000, netPosition: 300000, healthScore: 91.4, trend: 8.5 },
-  { name: 'St. James the Apostle (Paete)', type: 'parish', collections: 650000, disbursements: 580000, netPosition: 70000, healthScore: 75.6, trend: -2.1 },
-  { name: 'Liceo de San Pablo', type: 'school', collections: 850000, disbursements: 720000, netPosition: 130000, healthScore: 69.4, trend: 3.2 },
-  { name: "St. Peter's College Seminary", type: 'seminary', collections: 420000, disbursements: 350000, netPosition: 70000, healthScore: 59.3, trend: 1.8 },
-  { name: 'San Isidro Labrador (Biñan)', type: 'parish', collections: 1100000, disbursements: 890000, netPosition: 210000, healthScore: 88.7, trend: 5.3 },
-  { name: 'Liceo de Calamba', type: 'school', collections: 720000, disbursements: 610000, netPosition: 110000, healthScore: 66.7, trend: -1.5 },
+  {
+    name: 'San Pablo Cathedral',
+    type: 'parish',
+    collections: 1250000,
+    disbursements: 950000,
+    netPosition: 300000,
+    healthScore: 91.4,
+    trend: 8.5,
+  },
+  {
+    name: 'St. James the Apostle (Paete)',
+    type: 'parish',
+    collections: 650000,
+    disbursements: 580000,
+    netPosition: 70000,
+    healthScore: 75.6,
+    trend: -2.1,
+  },
+  {
+    name: 'Liceo de San Pablo',
+    type: 'school',
+    collections: 850000,
+    disbursements: 720000,
+    netPosition: 130000,
+    healthScore: 69.4,
+    trend: 3.2,
+  },
+  {
+    name: "St. Peter's College Seminary",
+    type: 'seminary',
+    collections: 420000,
+    disbursements: 350000,
+    netPosition: 70000,
+    healthScore: 59.3,
+    trend: 1.8,
+  },
+  {
+    name: 'San Isidro Labrador (Biñan)',
+    type: 'parish',
+    collections: 1100000,
+    disbursements: 890000,
+    netPosition: 210000,
+    healthScore: 88.7,
+    trend: 5.3,
+  },
+  {
+    name: 'Liceo de Calamba',
+    type: 'school',
+    collections: 720000,
+    disbursements: 610000,
+    netPosition: 110000,
+    healthScore: 66.7,
+    trend: -1.5,
+  },
 ];
 
 export function ConsolidatedFinancial() {
@@ -58,10 +146,7 @@ export function ConsolidatedFinancial() {
     let cancelled = false;
     setIsLoading(true);
 
-    Promise.all([
-      apiClient.getFinancialTrend('parish', ''),
-      apiClient.getEntities(),
-    ])
+    Promise.all([apiClient.getFinancialTrend('parish', ''), apiClient.getEntities()])
       .then(([trendRes, entitiesRes]) => {
         if (cancelled) return;
 
@@ -120,7 +205,9 @@ export function ConsolidatedFinancial() {
       totalCollections: latest.totalCollections,
       totalDisbursements: latest.totalDisbursements,
       netPosition: latest.netPosition,
-      collectionsTrend: previous ? ((latest.totalCollections - previous.totalCollections) / (previous.totalCollections || 1)) * 100 : 0,
+      collectionsTrend: previous
+        ? ((latest.totalCollections - previous.totalCollections) / (previous.totalCollections || 1)) * 100
+        : 0,
       netTrend: previous ? ((latest.netPosition - previous.netPosition) / (previous.netPosition || 1)) * 100 : 0,
       totalEntities: latest.parishCount + latest.schoolCount + latest.seminaryCount,
     };
@@ -154,7 +241,9 @@ export function ConsolidatedFinancial() {
   }, [consolidatedData]);
 
   return (
-    <div className={`min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 pt-6 pb-20 px-4 md:px-6 transition-opacity duration-300 ${isLoading ? 'opacity-60' : 'opacity-100'}`}>
+    <div
+      className={`min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 pt-6 pb-20 px-4 md:px-6 transition-opacity duration-300 ${isLoading ? 'opacity-60' : 'opacity-100'}`}
+    >
       <div className="max-w-7xl mx-auto">
         {/* Header */}
         <div className="flex items-center justify-between mb-8">
@@ -263,7 +352,14 @@ export function ConsolidatedFinancial() {
                   tooltip: { trigger: 'axis' },
                   xAxis: { type: 'category', data: consolidatedData.map((d) => d.period) },
                   yAxis: { type: 'value', axisLabel: { formatter: (v: number) => formatCurrency(v) } },
-                  series: [{ name: 'Total Collections', type: 'line', data: consolidatedData.map((d) => d.totalCollections), smooth: true }],
+                  series: [
+                    {
+                      name: 'Total Collections',
+                      type: 'line',
+                      data: consolidatedData.map((d) => d.totalCollections),
+                      smooth: true,
+                    },
+                  ],
                 }}
               />
             </motion.div>
@@ -302,12 +398,14 @@ export function ConsolidatedFinancial() {
                   color: ['#6366f1', '#8b5cf6', '#06b6d4', '#10b981', '#f59e0b', '#ef4444'],
                   tooltip: { trigger: 'item', formatter: '{b}: {c}' },
                   legend: { orient: 'vertical', left: 'left' },
-                  series: [{
-                    type: 'pie',
-                    radius: ['0%', '60%'],
-                    data: entityDistribution.map((d) => ({ name: d.name, value: d.value })),
-                    label: { formatter: '{b}: {c}' },
-                  }],
+                  series: [
+                    {
+                      type: 'pie',
+                      radius: ['0%', '60%'],
+                      data: entityDistribution.map((d) => ({ name: d.name, value: d.value })),
+                      label: { formatter: '{b}: {c}' },
+                    },
+                  ],
                 }}
               />
             </motion.div>
@@ -330,7 +428,11 @@ export function ConsolidatedFinancial() {
                   yAxis: { type: 'value', axisLabel: { formatter: (v: number) => formatCurrency(v) } },
                   series: [
                     { name: 'Total Collections', type: 'bar', data: consolidatedData.map((d) => d.totalCollections) },
-                    { name: 'Total Disbursements', type: 'bar', data: consolidatedData.map((d) => d.totalDisbursements) },
+                    {
+                      name: 'Total Disbursements',
+                      type: 'bar',
+                      data: consolidatedData.map((d) => d.totalDisbursements),
+                    },
                   ],
                 }}
               />

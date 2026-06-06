@@ -45,12 +45,14 @@ def _run_simulation(
         period_date = (base_date + pd.DateOffset(months=i + 1)).strftime("%Y-%m")
         sim_r = last_r * (r_growth ** (i + 1))
         sim_e = last_e * (e_growth ** (i + 1))
-        monthly.append({
-            "period": period_date,
-            "simulated_receipts": round(sim_r, 2),
-            "simulated_expenses": round(sim_e, 2),
-            "net": round(sim_r - sim_e, 2),
-        })
+        monthly.append(
+            {
+                "period": period_date,
+                "simulated_receipts": round(sim_r, 2),
+                "simulated_expenses": round(sim_e, 2),
+                "net": round(sim_r - sim_e, 2),
+            }
+        )
         score = _compute_health_score(sim_r, sim_e, consumable_avg)
         health_traj.append({"period": period_date, "health_score": score})
 
@@ -79,7 +81,9 @@ def _sensitivity_analysis(
             test_params = params.copy()
             test_params[param] = base_val + delta
             _, health_traj = _run_simulation(
-                baseline_receipts, baseline_expenses, consumable_avg,
+                baseline_receipts,
+                baseline_expenses,
+                consumable_avg,
                 test_params["collection_change_pct"],
                 test_params["expense_change_pct"],
                 periods,
@@ -147,13 +151,21 @@ def _run_scenario(
     baseline_r, baseline_e, consumable_avg = _fetch_baseline(institution_id, entity_type)
 
     monthly, health_traj = _run_simulation(
-        baseline_r, baseline_e, consumable_avg,
-        collection_change_pct, expense_change_pct, periods,
+        baseline_r,
+        baseline_e,
+        consumable_avg,
+        collection_change_pct,
+        expense_change_pct,
+        periods,
     )
 
     sensitivity = _sensitivity_analysis(
-        baseline_r, baseline_e, consumable_avg,
-        collection_change_pct, expense_change_pct, periods,
+        baseline_r,
+        baseline_e,
+        consumable_avg,
+        collection_change_pct,
+        expense_change_pct,
+        periods,
     )
 
     return {
@@ -182,6 +194,9 @@ async def run_institution_simulation(
         raise ValueError(f"Unknown entity type: {entity_type}")
     return await asyncio.to_thread(
         _run_scenario,
-        institution_id, entity_type,
-        collection_change_pct, expense_change_pct, periods,
+        institution_id,
+        entity_type,
+        collection_change_pct,
+        expense_change_pct,
+        periods,
     )

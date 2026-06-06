@@ -23,6 +23,7 @@ EntityType = Literal["parish", "school", "seminary"]
 
 # ── Request bodies ─────────────────────────────────────────────────────────────
 
+
 class SimulationRequest(BaseModel):
     collection_change_pct: float = 0.0
     expense_change_pct: float = 0.0
@@ -36,6 +37,7 @@ class PastoralSimulationRequest(BaseModel):
 
 
 # ── Endpoints ─────────────────────────────────────────────────────────────────
+
 
 @router.get("/financial-recommendation/{entity_type}/{institution_id}")
 async def financial_recommendation(entity_type: EntityType, institution_id: str):
@@ -108,7 +110,8 @@ async def seasonal_strategy(
 ):
     try:
         return await svc_ss.get_seasonal_strategy(
-            institution_id, entity_type,
+            institution_id,
+            entity_type,
             total_budget=total_budget,
             max_preparation_per_season=max_preparation_per_season,
         )

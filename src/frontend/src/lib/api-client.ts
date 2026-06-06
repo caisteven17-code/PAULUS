@@ -160,14 +160,12 @@ export const apiClient = {
   getPastoralAssignment: (institutionId: string) =>
     get(`/api/analytics/descriptive/pastoral-assignment/${institutionId}`),
 
-  getParishCluster: () =>
-    get('/api/analytics/descriptive/parish-cluster'),
+  getParishCluster: () => get('/api/analytics/descriptive/parish-cluster'),
 
   getSeasonalityTrend: (entityType: string, institutionId: string) =>
     get(`/api/analytics/descriptive/seasonality/${entityType}/${institutionId}`),
 
-  getProjectsDescriptive: (institutionId: string) =>
-    get(`/api/analytics/descriptive/projects/${institutionId}`),
+  getProjectsDescriptive: (institutionId: string) => get(`/api/analytics/descriptive/projects/${institutionId}`),
 
   // ----------------------------------------------------------------
   // Analytics — diagnostic
@@ -178,8 +176,7 @@ export const apiClient = {
   getClusterSeasonalDiagnostic: (entityType: string, institutionId: string) =>
     get(`/api/analytics/diagnostic/cluster-seasonal/${entityType}/${institutionId}`),
 
-  getProjectRiskDiagnostic: (institutionId: string) =>
-    get(`/api/analytics/diagnostic/project-risk/${institutionId}`),
+  getProjectRiskDiagnostic: (institutionId: string) => get(`/api/analytics/diagnostic/project-risk/${institutionId}`),
 
   // ----------------------------------------------------------------
   // Analytics — predictive
@@ -192,16 +189,14 @@ export const apiClient = {
   getPastoralForecast: (institutionId: string, periods = 6) =>
     get(`/api/analytics/predictive/pastoral-forecast/${institutionId}`, { periods: String(periods) }),
 
-  getClusterForecast: () =>
-    get('/api/analytics/predictive/cluster-forecast'),
+  getClusterForecast: () => get('/api/analytics/predictive/cluster-forecast'),
 
   getSeasonalForecast: (entityType: string, institutionId: string, periods = 6) =>
     get(`/api/analytics/predictive/seasonal-forecast/${entityType}/${institutionId}`, {
       periods: String(periods),
     }),
 
-  getProjectForecast: (institutionId: string) =>
-    get(`/api/analytics/predictive/project-forecast/${institutionId}`),
+  getProjectForecast: (institutionId: string) => get(`/api/analytics/predictive/project-forecast/${institutionId}`),
 
   // ----------------------------------------------------------------
   // Analytics — prescriptive
@@ -212,20 +207,17 @@ export const apiClient = {
   runInstitutionSimulation: (entityType: string, institutionId: string, body: object) =>
     post(`/api/analytics/prescriptive/institution-simulation/${entityType}/${institutionId}`, body),
 
-  getPastoralAction: (institutionId: string) =>
-    get(`/api/analytics/prescriptive/pastoral-action/${institutionId}`),
+  getPastoralAction: (institutionId: string) => get(`/api/analytics/prescriptive/pastoral-action/${institutionId}`),
 
   runPastoralSimulation: (institutionId: string, body: object) =>
     post(`/api/analytics/prescriptive/pastoral-simulation/${institutionId}`, body),
 
-  getParishUpgrade: () =>
-    get('/api/analytics/prescriptive/parish-upgrade'),
+  getParishUpgrade: () => get('/api/analytics/prescriptive/parish-upgrade'),
 
   getSeasonalStrategy: (entityType: string, institutionId: string) =>
     get(`/api/analytics/prescriptive/seasonal-strategy/${entityType}/${institutionId}`),
 
-  getProjectPortfolio: (institutionId: string) =>
-    get(`/api/analytics/prescriptive/project-portfolio/${institutionId}`),
+  getProjectPortfolio: (institutionId: string) => get(`/api/analytics/prescriptive/project-portfolio/${institutionId}`),
 
   // ----------------------------------------------------------------
   // Projects
@@ -306,7 +298,9 @@ export const apiClient = {
   // ----------------------------------------------------------------
   // Submissions — real file upload to Supabase Storage + DB record
   // ----------------------------------------------------------------
-  async submitReport(formData: FormData): Promise<{ submissionId: string; filePath: string; validationStatus: string }> {
+  async submitReport(
+    formData: FormData,
+  ): Promise<{ submissionId: string; filePath: string; validationStatus: string }> {
     const res = await fetch('/api/submissions', {
       method: 'POST',
       credentials: 'include',

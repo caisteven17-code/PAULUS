@@ -47,6 +47,7 @@ DEFAULT_OUT_DIR = Path(__file__).resolve().parents[4] / "weather_output"
 
 # ── Condition derivation ──────────────────────────────────────────────────────
 
+
 def _condition(daily_avg_mm: Optional[float]) -> Optional[str]:
     if daily_avg_mm is None:
         return None
@@ -60,6 +61,7 @@ def _condition(daily_avg_mm: Optional[float]) -> Optional[str]:
 
 
 # ── Typhoon signal derivation ─────────────────────────────────────────────────
+
 
 def _typhoon_signal_from_kt(
     max_wind_kt: Optional[float],
@@ -84,7 +86,7 @@ def _typhoon_signal_from_kt(
         return 3  # severe tropical storm
     if max_wind_kt < 100:
         return 4  # typhoon
-    return 5        # super typhoon
+    return 5  # super typhoon
 
 
 def _typhoon_signal_from_monthly(
@@ -104,6 +106,7 @@ def _typhoon_signal_from_monthly(
 
 # ── Batch upsert helper ───────────────────────────────────────────────────────
 
+
 def _upsert_batch(rows: list[dict]) -> int:
     """
     Upsert rows into reference.weather_observations.
@@ -116,7 +119,7 @@ def _upsert_batch(rows: list[dict]) -> int:
     from app.services.supabase_client import get_table
 
     # Pre-fetch all existing records for these (date, location) pairs in one call
-    dates     = list({r["date"] for r in rows})
+    dates = list({r["date"] for r in rows})
     locations = list({r["location"] for r in rows})
 
     existing_resp = (
@@ -127,10 +130,7 @@ def _upsert_batch(rows: list[dict]) -> int:
         .is_("institution_id", "null")
         .execute()
     )
-    existing_map: dict[tuple[str, str], str] = {
-        (r["date"], r["location"]): r["id"]
-        for r in (existing_resp.data or [])
-    }
+    existing_map: dict[tuple[str, str], str] = {(r["date"], r["location"]): r["id"] for r in (existing_resp.data or [])}
 
     inserts: list[dict] = []
     updates: list[tuple[str, dict]] = []
@@ -157,6 +157,7 @@ def _upsert_batch(rows: list[dict]) -> int:
 
 # ── Monthly loader ────────────────────────────────────────────────────────────
 
+
 def load_from_file(path: Path) -> int:
     """
     Load monthly-aggregated champion data from laguna_weather_final.json.
@@ -169,16 +170,16 @@ def load_from_file(path: Path) -> int:
 
     rows: list[dict] = []
     for muni in data.get("municipalities", []):
-        name   = muni["municipality"]
+        name = muni["municipality"]
         source = muni["champion_source"]
 
         for m in muni.get("monthly_data", []):
-            year        = int(m["year"])
-            month       = int(m["month"])
-            date_str    = f"{year}-{month:02d}-01"
+            year = int(m["year"])
+            month = int(m["month"])
+            date_str = f"{year}-{month:02d}-01"
             rainfall_mm = m.get("rainfall_mm")
-            days        = calendar.monthrange(year, month)[1]
-            daily_avg   = (rainfall_mm / days) if rainfall_mm is not None else None
+            days = calendar.monthrange(year, month)[1]
+            daily_avg = (rainfall_mm / days) if rainfall_mm is not None else None
 
             signal = _typhoon_signal_from_monthly(
                 m.get("major_events_count", 0),
@@ -186,18 +187,20 @@ def load_from_file(path: Path) -> int:
                 m.get("typhoon_days_count", 0),
             )
 
-            rows.append({
-                "date":             date_str,
-                "institution_id":   None,
-                "location":         name,
-                "condition":        _condition(daily_avg),
-                "temp_avg_c":       m.get("temp_avg_c"),
-                "rainfall_mm":      rainfall_mm,
-                "typhoon_signal":   signal,
-                "is_extreme_event": bool(m.get("has_event", False)),
-                "source":           source,
-                "recorded_at":      now_iso,
-            })
+            rows.append(
+                {
+                    "date": date_str,
+                    "institution_id": None,
+                    "location": name,
+                    "condition": _condition(daily_avg),
+                    "temp_avg_c": m.get("temp_avg_c"),
+                    "rainfall_mm": rainfall_mm,
+                    "typhoon_signal": signal,
+                    "is_extreme_event": bool(m.get("has_event", False)),
+                    "source": source,
+                    "recorded_at": now_iso,
+                }
+            )
 
     logger.info("Processing %d monthly weather records...", len(rows))
     count = _upsert_batch(rows)
@@ -206,6 +209,7 @@ def load_from_file(path: Path) -> int:
 
 
 # ── Daily incremental loader ──────────────────────────────────────────────────
+
 
 def load_incremental(path: Path) -> int:
     """
@@ -219,7 +223,7 @@ def load_incremental(path: Path) -> int:
 
     rows: list[dict] = []
     for muni in data.get("municipalities", []):
-        name   = muni["municipality"]
+        name = muni["municipality"]
         source = muni.get("source_used") or muni.get("champion_source", "unknown")
 
         for r in muni.get("daily_records", []):
@@ -229,18 +233,20 @@ def load_incremental(path: Path) -> int:
                 r.get("intensity_class"),
             )
 
-            rows.append({
-                "date":             r["date"],
-                "institution_id":   None,
-                "location":         name,
-                "condition":        _condition(rainfall_mm),
-                "temp_avg_c":       r.get("temp_avg_c"),
-                "rainfall_mm":      rainfall_mm,
-                "typhoon_signal":   signal,
-                "is_extreme_event": bool(r.get("typhoon_day", False)),
-                "source":           source,
-                "recorded_at":      now_iso,
-            })
+            rows.append(
+                {
+                    "date": r["date"],
+                    "institution_id": None,
+                    "location": name,
+                    "condition": _condition(rainfall_mm),
+                    "temp_avg_c": r.get("temp_avg_c"),
+                    "rainfall_mm": rainfall_mm,
+                    "typhoon_signal": signal,
+                    "is_extreme_event": bool(r.get("typhoon_day", False)),
+                    "source": source,
+                    "recorded_at": now_iso,
+                }
+            )
 
     logger.info("Processing %d incremental daily records...", len(rows))
     count = _upsert_batch(rows)
@@ -255,20 +261,20 @@ if __name__ == "__main__":
 
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
 
-    parser = argparse.ArgumentParser(
-        description="Load Laguna weather data into reference.weather_observations"
+    parser = argparse.ArgumentParser(description="Load Laguna weather data into reference.weather_observations")
+    parser.add_argument(
+        "--file",
+        type=str,
+        default=None,
+        help="Path to laguna_weather_final.json (monthly); default: weather_output/laguna_weather_final.json",
     )
     parser.add_argument(
-        "--file", type=str, default=None,
-        help="Path to laguna_weather_final.json (monthly); default: weather_output/laguna_weather_final.json"
+        "--incremental",
+        action="store_true",
+        help="Load from laguna_weather_incremental.json (daily) instead of monthly",
     )
     parser.add_argument(
-        "--incremental", action="store_true",
-        help="Load from laguna_weather_incremental.json (daily) instead of monthly"
-    )
-    parser.add_argument(
-        "--out", type=str, default=str(DEFAULT_OUT_DIR),
-        help="Directory containing the JSON output files"
+        "--out", type=str, default=str(DEFAULT_OUT_DIR), help="Directory containing the JSON output files"
     )
     args = parser.parse_args()
 
@@ -276,9 +282,9 @@ if __name__ == "__main__":
 
     if args.incremental:
         target = Path(args.file) if args.file else out_dir / "laguna_weather_incremental.json"
-        count  = load_incremental(target)
+        count = load_incremental(target)
     else:
         target = Path(args.file) if args.file else out_dir / "laguna_weather_final.json"
-        count  = load_from_file(target)
+        count = load_from_file(target)
 
     print(f"Loaded {count} records into reference.weather_observations")

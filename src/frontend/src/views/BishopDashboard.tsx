@@ -283,7 +283,6 @@ const vocationPipelineData = [
   { stage: 'Accepted', count: 20, fill: '#1a472a', dropOff: '-56%' },
 ];
 
-
 const AdvancedForecastChart = ({
   data,
   actualKey,
@@ -452,15 +451,48 @@ const AdvancedForecastChart = ({
           silent: true,
           data: [
             [
-              { xAxis: 'Jan', itemStyle: { color: '#F0F9FF', opacity: 0.4 }, label: { show: true, position: 'insideTopLeft', value: 'PAST (Train)', color: '#0EA5E9', fontSize: 9, fontWeight: 700 } },
+              {
+                xAxis: 'Jan',
+                itemStyle: { color: '#F0F9FF', opacity: 0.4 },
+                label: {
+                  show: true,
+                  position: 'insideTopLeft',
+                  value: 'PAST (Train)',
+                  color: '#0EA5E9',
+                  fontSize: 9,
+                  fontWeight: 700,
+                },
+              },
               { xAxis: pastEnd },
             ],
             [
-              { xAxis: pastEnd, itemStyle: { color: '#FFF7ED', opacity: 0.4 }, label: { show: true, position: 'insideTopLeft', value: 'PRESENT (Holdout)', color: '#F97316', fontSize: 9, fontWeight: 700 } },
+              {
+                xAxis: pastEnd,
+                itemStyle: { color: '#FFF7ED', opacity: 0.4 },
+                label: {
+                  show: true,
+                  position: 'insideTopLeft',
+                  value: 'PRESENT (Holdout)',
+                  color: '#F97316',
+                  fontSize: 9,
+                  fontWeight: 700,
+                },
+              },
               { xAxis: presentEnd },
             ],
             [
-              { xAxis: presentEnd, itemStyle: { color: '#F0FDF4', opacity: 0.4 }, label: { show: true, position: 'insideTopLeft', value: 'FUTURE (Forecast)', color: '#22C55E', fontSize: 9, fontWeight: 700 } },
+              {
+                xAxis: presentEnd,
+                itemStyle: { color: '#F0FDF4', opacity: 0.4 },
+                label: {
+                  show: true,
+                  position: 'insideTopLeft',
+                  value: 'FUTURE (Forecast)',
+                  color: '#22C55E',
+                  fontSize: 9,
+                  fontWeight: 700,
+                },
+              },
               { xAxis: futureEnd },
             ],
           ],
@@ -2444,15 +2476,27 @@ export function BishopDashboard({
                             <ReactECharts
                               option={{
                                 color: ['#6366f1', '#8b5cf6', '#06b6d4', '#10b981', '#f59e0b', '#ef4444'],
-                                tooltip: { trigger: 'axis', extraCssText: 'border-radius:12px;border:none;box-shadow:0 4px 20px rgba(0,0,0,0.08)' },
+                                tooltip: {
+                                  trigger: 'axis',
+                                  extraCssText: 'border-radius:12px;border:none;box-shadow:0 4px 20px rgba(0,0,0,0.08)',
+                                },
                                 grid: { top: 20, right: 30, left: 100, bottom: 20 },
                                 xAxis: { type: 'value', axisLabel: { color: '#6B7280', fontSize: 12 } },
-                                yAxis: { type: 'category', data: seminaryCohortData.map((d) => d.stage), axisLabel: { color: '#6B7280', fontSize: 12 } },
-                                series: [{
-                                  type: 'bar',
-                                  data: seminaryCohortData.map((d) => ({ value: d.count, itemStyle: { color: d.color, borderRadius: [0, 6, 6, 0] } })),
-                                  barWidth: 40,
-                                }],
+                                yAxis: {
+                                  type: 'category',
+                                  data: seminaryCohortData.map((d) => d.stage),
+                                  axisLabel: { color: '#6B7280', fontSize: 12 },
+                                },
+                                series: [
+                                  {
+                                    type: 'bar',
+                                    data: seminaryCohortData.map((d) => ({
+                                      value: d.count,
+                                      itemStyle: { color: d.color, borderRadius: [0, 6, 6, 0] },
+                                    })),
+                                    barWidth: 40,
+                                  },
+                                ],
                               }}
                               style={{ height: '100%', width: '100%' }}
                             />
@@ -2475,15 +2519,25 @@ export function BishopDashboard({
                             <ReactECharts
                               option={{
                                 color: SEMINARY_COST_COLORS,
-                                tooltip: { trigger: 'item', formatter: '{b}: {c} ({d}%)', extraCssText: 'border-radius:12px;border:none;box-shadow:0 4px 20px rgba(0,0,0,0.08)' },
-                                series: [{
-                                  type: 'pie',
-                                  radius: ['40%', '60%'],
-                                  center: ['50%', '50%'],
-                                  padAngle: 5,
-                                  data: seminaryOriginData.map((d, i) => ({ name: d.name, value: d.count, itemStyle: { color: SEMINARY_COST_COLORS[i % SEMINARY_COST_COLORS.length] } })),
-                                  label: { show: false },
-                                }],
+                                tooltip: {
+                                  trigger: 'item',
+                                  formatter: '{b}: {c} ({d}%)',
+                                  extraCssText: 'border-radius:12px;border:none;box-shadow:0 4px 20px rgba(0,0,0,0.08)',
+                                },
+                                series: [
+                                  {
+                                    type: 'pie',
+                                    radius: ['40%', '60%'],
+                                    center: ['50%', '50%'],
+                                    padAngle: 5,
+                                    data: seminaryOriginData.map((d, i) => ({
+                                      name: d.name,
+                                      value: d.count,
+                                      itemStyle: { color: SEMINARY_COST_COLORS[i % SEMINARY_COST_COLORS.length] },
+                                    })),
+                                    label: { show: false },
+                                  },
+                                ],
                               }}
                               style={{ height: '100%', width: '100%' }}
                             />
@@ -2522,11 +2576,31 @@ export function BishopDashboard({
                             <ReactECharts
                               option={{
                                 color: ['#6366f1', '#8b5cf6', '#06b6d4', '#10b981', '#f59e0b', '#ef4444'],
-                                tooltip: { trigger: 'axis', extraCssText: 'border-radius:12px;border:none;box-shadow:0 4px 20px rgba(0,0,0,0.08)' },
+                                tooltip: {
+                                  trigger: 'axis',
+                                  extraCssText: 'border-radius:12px;border:none;box-shadow:0 4px 20px rgba(0,0,0,0.08)',
+                                },
                                 grid: { top: 20, right: 30, left: 45, bottom: 30 },
-                                xAxis: { type: 'category', data: seminaryAgeData.map((d) => d.age), axisLabel: { color: '#6B7280', fontSize: 12 } },
-                                yAxis: { type: 'value', axisLabel: { color: '#6B7280', fontSize: 12 }, splitLine: { lineStyle: { color: '#E5E7EB', type: 'dashed' } } },
-                                series: [{ type: 'bar', data: seminaryAgeData.map((d) => ({ value: d.count, itemStyle: { color: '#D4AF37', borderRadius: [6, 6, 0, 0] } })), barMaxWidth: 50 }],
+                                xAxis: {
+                                  type: 'category',
+                                  data: seminaryAgeData.map((d) => d.age),
+                                  axisLabel: { color: '#6B7280', fontSize: 12 },
+                                },
+                                yAxis: {
+                                  type: 'value',
+                                  axisLabel: { color: '#6B7280', fontSize: 12 },
+                                  splitLine: { lineStyle: { color: '#E5E7EB', type: 'dashed' } },
+                                },
+                                series: [
+                                  {
+                                    type: 'bar',
+                                    data: seminaryAgeData.map((d) => ({
+                                      value: d.count,
+                                      itemStyle: { color: '#D4AF37', borderRadius: [6, 6, 0, 0] },
+                                    })),
+                                    barMaxWidth: 50,
+                                  },
+                                ],
                               }}
                               style={{ height: '100%', width: '100%' }}
                             />
@@ -2554,15 +2628,47 @@ export function BishopDashboard({
                             <ReactECharts
                               option={{
                                 color: ['#6366f1', '#8b5cf6', '#06b6d4', '#10b981', '#f59e0b', '#ef4444'],
-                                tooltip: { trigger: 'axis', extraCssText: 'border-radius:12px;border:none;box-shadow:0 4px 20px rgba(0,0,0,0.08)' },
+                                tooltip: {
+                                  trigger: 'axis',
+                                  extraCssText: 'border-radius:12px;border:none;box-shadow:0 4px 20px rgba(0,0,0,0.08)',
+                                },
                                 legend: { top: 0, data: ['Propaedeutic', 'Philosophy', 'Theology'] },
                                 grid: { top: 40, right: 30, left: 45, bottom: 30 },
-                                xAxis: { type: 'category', data: formationProgressData.map((d) => d.year), axisLabel: { color: '#6B7280', fontSize: 12 } },
-                                yAxis: { type: 'value', axisLabel: { color: '#6B7280', fontSize: 12 }, splitLine: { lineStyle: { color: '#E5E7EB', type: 'dashed' } } },
+                                xAxis: {
+                                  type: 'category',
+                                  data: formationProgressData.map((d) => d.year),
+                                  axisLabel: { color: '#6B7280', fontSize: 12 },
+                                },
+                                yAxis: {
+                                  type: 'value',
+                                  axisLabel: { color: '#6B7280', fontSize: 12 },
+                                  splitLine: { lineStyle: { color: '#E5E7EB', type: 'dashed' } },
+                                },
                                 series: [
-                                  { name: 'Propaedeutic', type: 'line', data: formationProgressData.map((d) => d.propaedeutic), lineStyle: { color: '#1a472a', width: 2 }, itemStyle: { color: '#1a472a' }, symbolSize: 8 },
-                                  { name: 'Philosophy', type: 'line', data: formationProgressData.map((d) => d.philosophy), lineStyle: { color: '#D4AF37', width: 2 }, itemStyle: { color: '#D4AF37' }, symbolSize: 8 },
-                                  { name: 'Theology', type: 'line', data: formationProgressData.map((d) => d.theology), lineStyle: { color: '#06b6d4', width: 2 }, itemStyle: { color: '#06b6d4' }, symbolSize: 8 },
+                                  {
+                                    name: 'Propaedeutic',
+                                    type: 'line',
+                                    data: formationProgressData.map((d) => d.propaedeutic),
+                                    lineStyle: { color: '#1a472a', width: 2 },
+                                    itemStyle: { color: '#1a472a' },
+                                    symbolSize: 8,
+                                  },
+                                  {
+                                    name: 'Philosophy',
+                                    type: 'line',
+                                    data: formationProgressData.map((d) => d.philosophy),
+                                    lineStyle: { color: '#D4AF37', width: 2 },
+                                    itemStyle: { color: '#D4AF37' },
+                                    symbolSize: 8,
+                                  },
+                                  {
+                                    name: 'Theology',
+                                    type: 'line',
+                                    data: formationProgressData.map((d) => d.theology),
+                                    lineStyle: { color: '#06b6d4', width: 2 },
+                                    itemStyle: { color: '#06b6d4' },
+                                    symbolSize: 8,
+                                  },
                                 ],
                               }}
                               style={{ height: '100%', width: '100%' }}
@@ -2616,11 +2722,31 @@ export function BishopDashboard({
                             <ReactECharts
                               option={{
                                 color: ['#6366f1', '#8b5cf6', '#06b6d4', '#10b981', '#f59e0b', '#ef4444'],
-                                tooltip: { trigger: 'axis', formatter: (params: any[]) => `${params[0].axisValue}: ${params[0].value}%`, extraCssText: 'border-radius:12px;border:none;box-shadow:0 4px 20px rgba(0,0,0,0.08)' },
+                                tooltip: {
+                                  trigger: 'axis',
+                                  formatter: (params: any[]) => `${params[0].axisValue}: ${params[0].value}%`,
+                                  extraCssText: 'border-radius:12px;border:none;box-shadow:0 4px 20px rgba(0,0,0,0.08)',
+                                },
                                 grid: { top: 20, right: 30, left: 55, bottom: 30 },
-                                xAxis: { type: 'category', data: seminaryCostData.map((d) => d.name), axisLabel: { color: '#6B7280', fontSize: 12 } },
-                                yAxis: { type: 'value', axisLabel: { color: '#6B7280', fontSize: 12, formatter: (v: number) => `${v}%` }, splitLine: { lineStyle: { color: '#E5E7EB', type: 'dashed' } } },
-                                series: [{ type: 'bar', data: seminaryCostData.map((d) => ({ value: d.value, itemStyle: { color: '#1a472a', borderRadius: [6, 6, 0, 0] } })) }],
+                                xAxis: {
+                                  type: 'category',
+                                  data: seminaryCostData.map((d) => d.name),
+                                  axisLabel: { color: '#6B7280', fontSize: 12 },
+                                },
+                                yAxis: {
+                                  type: 'value',
+                                  axisLabel: { color: '#6B7280', fontSize: 12, formatter: (v: number) => `${v}%` },
+                                  splitLine: { lineStyle: { color: '#E5E7EB', type: 'dashed' } },
+                                },
+                                series: [
+                                  {
+                                    type: 'bar',
+                                    data: seminaryCostData.map((d) => ({
+                                      value: d.value,
+                                      itemStyle: { color: '#1a472a', borderRadius: [6, 6, 0, 0] },
+                                    })),
+                                  },
+                                ],
                               }}
                               style={{ height: '100%', width: '100%' }}
                             />
@@ -2661,23 +2787,48 @@ export function BishopDashboard({
                             <ReactECharts
                               option={{
                                 color: ['#6366f1', '#8b5cf6', '#06b6d4', '#10b981', '#f59e0b', '#ef4444'],
-                                tooltip: { trigger: 'axis', extraCssText: 'border-radius:12px;border:none;box-shadow:0 4px 20px rgba(0,0,0,0.08)' },
+                                tooltip: {
+                                  trigger: 'axis',
+                                  extraCssText: 'border-radius:12px;border:none;box-shadow:0 4px 20px rgba(0,0,0,0.08)',
+                                },
                                 grid: { top: 20, right: 30, left: 45, bottom: 30 },
-                                xAxis: { type: 'category', data: seminaryEnrollmentData.map((d) => d.name), axisLabel: { color: '#6B7280', fontSize: 12 } },
-                                yAxis: { type: 'value', axisLabel: { color: '#6B7280', fontSize: 12 }, splitLine: { lineStyle: { color: '#E5E7EB', type: 'dashed' } } },
+                                xAxis: {
+                                  type: 'category',
+                                  data: seminaryEnrollmentData.map((d) => d.name),
+                                  axisLabel: { color: '#6B7280', fontSize: 12 },
+                                },
+                                yAxis: {
+                                  type: 'value',
+                                  axisLabel: { color: '#6B7280', fontSize: 12 },
+                                  splitLine: { lineStyle: { color: '#E5E7EB', type: 'dashed' } },
+                                },
                                 series: [
-                                  ...(staffRatioFilter === 'all' || staffRatioFilter === 'seminarians' ? [{
-                                    name: 'Seminarians',
-                                    type: 'bar',
-                                    data: seminaryEnrollmentData.map((d) => ({ value: d.enrollment, itemStyle: { color: '#D4AF37', borderRadius: [6, 6, 0, 0] } })),
-                                    barWidth: staffRatioFilter === 'all' ? 25 : 50,
-                                  }] : []),
-                                  ...(staffRatioFilter === 'all' || staffRatioFilter === 'staff' ? [{
-                                    name: 'Staff/Faculty',
-                                    type: 'bar',
-                                    data: seminaryEnrollmentData.map((d) => ({ value: d.staff, itemStyle: { color: '#1a472a', borderRadius: [6, 6, 0, 0] } })),
-                                    barWidth: staffRatioFilter === 'all' ? 25 : 50,
-                                  }] : []),
+                                  ...(staffRatioFilter === 'all' || staffRatioFilter === 'seminarians'
+                                    ? [
+                                        {
+                                          name: 'Seminarians',
+                                          type: 'bar',
+                                          data: seminaryEnrollmentData.map((d) => ({
+                                            value: d.enrollment,
+                                            itemStyle: { color: '#D4AF37', borderRadius: [6, 6, 0, 0] },
+                                          })),
+                                          barWidth: staffRatioFilter === 'all' ? 25 : 50,
+                                        },
+                                      ]
+                                    : []),
+                                  ...(staffRatioFilter === 'all' || staffRatioFilter === 'staff'
+                                    ? [
+                                        {
+                                          name: 'Staff/Faculty',
+                                          type: 'bar',
+                                          data: seminaryEnrollmentData.map((d) => ({
+                                            value: d.staff,
+                                            itemStyle: { color: '#1a472a', borderRadius: [6, 6, 0, 0] },
+                                          })),
+                                          barWidth: staffRatioFilter === 'all' ? 25 : 50,
+                                        },
+                                      ]
+                                    : []),
                                 ],
                               }}
                               style={{ height: '100%', width: '100%' }}
@@ -2766,15 +2917,25 @@ export function BishopDashboard({
                                 tooltip: {
                                   trigger: 'axis',
                                   formatter: (params: any[]) => {
-                                    const lines = params.map((p) => {
-                                      const label = p.seriesName === 'collections'
-                                        ? (selectedBarVicariate ? (entityType === 'Diocesan Schools' ? 'School Collections' : 'Parish Collections') : (entityType === 'Diocesan Schools' ? 'Cluster Collections' : 'Vicariate Collections'))
-                                        : 'Disbursements';
-                                      return `${p.marker} ${label}: ${formatCurrency(p.value)}`;
-                                    }).join('<br/>');
+                                    const lines = params
+                                      .map((p) => {
+                                        const label =
+                                          p.seriesName === 'collections'
+                                            ? selectedBarVicariate
+                                              ? entityType === 'Diocesan Schools'
+                                                ? 'School Collections'
+                                                : 'Parish Collections'
+                                              : entityType === 'Diocesan Schools'
+                                                ? 'Cluster Collections'
+                                                : 'Vicariate Collections'
+                                            : 'Disbursements';
+                                        return `${p.marker} ${label}: ${formatCurrency(p.value)}`;
+                                      })
+                                      .join('<br/>');
                                     return `${params[0].axisValue}<br/>${lines}`;
                                   },
-                                  extraCssText: 'border-radius:16px;border:none;box-shadow:0 10px 25px -5px rgba(0,0,0,0.1);padding:12px 16px',
+                                  extraCssText:
+                                    'border-radius:16px;border:none;box-shadow:0 10px 25px -5px rgba(0,0,0,0.1);padding:12px 16px',
                                 },
                                 grid: { top: 20, right: 30, left: 60, bottom: 80 },
                                 xAxis: {
@@ -2789,25 +2950,61 @@ export function BishopDashboard({
                                   nameLocation: 'middle',
                                   nameGap: 45,
                                   nameRotate: 90,
-                                  axisLabel: { color: '#9CA3AF', fontSize: 11, formatter: (v: number) => v === 0 ? '0' : `${Math.round(v / 1000000)}M` },
+                                  axisLabel: {
+                                    color: '#9CA3AF',
+                                    fontSize: 11,
+                                    formatter: (v: number) => (v === 0 ? '0' : `${Math.round(v / 1000000)}M`),
+                                  },
                                   axisLine: { lineStyle: { color: '#E5E7EB' } },
                                   splitLine: { lineStyle: { color: '#F3F4F6' } },
                                 },
                                 series: [
-                                  ...(collectionsDisbursementsFilter === 'all' || collectionsDisbursementsFilter === 'collections' ? [{
-                                    name: 'collections',
-                                    type: 'bar',
-                                    data: barChartData.map((d) => ({ value: d.collections, itemStyle: { color: '#D4AF37', borderRadius: [8, 8, 0, 0] } })),
-                                    barMaxWidth: 40,
-                                    label: { show: true, position: 'top', formatter: (params: any) => params.value > 0 ? `${(params.value / 1000000).toFixed(1)}M` : '', color: '#9CA3AF', fontSize: 9, fontWeight: 700 },
-                                  }] : []),
-                                  ...(collectionsDisbursementsFilter === 'all' || collectionsDisbursementsFilter === 'disbursements' ? [{
-                                    name: 'disbursements',
-                                    type: 'bar',
-                                    data: barChartData.map((d) => ({ value: d.disbursements, itemStyle: { color: '#1a472a', borderRadius: [8, 8, 0, 0] } })),
-                                    barMaxWidth: 40,
-                                    label: { show: true, position: 'top', formatter: (params: any) => params.value > 0 ? `${(params.value / 1000000).toFixed(1)}M` : '', color: '#9CA3AF', fontSize: 9, fontWeight: 700 },
-                                  }] : []),
+                                  ...(collectionsDisbursementsFilter === 'all' ||
+                                  collectionsDisbursementsFilter === 'collections'
+                                    ? [
+                                        {
+                                          name: 'collections',
+                                          type: 'bar',
+                                          data: barChartData.map((d) => ({
+                                            value: d.collections,
+                                            itemStyle: { color: '#D4AF37', borderRadius: [8, 8, 0, 0] },
+                                          })),
+                                          barMaxWidth: 40,
+                                          label: {
+                                            show: true,
+                                            position: 'top',
+                                            formatter: (params: any) =>
+                                              params.value > 0 ? `${(params.value / 1000000).toFixed(1)}M` : '',
+                                            color: '#9CA3AF',
+                                            fontSize: 9,
+                                            fontWeight: 700,
+                                          },
+                                        },
+                                      ]
+                                    : []),
+                                  ...(collectionsDisbursementsFilter === 'all' ||
+                                  collectionsDisbursementsFilter === 'disbursements'
+                                    ? [
+                                        {
+                                          name: 'disbursements',
+                                          type: 'bar',
+                                          data: barChartData.map((d) => ({
+                                            value: d.disbursements,
+                                            itemStyle: { color: '#1a472a', borderRadius: [8, 8, 0, 0] },
+                                          })),
+                                          barMaxWidth: 40,
+                                          label: {
+                                            show: true,
+                                            position: 'top',
+                                            formatter: (params: any) =>
+                                              params.value > 0 ? `${(params.value / 1000000).toFixed(1)}M` : '',
+                                            color: '#9CA3AF',
+                                            fontSize: 9,
+                                            fontWeight: 700,
+                                          },
+                                        },
+                                      ]
+                                    : []),
                                 ],
                               }}
                               onEvents={{
@@ -2903,14 +3100,66 @@ export function BishopDashboard({
                           <ReactECharts
                             option={{
                               color: ['#6366f1', '#8b5cf6', '#06b6d4', '#10b981', '#f59e0b', '#ef4444'],
-                              tooltip: { trigger: 'axis', formatter: (params: any[]) => `${params[0].axisValue}<br/>${params.map((p) => `${p.marker} ${p.seriesName}: ${formatCurrency(p.value)}`).join('<br/>')}` },
+                              tooltip: {
+                                trigger: 'axis',
+                                formatter: (params: any[]) =>
+                                  `${params[0].axisValue}<br/>${params.map((p) => `${p.marker} ${p.seriesName}: ${formatCurrency(p.value)}`).join('<br/>')}`,
+                              },
                               grid: { top: 20, right: 30, left: 55, bottom: 30 },
-                              xAxis: { type: 'category', data: filteredCollectionsData.map((d) => d.month), axisLabel: { color: '#6B7280', fontSize: 12 } },
-                              yAxis: { type: 'value', axisLabel: { color: '#6B7280', fontSize: 12, formatter: (v: number) => `${v / 1000000}M` }, splitLine: { lineStyle: { color: '#E5E7EB', type: 'dashed' } } },
+                              xAxis: {
+                                type: 'category',
+                                data: filteredCollectionsData.map((d) => d.month),
+                                axisLabel: { color: '#6B7280', fontSize: 12 },
+                              },
+                              yAxis: {
+                                type: 'value',
+                                axisLabel: {
+                                  color: '#6B7280',
+                                  fontSize: 12,
+                                  formatter: (v: number) => `${v / 1000000}M`,
+                                },
+                                splitLine: { lineStyle: { color: '#E5E7EB', type: 'dashed' } },
+                              },
                               series: [
-                                ...(collectionsFilter === 'all' || collectionsFilter === 'collections_mass' ? [{ name: 'Mass Collections', type: 'bar', data: filteredCollectionsData.map((d) => ({ value: d.collections_mass, itemStyle: { color: '#D4AF37', borderRadius: [4, 4, 0, 0] } })), barWidth: collectionsFilter === 'all' ? 20 : 40 }] : []),
-                                ...(collectionsFilter === 'all' || collectionsFilter === 'sacraments_rate' ? [{ name: 'Sacraments', type: 'bar', data: filteredCollectionsData.map((d) => ({ value: d.sacraments_rate, itemStyle: { color: '#1a472a', borderRadius: [4, 4, 0, 0] } })), barWidth: collectionsFilter === 'all' ? 20 : 40 }] : []),
-                                ...(collectionsFilter === 'all' || collectionsFilter === 'collections_other' ? [{ name: 'Other Collections', type: 'bar', data: filteredCollectionsData.map((d) => ({ value: d.collections_other, itemStyle: { color: '#4ade80', borderRadius: [4, 4, 0, 0] } })), barWidth: collectionsFilter === 'all' ? 20 : 40 }] : []),
+                                ...(collectionsFilter === 'all' || collectionsFilter === 'collections_mass'
+                                  ? [
+                                      {
+                                        name: 'Mass Collections',
+                                        type: 'bar',
+                                        data: filteredCollectionsData.map((d) => ({
+                                          value: d.collections_mass,
+                                          itemStyle: { color: '#D4AF37', borderRadius: [4, 4, 0, 0] },
+                                        })),
+                                        barWidth: collectionsFilter === 'all' ? 20 : 40,
+                                      },
+                                    ]
+                                  : []),
+                                ...(collectionsFilter === 'all' || collectionsFilter === 'sacraments_rate'
+                                  ? [
+                                      {
+                                        name: 'Sacraments',
+                                        type: 'bar',
+                                        data: filteredCollectionsData.map((d) => ({
+                                          value: d.sacraments_rate,
+                                          itemStyle: { color: '#1a472a', borderRadius: [4, 4, 0, 0] },
+                                        })),
+                                        barWidth: collectionsFilter === 'all' ? 20 : 40,
+                                      },
+                                    ]
+                                  : []),
+                                ...(collectionsFilter === 'all' || collectionsFilter === 'collections_other'
+                                  ? [
+                                      {
+                                        name: 'Other Collections',
+                                        type: 'bar',
+                                        data: filteredCollectionsData.map((d) => ({
+                                          value: d.collections_other,
+                                          itemStyle: { color: '#4ade80', borderRadius: [4, 4, 0, 0] },
+                                        })),
+                                        barWidth: collectionsFilter === 'all' ? 20 : 40,
+                                      },
+                                    ]
+                                  : []),
                               ],
                             }}
                             style={{ height: '100%', width: '100%' }}
@@ -2994,13 +3243,53 @@ export function BishopDashboard({
                             <ReactECharts
                               option={{
                                 color: ['#6366f1', '#8b5cf6', '#06b6d4', '#10b981', '#f59e0b', '#ef4444'],
-                                tooltip: { trigger: 'axis', formatter: (params: any[]) => `${params[0].axisValue}<br/>${params.map((p) => `${p.marker} ${p.seriesName}: ${formatCurrency(p.value)}`).join('<br/>')}` },
+                                tooltip: {
+                                  trigger: 'axis',
+                                  formatter: (params: any[]) =>
+                                    `${params[0].axisValue}<br/>${params.map((p) => `${p.marker} ${p.seriesName}: ${formatCurrency(p.value)}`).join('<br/>')}`,
+                                },
                                 grid: { top: 20, right: 30, left: 55, bottom: 30 },
-                                xAxis: { type: 'category', data: filteredDisbursementsData.map((d) => d.month), axisLabel: { color: '#6B7280', fontSize: 12 } },
-                                yAxis: { type: 'value', axisLabel: { color: '#6B7280', fontSize: 12, formatter: (v: number) => `${v / 1000000}M` }, splitLine: { lineStyle: { color: '#E5E7EB', type: 'dashed' } } },
+                                xAxis: {
+                                  type: 'category',
+                                  data: filteredDisbursementsData.map((d) => d.month),
+                                  axisLabel: { color: '#6B7280', fontSize: 12 },
+                                },
+                                yAxis: {
+                                  type: 'value',
+                                  axisLabel: {
+                                    color: '#6B7280',
+                                    fontSize: 12,
+                                    formatter: (v: number) => `${v / 1000000}M`,
+                                  },
+                                  splitLine: { lineStyle: { color: '#E5E7EB', type: 'dashed' } },
+                                },
                                 series: [
-                                  ...(disbursementsFilter === 'all' || disbursementsFilter === 'expenses_parish' ? [{ name: 'Parish Expenses', type: 'bar', data: filteredDisbursementsData.map((d) => ({ value: d.expenses_parish, itemStyle: { color: '#1a472a', borderRadius: [4, 4, 0, 0] } })), barMaxWidth: disbursementsFilter === 'all' ? 14 : 30 }] : []),
-                                  ...(disbursementsFilter === 'all' || disbursementsFilter === 'expenses_pastoral' ? [{ name: 'Pastoral Expenses', type: 'bar', data: filteredDisbursementsData.map((d) => ({ value: d.expenses_pastoral, itemStyle: { color: '#D4AF37', borderRadius: [4, 4, 0, 0] } })), barMaxWidth: disbursementsFilter === 'all' ? 14 : 30 }] : []),
+                                  ...(disbursementsFilter === 'all' || disbursementsFilter === 'expenses_parish'
+                                    ? [
+                                        {
+                                          name: 'Parish Expenses',
+                                          type: 'bar',
+                                          data: filteredDisbursementsData.map((d) => ({
+                                            value: d.expenses_parish,
+                                            itemStyle: { color: '#1a472a', borderRadius: [4, 4, 0, 0] },
+                                          })),
+                                          barMaxWidth: disbursementsFilter === 'all' ? 14 : 30,
+                                        },
+                                      ]
+                                    : []),
+                                  ...(disbursementsFilter === 'all' || disbursementsFilter === 'expenses_pastoral'
+                                    ? [
+                                        {
+                                          name: 'Pastoral Expenses',
+                                          type: 'bar',
+                                          data: filteredDisbursementsData.map((d) => ({
+                                            value: d.expenses_pastoral,
+                                            itemStyle: { color: '#D4AF37', borderRadius: [4, 4, 0, 0] },
+                                          })),
+                                          barMaxWidth: disbursementsFilter === 'all' ? 14 : 30,
+                                        },
+                                      ]
+                                    : []),
                                 ],
                               }}
                               style={{ height: '100%', width: '100%' }}
@@ -3047,11 +3336,38 @@ export function BishopDashboard({
                             <ReactECharts
                               option={{
                                 color: ['#6366f1', '#8b5cf6', '#06b6d4', '#10b981', '#f59e0b', '#ef4444'],
-                                tooltip: { trigger: 'axis', formatter: (params: any[]) => `${params[0].axisValue}: ${formatCurrency(params[0].value)}`, extraCssText: 'border-radius:12px;border:none;box-shadow:0 4px 20px rgba(0,0,0,0.08)' },
+                                tooltip: {
+                                  trigger: 'axis',
+                                  formatter: (params: any[]) =>
+                                    `${params[0].axisValue}: ${formatCurrency(params[0].value)}`,
+                                  extraCssText: 'border-radius:12px;border:none;box-shadow:0 4px 20px rgba(0,0,0,0.08)',
+                                },
                                 grid: { top: 20, right: 30, left: 135, bottom: 20 },
-                                xAxis: { type: 'value', axisLabel: { color: '#6B7280', fontSize: 10, formatter: (v: number) => `${v / 1000}k` }, splitLine: { lineStyle: { color: '#E5E7EB', type: 'dashed' } } },
-                                yAxis: { type: 'category', inverse: true, data: topDisbursementCategories.map((d) => d.category), axisLabel: { color: '#6B7280', fontSize: 10 } },
-                                series: [{ type: 'bar', data: topDisbursementCategories.map((d) => ({ value: d.amount, itemStyle: { color: '#1a472a', borderRadius: [0, 6, 6, 0] } })), barMaxWidth: 36 }],
+                                xAxis: {
+                                  type: 'value',
+                                  axisLabel: {
+                                    color: '#6B7280',
+                                    fontSize: 10,
+                                    formatter: (v: number) => `${v / 1000}k`,
+                                  },
+                                  splitLine: { lineStyle: { color: '#E5E7EB', type: 'dashed' } },
+                                },
+                                yAxis: {
+                                  type: 'category',
+                                  inverse: true,
+                                  data: topDisbursementCategories.map((d) => d.category),
+                                  axisLabel: { color: '#6B7280', fontSize: 10 },
+                                },
+                                series: [
+                                  {
+                                    type: 'bar',
+                                    data: topDisbursementCategories.map((d) => ({
+                                      value: d.amount,
+                                      itemStyle: { color: '#1a472a', borderRadius: [0, 6, 6, 0] },
+                                    })),
+                                    barMaxWidth: 36,
+                                  },
+                                ],
                               }}
                               style={{ height: '100%', width: '100%' }}
                             />
@@ -3397,19 +3713,53 @@ export function BishopDashboard({
                           <ReactECharts
                             option={{
                               color: ['#6366f1', '#8b5cf6', '#06b6d4', '#10b981', '#f59e0b', '#ef4444'],
-                              tooltip: { trigger: 'axis', itemStyle: { color: '#D4AF37' }, extraCssText: 'border-radius:12px;border:none;background:#2D2D2D;color:#fff' },
-                              grid: { top: 10, right: 10, left: 50, bottom: 30 },
-                              xAxis: { type: 'category', data: dynamicSeasonalityData.map((d) => d.month), axisLabel: { color: '#9CA3AF', fontSize: 10, fontWeight: 600 }, axisLine: { lineStyle: { color: '#333' } }, axisTick: { show: false } },
-                              yAxis: { type: 'value', axisLabel: { color: '#9CA3AF', fontSize: 10, formatter: (v: number) => v >= 1000000 ? `${(v / 1000000).toFixed(1)}M` : String(v) }, axisLine: { show: false }, axisTick: { show: false }, splitLine: { lineStyle: { color: 'rgba(255,255,255,0.05)' } } },
-                              series: [{
-                                type: 'line',
-                                data: dynamicSeasonalityData.map((d) => d.value),
-                                smooth: true,
-                                lineStyle: { color: '#D4AF37', width: 3 },
+                              tooltip: {
+                                trigger: 'axis',
                                 itemStyle: { color: '#D4AF37' },
-                                areaStyle: { color: { type: 'linear', x: 0, y: 0, x2: 0, y2: 1, colorStops: [{ offset: 0, color: 'rgba(212,175,55,0.3)' }, { offset: 1, color: 'rgba(212,175,55,0)' }] } },
-                                showSymbol: false,
-                              }],
+                                extraCssText: 'border-radius:12px;border:none;background:#2D2D2D;color:#fff',
+                              },
+                              grid: { top: 10, right: 10, left: 50, bottom: 30 },
+                              xAxis: {
+                                type: 'category',
+                                data: dynamicSeasonalityData.map((d) => d.month),
+                                axisLabel: { color: '#9CA3AF', fontSize: 10, fontWeight: 600 },
+                                axisLine: { lineStyle: { color: '#333' } },
+                                axisTick: { show: false },
+                              },
+                              yAxis: {
+                                type: 'value',
+                                axisLabel: {
+                                  color: '#9CA3AF',
+                                  fontSize: 10,
+                                  formatter: (v: number) => (v >= 1000000 ? `${(v / 1000000).toFixed(1)}M` : String(v)),
+                                },
+                                axisLine: { show: false },
+                                axisTick: { show: false },
+                                splitLine: { lineStyle: { color: 'rgba(255,255,255,0.05)' } },
+                              },
+                              series: [
+                                {
+                                  type: 'line',
+                                  data: dynamicSeasonalityData.map((d) => d.value),
+                                  smooth: true,
+                                  lineStyle: { color: '#D4AF37', width: 3 },
+                                  itemStyle: { color: '#D4AF37' },
+                                  areaStyle: {
+                                    color: {
+                                      type: 'linear',
+                                      x: 0,
+                                      y: 0,
+                                      x2: 0,
+                                      y2: 1,
+                                      colorStops: [
+                                        { offset: 0, color: 'rgba(212,175,55,0.3)' },
+                                        { offset: 1, color: 'rgba(212,175,55,0)' },
+                                      ],
+                                    },
+                                  },
+                                  showSymbol: false,
+                                },
+                              ],
                             }}
                             style={{ height: '100%', width: '100%' }}
                           />
@@ -3579,21 +3929,28 @@ export function BishopDashboard({
                                 option={{
                                   tooltip: {
                                     trigger: 'item',
-                                    formatter: (params: any) => `${params.name}: ${params.value} parishes (${Math.round((params.value / total) * 100)}%)`,
+                                    formatter: (params: any) =>
+                                      `${params.name}: ${params.value} parishes (${Math.round((params.value / total) * 100)}%)`,
                                     backgroundColor: '#111',
                                     borderColor: 'rgba(255,255,255,0.1)',
                                     textStyle: { color: '#fff', fontWeight: 700, fontSize: 12 },
                                     extraCssText: 'border-radius:12px',
                                   },
-                                  series: [{
-                                    type: 'pie',
-                                    radius: ['56%', '82%'],
-                                    center: ['50%', '50%'],
-                                    padAngle: 3,
-                                    data: pieData.map((d) => ({ name: d.name, value: d.value, itemStyle: { color: d.color, opacity: 0.9 } })),
-                                    label: { show: false },
-                                    emphasis: { scale: false },
-                                  }],
+                                  series: [
+                                    {
+                                      type: 'pie',
+                                      radius: ['56%', '82%'],
+                                      center: ['50%', '50%'],
+                                      padAngle: 3,
+                                      data: pieData.map((d) => ({
+                                        name: d.name,
+                                        value: d.value,
+                                        itemStyle: { color: d.color, opacity: 0.9 },
+                                      })),
+                                      label: { show: false },
+                                      emphasis: { scale: false },
+                                    },
+                                  ],
                                 }}
                                 style={{ width: '100%', height: '100%' }}
                               />
@@ -3767,15 +4124,42 @@ export function BishopDashboard({
                           <ReactECharts
                             option={{
                               color: ['#6366f1', '#8b5cf6', '#06b6d4', '#10b981', '#f59e0b', '#ef4444'],
-                              tooltip: { trigger: 'axis', formatter: (params: any[]) => `${params[0].axisValue}: ${formatCurrency(params[0].value)}`, extraCssText: 'border-radius:16px;border:none;box-shadow:0 10px 25px rgba(0,0,0,0.1);font-size:12px' },
+                              tooltip: {
+                                trigger: 'axis',
+                                formatter: (params: any[]) =>
+                                  `${params[0].axisValue}: ${formatCurrency(params[0].value)}`,
+                                extraCssText:
+                                  'border-radius:16px;border:none;box-shadow:0 10px 25px rgba(0,0,0,0.1);font-size:12px',
+                              },
                               grid: { top: 20, right: 30, left: 60, bottom: 30 },
-                              xAxis: { type: 'category', data: cmpResult.barData.map((d) => d.period), axisLine: { show: false }, axisTick: { show: false }, axisLabel: { color: '#6B7280', fontSize: 11, fontWeight: 700 } },
-                              yAxis: { type: 'value', axisLine: { show: false }, axisTick: { show: false }, axisLabel: { color: '#9CA3AF', fontSize: 10, formatter: (v: number) => `${(v / 1_000_000).toFixed(1)}M` }, splitLine: { lineStyle: { color: '#F3F4F6' } } },
-                              series: [{
-                                type: 'bar',
-                                data: cmpResult.barData.map((d, i) => ({ value: d.value, itemStyle: { color: i === 0 ? '#1a472a' : '#D4AF37', borderRadius: [10, 10, 0, 0] } })),
-                                barMaxWidth: 90,
-                              }],
+                              xAxis: {
+                                type: 'category',
+                                data: cmpResult.barData.map((d) => d.period),
+                                axisLine: { show: false },
+                                axisTick: { show: false },
+                                axisLabel: { color: '#6B7280', fontSize: 11, fontWeight: 700 },
+                              },
+                              yAxis: {
+                                type: 'value',
+                                axisLine: { show: false },
+                                axisTick: { show: false },
+                                axisLabel: {
+                                  color: '#9CA3AF',
+                                  fontSize: 10,
+                                  formatter: (v: number) => `${(v / 1_000_000).toFixed(1)}M`,
+                                },
+                                splitLine: { lineStyle: { color: '#F3F4F6' } },
+                              },
+                              series: [
+                                {
+                                  type: 'bar',
+                                  data: cmpResult.barData.map((d, i) => ({
+                                    value: d.value,
+                                    itemStyle: { color: i === 0 ? '#1a472a' : '#D4AF37', borderRadius: [10, 10, 0, 0] },
+                                  })),
+                                  barMaxWidth: 90,
+                                },
+                              ],
                             }}
                             style={{ height: '100%', width: '100%' }}
                           />
@@ -3979,20 +4363,45 @@ export function BishopDashboard({
                             <ReactECharts
                               option={{
                                 color: ['#6366f1', '#8b5cf6', '#06b6d4', '#10b981', '#f59e0b', '#ef4444'],
-                                tooltip: { trigger: 'axis', extraCssText: 'border-radius:12px;border:none;box-shadow:0 4px 20px rgba(0,0,0,0.08)' },
+                                tooltip: {
+                                  trigger: 'axis',
+                                  extraCssText: 'border-radius:12px;border:none;box-shadow:0 4px 20px rgba(0,0,0,0.08)',
+                                },
                                 grid: { top: 20, right: 30, left: 45, bottom: 30 },
-                                xAxis: { type: 'category', data: ordinationForecastData.map((d) => d.year), axisLabel: { color: '#6B7280', fontSize: 12 } },
-                                yAxis: { type: 'value', axisLabel: { color: '#6B7280', fontSize: 12 }, splitLine: { lineStyle: { color: '#E5E7EB', type: 'dashed' } } },
-                                series: [{
-                                  name: 'Predicted Ordinations',
-                                  type: 'line',
-                                  data: ordinationForecastData.map((d) => d.predicted),
-                                  smooth: true,
-                                  lineStyle: { color: '#D4AF37', width: 3 },
-                                  itemStyle: { color: '#D4AF37' },
-                                  areaStyle: { color: { type: 'linear', x: 0, y: 0, x2: 0, y2: 1, colorStops: [{ offset: 0, color: 'rgba(212,175,55,0.3)' }, { offset: 1, color: 'rgba(212,175,55,0)' }] } },
-                                  symbolSize: 8,
-                                }],
+                                xAxis: {
+                                  type: 'category',
+                                  data: ordinationForecastData.map((d) => d.year),
+                                  axisLabel: { color: '#6B7280', fontSize: 12 },
+                                },
+                                yAxis: {
+                                  type: 'value',
+                                  axisLabel: { color: '#6B7280', fontSize: 12 },
+                                  splitLine: { lineStyle: { color: '#E5E7EB', type: 'dashed' } },
+                                },
+                                series: [
+                                  {
+                                    name: 'Predicted Ordinations',
+                                    type: 'line',
+                                    data: ordinationForecastData.map((d) => d.predicted),
+                                    smooth: true,
+                                    lineStyle: { color: '#D4AF37', width: 3 },
+                                    itemStyle: { color: '#D4AF37' },
+                                    areaStyle: {
+                                      color: {
+                                        type: 'linear',
+                                        x: 0,
+                                        y: 0,
+                                        x2: 0,
+                                        y2: 1,
+                                        colorStops: [
+                                          { offset: 0, color: 'rgba(212,175,55,0.3)' },
+                                          { offset: 1, color: 'rgba(212,175,55,0)' },
+                                        ],
+                                      },
+                                    },
+                                    symbolSize: 8,
+                                  },
+                                ],
                               }}
                               style={{ height: '100%', width: '100%' }}
                             />
@@ -4020,19 +4429,32 @@ export function BishopDashboard({
                             <ReactECharts
                               option={{
                                 color: ['#6366f1', '#8b5cf6', '#06b6d4', '#10b981', '#f59e0b', '#ef4444'],
-                                tooltip: { trigger: 'axis', extraCssText: 'border-radius:12px;border:none;box-shadow:0 4px 20px rgba(0,0,0,0.08)' },
+                                tooltip: {
+                                  trigger: 'axis',
+                                  extraCssText: 'border-radius:12px;border:none;box-shadow:0 4px 20px rgba(0,0,0,0.08)',
+                                },
                                 grid: { top: 20, right: 30, left: 45, bottom: 30 },
-                                xAxis: { type: 'category', data: attritionRiskData.map((d) => d.year), axisLabel: { color: '#6B7280', fontSize: 12 } },
-                                yAxis: { type: 'value', axisLabel: { color: '#6B7280', fontSize: 12 }, splitLine: { lineStyle: { color: '#E5E7EB', type: 'dashed' } } },
-                                series: [{
-                                  name: 'Risk Level (%)',
-                                  type: 'line',
-                                  data: attritionRiskData.map((d) => d.risk),
-                                  smooth: true,
-                                  lineStyle: { color: '#EF4444', width: 3 },
-                                  itemStyle: { color: '#EF4444' },
-                                  symbolSize: 8,
-                                }],
+                                xAxis: {
+                                  type: 'category',
+                                  data: attritionRiskData.map((d) => d.year),
+                                  axisLabel: { color: '#6B7280', fontSize: 12 },
+                                },
+                                yAxis: {
+                                  type: 'value',
+                                  axisLabel: { color: '#6B7280', fontSize: 12 },
+                                  splitLine: { lineStyle: { color: '#E5E7EB', type: 'dashed' } },
+                                },
+                                series: [
+                                  {
+                                    name: 'Risk Level (%)',
+                                    type: 'line',
+                                    data: attritionRiskData.map((d) => d.risk),
+                                    smooth: true,
+                                    lineStyle: { color: '#EF4444', width: 3 },
+                                    itemStyle: { color: '#EF4444' },
+                                    symbolSize: 8,
+                                  },
+                                ],
                               }}
                               style={{ height: '100%', width: '100%' }}
                             />
@@ -4074,13 +4496,47 @@ export function BishopDashboard({
                             <ReactECharts
                               option={{
                                 color: ['#6366f1', '#8b5cf6', '#06b6d4', '#10b981', '#f59e0b', '#ef4444'],
-                                tooltip: { trigger: 'axis', extraCssText: 'border-radius:12px;border:none;box-shadow:0 4px 20px rgba(0,0,0,0.08)' },
+                                tooltip: {
+                                  trigger: 'axis',
+                                  extraCssText: 'border-radius:12px;border:none;box-shadow:0 4px 20px rgba(0,0,0,0.08)',
+                                },
                                 grid: { top: 20, right: 30, left: 45, bottom: 30 },
-                                xAxis: { type: 'category', data: enrollmentForecastData.map((d) => d.year), axisLabel: { color: '#6B7280', fontSize: 12 } },
-                                yAxis: { type: 'value', axisLabel: { color: '#6B7280', fontSize: 12 }, splitLine: { lineStyle: { color: '#E5E7EB', type: 'dashed' } } },
+                                xAxis: {
+                                  type: 'category',
+                                  data: enrollmentForecastData.map((d) => d.year),
+                                  axisLabel: { color: '#6B7280', fontSize: 12 },
+                                },
+                                yAxis: {
+                                  type: 'value',
+                                  axisLabel: { color: '#6B7280', fontSize: 12 },
+                                  splitLine: { lineStyle: { color: '#E5E7EB', type: 'dashed' } },
+                                },
                                 series: [
-                                  ...(enrollmentForecastFilter === 'all' || enrollmentForecastFilter === 'enrollment' ? [{ name: 'Projected Enrollment', type: 'bar', data: enrollmentForecastData.map((d) => ({ value: d.enrollment, itemStyle: { color: '#D4AF37', borderRadius: [6, 6, 0, 0] } })), barWidth: enrollmentForecastFilter === 'all' ? 30 : 60 }] : []),
-                                  ...(enrollmentForecastFilter === 'all' || enrollmentForecastFilter === 'capacity' ? [{ name: 'Maximum Capacity', type: 'line', data: enrollmentForecastData.map((d) => d.capacity), lineStyle: { color: '#EF4444', width: 2, type: 'dashed' }, itemStyle: { color: '#EF4444' }, showSymbol: false }] : []),
+                                  ...(enrollmentForecastFilter === 'all' || enrollmentForecastFilter === 'enrollment'
+                                    ? [
+                                        {
+                                          name: 'Projected Enrollment',
+                                          type: 'bar',
+                                          data: enrollmentForecastData.map((d) => ({
+                                            value: d.enrollment,
+                                            itemStyle: { color: '#D4AF37', borderRadius: [6, 6, 0, 0] },
+                                          })),
+                                          barWidth: enrollmentForecastFilter === 'all' ? 30 : 60,
+                                        },
+                                      ]
+                                    : []),
+                                  ...(enrollmentForecastFilter === 'all' || enrollmentForecastFilter === 'capacity'
+                                    ? [
+                                        {
+                                          name: 'Maximum Capacity',
+                                          type: 'line',
+                                          data: enrollmentForecastData.map((d) => d.capacity),
+                                          lineStyle: { color: '#EF4444', width: 2, type: 'dashed' },
+                                          itemStyle: { color: '#EF4444' },
+                                          showSymbol: false,
+                                        },
+                                      ]
+                                    : []),
                                 ],
                               }}
                               style={{ height: '100%', width: '100%' }}
@@ -4122,20 +4578,36 @@ export function BishopDashboard({
                             <ReactECharts
                               option={{
                                 color: ['#6366f1', '#8b5cf6', '#06b6d4', '#10b981', '#f59e0b', '#ef4444'],
-                                tooltip: { trigger: 'item', formatter: (params: any) => `${params.name}: ${params.value}` },
-                                series: [{
-                                  type: 'funnel',
-                                  left: '10%',
-                                  width: '80%',
-                                  min: 0,
-                                  max: 120,
-                                  minSize: '0%',
-                                  maxSize: '100%',
-                                  sort: 'descending',
-                                  gap: 4,
-                                  label: { show: true, position: 'inside', color: '#fff', fontSize: 12, fontWeight: 700, formatter: (params: any) => `${params.name}: ${params.value}` },
-                                  data: vocationPipelineData.map((d) => ({ name: d.stage, value: d.count, itemStyle: { color: d.fill } })),
-                                }],
+                                tooltip: {
+                                  trigger: 'item',
+                                  formatter: (params: any) => `${params.name}: ${params.value}`,
+                                },
+                                series: [
+                                  {
+                                    type: 'funnel',
+                                    left: '10%',
+                                    width: '80%',
+                                    min: 0,
+                                    max: 120,
+                                    minSize: '0%',
+                                    maxSize: '100%',
+                                    sort: 'descending',
+                                    gap: 4,
+                                    label: {
+                                      show: true,
+                                      position: 'inside',
+                                      color: '#fff',
+                                      fontSize: 12,
+                                      fontWeight: 700,
+                                      formatter: (params: any) => `${params.name}: ${params.value}`,
+                                    },
+                                    data: vocationPipelineData.map((d) => ({
+                                      name: d.stage,
+                                      value: d.count,
+                                      itemStyle: { color: d.fill },
+                                    })),
+                                  },
+                                ],
                               }}
                               style={{ height: '100%', width: '100%' }}
                             />
@@ -4163,20 +4635,51 @@ export function BishopDashboard({
                             <ReactECharts
                               option={{
                                 color: ['#6366f1', '#8b5cf6', '#06b6d4', '#10b981', '#f59e0b', '#ef4444'],
-                                tooltip: { trigger: 'axis', formatter: (params: any[]) => `${params[0].axisValue}: ${formatCurrency(params[0].value)}`, extraCssText: 'border-radius:12px;border:none;box-shadow:0 4px 20px rgba(0,0,0,0.08)' },
+                                tooltip: {
+                                  trigger: 'axis',
+                                  formatter: (params: any[]) =>
+                                    `${params[0].axisValue}: ${formatCurrency(params[0].value)}`,
+                                  extraCssText: 'border-radius:12px;border:none;box-shadow:0 4px 20px rgba(0,0,0,0.08)',
+                                },
                                 grid: { top: 20, right: 30, left: 55, bottom: 30 },
-                                xAxis: { type: 'category', data: endowmentGrowthData.map((d) => d.year), axisLabel: { color: '#6B7280', fontSize: 12 } },
-                                yAxis: { type: 'value', axisLabel: { color: '#6B7280', fontSize: 12, formatter: (v: number) => `${v / 1000000}M` }, splitLine: { lineStyle: { color: '#E5E7EB', type: 'dashed' } } },
-                                series: [{
-                                  name: 'Endowment Value',
-                                  type: 'line',
-                                  data: endowmentGrowthData.map((d) => d.value),
-                                  smooth: true,
-                                  lineStyle: { color: '#D4AF37', width: 3 },
-                                  itemStyle: { color: '#D4AF37' },
-                                  areaStyle: { color: { type: 'linear', x: 0, y: 0, x2: 0, y2: 1, colorStops: [{ offset: 0, color: 'rgba(212,175,55,0.3)' }, { offset: 1, color: 'rgba(212,175,55,0)' }] } },
-                                  symbolSize: 8,
-                                }],
+                                xAxis: {
+                                  type: 'category',
+                                  data: endowmentGrowthData.map((d) => d.year),
+                                  axisLabel: { color: '#6B7280', fontSize: 12 },
+                                },
+                                yAxis: {
+                                  type: 'value',
+                                  axisLabel: {
+                                    color: '#6B7280',
+                                    fontSize: 12,
+                                    formatter: (v: number) => `${v / 1000000}M`,
+                                  },
+                                  splitLine: { lineStyle: { color: '#E5E7EB', type: 'dashed' } },
+                                },
+                                series: [
+                                  {
+                                    name: 'Endowment Value',
+                                    type: 'line',
+                                    data: endowmentGrowthData.map((d) => d.value),
+                                    smooth: true,
+                                    lineStyle: { color: '#D4AF37', width: 3 },
+                                    itemStyle: { color: '#D4AF37' },
+                                    areaStyle: {
+                                      color: {
+                                        type: 'linear',
+                                        x: 0,
+                                        y: 0,
+                                        x2: 0,
+                                        y2: 1,
+                                        colorStops: [
+                                          { offset: 0, color: 'rgba(212,175,55,0.3)' },
+                                          { offset: 1, color: 'rgba(212,175,55,0)' },
+                                        ],
+                                      },
+                                    },
+                                    symbolSize: 8,
+                                  },
+                                ],
                               }}
                               style={{ height: '100%', width: '100%' }}
                             />
@@ -4204,19 +4707,32 @@ export function BishopDashboard({
                             <ReactECharts
                               option={{
                                 color: ['#6366f1', '#8b5cf6', '#06b6d4', '#10b981', '#f59e0b', '#ef4444'],
-                                tooltip: { trigger: 'axis', extraCssText: 'border-radius:12px;border:none;box-shadow:0 4px 20px rgba(0,0,0,0.08)' },
+                                tooltip: {
+                                  trigger: 'axis',
+                                  extraCssText: 'border-radius:12px;border:none;box-shadow:0 4px 20px rgba(0,0,0,0.08)',
+                                },
                                 grid: { top: 20, right: 30, left: 45, bottom: 30 },
-                                xAxis: { type: 'category', data: vocationInterestData.map((d) => d.month), axisLabel: { color: '#6B7280', fontSize: 12 } },
-                                yAxis: { type: 'value', axisLabel: { color: '#6B7280', fontSize: 12 }, splitLine: { lineStyle: { color: '#E5E7EB', type: 'dashed' } } },
-                                series: [{
-                                  name: 'Monthly Inquiries',
-                                  type: 'line',
-                                  data: vocationInterestData.map((d) => d.inquiries),
-                                  smooth: true,
-                                  lineStyle: { color: '#1a472a', width: 3 },
-                                  itemStyle: { color: '#1a472a' },
-                                  symbolSize: 8,
-                                }],
+                                xAxis: {
+                                  type: 'category',
+                                  data: vocationInterestData.map((d) => d.month),
+                                  axisLabel: { color: '#6B7280', fontSize: 12 },
+                                },
+                                yAxis: {
+                                  type: 'value',
+                                  axisLabel: { color: '#6B7280', fontSize: 12 },
+                                  splitLine: { lineStyle: { color: '#E5E7EB', type: 'dashed' } },
+                                },
+                                series: [
+                                  {
+                                    name: 'Monthly Inquiries',
+                                    type: 'line',
+                                    data: vocationInterestData.map((d) => d.inquiries),
+                                    smooth: true,
+                                    lineStyle: { color: '#1a472a', width: 3 },
+                                    itemStyle: { color: '#1a472a' },
+                                    symbolSize: 8,
+                                  },
+                                ],
                               }}
                               style={{ height: '100%', width: '100%' }}
                             />
@@ -4247,14 +4763,39 @@ export function BishopDashboard({
                             <ReactECharts
                               option={{
                                 color: ['#6366f1', '#8b5cf6', '#06b6d4', '#10b981', '#f59e0b', '#ef4444'],
-                                tooltip: { trigger: 'axis', extraCssText: 'border-radius:12px;border:none;box-shadow:0 4px 20px rgba(0,0,0,0.08)' },
+                                tooltip: {
+                                  trigger: 'axis',
+                                  extraCssText: 'border-radius:12px;border:none;box-shadow:0 4px 20px rgba(0,0,0,0.08)',
+                                },
                                 legend: { top: 0, data: ['Projected Retirements', 'Projected Ordinations'] },
                                 grid: { top: 40, right: 30, left: 45, bottom: 30 },
-                                xAxis: { type: 'category', data: priestGapData.map((d) => d.year), axisLabel: { color: '#6B7280', fontSize: 12 } },
-                                yAxis: { type: 'value', axisLabel: { color: '#6B7280', fontSize: 12 }, splitLine: { lineStyle: { color: '#E5E7EB', type: 'dashed' } } },
+                                xAxis: {
+                                  type: 'category',
+                                  data: priestGapData.map((d) => d.year),
+                                  axisLabel: { color: '#6B7280', fontSize: 12 },
+                                },
+                                yAxis: {
+                                  type: 'value',
+                                  axisLabel: { color: '#6B7280', fontSize: 12 },
+                                  splitLine: { lineStyle: { color: '#E5E7EB', type: 'dashed' } },
+                                },
                                 series: [
-                                  { name: 'Projected Retirements', type: 'bar', data: priestGapData.map((d) => ({ value: d.retirements, itemStyle: { color: '#1a472a', borderRadius: [6, 6, 0, 0] } })) },
-                                  { name: 'Projected Ordinations', type: 'bar', data: priestGapData.map((d) => ({ value: d.ordinations, itemStyle: { color: '#D4AF37', borderRadius: [6, 6, 0, 0] } })) },
+                                  {
+                                    name: 'Projected Retirements',
+                                    type: 'bar',
+                                    data: priestGapData.map((d) => ({
+                                      value: d.retirements,
+                                      itemStyle: { color: '#1a472a', borderRadius: [6, 6, 0, 0] },
+                                    })),
+                                  },
+                                  {
+                                    name: 'Projected Ordinations',
+                                    type: 'bar',
+                                    data: priestGapData.map((d) => ({
+                                      value: d.ordinations,
+                                      itemStyle: { color: '#D4AF37', borderRadius: [6, 6, 0, 0] },
+                                    })),
+                                  },
                                 ],
                               }}
                               style={{ height: '100%', width: '100%' }}

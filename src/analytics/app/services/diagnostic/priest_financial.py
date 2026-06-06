@@ -22,6 +22,7 @@ from app.services.supabase_client import get_table
 
 # ── LLM narrative ─────────────────────────────────────────────────────────────
 
+
 def _llm_narrative(stats: dict[str, Any]) -> str:
     """
     Generate narrative via Claude. Only passes aggregated statistics.
@@ -84,6 +85,7 @@ def _rule_based_narrative(stats: dict[str, Any]) -> str:
 
 
 # ── Core processing ───────────────────────────────────────────────────────────
+
 
 def _fetch_and_process(institution_id: str) -> dict[str, Any]:
     ts = datetime.now(timezone.utc).isoformat()
@@ -205,14 +207,16 @@ def _fetch_and_process(institution_id: str) -> dict[str, Any]:
     avg_c = float(np.mean(y))
     trend = "up" if growth_rate > 0.02 else ("down" if growth_rate < -0.02 else "stable")
 
-    narrative = _llm_narrative({
-        "avg_collection": avg_c,
-        "variance": variance,
-        "top_feature": top_feature,
-        "gauge_score": gauge_score,
-        "trend": trend,
-        "growth_rate": growth_rate,
-    })
+    narrative = _llm_narrative(
+        {
+            "avg_collection": avg_c,
+            "variance": variance,
+            "top_feature": top_feature,
+            "gauge_score": gauge_score,
+            "trend": trend,
+            "growth_rate": growth_rate,
+        }
+    )
 
     return {
         "data_sufficient": True,

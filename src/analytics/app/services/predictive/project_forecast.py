@@ -59,11 +59,7 @@ def _fetch_and_process(institution_id: str) -> dict[str, Any]:
 
     # Attempt project_expenses query
     try:
-        exp_res = (
-            get_table("diocese", "project_expenses")
-            .select("project_id, amount")
-            .execute()
-        )
+        exp_res = get_table("diocese", "project_expenses").select("project_id, amount").execute()
         expenses_data = exp_res.data or []
     except Exception:
         expenses_data = []
@@ -129,13 +125,15 @@ def _fetch_and_process(institution_id: str) -> dict[str, Any]:
         projects_out = []
         for r in feature_rows:
             sp = min(1.0, r["completion_ratio"] * 1.1)
-            projects_out.append({
-                "project_id": r["project_id"],
-                "name": r["name"],
-                "success_probability": round(sp, 4),
-                "risk_score": round(1.0 - sp, 4),
-                "predicted_delay": r["time_elapsed_ratio"] > r["completion_ratio"] + 0.1,
-            })
+            projects_out.append(
+                {
+                    "project_id": r["project_id"],
+                    "name": r["name"],
+                    "success_probability": round(sp, 4),
+                    "risk_score": round(1.0 - sp, 4),
+                    "predicted_delay": r["time_elapsed_ratio"] > r["completion_ratio"] + 0.1,
+                }
+            )
         return {
             "data_sufficient": True,
             "institution_id": institution_id,
@@ -157,13 +155,15 @@ def _fetch_and_process(institution_id: str) -> dict[str, Any]:
         projects_out = []
         for i, r in enumerate(feature_rows):
             sp = float(y[i]) if len(y) > i else r["completion_ratio"]
-            projects_out.append({
-                "project_id": r["project_id"],
-                "name": r["name"],
-                "success_probability": round(sp, 4),
-                "risk_score": round(1.0 - sp, 4),
-                "predicted_delay": r["time_elapsed_ratio"] > r["completion_ratio"] + 0.1,
-            })
+            projects_out.append(
+                {
+                    "project_id": r["project_id"],
+                    "name": r["name"],
+                    "success_probability": round(sp, 4),
+                    "risk_score": round(1.0 - sp, 4),
+                    "predicted_delay": r["time_elapsed_ratio"] > r["completion_ratio"] + 0.1,
+                }
+            )
         return {
             "data_sufficient": True,
             "institution_id": institution_id,
@@ -177,8 +177,11 @@ def _fetch_and_process(institution_id: str) -> dict[str, Any]:
 
     # XGBoost
     xgb_clf = xgb.XGBClassifier(
-        n_estimators=50, max_depth=3, use_label_encoder=False,
-        eval_metric="logloss", random_state=42,
+        n_estimators=50,
+        max_depth=3,
+        use_label_encoder=False,
+        eval_metric="logloss",
+        random_state=42,
     )
     xgb_clf.fit(X_tr, y_tr)
     xgb_preds = xgb_clf.predict(X_te)
@@ -206,14 +209,16 @@ def _fetch_and_process(institution_id: str) -> dict[str, Any]:
     projects_out = []
     for i, r in enumerate(feature_rows):
         prob_success = float(probas[i, 1]) if probas.shape[1] > 1 else float(probas[i, 0])
-        predicted_delay = (r["time_elapsed_ratio"] > r["completion_ratio"] + 0.1)
-        projects_out.append({
-            "project_id": r["project_id"],
-            "name": r["name"],
-            "success_probability": round(prob_success, 4),
-            "risk_score": round(1.0 - prob_success, 4),
-            "predicted_delay": predicted_delay,
-        })
+        predicted_delay = r["time_elapsed_ratio"] > r["completion_ratio"] + 0.1
+        projects_out.append(
+            {
+                "project_id": r["project_id"],
+                "name": r["name"],
+                "success_probability": round(prob_success, 4),
+                "risk_score": round(1.0 - prob_success, 4),
+                "predicted_delay": predicted_delay,
+            }
+        )
 
     return {
         "data_sufficient": True,

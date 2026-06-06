@@ -130,7 +130,9 @@ def _fetch_and_process(institution_id: str) -> dict[str, Any]:
             sub = df[mask]
             if sub.empty:
                 continue
-            label = f"Assignment {asn.get('priest_id', 'unknown')} ({start.strftime('%Y-%m')} to {end.strftime('%Y-%m')})"
+            label = (
+                f"Assignment {asn.get('priest_id', 'unknown')} ({start.strftime('%Y-%m')} to {end.strftime('%Y-%m')})"
+            )
             period_stats.append(_period_stats(sub, label))
     else:
         # Fallback: group by year

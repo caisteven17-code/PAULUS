@@ -21,6 +21,7 @@ from app.services.supabase_client import get_table
 
 # ── Internal helpers ──────────────────────────────────────────────────────────
 
+
 def _run_stl(series: pd.Series) -> tuple[pd.Series, pd.Series, pd.Series]:
     """Run STL decomposition; return (trend, seasonal, residual)."""
     from statsmodels.tsa.seasonal import STL

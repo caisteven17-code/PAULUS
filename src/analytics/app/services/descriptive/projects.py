@@ -77,16 +77,18 @@ def _fetch_and_process(institution_id: str) -> dict[str, Any]:
         else:
             active_count += 1
 
-        projects.append({
-            "project_id": pid,
-            "name": p.get("name", ""),
-            "completion_pct": completion_pct,
-            "raised": round(raised, 2),
-            "target": round(target, 2),
-            "status": status,
-            "start_date": p.get("start_date"),
-            "end_date": p.get("end_date"),
-        })
+        projects.append(
+            {
+                "project_id": pid,
+                "name": p.get("name", ""),
+                "completion_pct": completion_pct,
+                "raised": round(raised, 2),
+                "target": round(target, 2),
+                "status": status,
+                "start_date": p.get("start_date"),
+                "end_date": p.get("end_date"),
+            }
+        )
 
         total_raised += raised
         total_target += target

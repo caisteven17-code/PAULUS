@@ -15,7 +15,7 @@ from app.services.data_definitions import _SCHEMA_MAP, build_date_index, safe_di
 from app.services.supabase_client import get_table
 
 _DISBURSEMENT_CAP = 0.9347  # 93.47% of receipts per Diocese benchmark
-_BUDGET_CAP = 0.90          # total disbursements <= 90% of total_receipts
+_BUDGET_CAP = 0.90  # total disbursements <= 90% of total_receipts
 
 
 def _solve_lp(avg_receipts: float, category_avgs: dict[str, float]) -> dict[str, Any]:

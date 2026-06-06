@@ -38,12 +38,14 @@ def _run_scenario(
         value = current_base + base_growth
         # Apply assignment impact at transition boundaries
         if assignment_duration_months > 0 and (i + 1) % assignment_duration_months == 0:
-            value *= (1 + collection_impact_pct / 100)
+            value *= 1 + collection_impact_pct / 100
         current_base = value
-        results.append({
-            "period": period_date,
-            "simulated_collection": round(max(0.0, value), 2),
-        })
+        results.append(
+            {
+                "period": period_date,
+                "simulated_collection": round(max(0.0, value), 2),
+            }
+        )
 
     return results
 
@@ -62,7 +64,9 @@ def _sensitivity_analysis(
     ]:
         impacts: dict[str, float] = {}
         for delta in delta_vals:
-            test_duration = base_duration if param_name != "assignment_duration_months" else max(1, base_duration + delta)
+            test_duration = (
+                base_duration if param_name != "assignment_duration_months" else max(1, base_duration + delta)
+            )
             test_impact = base_impact if param_name != "collection_impact_pct" else base_impact + delta
             sim = _run_scenario(baseline, test_duration, test_impact, periods)
             terminal = sim[-1]["simulated_collection"] if sim else 0.0
@@ -164,5 +168,8 @@ async def run_pastoral_simulation(
 ) -> dict[str, Any]:
     return await asyncio.to_thread(
         _fetch_and_run,
-        institution_id, assignment_duration_months, collection_impact_pct, periods,
+        institution_id,
+        assignment_duration_months,
+        collection_impact_pct,
+        periods,
     )

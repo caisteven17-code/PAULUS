@@ -156,8 +156,7 @@ function KpiCard({ metric }: { metric: KpiMetric }) {
             yAxis: { type: 'value', show: false },
             tooltip: {
               trigger: 'axis',
-              formatter: (params: any) =>
-                `${params[0].axisValue}: ${compactCurrency(params[0].value)}`,
+              formatter: (params: any) => `${params[0].axisValue}: ${compactCurrency(params[0].value)}`,
             },
             series: [
               {
@@ -169,7 +168,10 @@ function KpiCard({ metric }: { metric: KpiMetric }) {
                 areaStyle: {
                   color: {
                     type: 'linear',
-                    x: 0, y: 0, x2: 0, y2: 1,
+                    x: 0,
+                    y: 0,
+                    x2: 0,
+                    y2: 1,
                     colorStops: [
                       { offset: 0.05, color: metric.accent + '52' },
                       { offset: 0.95, color: metric.accent + '00' },
@@ -750,7 +752,9 @@ export function SeminaryFinancialDashboard({
                       trigger: 'axis',
                       formatter: (params: any) =>
                         `${params[0].axisValue}<br/>` +
-                        params.map((p: any) => `${p.marker}${p.seriesName}: ${currencyFormatter(p.value)}`).join('<br/>'),
+                        params
+                          .map((p: any) => `${p.marker}${p.seriesName}: ${currencyFormatter(p.value)}`)
+                          .join('<br/>'),
                     },
                     legend: { bottom: 0 },
                     grid: { top: 16, right: 24, left: 56, bottom: 48 },
@@ -775,12 +779,18 @@ export function SeminaryFinancialDashboard({
                       {
                         name: 'Income',
                         type: 'bar',
-                        data: operatingTrendData.map((d) => ({ value: d.Income, itemStyle: { color: palette[0], borderRadius: [10, 10, 0, 0] } })),
+                        data: operatingTrendData.map((d) => ({
+                          value: d.Income,
+                          itemStyle: { color: palette[0], borderRadius: [10, 10, 0, 0] },
+                        })),
                       },
                       {
                         name: 'Expenses',
                         type: 'bar',
-                        data: operatingTrendData.map((d) => ({ value: d.Expenses, itemStyle: { color: palette[1], borderRadius: [10, 10, 0, 0] } })),
+                        data: operatingTrendData.map((d) => ({
+                          value: d.Expenses,
+                          itemStyle: { color: palette[1], borderRadius: [10, 10, 0, 0] },
+                        })),
                       },
                     ],
                   }}
@@ -819,9 +829,12 @@ export function SeminaryFinancialDashboard({
                       trigger: 'axis',
                       formatter: (params: any) =>
                         `${params[0].axisValue}<br/>` +
-                        params.map((p: any) =>
-                          `${p.marker}${p.seriesName}: ${p.seriesName === 'Dependency' ? percentFormatter(p.value) : currencyFormatter(p.value)}`
-                        ).join('<br/>'),
+                        params
+                          .map(
+                            (p: any) =>
+                              `${p.marker}${p.seriesName}: ${p.seriesName === 'Dependency' ? percentFormatter(p.value) : currencyFormatter(p.value)}`,
+                          )
+                          .join('<br/>'),
                     },
                     legend: { bottom: 0 },
                     grid: { top: 16, right: 60, left: 56, bottom: 40 },
@@ -1036,12 +1049,18 @@ export function SeminaryFinancialDashboard({
                     {
                       name: 'Income',
                       type: 'bar',
-                      data: operatingTrendData.map((d) => ({ value: d.Income, itemStyle: { color: palette[0], borderRadius: [10, 10, 0, 0] } })),
+                      data: operatingTrendData.map((d) => ({
+                        value: d.Income,
+                        itemStyle: { color: palette[0], borderRadius: [10, 10, 0, 0] },
+                      })),
                     },
                     {
                       name: 'Expenses',
                       type: 'bar',
-                      data: operatingTrendData.map((d) => ({ value: d.Expenses, itemStyle: { color: palette[1], borderRadius: [10, 10, 0, 0] } })),
+                      data: operatingTrendData.map((d) => ({
+                        value: d.Expenses,
+                        itemStyle: { color: palette[1], borderRadius: [10, 10, 0, 0] },
+                      })),
                     },
                   ],
                 }}
@@ -1088,13 +1107,19 @@ export function SeminaryFinancialDashboard({
                       name: 'Subsidies + Donations',
                       type: 'bar',
                       stack: 'dependency',
-                      data: dependencyRatioData.map((d) => ({ value: d['Subsidies + Donations'], itemStyle: { color: palette[2], borderRadius: [10, 10, 0, 0] } })),
+                      data: dependencyRatioData.map((d) => ({
+                        value: d['Subsidies + Donations'],
+                        itemStyle: { color: palette[2], borderRadius: [10, 10, 0, 0] },
+                      })),
                     },
                     {
                       name: 'Self-Generated',
                       type: 'bar',
                       stack: 'dependency',
-                      data: dependencyRatioData.map((d) => ({ value: d['Self-Generated'], itemStyle: { color: palette[0], borderRadius: [10, 10, 0, 0] } })),
+                      data: dependencyRatioData.map((d) => ({
+                        value: d['Self-Generated'],
+                        itemStyle: { color: palette[0], borderRadius: [10, 10, 0, 0] },
+                      })),
                     },
                   ],
                 }}
@@ -1119,7 +1144,11 @@ export function SeminaryFinancialDashboard({
                     {
                       type: 'pie',
                       radius: ['40%', '65%'],
-                      data: peopleOperationalData.map((d) => ({ name: d.name, value: d.value, itemStyle: { color: d.fill } })),
+                      data: peopleOperationalData.map((d) => ({
+                        name: d.name,
+                        value: d.value,
+                        itemStyle: { color: d.fill },
+                      })),
                       label: { show: false },
                     },
                   ],
@@ -1211,11 +1240,46 @@ export function SeminaryFinancialDashboard({
                     splitLine: { lineStyle: { color: '#E5E7EB' } },
                   },
                   series: [
-                    { name: 'Donations', type: 'line', data: monthlyTrendData.map((d) => d.Donations), smooth: true, lineStyle: { width: 3 }, showSymbol: false },
-                    { name: 'Seminary Fees', type: 'line', data: monthlyTrendData.map((d) => d['Seminary Fees']), smooth: true, lineStyle: { width: 3 }, showSymbol: false },
-                    { name: 'Subsidy', type: 'line', data: monthlyTrendData.map((d) => d.Subsidy), smooth: true, lineStyle: { width: 3 }, showSymbol: false },
-                    { name: 'Utilities', type: 'line', data: monthlyTrendData.map((d) => d.Utilities), smooth: true, lineStyle: { width: 3 }, showSymbol: false },
-                    { name: 'Salaries', type: 'line', data: monthlyTrendData.map((d) => d.Salaries), smooth: true, lineStyle: { width: 3 }, showSymbol: false },
+                    {
+                      name: 'Donations',
+                      type: 'line',
+                      data: monthlyTrendData.map((d) => d.Donations),
+                      smooth: true,
+                      lineStyle: { width: 3 },
+                      showSymbol: false,
+                    },
+                    {
+                      name: 'Seminary Fees',
+                      type: 'line',
+                      data: monthlyTrendData.map((d) => d['Seminary Fees']),
+                      smooth: true,
+                      lineStyle: { width: 3 },
+                      showSymbol: false,
+                    },
+                    {
+                      name: 'Subsidy',
+                      type: 'line',
+                      data: monthlyTrendData.map((d) => d.Subsidy),
+                      smooth: true,
+                      lineStyle: { width: 3 },
+                      showSymbol: false,
+                    },
+                    {
+                      name: 'Utilities',
+                      type: 'line',
+                      data: monthlyTrendData.map((d) => d.Utilities),
+                      smooth: true,
+                      lineStyle: { width: 3 },
+                      showSymbol: false,
+                    },
+                    {
+                      name: 'Salaries',
+                      type: 'line',
+                      data: monthlyTrendData.map((d) => d.Salaries),
+                      smooth: true,
+                      lineStyle: { width: 3 },
+                      showSymbol: false,
+                    },
                   ],
                 }}
                 style={{ height: '100%', width: '100%' }}
@@ -1239,7 +1303,10 @@ export function SeminaryFinancialDashboard({
                     trigger: 'axis',
                     formatter: (params: any) =>
                       `${params[0].axisValue}<br/>` +
-                      params.filter((p: any) => p.value != null).map((p: any) => `${p.marker}${p.seriesName}: ${currencyFormatter(p.value)}`).join('<br/>'),
+                      params
+                        .filter((p: any) => p.value != null)
+                        .map((p: any) => `${p.marker}${p.seriesName}: ${currencyFormatter(p.value)}`)
+                        .join('<br/>'),
                   },
                   legend: { bottom: 0 },
                   grid: { top: 16, right: 24, left: 64, bottom: 56 },
@@ -1321,9 +1388,30 @@ export function SeminaryFinancialDashboard({
                     splitLine: { lineStyle: { color: '#E5E7EB' } },
                   },
                   series: [
-                    { name: 'Facilities', type: 'line', data: expenseEscalationData.map((d) => d.Facilities), smooth: true, lineStyle: { width: 3 }, showSymbol: false },
-                    { name: 'Payroll', type: 'line', data: expenseEscalationData.map((d) => d.Payroll), smooth: true, lineStyle: { width: 3 }, showSymbol: false },
-                    { name: 'Logistics', type: 'line', data: expenseEscalationData.map((d) => d.Logistics), smooth: true, lineStyle: { width: 3 }, showSymbol: false },
+                    {
+                      name: 'Facilities',
+                      type: 'line',
+                      data: expenseEscalationData.map((d) => d.Facilities),
+                      smooth: true,
+                      lineStyle: { width: 3 },
+                      showSymbol: false,
+                    },
+                    {
+                      name: 'Payroll',
+                      type: 'line',
+                      data: expenseEscalationData.map((d) => d.Payroll),
+                      smooth: true,
+                      lineStyle: { width: 3 },
+                      showSymbol: false,
+                    },
+                    {
+                      name: 'Logistics',
+                      type: 'line',
+                      data: expenseEscalationData.map((d) => d.Logistics),
+                      smooth: true,
+                      lineStyle: { width: 3 },
+                      showSymbol: false,
+                    },
                     {
                       name: 'Threshold',
                       type: 'line',
@@ -1351,7 +1439,10 @@ export function SeminaryFinancialDashboard({
                     trigger: 'axis',
                     formatter: (params: any) =>
                       `${params[0].axisValue}<br/>` +
-                      params.filter((p: any) => p.value != null).map((p: any) => `${p.marker}${p.seriesName}: ${currencyFormatter(p.value)}`).join('<br/>'),
+                      params
+                        .filter((p: any) => p.value != null)
+                        .map((p: any) => `${p.marker}${p.seriesName}: ${currencyFormatter(p.value)}`)
+                        .join('<br/>'),
                   },
                   legend: { bottom: 0 },
                   grid: { top: 16, right: 24, left: 56, bottom: 56 },
@@ -1385,7 +1476,11 @@ export function SeminaryFinancialDashboard({
                       connectNulls: false,
                       areaStyle: {
                         color: {
-                          type: 'linear', x: 0, y: 0, x2: 0, y2: 1,
+                          type: 'linear',
+                          x: 0,
+                          y: 0,
+                          x2: 0,
+                          y2: 1,
                           colorStops: [
                             { offset: 0.05, color: seminaryTheme.success + '59' },
                             { offset: 0.95, color: seminaryTheme.success + '05' },
@@ -1404,7 +1499,11 @@ export function SeminaryFinancialDashboard({
                       connectNulls: false,
                       areaStyle: {
                         color: {
-                          type: 'linear', x: 0, y: 0, x2: 0, y2: 1,
+                          type: 'linear',
+                          x: 0,
+                          y: 0,
+                          x2: 0,
+                          y2: 1,
                           colorStops: [
                             { offset: 0.05, color: palette[0] + '4D' },
                             { offset: 0.95, color: palette[0] + '08' },
@@ -1465,10 +1564,12 @@ export function SeminaryFinancialDashboard({
                         silent: true,
                         symbol: ['none', 'none'],
                         lineStyle: { color: '#000000', width: 2 },
-                        data: donationVolatilityData.map((d, i) => [
-                          { xAxis: i, yAxis: d.mean + d.stdDev, label: { show: false } },
-                          { xAxis: i, yAxis: Math.max(0, d.mean - d.stdDev), label: { show: false } },
-                        ]).flat(),
+                        data: donationVolatilityData
+                          .map((d, i) => [
+                            { xAxis: i, yAxis: d.mean + d.stdDev, label: { show: false } },
+                            { xAxis: i, yAxis: Math.max(0, d.mean - d.stdDev), label: { show: false } },
+                          ])
+                          .flat(),
                       },
                     },
                   ],
@@ -1561,8 +1662,22 @@ export function SeminaryFinancialDashboard({
                     splitLine: { lineStyle: { color: '#E5E7EB' } },
                   },
                   series: [
-                    { name: 'Spend', type: 'line', data: infrastructureTrendData.map((d) => d.Spend), smooth: true, lineStyle: { width: 3 }, showSymbol: false },
-                    { name: 'Rolling Avg', type: 'line', data: infrastructureTrendData.map((d) => d['Rolling Avg']), smooth: true, lineStyle: { width: 3, type: 'dashed' }, showSymbol: false },
+                    {
+                      name: 'Spend',
+                      type: 'line',
+                      data: infrastructureTrendData.map((d) => d.Spend),
+                      smooth: true,
+                      lineStyle: { width: 3 },
+                      showSymbol: false,
+                    },
+                    {
+                      name: 'Rolling Avg',
+                      type: 'line',
+                      data: infrastructureTrendData.map((d) => d['Rolling Avg']),
+                      smooth: true,
+                      lineStyle: { width: 3, type: 'dashed' },
+                      showSymbol: false,
+                    },
                   ],
                 }}
                 style={{ height: '100%', width: '100%' }}
@@ -1607,12 +1722,18 @@ export function SeminaryFinancialDashboard({
                     {
                       name: 'Income',
                       type: 'bar',
-                      data: subsidyRiskDigitalTwinData.map((d) => ({ value: d.Income, itemStyle: { color: palette[0], borderRadius: [10, 10, 0, 0] } })),
+                      data: subsidyRiskDigitalTwinData.map((d) => ({
+                        value: d.Income,
+                        itemStyle: { color: palette[0], borderRadius: [10, 10, 0, 0] },
+                      })),
                     },
                     {
                       name: 'Surplus',
                       type: 'bar',
-                      data: subsidyRiskDigitalTwinData.map((d) => ({ value: d.Surplus, itemStyle: { color: palette[1], borderRadius: [10, 10, 0, 0] } })),
+                      data: subsidyRiskDigitalTwinData.map((d) => ({
+                        value: d.Surplus,
+                        itemStyle: { color: palette[1], borderRadius: [10, 10, 0, 0] },
+                      })),
                     },
                   ],
                 }}
@@ -1683,7 +1804,9 @@ export function SeminaryFinancialDashboard({
                   grid: { top: 16, right: 24, left: 64, bottom: 60 },
                   xAxis: {
                     type: 'category',
-                    data: (seminaryDiversificationTargets as { source: string; current: number; target: number }[]).map((d) => d.source),
+                    data: (seminaryDiversificationTargets as { source: string; current: number; target: number }[]).map(
+                      (d) => d.source,
+                    ),
                     name: 'Income Source',
                     nameLocation: 'middle',
                     nameGap: 42,
@@ -1702,12 +1825,22 @@ export function SeminaryFinancialDashboard({
                     {
                       name: 'Current Share',
                       type: 'bar',
-                      data: (seminaryDiversificationTargets as { source: string; current: number; target: number }[]).map((d) => ({ value: d.current, itemStyle: { color: palette[1], borderRadius: [10, 10, 0, 0] } })),
+                      data: (
+                        seminaryDiversificationTargets as { source: string; current: number; target: number }[]
+                      ).map((d) => ({
+                        value: d.current,
+                        itemStyle: { color: palette[1], borderRadius: [10, 10, 0, 0] },
+                      })),
                     },
                     {
                       name: 'Target Share',
                       type: 'bar',
-                      data: (seminaryDiversificationTargets as { source: string; current: number; target: number }[]).map((d) => ({ value: d.target, itemStyle: { color: palette[0], borderRadius: [10, 10, 0, 0] } })),
+                      data: (
+                        seminaryDiversificationTargets as { source: string; current: number; target: number }[]
+                      ).map((d) => ({
+                        value: d.target,
+                        itemStyle: { color: palette[0], borderRadius: [10, 10, 0, 0] },
+                      })),
                     },
                   ],
                 }}
@@ -1830,7 +1963,14 @@ export function SeminaryFinancialDashboard({
                     trigger: 'axis',
                     formatter: (params: any) => {
                       const durationParam = params.find((p: any) => p.seriesName === 'Planned Duration');
-                      const d = (seminaryCapexTimeline as { initiative: string; start: number; duration: number; budget: number }[])[params[0].dataIndex];
+                      const d = (
+                        seminaryCapexTimeline as {
+                          initiative: string;
+                          start: number;
+                          duration: number;
+                          budget: number;
+                        }[]
+                      )[params[0].dataIndex];
                       return `${params[0].axisValue}<br/>Duration: ${durationParam?.value ?? 0} months<br/>Budget: ${currencyFormatter(d?.budget ?? 0)}`;
                     },
                   },
@@ -1848,7 +1988,9 @@ export function SeminaryFinancialDashboard({
                   },
                   yAxis: {
                     type: 'category',
-                    data: (seminaryCapexTimeline as { initiative: string; start: number; duration: number; budget: number }[]).map((d) => d.initiative),
+                    data: (
+                      seminaryCapexTimeline as { initiative: string; start: number; duration: number; budget: number }[]
+                    ).map((d) => d.initiative),
                     axisLine: { show: false },
                     axisTick: { show: false },
                   },
@@ -1858,7 +2000,14 @@ export function SeminaryFinancialDashboard({
                       type: 'bar',
                       stack: 'timeline',
                       itemStyle: { color: 'transparent' },
-                      data: (seminaryCapexTimeline as { initiative: string; start: number; duration: number; budget: number }[]).map((d) => d.start),
+                      data: (
+                        seminaryCapexTimeline as {
+                          initiative: string;
+                          start: number;
+                          duration: number;
+                          budget: number;
+                        }[]
+                      ).map((d) => d.start),
                       legendType: 'none',
                       silent: true,
                     },
@@ -1866,7 +2015,14 @@ export function SeminaryFinancialDashboard({
                       name: 'Planned Duration',
                       type: 'bar',
                       stack: 'timeline',
-                      data: (seminaryCapexTimeline as { initiative: string; start: number; duration: number; budget: number }[]).map((d) => ({
+                      data: (
+                        seminaryCapexTimeline as {
+                          initiative: string;
+                          start: number;
+                          duration: number;
+                          budget: number;
+                        }[]
+                      ).map((d) => ({
                         value: d.duration,
                         itemStyle: { color: palette[0], borderRadius: [0, 10, 10, 0] },
                       })),
@@ -1923,7 +2079,11 @@ export function SeminaryFinancialDashboard({
                       showSymbol: false,
                       areaStyle: {
                         color: {
-                          type: 'linear', x: 0, y: 0, x2: 0, y2: 1,
+                          type: 'linear',
+                          x: 0,
+                          y: 0,
+                          x2: 0,
+                          y2: 1,
                           colorStops: [
                             { offset: 0.05, color: palette[1] + '4D' },
                             { offset: 0.95, color: palette[1] + '0A' },
@@ -1942,7 +2102,11 @@ export function SeminaryFinancialDashboard({
                       showSymbol: false,
                       areaStyle: {
                         color: {
-                          type: 'linear', x: 0, y: 0, x2: 0, y2: 1,
+                          type: 'linear',
+                          x: 0,
+                          y: 0,
+                          x2: 0,
+                          y2: 1,
                           colorStops: [
                             { offset: 0.05, color: palette[0] + '52' },
                             { offset: 0.95, color: palette[0] + '0D' },

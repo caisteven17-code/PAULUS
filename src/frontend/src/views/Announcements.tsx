@@ -78,7 +78,7 @@ export function Announcements() {
     fetch('/api/announcements', { credentials: 'include' })
       .then((res) => (res.ok ? res.json() : []))
       .then((data: Announcement[]) => setAnnouncements(data))
-      .catch(() => setAnnouncements([]))
+      .catch(() => setAnnouncements([]));
   }, []);
 
   if (!permissions.view_announcements && !permissions.manage_announcements) {

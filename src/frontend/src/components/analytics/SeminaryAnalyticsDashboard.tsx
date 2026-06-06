@@ -122,15 +122,17 @@ const KPICard = ({ title, value, priorValue, icon: Icon, data }: any) => {
               grid: { top: 0, right: 0, left: 0, bottom: 0 },
               xAxis: { type: 'category', show: false, data: data.slice(-6).map((_: any, i: number) => i) },
               yAxis: { type: 'value', show: false },
-              series: [{
-                type: 'line',
-                data: data.slice(-6).map((d: any) => d.value),
-                smooth: true,
-                lineStyle: { color: isPositive ? COLORS.success : COLORS.error, width: 2 },
-                itemStyle: { color: isPositive ? COLORS.success : COLORS.error },
-                areaStyle: { color: isPositive ? COLORS.success : COLORS.error, opacity: 0.1 },
-                showSymbol: false,
-              }],
+              series: [
+                {
+                  type: 'line',
+                  data: data.slice(-6).map((d: any) => d.value),
+                  smooth: true,
+                  lineStyle: { color: isPositive ? COLORS.success : COLORS.error, width: 2 },
+                  itemStyle: { color: isPositive ? COLORS.success : COLORS.error },
+                  areaStyle: { color: isPositive ? COLORS.success : COLORS.error, opacity: 0.1 },
+                  showSymbol: false,
+                },
+              ],
             }}
             style={{ height: '100%', width: '100%' }}
           />
@@ -243,10 +245,29 @@ const SeminaryForecastChart = ({
               },
               extraCssText: 'border-radius:12px;border:none;box-shadow:0 4px 20px rgba(0,0,0,0.08)',
             },
-            legend: { top: 0, right: 0, textStyle: { fontSize: 10, fontWeight: 700, color: '#4B5563' }, icon: 'circle', data: ['Historical (Actual)', 'Forecast (ML Model)'] },
+            legend: {
+              top: 0,
+              right: 0,
+              textStyle: { fontSize: 10, fontWeight: 700, color: '#4B5563' },
+              icon: 'circle',
+              data: ['Historical (Actual)', 'Forecast (ML Model)'],
+            },
             grid: { top: 55, right: 30, left: 55, bottom: 30 },
-            xAxis: { type: 'category', data: processedData.map((d: any) => d.month), axisLine: { show: false }, axisTick: { show: false }, axisLabel: { color: '#9CA3AF', fontSize: 11, fontWeight: 600 }, splitLine: { show: true, lineStyle: { color: '#F3F4F6', type: 'dashed' } } },
-            yAxis: { type: 'value', axisLine: { show: false }, axisTick: { show: false }, axisLabel: { color: '#9CA3AF', fontSize: 11, formatter: (v: number) => `${v / 1000}k` }, splitLine: { show: true, lineStyle: { color: '#F3F4F6' } } },
+            xAxis: {
+              type: 'category',
+              data: processedData.map((d: any) => d.month),
+              axisLine: { show: false },
+              axisTick: { show: false },
+              axisLabel: { color: '#9CA3AF', fontSize: 11, fontWeight: 600 },
+              splitLine: { show: true, lineStyle: { color: '#F3F4F6', type: 'dashed' } },
+            },
+            yAxis: {
+              type: 'value',
+              axisLine: { show: false },
+              axisTick: { show: false },
+              axisLabel: { color: '#9CA3AF', fontSize: 11, formatter: (v: number) => `${v / 1000}k` },
+              splitLine: { show: true, lineStyle: { color: '#F3F4F6' } },
+            },
             series: [
               {
                 name: 'Historical (Actual)',
@@ -260,12 +281,59 @@ const SeminaryForecastChart = ({
                 markArea: {
                   silent: true,
                   data: [
-                    [{ xAxis: 'Jun', itemStyle: { color: '#F0F9FF', opacity: 0.4 }, label: { show: true, position: 'insideTopLeft', value: 'PAST (Train)', color: '#0EA5E9', fontSize: 9, fontWeight: 700 } }, { xAxis: pastEnd }],
-                    [{ xAxis: pastEnd, itemStyle: { color: '#FFF7ED', opacity: 0.4 }, label: { show: true, position: 'insideTopLeft', value: 'PRESENT (Holdout)', color: '#F97316', fontSize: 9, fontWeight: 700 } }, { xAxis: presentEnd }],
-                    [{ xAxis: presentEnd, itemStyle: { color: '#F0FDF4', opacity: 0.4 }, label: { show: true, position: 'insideTopLeft', value: 'FUTURE (Forecast)', color: '#22C55E', fontSize: 9, fontWeight: 700 } }, { xAxis: futureEnd }],
+                    [
+                      {
+                        xAxis: 'Jun',
+                        itemStyle: { color: '#F0F9FF', opacity: 0.4 },
+                        label: {
+                          show: true,
+                          position: 'insideTopLeft',
+                          value: 'PAST (Train)',
+                          color: '#0EA5E9',
+                          fontSize: 9,
+                          fontWeight: 700,
+                        },
+                      },
+                      { xAxis: pastEnd },
+                    ],
+                    [
+                      {
+                        xAxis: pastEnd,
+                        itemStyle: { color: '#FFF7ED', opacity: 0.4 },
+                        label: {
+                          show: true,
+                          position: 'insideTopLeft',
+                          value: 'PRESENT (Holdout)',
+                          color: '#F97316',
+                          fontSize: 9,
+                          fontWeight: 700,
+                        },
+                      },
+                      { xAxis: presentEnd },
+                    ],
+                    [
+                      {
+                        xAxis: presentEnd,
+                        itemStyle: { color: '#F0FDF4', opacity: 0.4 },
+                        label: {
+                          show: true,
+                          position: 'insideTopLeft',
+                          value: 'FUTURE (Forecast)',
+                          color: '#22C55E',
+                          fontSize: 9,
+                          fontWeight: 700,
+                        },
+                      },
+                      { xAxis: futureEnd },
+                    ],
                   ],
                 },
-                markLine: { silent: true, symbol: 'none', data: [{ xAxis: presentEnd, lineStyle: { color: '#D1D5DB', type: 'dashed' } }], label: { show: false } },
+                markLine: {
+                  silent: true,
+                  symbol: 'none',
+                  data: [{ xAxis: presentEnd, lineStyle: { color: '#D1D5DB', type: 'dashed' } }],
+                  label: { show: false },
+                },
               },
               {
                 name: 'Forecast (ML Model)',
@@ -379,7 +447,9 @@ export default function SeminaryAnalyticsDashboard({
   const [periodYear2, setPeriodYear2] = useState<SemCmpYear>('2026');
   const [apiLoading, setApiLoading] = useState(false);
   const [apiTrendData, setApiTrendData] = useState<typeof seminaryMockData | null>(null);
-  const [apiForecastPoints, setApiForecastPoints] = useState<{ period: string; value: number; lower_bound: number; upper_bound: number }[] | null>(null);
+  const [apiForecastPoints, setApiForecastPoints] = useState<
+    { period: string; value: number; lower_bound: number; upper_bound: number }[] | null
+  >(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -406,7 +476,11 @@ export default function SeminaryAnalyticsDashboard({
           setApiTrendData(mapped);
         }
 
-        if (forecast?.data_sufficient !== false && Array.isArray(forecast?.forecast_points) && forecast.forecast_points.length > 0) {
+        if (
+          forecast?.data_sufficient !== false &&
+          Array.isArray(forecast?.forecast_points) &&
+          forecast.forecast_points.length > 0
+        ) {
           setApiForecastPoints(forecast.forecast_points);
         }
       })
@@ -526,9 +600,19 @@ export default function SeminaryAnalyticsDashboard({
   const costCompositionData = [
     {
       name: 'People Costs',
-      value: (latestMonth.salaries ?? mockLatest.salaries) + (latestMonth.benefits ?? mockLatest.benefits) + (latestMonth.labor ?? mockLatest.labor) + (latestMonth.profFee ?? mockLatest.profFee),
+      value:
+        (latestMonth.salaries ?? mockLatest.salaries) +
+        (latestMonth.benefits ?? mockLatest.benefits) +
+        (latestMonth.labor ?? mockLatest.labor) +
+        (latestMonth.profFee ?? mockLatest.profFee),
     },
-    { name: 'Infrastructure', value: (latestMonth.construction ?? mockLatest.construction) + (latestMonth.repairs ?? mockLatest.repairs) + (latestMonth.purchases ?? mockLatest.purchases) },
+    {
+      name: 'Infrastructure',
+      value:
+        (latestMonth.construction ?? mockLatest.construction) +
+        (latestMonth.repairs ?? mockLatest.repairs) +
+        (latestMonth.purchases ?? mockLatest.purchases),
+    },
     {
       name: 'Operations',
       value:
@@ -799,8 +883,13 @@ export default function SeminaryAnalyticsDashboard({
       const fallback = seminaryMockData[i] ?? seminaryMockData[seminaryMockData.length - 1];
       return {
         month: d.month,
-        Personnel: (d.salaries ?? fallback.salaries) + (d.benefits ?? fallback.benefits) + (d.incentives ?? fallback.incentives),
-        Operations: (d.utilities ?? fallback.utilities) + (d.lpg ?? fallback.lpg) + (d.supplies ?? fallback.supplies) + (d.purchases ?? fallback.purchases),
+        Personnel:
+          (d.salaries ?? fallback.salaries) + (d.benefits ?? fallback.benefits) + (d.incentives ?? fallback.incentives),
+        Operations:
+          (d.utilities ?? fallback.utilities) +
+          (d.lpg ?? fallback.lpg) +
+          (d.supplies ?? fallback.supplies) +
+          (d.purchases ?? fallback.purchases),
         Maintenance: (d.repairs ?? fallback.repairs) + (d.construction ?? fallback.construction),
       };
     });
@@ -997,15 +1086,40 @@ export default function SeminaryAnalyticsDashboard({
             <ReactECharts
               option={{
                 color: ['#6366f1', '#8b5cf6', '#06b6d4', '#10b981', '#f59e0b', '#ef4444'],
-                tooltip: { trigger: 'axis', formatter: (params: any[]) => `${params[0].axisValue}: ${formatCurrency(params[0].value)}`, extraCssText: 'border-radius:16px;border:none;box-shadow:0 10px 25px rgba(0,0,0,0.1);font-size:12px' },
+                tooltip: {
+                  trigger: 'axis',
+                  formatter: (params: any[]) => `${params[0].axisValue}: ${formatCurrency(params[0].value)}`,
+                  extraCssText: 'border-radius:16px;border:none;box-shadow:0 10px 25px rgba(0,0,0,0.1);font-size:12px',
+                },
                 grid: { top: 20, right: 30, left: 60, bottom: 30 },
-                xAxis: { type: 'category', data: seminaryPeriodComparison.barData.map((d) => d.period), axisLine: { show: false }, axisTick: { show: false }, axisLabel: { color: '#6B7280', fontSize: 11, fontWeight: 700 } },
-                yAxis: { type: 'value', axisLine: { show: false }, axisTick: { show: false }, axisLabel: { color: '#9CA3AF', fontSize: 10, formatter: (v: number) => `${(v / 1_000_000).toFixed(1)}M` }, splitLine: { lineStyle: { color: '#F3F4F6' } } },
-                series: [{
-                  type: 'bar',
-                  data: seminaryPeriodComparison.barData.map((d, i) => ({ value: d.value, itemStyle: { color: i === 0 ? '#1a472a' : '#D4AF37', borderRadius: [10, 10, 0, 0] } })),
-                  barMaxWidth: 90,
-                }],
+                xAxis: {
+                  type: 'category',
+                  data: seminaryPeriodComparison.barData.map((d) => d.period),
+                  axisLine: { show: false },
+                  axisTick: { show: false },
+                  axisLabel: { color: '#6B7280', fontSize: 11, fontWeight: 700 },
+                },
+                yAxis: {
+                  type: 'value',
+                  axisLine: { show: false },
+                  axisTick: { show: false },
+                  axisLabel: {
+                    color: '#9CA3AF',
+                    fontSize: 10,
+                    formatter: (v: number) => `${(v / 1_000_000).toFixed(1)}M`,
+                  },
+                  splitLine: { lineStyle: { color: '#F3F4F6' } },
+                },
+                series: [
+                  {
+                    type: 'bar',
+                    data: seminaryPeriodComparison.barData.map((d, i) => ({
+                      value: d.value,
+                      itemStyle: { color: i === 0 ? '#1a472a' : '#D4AF37', borderRadius: [10, 10, 0, 0] },
+                    })),
+                    barMaxWidth: 90,
+                  },
+                ],
               }}
               style={{ height: '100%', width: '100%' }}
             />
@@ -1065,17 +1179,78 @@ export default function SeminaryAnalyticsDashboard({
             <ReactECharts
               option={{
                 color: ['#6366f1', '#8b5cf6', '#06b6d4', '#10b981', '#f59e0b', '#ef4444'],
-                tooltip: { trigger: 'axis', formatter: (params: any[]) => `${params[0].axisValue}<br/>${params.map((p) => `${p.marker} ${p.seriesName}: ${formatCurrency(p.value)}`).join('<br/>')}`, extraCssText: 'border-radius:12px;border:none;box-shadow:0 4px 20px rgba(0,0,0,0.08)' },
+                tooltip: {
+                  trigger: 'axis',
+                  formatter: (params: any[]) =>
+                    `${params[0].axisValue}<br/>${params.map((p) => `${p.marker} ${p.seriesName}: ${formatCurrency(p.value)}`).join('<br/>')}`,
+                  extraCssText: 'border-radius:12px;border:none;box-shadow:0 4px 20px rgba(0,0,0,0.08)',
+                },
                 legend: { bottom: 0, textStyle: { fontSize: 10 }, icon: 'circle' },
                 grid: { top: 10, right: 20, left: 60, bottom: 60 },
-                xAxis: { type: 'category', data: collectionsBreakdownData.map((d: any) => d.month), axisLabel: { color: '#6B7280', fontSize: 10 } },
-                yAxis: { type: 'value', name: 'Amount (Millions)', nameLocation: 'middle', nameGap: 45, nameRotate: 90, axisLabel: { color: '#6B7280', fontSize: 10, formatter: (v: number) => `${(v / 1000000).toFixed(1)}M` }, splitLine: { lineStyle: { color: '#E5E7EB', type: 'dashed' } } },
+                xAxis: {
+                  type: 'category',
+                  data: collectionsBreakdownData.map((d: any) => d.month),
+                  axisLabel: { color: '#6B7280', fontSize: 10 },
+                },
+                yAxis: {
+                  type: 'value',
+                  name: 'Amount (Millions)',
+                  nameLocation: 'middle',
+                  nameGap: 45,
+                  nameRotate: 90,
+                  axisLabel: {
+                    color: '#6B7280',
+                    fontSize: 10,
+                    formatter: (v: number) => `${(v / 1000000).toFixed(1)}M`,
+                  },
+                  splitLine: { lineStyle: { color: '#E5E7EB', type: 'dashed' } },
+                },
                 series: [
-                  { name: 'Mass Collections', type: 'bar', data: collectionsBreakdownData.map((d: any) => ({ value: d['Mass Collections'], itemStyle: { color: '#D4AF37', borderRadius: [4, 4, 0, 0] } })), barMaxWidth: 14 },
-                  { name: 'Seminary Fees', type: 'bar', data: collectionsBreakdownData.map((d: any) => ({ value: d['Seminary Fees'], itemStyle: { color: '#1a472a', borderRadius: [4, 4, 0, 0] } })), barMaxWidth: 14 },
-                  { name: 'Donations', type: 'bar', data: collectionsBreakdownData.map((d: any) => ({ value: d['Donations'], itemStyle: { color: '#10B981', borderRadius: [4, 4, 0, 0] } })), barMaxWidth: 14 },
-                  { name: 'RCBSP Subsidy', type: 'bar', data: collectionsBreakdownData.map((d: any) => ({ value: d['RCBSP Subsidy'], itemStyle: { color: '#3B82F6', borderRadius: [4, 4, 0, 0] } })), barMaxWidth: 14 },
-                  { name: 'Other Sources', type: 'bar', data: collectionsBreakdownData.map((d: any) => ({ value: d['Other Sources'], itemStyle: { color: '#F59E0B', borderRadius: [4, 4, 0, 0] } })), barMaxWidth: 14 },
+                  {
+                    name: 'Mass Collections',
+                    type: 'bar',
+                    data: collectionsBreakdownData.map((d: any) => ({
+                      value: d['Mass Collections'],
+                      itemStyle: { color: '#D4AF37', borderRadius: [4, 4, 0, 0] },
+                    })),
+                    barMaxWidth: 14,
+                  },
+                  {
+                    name: 'Seminary Fees',
+                    type: 'bar',
+                    data: collectionsBreakdownData.map((d: any) => ({
+                      value: d['Seminary Fees'],
+                      itemStyle: { color: '#1a472a', borderRadius: [4, 4, 0, 0] },
+                    })),
+                    barMaxWidth: 14,
+                  },
+                  {
+                    name: 'Donations',
+                    type: 'bar',
+                    data: collectionsBreakdownData.map((d: any) => ({
+                      value: d['Donations'],
+                      itemStyle: { color: '#10B981', borderRadius: [4, 4, 0, 0] },
+                    })),
+                    barMaxWidth: 14,
+                  },
+                  {
+                    name: 'RCBSP Subsidy',
+                    type: 'bar',
+                    data: collectionsBreakdownData.map((d: any) => ({
+                      value: d['RCBSP Subsidy'],
+                      itemStyle: { color: '#3B82F6', borderRadius: [4, 4, 0, 0] },
+                    })),
+                    barMaxWidth: 14,
+                  },
+                  {
+                    name: 'Other Sources',
+                    type: 'bar',
+                    data: collectionsBreakdownData.map((d: any) => ({
+                      value: d['Other Sources'],
+                      itemStyle: { color: '#F59E0B', borderRadius: [4, 4, 0, 0] },
+                    })),
+                    barMaxWidth: 14,
+                  },
                 ],
               }}
               style={{ height: '100%', width: '100%' }}
@@ -1093,15 +1268,57 @@ export default function SeminaryAnalyticsDashboard({
             <ReactECharts
               option={{
                 color: ['#6366f1', '#8b5cf6', '#06b6d4', '#10b981', '#f59e0b', '#ef4444'],
-                tooltip: { trigger: 'axis', formatter: (params: any[]) => `${params[0].axisValue}<br/>${params.map((p) => `${p.marker} ${p.seriesName}: ${formatCurrency(p.value)}`).join('<br/>')}`, extraCssText: 'border-radius:12px;border:none;box-shadow:0 4px 20px rgba(0,0,0,0.08)' },
+                tooltip: {
+                  trigger: 'axis',
+                  formatter: (params: any[]) =>
+                    `${params[0].axisValue}<br/>${params.map((p) => `${p.marker} ${p.seriesName}: ${formatCurrency(p.value)}`).join('<br/>')}`,
+                  extraCssText: 'border-radius:12px;border:none;box-shadow:0 4px 20px rgba(0,0,0,0.08)',
+                },
                 legend: { bottom: 0, textStyle: { fontSize: 10 }, icon: 'circle' },
                 grid: { top: 10, right: 20, left: 60, bottom: 60 },
-                xAxis: { type: 'category', data: disbursementBreakdownData.map((d: any) => d.month), axisLabel: { color: '#6B7280', fontSize: 10 } },
-                yAxis: { type: 'value', name: 'Amount (Millions)', nameLocation: 'middle', nameGap: 45, nameRotate: 90, axisLabel: { color: '#6B7280', fontSize: 10, formatter: (v: number) => `${(v / 1000000).toFixed(1)}M` }, splitLine: { lineStyle: { color: '#E5E7EB', type: 'dashed' } } },
+                xAxis: {
+                  type: 'category',
+                  data: disbursementBreakdownData.map((d: any) => d.month),
+                  axisLabel: { color: '#6B7280', fontSize: 10 },
+                },
+                yAxis: {
+                  type: 'value',
+                  name: 'Amount (Millions)',
+                  nameLocation: 'middle',
+                  nameGap: 45,
+                  nameRotate: 90,
+                  axisLabel: {
+                    color: '#6B7280',
+                    fontSize: 10,
+                    formatter: (v: number) => `${(v / 1000000).toFixed(1)}M`,
+                  },
+                  splitLine: { lineStyle: { color: '#E5E7EB', type: 'dashed' } },
+                },
                 series: [
-                  { name: 'Personnel', type: 'bar', data: disbursementBreakdownData.map((d: any) => ({ value: d['Personnel'], itemStyle: { color: '#1a472a' } })) },
-                  { name: 'Operations', type: 'bar', data: disbursementBreakdownData.map((d: any) => ({ value: d['Operations'], itemStyle: { color: '#D4AF37' } })) },
-                  { name: 'Maintenance', type: 'bar', data: disbursementBreakdownData.map((d: any) => ({ value: d['Maintenance'], itemStyle: { color: '#10B981', borderRadius: [4, 4, 0, 0] } })) },
+                  {
+                    name: 'Personnel',
+                    type: 'bar',
+                    data: disbursementBreakdownData.map((d: any) => ({
+                      value: d['Personnel'],
+                      itemStyle: { color: '#1a472a' },
+                    })),
+                  },
+                  {
+                    name: 'Operations',
+                    type: 'bar',
+                    data: disbursementBreakdownData.map((d: any) => ({
+                      value: d['Operations'],
+                      itemStyle: { color: '#D4AF37' },
+                    })),
+                  },
+                  {
+                    name: 'Maintenance',
+                    type: 'bar',
+                    data: disbursementBreakdownData.map((d: any) => ({
+                      value: d['Maintenance'],
+                      itemStyle: { color: '#10B981', borderRadius: [4, 4, 0, 0] },
+                    })),
+                  },
                 ],
               }}
               style={{ height: '100%', width: '100%' }}
@@ -1188,14 +1405,50 @@ export default function SeminaryAnalyticsDashboard({
             <ReactECharts
               option={{
                 color: ['#6366f1', '#8b5cf6', '#06b6d4', '#10b981', '#f59e0b', '#ef4444'],
-                tooltip: { trigger: 'axis', formatter: (params: any[]) => `${params[0].axisValue}<br/>${params.map((p) => `${p.marker} ${p.seriesName}: ${formatCurrency(p.value)}`).join('<br/>')}`, extraCssText: 'border-radius:12px;border:none;box-shadow:0 4px 20px rgba(0,0,0,0.08)' },
+                tooltip: {
+                  trigger: 'axis',
+                  formatter: (params: any[]) =>
+                    `${params[0].axisValue}<br/>${params.map((p) => `${p.marker} ${p.seriesName}: ${formatCurrency(p.value)}`).join('<br/>')}`,
+                  extraCssText: 'border-radius:12px;border:none;box-shadow:0 4px 20px rgba(0,0,0,0.08)',
+                },
                 grid: { top: 10, right: 20, left: 60, bottom: 30 },
-                xAxis: { type: 'category', data: activeData.map((d: any) => d.month), axisLabel: { color: '#6B7280', fontSize: 11 } },
-                yAxis: { type: 'value', axisLabel: { color: '#6B7280', fontSize: 11, formatter: (v: number) => `${v / 1000}k` }, splitLine: { lineStyle: { color: '#E5E7EB', type: 'dashed' } } },
+                xAxis: {
+                  type: 'category',
+                  data: activeData.map((d: any) => d.month),
+                  axisLabel: { color: '#6B7280', fontSize: 11 },
+                },
+                yAxis: {
+                  type: 'value',
+                  axisLabel: { color: '#6B7280', fontSize: 11, formatter: (v: number) => `${v / 1000}k` },
+                  splitLine: { lineStyle: { color: '#E5E7EB', type: 'dashed' } },
+                },
                 series: [
-                  { name: 'Total Receipts', type: 'bar', data: activeData.map((d: any) => ({ value: d.totalIncome, itemStyle: { color: '#1a472a', borderRadius: [4, 4, 0, 0] } })), barMaxWidth: 30 },
-                  { name: 'Total Disbursements', type: 'bar', data: activeData.map((d: any) => ({ value: d.totalExpenses, itemStyle: { color: '#D4AF37', borderRadius: [4, 4, 0, 0] } })), barMaxWidth: 30 },
-                  { name: 'Net Surplus/Deficit', type: 'line', data: activeData.map((d: any) => d.netSurplus), lineStyle: { color: '#EF4444', width: 2 }, itemStyle: { color: '#EF4444' }, symbolSize: 6 },
+                  {
+                    name: 'Total Receipts',
+                    type: 'bar',
+                    data: activeData.map((d: any) => ({
+                      value: d.totalIncome,
+                      itemStyle: { color: '#1a472a', borderRadius: [4, 4, 0, 0] },
+                    })),
+                    barMaxWidth: 30,
+                  },
+                  {
+                    name: 'Total Disbursements',
+                    type: 'bar',
+                    data: activeData.map((d: any) => ({
+                      value: d.totalExpenses,
+                      itemStyle: { color: '#D4AF37', borderRadius: [4, 4, 0, 0] },
+                    })),
+                    barMaxWidth: 30,
+                  },
+                  {
+                    name: 'Net Surplus/Deficit',
+                    type: 'line',
+                    data: activeData.map((d: any) => d.netSurplus),
+                    lineStyle: { color: '#EF4444', width: 2 },
+                    itemStyle: { color: '#EF4444' },
+                    symbolSize: 6,
+                  },
                 ],
               }}
               style={{ height: '100%', width: '100%' }}

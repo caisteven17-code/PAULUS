@@ -173,13 +173,15 @@ def _fetch_and_process(institution_id: str) -> dict[str, Any]:
         eff = dea_scores[i]
         if eff < 0.8:
             gap = max_collection - float(y[i])
-            recommended_actions.append({
-                "period": str(int(yearly["year"].iloc[i])),
-                "efficiency_score": eff,
-                "avg_collection": round(float(y[i]), 2),
-                "collection_gap": round(gap, 2),
-                "action": "Review assignment strategy and increase community engagement activities.",
-            })
+            recommended_actions.append(
+                {
+                    "period": str(int(yearly["year"].iloc[i])),
+                    "efficiency_score": eff,
+                    "avg_collection": round(float(y[i]), 2),
+                    "collection_gap": round(gap, 2),
+                    "action": "Review assignment strategy and increase community engagement activities.",
+                }
+            )
 
     # Performance improvement estimate: avg gap for inefficient periods
     if recommended_actions:

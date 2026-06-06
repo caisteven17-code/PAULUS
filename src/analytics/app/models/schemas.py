@@ -4,6 +4,7 @@ from pydantic import BaseModel
 
 # ── Existing models (unchanged) ───────────────────────────────────────────────
 
+
 class HealthDimensions(BaseModel):
     liquidity: float
     sustainability: float
@@ -56,6 +57,7 @@ class DioceseSummary(BaseModel):
 
 # ── Shared primitives ─────────────────────────────────────────────────────────
 
+
 class ForecastPoint(BaseModel):
     period: str
     value: float
@@ -73,13 +75,14 @@ class ChampionModelResult(BaseModel):
 
 # ── Descriptive schemas ───────────────────────────────────────────────────────
 
+
 class FinancialTrendResponse(BaseModel):
     data_sufficient: bool
     entity_id: str
     entity_type: str
-    monthly_series: List[Dict[str, Any]]   # [{period, total_receipts, total_expenses, trend, seasonal, residual}]
-    anomaly_flags: List[Dict[str, Any]]    # [{period, is_anomaly, z_score}]
-    kpis: Dict[str, float]                 # annual_growth_rate, disbursement_ratio, mom_change, deficit_rate
+    monthly_series: List[Dict[str, Any]]  # [{period, total_receipts, total_expenses, trend, seasonal, residual}]
+    anomaly_flags: List[Dict[str, Any]]  # [{period, is_anomaly, z_score}]
+    kpis: Dict[str, float]  # annual_growth_rate, disbursement_ratio, mom_change, deficit_rate
     decline_detected: bool
     timestamp: str
 
@@ -94,9 +97,9 @@ class PastoralAssignmentResponse(BaseModel):
 
 class ParishClusterResponse(BaseModel):
     data_sufficient: bool
-    cluster_counts: Dict[str, int]          # {High-Performing, Growing, Stable, At-Risk}
-    parishes: List[Dict[str, Any]]          # [{institution_id, cluster_label, avg_collection, growth_rate, variance}]
-    kpis: Dict[str, float]                  # cluster_purity, rule_coverage_rate
+    cluster_counts: Dict[str, int]  # {High-Performing, Growing, Stable, At-Risk}
+    parishes: List[Dict[str, Any]]  # [{institution_id, cluster_label, avg_collection, growth_rate, variance}]
+    kpis: Dict[str, float]  # cluster_purity, rule_coverage_rate
     timestamp: str
 
 
@@ -104,8 +107,8 @@ class SeasonalityTrendResponse(BaseModel):
     data_sufficient: bool
     entity_id: str
     entity_type: str
-    monthly_trend: List[Dict[str, Any]]     # [{month, avg_collection, seasonal_impact}]
-    event_averages: List[Dict[str, Any]]    # [{event_name, avg_collection, vs_baseline_pct}]
+    monthly_trend: List[Dict[str, Any]]  # [{month, avg_collection, seasonal_impact}]
+    event_averages: List[Dict[str, Any]]  # [{event_name, avg_collection, vs_baseline_pct}]
     seasonal_anomalies: List[Dict[str, Any]]
     timestamp: str
 
@@ -113,12 +116,13 @@ class SeasonalityTrendResponse(BaseModel):
 class ProjectsDescriptiveResponse(BaseModel):
     data_sufficient: bool
     institution_id: str
-    projects: List[Dict[str, Any]]          # [{project_id, name, completion_pct, raised, target}]
-    aggregates: Dict[str, Any]              # total_raised, total_target, overall_completion_pct, count
+    projects: List[Dict[str, Any]]  # [{project_id, name, completion_pct, raised, target}]
+    aggregates: Dict[str, Any]  # total_raised, total_target, overall_completion_pct, count
     timestamp: str
 
 
 # ── Diagnostic schemas ────────────────────────────────────────────────────────
+
 
 class PriestFinancialDiagnosticResponse(BaseModel):
     data_sufficient: bool
@@ -156,6 +160,7 @@ class ProjectRiskDiagnosticResponse(BaseModel):
 
 # ── Predictive schemas ────────────────────────────────────────────────────────
 
+
 class FinancialForecastResponse(BaseModel):
     data_sufficient: bool
     entity_id: str
@@ -163,7 +168,7 @@ class FinancialForecastResponse(BaseModel):
     forecast_receipts: List[ForecastPoint]
     forecast_expenses: List[ForecastPoint]
     champion: ChampionModelResult
-    signal: str                             # "rise" | "fall" | "stable"
+    signal: str  # "rise" | "fall" | "stable"
     timestamp: str
 
 
@@ -171,7 +176,7 @@ class PastoralForecastResponse(BaseModel):
     data_sufficient: bool
     institution_id: str
     continuous_forecast: List[ForecastPoint]
-    state_prediction: str                   # "improving" | "stable" | "declining"
+    state_prediction: str  # "improving" | "stable" | "declining"
     transition_probabilities: Dict[str, float]
     champion: ChampionModelResult
     timestamp: str
@@ -179,7 +184,7 @@ class PastoralForecastResponse(BaseModel):
 
 class ClusterForecastResponse(BaseModel):
     data_sufficient: bool
-    parish_predictions: List[Dict[str, Any]]   # [{institution_id, current_cluster, predicted_cluster, probability}]
+    parish_predictions: List[Dict[str, Any]]  # [{institution_id, current_cluster, predicted_cluster, probability}]
     transition_matrix: Dict[str, Dict[str, float]]
     movement_summary: Dict[str, int]
     timestamp: str
@@ -198,18 +203,19 @@ class SeasonalForecastResponse(BaseModel):
 class ProjectForecastResponse(BaseModel):
     data_sufficient: bool
     institution_id: str
-    projects: List[Dict[str, Any]]          # [{project_id, success_probability, risk_score, predicted_delay}]
+    projects: List[Dict[str, Any]]  # [{project_id, success_probability, risk_score, predicted_delay}]
     model_metrics: Dict[str, float]
     timestamp: str
 
 
 # ── Prescriptive schemas ──────────────────────────────────────────────────────
 
+
 class FinancialRecommendationResponse(BaseModel):
     data_sufficient: bool
     entity_id: str
     entity_type: str
-    optimal_allocation: Dict[str, float]    # {category: recommended_disbursement}
+    optimal_allocation: Dict[str, float]  # {category: recommended_disbursement}
     budget_utilization_pct: float
     disbursement_saved_pct: float
     timestamp: str

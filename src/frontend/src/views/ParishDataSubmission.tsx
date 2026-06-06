@@ -112,7 +112,11 @@ export function ParishDataSubmission({
   const [statusMessage, setStatusMessage] = useState(
     'No submission has started yet. Download a template or choose a report file to begin.',
   );
-  const [submissionResult, setSubmissionResult] = useState<{ submissionId: string; filePath: string; validationStatus: string } | null>(null);
+  const [submissionResult, setSubmissionResult] = useState<{
+    submissionId: string;
+    filePath: string;
+    validationStatus: string;
+  } | null>(null);
 
   const fileSizeLabel = selectedFile ? formatFileSize(selectedFile.size) : '';
 
@@ -218,11 +222,7 @@ export function ParishDataSubmission({
     setStatusMessage('Uploading report to diocesan secure storage...');
 
     const reportType =
-      institutionType === 'parish'
-        ? 'IAFR'
-        : institutionType === 'school'
-          ? 'School FS'
-          : 'Seminary FS';
+      institutionType === 'parish' ? 'IAFR' : institutionType === 'school' ? 'School FS' : 'Seminary FS';
 
     let apiResult: { submissionId: string; filePath: string; validationStatus: string } | null = null;
     try {

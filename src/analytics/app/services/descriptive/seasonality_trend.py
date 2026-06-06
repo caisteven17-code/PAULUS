@@ -104,11 +104,13 @@ def _fetch_and_process(institution_id: str, entity_type: str) -> dict[str, Any]:
     monthly_trend = []
     for i, mname in enumerate(MONTH_ORDER, start=1):
         avg_val = float(monthly_avg.get(i, 0.0))
-        monthly_trend.append({
-            "month": mname,
-            "avg_collection": round(avg_val, 2),
-            "seasonal_impact": round(avg_val - float(monthly_avg.mean()), 2),
-        })
+        monthly_trend.append(
+            {
+                "month": mname,
+                "avg_collection": round(avg_val, 2),
+                "seasonal_impact": round(avg_val - float(monthly_avg.mean()), 2),
+            }
+        )
 
     # STL residuals and anomaly flags over the full time series
     series = df["total_receipts"].copy()
@@ -133,11 +135,13 @@ def _fetch_and_process(institution_id: str, entity_type: str) -> dict[str, Any]:
             continue
         avg_c = float(sub.mean())
         vs_baseline = safe_div(avg_c - baseline, baseline) * 100
-        event_averages.append({
-            "event_name": event,
-            "avg_collection": round(avg_c, 2),
-            "vs_baseline_pct": round(vs_baseline, 2),
-        })
+        event_averages.append(
+            {
+                "event_name": event,
+                "avg_collection": round(avg_c, 2),
+                "vs_baseline_pct": round(vs_baseline, 2),
+            }
+        )
 
     return {
         "data_sufficient": True,

@@ -328,11 +328,15 @@ export function HealthTracker() {
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-slate-600 text-sm font-medium">Financial Health Score</p>
-                  <p className={`text-3xl font-bold mt-2 ${apiHealthScore >= 70 ? 'text-emerald-600' : apiHealthScore >= 40 ? 'text-amber-600' : 'text-rose-600'}`}>
+                  <p
+                    className={`text-3xl font-bold mt-2 ${apiHealthScore >= 70 ? 'text-emerald-600' : apiHealthScore >= 40 ? 'text-amber-600' : 'text-rose-600'}`}
+                  >
                     {apiHealthScore.toFixed(1)}
                   </p>
                 </div>
-                <Heart className={`w-12 h-12 ${apiHealthScore >= 70 ? 'text-emerald-300' : apiHealthScore >= 40 ? 'text-amber-300' : 'text-rose-300'}`} />
+                <Heart
+                  className={`w-12 h-12 ${apiHealthScore >= 70 ? 'text-emerald-300' : apiHealthScore >= 40 ? 'text-amber-300' : 'text-rose-300'}`}
+                />
               </div>
             </motion.div>
           )}

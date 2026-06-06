@@ -42,18 +42,13 @@ export async function POST(req: NextRequest) {
     const storagePath = `${institutionType}/${safeName}/${reportingYear}/${reportingMonth}/${file.name}`;
 
     // Upload to Supabase Storage using the service-role client
-    const { error: uploadError } = await supabase.storage
-      .from(BUCKET)
-      .upload(storagePath, buffer, {
-        contentType: file.type || 'application/octet-stream',
-        upsert: true,
-      });
+    const { error: uploadError } = await supabase.storage.from(BUCKET).upload(storagePath, buffer, {
+      contentType: file.type || 'application/octet-stream',
+      upsert: true,
+    });
 
     if (uploadError) {
-      return NextResponse.json(
-        { error: `Storage upload failed: ${uploadError.message}` },
-        { status: 500 },
-      );
+      return NextResponse.json({ error: `Storage upload failed: ${uploadError.message}` }, { status: 500 });
     }
 
     // Generate a 1-year signed URL (bucket is private)

@@ -59,12 +59,13 @@ CACHE_FILE = CACHE_DIR / "ibtracs_WP.csv"
 CACHE_MAX_AGE_DAYS = 7  # re-download if older than this
 
 # Intensity thresholds (knots, 1-minute sustained wind — IBTrACS USA_WIND column)
-TYPHOON_KT = 64      # Category 1+ typhoon
-STORM_KT = 34        # Tropical storm
-DEPRESSION_KT = 0    # Tropical depression (any named system)
+TYPHOON_KT = 64  # Category 1+ typhoon
+STORM_KT = 34  # Tropical storm
+DEPRESSION_KT = 0  # Tropical depression (any named system)
 
 
 # ── Haversine distance ────────────────────────────────────────────────────────
+
 
 def _haversine_km(lat1: float, lon1: float, lat2: float, lon2: float) -> float:
     """Great-circle distance between two points in kilometres."""
@@ -77,6 +78,7 @@ def _haversine_km(lat1: float, lon1: float, lat2: float, lon2: float) -> float:
 
 
 # ── IBTrACS download & cache ──────────────────────────────────────────────────
+
 
 def _download_ibtracs() -> str:
     """Return raw CSV text from cache or fresh download."""
@@ -98,6 +100,7 @@ def _download_ibtracs() -> str:
 
 
 # ── Parser ────────────────────────────────────────────────────────────────────
+
 
 def _parse_ibtracs(
     raw_csv: str,
@@ -197,6 +200,7 @@ def _parse_ibtracs(
 
 # ── Monthly aggregation ───────────────────────────────────────────────────────
 
+
 def aggregate_monthly(
     daily_flags: dict[str, dict],
     start_year: int,
@@ -247,6 +251,7 @@ def aggregate_monthly(
 
 
 # ── Public API ────────────────────────────────────────────────────────────────
+
 
 def get_typhoon_flags(
     start_year: int = 2021,
