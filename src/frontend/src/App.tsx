@@ -564,6 +564,8 @@ export default function App() {
           );
         case 'audit-log':
           return permissions.view_audit_logs ? <AuditLog /> : renderAccessDenied();
+        case 'consolidated':
+          return permissions.view_diocese ? <ConsolidatedFinancial /> : renderAccessDenied();
         default:
           return (
             <div className="flex items-center justify-center h-[calc(100vh-80px)]">

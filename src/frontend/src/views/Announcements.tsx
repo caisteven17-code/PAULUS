@@ -61,10 +61,7 @@ export function Announcements() {
   const { permissions } = usePermissions();
   const { user } = useAuth();
 
-  const [announcements, setAnnouncements] = useState<Announcement[]>(() => {
-    const saved = localStorage.getItem('announcements');
-    return saved ? JSON.parse(saved) : [];
-  });
+  const [announcements, setAnnouncements] = useState<Announcement[]>([]);
   const [showForm, setShowForm] = useState(false);
   const [selectedAnnouncement, setSelectedAnnouncement] = useState<Announcement | null>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -78,8 +75,11 @@ export function Announcements() {
   });
 
   useEffect(() => {
-    localStorage.setItem('announcements', JSON.stringify(announcements));
-  }, [announcements]);
+    fetch('/api/announcements', { credentials: 'include' })
+      .then((res) => (res.ok ? res.json() : []))
+      .then((data: Announcement[]) => setAnnouncements(data))
+      .catch(() => setAnnouncements([]))
+  }, []);
 
   if (!permissions.view_announcements && !permissions.manage_announcements) {
     return (
@@ -118,13 +118,14 @@ export function Announcements() {
     setEditingId(null);
   }, []);
 
-  const handleAddAnnouncement = useCallback(() => {
+  const handleAddAnnouncement = useCallback(async () => {
     if (!formData.title.trim() || !formData.content.trim()) {
       alert('Please fill in all fields');
       return;
     }
 
     if (editingId) {
+      // Optimistic local update for edits (no PATCH endpoint yet)
       setAnnouncements((prev) =>
         prev.map((announcement) =>
           announcement.id === editingId
@@ -139,26 +140,73 @@ export function Announcements() {
         ),
       );
     } else {
-      const newAnnouncement: Announcement = {
-        id: Math.random().toString(36).substr(2, 9),
-        title: formData.title,
-        content: formData.content,
-        author: user?.name || "Chancellor's Office",
-        authorRole: user?.role || 'admin',
-        createdAt: Date.now(),
-        priority: formData.priority,
-        category: formData.category,
-      };
-      setAnnouncements((prev) => [newAnnouncement, ...prev]);
+      try {
+        const res = await fetch('/api/announcements', {
+          method: 'POST',
+          credentials: 'include',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            title: formData.title,
+            content: formData.content,
+            author: user?.name || "Chancellor's Office",
+            authorRole: user?.role || 'admin',
+            priority: formData.priority,
+            category: formData.category,
+          }),
+        });
+        if (res.ok) {
+          const created: Announcement = await res.json();
+          setAnnouncements((prev) => [created, ...prev]);
+        } else {
+          // Fallback: optimistic insert
+          const newAnnouncement: Announcement = {
+            id: Math.random().toString(36).substr(2, 9),
+            title: formData.title,
+            content: formData.content,
+            author: user?.name || "Chancellor's Office",
+            authorRole: user?.role || 'admin',
+            createdAt: Date.now(),
+            priority: formData.priority,
+            category: formData.category,
+          };
+          setAnnouncements((prev) => [newAnnouncement, ...prev]);
+        }
+      } catch {
+        // Fallback: optimistic insert
+        const newAnnouncement: Announcement = {
+          id: Math.random().toString(36).substr(2, 9),
+          title: formData.title,
+          content: formData.content,
+          author: user?.name || "Chancellor's Office",
+          authorRole: user?.role || 'admin',
+          createdAt: Date.now(),
+          priority: formData.priority,
+          category: formData.category,
+        };
+        setAnnouncements((prev) => [newAnnouncement, ...prev]);
+      }
     }
 
     resetForm();
     setShowForm(false);
   }, [editingId, formData, resetForm, user]);
 
-  const handleDelete = useCallback((id: string) => {
+  const handleDelete = useCallback(async (id: string) => {
     if (confirm('Delete this announcement?')) {
+      // Optimistic remove
       setAnnouncements((prev) => prev.filter((announcement) => announcement.id !== id));
+      try {
+        await fetch('/api/announcements?id=' + encodeURIComponent(id), {
+          method: 'DELETE',
+          credentials: 'include',
+        });
+      } catch {
+        // If delete fails, re-fetch to restore state
+        fetch('/api/announcements', { credentials: 'include' })
+          .then((res) => (res.ok ? res.json() : []))
+          .then((data: Announcement[]) => setAnnouncements(data))
+          .catch(() => {});
+      }
     }
   }, []);
 

@@ -6,7 +6,7 @@
  *
  * All existing callers throughout the app continue to work without
  * modification.  The actual business logic now lives in the server-side
- * microservices under src/microservices/.
+ * NestJS backend via the api-client.
  */
 
 import { apiClient } from '../lib/api-client';
@@ -20,8 +20,7 @@ import type {
   ProjectExpense,
 } from '../types';
 
-// Re-export DEFAULT_RECORDS for any component that imports it directly.
-export { DEFAULT_RECORDS } from '../microservices/financial.service';
+
 
 export const dataService = {
   // ------------------------------------------------------------------

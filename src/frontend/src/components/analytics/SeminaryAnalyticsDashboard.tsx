@@ -1,24 +1,7 @@
 'use client';
 
-import React, { useState, useMemo } from 'react';
-import {
-  BarChart,
-  Bar,
-  XAxis,
-  YAxis,
-  CartesianGrid,
-  Tooltip,
-  Legend,
-  ResponsiveContainer,
-  LineChart,
-  Line,
-  AreaChart,
-  Area,
-  ComposedChart,
-  ReferenceArea,
-  ReferenceLine,
-  Cell,
-} from 'recharts';
+import React, { useState, useMemo, useEffect } from 'react';
+import ReactECharts from 'echarts-for-react';
 import {
   TrendingUp,
   TrendingDown,
@@ -42,6 +25,7 @@ import { COLORS } from '../../constants';
 import { seminaryMockData, CHART_COLORS } from '../../utils/seminaryMockData';
 import { FinancialHealthGauge } from '../ui/FinancialHealthGauge';
 import { HealthDimensionBar } from '../ui/HealthDimensionBar';
+import { apiClient } from '../../lib/api-client';
 
 // ============================================================================
 // UTILS & FORMATTERS
@@ -133,18 +117,23 @@ const KPICard = ({ title, value, priorValue, icon: Icon, data }: any) => {
         </div>
 
         <div className="h-10 w-full opacity-50">
-          <ResponsiveContainer width="100%" height="100%">
-            <AreaChart data={data.slice(-6)}>
-              <Area
-                type="monotone"
-                dataKey="value"
-                stroke={isPositive ? COLORS.success : COLORS.error}
-                fill={isPositive ? COLORS.success : COLORS.error}
-                fillOpacity={0.1}
-                strokeWidth={2}
-              />
-            </AreaChart>
-          </ResponsiveContainer>
+          <ReactECharts
+            option={{
+              grid: { top: 0, right: 0, left: 0, bottom: 0 },
+              xAxis: { type: 'category', show: false, data: data.slice(-6).map((_: any, i: number) => i) },
+              yAxis: { type: 'value', show: false },
+              series: [{
+                type: 'line',
+                data: data.slice(-6).map((d: any) => d.value),
+                smooth: true,
+                lineStyle: { color: isPositive ? COLORS.success : COLORS.error, width: 2 },
+                itemStyle: { color: isPositive ? COLORS.success : COLORS.error },
+                areaStyle: { color: isPositive ? COLORS.success : COLORS.error, opacity: 0.1 },
+                showSymbol: false,
+              }],
+            }}
+            style={{ height: '100%', width: '100%' }}
+          />
         </div>
       </div>
     </div>
@@ -242,105 +231,56 @@ const SeminaryForecastChart = ({
             {yAxisLabel}
           </span>
         </div>
-        <ResponsiveContainer width="100%" height="100%">
-          <LineChart data={processedData} margin={{ top: 30, right: 30, left: 10, bottom: 10 }}>
-            <CartesianGrid strokeDasharray="3 3" vertical={true} stroke="#F3F4F6" />
-            <XAxis
-              dataKey="month"
-              axisLine={false}
-              tickLine={false}
-              tick={{ fill: '#9CA3AF', fontSize: 11, fontWeight: 600 }}
-              dy={10}
-            />
-            <YAxis
-              axisLine={false}
-              tickLine={false}
-              tick={{ fill: '#9CA3AF', fontSize: 11, fontWeight: 600 }}
-              tickFormatter={(v) => `${v / 1000}k`}
-              width={50}
-            />
-            <Tooltip
-              contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 4px 20px rgba(0,0,0,0.08)' }}
-              formatter={(v) => formatCurrency(Number(v ?? 0))}
-            />
-            <ReferenceArea
-              x1="Jun"
-              x2={pastEnd}
-              fill="#F0F9FF"
-              fillOpacity={0.4}
-              label={{
-                position: 'insideTopLeft',
-                value: 'PAST (Train)',
-                fill: '#0EA5E9',
-                fontSize: 9,
-                fontWeight: 800,
-                offset: 10,
-              }}
-            />
-            <ReferenceArea
-              x1={pastEnd}
-              x2={presentEnd}
-              fill="#FFF7ED"
-              fillOpacity={0.4}
-              label={{
-                position: 'insideTopLeft',
-                value: 'PRESENT (Holdout)',
-                fill: '#F97316',
-                fontSize: 9,
-                fontWeight: 800,
-                offset: 10,
-              }}
-            />
-            <ReferenceArea
-              x1={presentEnd}
-              x2={futureEnd}
-              fill="#F0FDF4"
-              fillOpacity={0.4}
-              label={{
-                position: 'insideTopLeft',
-                value: 'FUTURE (Forecast)',
-                fill: '#22C55E',
-                fontSize: 9,
-                fontWeight: 800,
-                offset: 10,
-              }}
-            />
-            <ReferenceLine x={presentEnd} stroke="#D1D5DB" strokeDasharray="4 4" />
-            <Line
-              type="monotone"
-              dataKey={actualKey}
-              name="Historical (Actual)"
-              stroke="#1a472a"
-              strokeWidth={4}
-              dot={{ r: 4, fill: '#1a472a', strokeWidth: 2, stroke: '#fff' }}
-              activeDot={{ r: 7, strokeWidth: 0 }}
-              connectNulls={false}
-            />
-            <Line
-              type="monotone"
-              dataKey={forecastKey}
-              name="Forecast (ML Model)"
-              stroke="#D4AF37"
-              strokeWidth={4}
-              strokeDasharray="8 4"
-              dot={{ r: 4, fill: '#D4AF37', strokeWidth: 2, stroke: '#fff' }}
-              activeDot={{ r: 7, strokeWidth: 0 }}
-            />
-            <Legend
-              verticalAlign="top"
-              align="right"
-              height={50}
-              iconType="circle"
-              wrapperStyle={{
-                fontSize: '10px',
-                fontWeight: 700,
-                textTransform: 'uppercase',
-                letterSpacing: '0.05em',
-                color: '#4B5563',
-              }}
-            />
-          </LineChart>
-        </ResponsiveContainer>
+        <ReactECharts
+          option={{
+            color: ['#6366f1', '#8b5cf6', '#06b6d4', '#10b981', '#f59e0b', '#ef4444'],
+            tooltip: {
+              trigger: 'axis',
+              formatter: (params: any[]) => {
+                const validParams = params.filter((p) => p.value !== null && p.value !== undefined);
+                if (!validParams.length) return '';
+                return `${validParams[0].axisValue}<br/>${validParams.map((p) => `${p.marker} ${p.seriesName}: ${formatCurrency(p.value)}`).join('<br/>')}`;
+              },
+              extraCssText: 'border-radius:12px;border:none;box-shadow:0 4px 20px rgba(0,0,0,0.08)',
+            },
+            legend: { top: 0, right: 0, textStyle: { fontSize: 10, fontWeight: 700, color: '#4B5563' }, icon: 'circle', data: ['Historical (Actual)', 'Forecast (ML Model)'] },
+            grid: { top: 55, right: 30, left: 55, bottom: 30 },
+            xAxis: { type: 'category', data: processedData.map((d: any) => d.month), axisLine: { show: false }, axisTick: { show: false }, axisLabel: { color: '#9CA3AF', fontSize: 11, fontWeight: 600 }, splitLine: { show: true, lineStyle: { color: '#F3F4F6', type: 'dashed' } } },
+            yAxis: { type: 'value', axisLine: { show: false }, axisTick: { show: false }, axisLabel: { color: '#9CA3AF', fontSize: 11, formatter: (v: number) => `${v / 1000}k` }, splitLine: { show: true, lineStyle: { color: '#F3F4F6' } } },
+            series: [
+              {
+                name: 'Historical (Actual)',
+                type: 'line',
+                data: processedData.map((d: any) => d[actualKey] ?? null),
+                smooth: true,
+                connectNulls: false,
+                lineStyle: { color: '#1a472a', width: 4 },
+                itemStyle: { color: '#1a472a', borderColor: '#fff', borderWidth: 2 },
+                symbolSize: 8,
+                markArea: {
+                  silent: true,
+                  data: [
+                    [{ xAxis: 'Jun', itemStyle: { color: '#F0F9FF', opacity: 0.4 }, label: { show: true, position: 'insideTopLeft', value: 'PAST (Train)', color: '#0EA5E9', fontSize: 9, fontWeight: 700 } }, { xAxis: pastEnd }],
+                    [{ xAxis: pastEnd, itemStyle: { color: '#FFF7ED', opacity: 0.4 }, label: { show: true, position: 'insideTopLeft', value: 'PRESENT (Holdout)', color: '#F97316', fontSize: 9, fontWeight: 700 } }, { xAxis: presentEnd }],
+                    [{ xAxis: presentEnd, itemStyle: { color: '#F0FDF4', opacity: 0.4 }, label: { show: true, position: 'insideTopLeft', value: 'FUTURE (Forecast)', color: '#22C55E', fontSize: 9, fontWeight: 700 } }, { xAxis: futureEnd }],
+                  ],
+                },
+                markLine: { silent: true, symbol: 'none', data: [{ xAxis: presentEnd, lineStyle: { color: '#D1D5DB', type: 'dashed' } }], label: { show: false } },
+              },
+              {
+                name: 'Forecast (ML Model)',
+                type: 'line',
+                data: processedData.map((d: any) => d[forecastKey] ?? null),
+                smooth: true,
+                connectNulls: false,
+                lineStyle: { color: '#D4AF37', width: 4, type: 'dashed' },
+                itemStyle: { color: '#D4AF37', borderColor: '#fff', borderWidth: 2 },
+                symbolSize: 8,
+              },
+            ],
+          }}
+          style={{ height: '100%', width: '100%' }}
+        />
       </div>
 
       <div className="mt-8 bg-gray-50/50 rounded-xl p-4 border border-gray-100">
@@ -419,11 +359,13 @@ export default function SeminaryAnalyticsDashboard({
   onTabChange,
   lockEntityFilter = false,
   filterMode = 'all',
+  institutionId = '',
 }: {
   activeTab?: number;
   onTabChange?: (tab: number) => void;
   lockEntityFilter?: boolean;
   filterMode?: 'all' | 'per-entity';
+  institutionId?: string;
 }) {
   const isDioceseWide = !lockEntityFilter && filterMode !== 'per-entity';
   const [localTab, setLocalTab] = useState(0);
@@ -435,22 +377,84 @@ export default function SeminaryAnalyticsDashboard({
   const [periodYear1, setPeriodYear1] = useState<SemCmpYear>('2025');
   const [periodMonth2, setPeriodMonth2] = useState('Jan');
   const [periodYear2, setPeriodYear2] = useState<SemCmpYear>('2026');
+  const [apiLoading, setApiLoading] = useState(false);
+  const [apiTrendData, setApiTrendData] = useState<typeof seminaryMockData | null>(null);
+  const [apiForecastPoints, setApiForecastPoints] = useState<{ period: string; value: number; lower_bound: number; upper_bound: number }[] | null>(null);
 
-  const seminaryForecastData = useMemo(
-    () =>
-      seminaryMockData.map((d) => ({
+  useEffect(() => {
+    let cancelled = false;
+    setApiLoading(true);
+
+    Promise.all([
+      apiClient.getFinancialTrend('seminary', institutionId),
+      apiClient.getSeasonalityTrend('seminary', institutionId),
+      apiClient.getFinancialForecast('seminary', institutionId),
+    ])
+      .then(([trendRes, , forecastRes]) => {
+        if (cancelled) return;
+        const trend = trendRes as any;
+        const forecast = forecastRes as any;
+
+        if (trend?.data_sufficient !== false && Array.isArray(trend?.monthly_data) && trend.monthly_data.length > 0) {
+          const mapped = trend.monthly_data.map((item: any) => ({
+            ...seminaryMockData[0],
+            month: item.month ?? '',
+            totalIncome: item.total_receipts ?? 0,
+            totalExpenses: item.total_expenses ?? 0,
+            netSurplus: item.net_balance ?? 0,
+          }));
+          setApiTrendData(mapped);
+        }
+
+        if (forecast?.data_sufficient !== false && Array.isArray(forecast?.forecast_points) && forecast.forecast_points.length > 0) {
+          setApiForecastPoints(forecast.forecast_points);
+        }
+      })
+      .catch((err) => {
+        console.error('[SeminaryAnalyticsDashboard] API fetch failed, using mock data:', err);
+      })
+      .finally(() => {
+        if (!cancelled) setApiLoading(false);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [institutionId]);
+
+  // Use API data when available, fall back to mock data
+  const activeData = apiTrendData ?? seminaryMockData;
+
+  const seminaryForecastData = useMemo(() => {
+    if (apiForecastPoints && apiForecastPoints.length > 0) {
+      const historical = activeData.map((d) => ({
         month: d.month,
         collections: d.totalIncome,
         expenses_parish: d.totalExpenses,
-        forecast: Math.round(d.totalIncome * 1.03),
-        disbForecast: Math.round(d.totalExpenses * 1.02),
-      })),
-    [],
-  );
+        forecast: null as number | null,
+        disbForecast: null as number | null,
+      }));
+      const futurePoints = apiForecastPoints.map((pt) => ({
+        month: pt.period,
+        collections: null as number | null,
+        expenses_parish: null as number | null,
+        forecast: pt.value,
+        disbForecast: Math.round(pt.value * 0.85),
+      }));
+      return [...historical, ...futurePoints];
+    }
+    return activeData.map((d) => ({
+      month: d.month,
+      collections: d.totalIncome,
+      expenses_parish: d.totalExpenses,
+      forecast: Math.round(d.totalIncome * 1.03),
+      disbForecast: Math.round(d.totalExpenses * 1.02),
+    }));
+  }, [activeData, apiForecastPoints]);
 
   // Derived metrics for Dashboard Tab
-  const latestMonth = seminaryMockData[seminaryMockData.length - 1];
-  const priorMonth = seminaryMockData[seminaryMockData.length - 2];
+  const latestMonth = activeData[activeData.length - 1];
+  const priorMonth = activeData[activeData.length - 2];
 
   const dashboardKPIs = useMemo(
     () => [
@@ -459,85 +463,86 @@ export default function SeminaryAnalyticsDashboard({
         value: latestMonth.totalIncome,
         priorValue: priorMonth.totalIncome,
         icon: Wallet,
-        data: seminaryMockData.map((d) => ({ value: d.totalIncome })),
+        data: activeData.map((d) => ({ value: d.totalIncome })),
       },
       {
         title: 'Total Disbursements',
         value: latestMonth.totalExpenses,
         priorValue: priorMonth.totalExpenses,
         icon: Activity,
-        data: seminaryMockData.map((d) => ({ value: d.totalExpenses })),
+        data: activeData.map((d) => ({ value: d.totalExpenses })),
       },
       {
         title: 'Net Surplus/Deficit',
         value: latestMonth.netSurplus,
         priorValue: priorMonth.netSurplus,
         icon: DollarSign,
-        data: seminaryMockData.map((d) => ({ value: d.netSurplus })),
+        data: activeData.map((d) => ({ value: d.netSurplus })),
       },
       {
         title: 'Subsidy Dependency',
         value: formatPercent(latestMonth.dependencyRatio),
         priorValue: priorMonth.dependencyRatio,
         icon: Shield,
-        data: seminaryMockData.map((d) => ({ value: d.dependencyRatio })),
+        data: activeData.map((d) => ({ value: d.dependencyRatio })),
       },
       {
         title: 'Largest Disbursement',
         value: 'Salaries & Wages',
         priorValue: 1, // dummy for indicator
         icon: Users,
-        data: seminaryMockData.map((d) => ({ value: d.salaries })),
+        data: activeData.map((d) => ({ value: d.salaries })),
       },
       {
         title: 'Disbursement Growth (MoM)',
         value: 'Maintenance',
         priorValue: 1,
         icon: TrendingUp,
-        data: seminaryMockData.map((d) => ({ value: d.repairs })),
+        data: activeData.map((d) => ({ value: d.repairs })),
       },
     ],
-    [latestMonth, priorMonth],
+    [latestMonth, priorMonth, activeData],
   );
 
-  // Tab 1 Data
+  // Tab 1 Data — use mock fallback values for detail fields not returned by API
+  const mockLatest = seminaryMockData[seminaryMockData.length - 1];
   const revenueMixData = [
-    { name: 'Fees', value: latestMonth.fees },
-    { name: 'Subsidy (RCBSP)', value: latestMonth.subsidyRCBSP },
-    { name: 'Donations', value: latestMonth.donations },
-    { name: 'Mass Collections', value: latestMonth.massCollections },
-    { name: 'Other', value: latestMonth.otherSources },
+    { name: 'Fees', value: latestMonth.fees ?? mockLatest.fees },
+    { name: 'Subsidy (RCBSP)', value: latestMonth.subsidyRCBSP ?? mockLatest.subsidyRCBSP },
+    { name: 'Donations', value: latestMonth.donations ?? mockLatest.donations },
+    { name: 'Mass Collections', value: latestMonth.massCollections ?? mockLatest.massCollections },
+    { name: 'Other', value: latestMonth.otherSources ?? mockLatest.otherSources },
   ];
 
   const feeBreakdownData = [
-    { name: 'Tuition', value: latestMonth.tuitionFees },
-    { name: 'Board & Lodging', value: latestMonth.boardFees },
-    { name: 'Retreat', value: latestMonth.retreat },
-    { name: 'Misc', value: latestMonth.miscFees },
-    { name: 'DRM/SRA', value: latestMonth.drm + latestMonth.sra },
-    { name: 'Honorarium', value: latestMonth.honorariumFee },
+    { name: 'Tuition', value: latestMonth.tuitionFees ?? mockLatest.tuitionFees },
+    { name: 'Board & Lodging', value: latestMonth.boardFees ?? mockLatest.boardFees },
+    { name: 'Retreat', value: latestMonth.retreat ?? mockLatest.retreat },
+    { name: 'Misc', value: latestMonth.miscFees ?? mockLatest.miscFees },
+    { name: 'DRM/SRA', value: (latestMonth.drm ?? mockLatest.drm) + (latestMonth.sra ?? mockLatest.sra) },
+    { name: 'Honorarium', value: latestMonth.honorariumFee ?? mockLatest.honorariumFee },
   ].sort((a, b) => b.value - a.value);
 
   const costCompositionData = [
     {
       name: 'People Costs',
-      value: latestMonth.salaries + latestMonth.benefits + latestMonth.labor + latestMonth.profFee,
+      value: (latestMonth.salaries ?? mockLatest.salaries) + (latestMonth.benefits ?? mockLatest.benefits) + (latestMonth.labor ?? mockLatest.labor) + (latestMonth.profFee ?? mockLatest.profFee),
     },
-    { name: 'Infrastructure', value: latestMonth.construction + latestMonth.repairs + latestMonth.purchases },
+    { name: 'Infrastructure', value: (latestMonth.construction ?? mockLatest.construction) + (latestMonth.repairs ?? mockLatest.repairs) + (latestMonth.purchases ?? mockLatest.purchases) },
     {
       name: 'Operations',
       value:
-        latestMonth.utilities +
-        latestMonth.lpg +
-        latestMonth.supplies +
-        latestMonth.bankCharges +
-        latestMonth.othersExpenses,
+        (latestMonth.utilities ?? mockLatest.utilities) +
+        (latestMonth.lpg ?? mockLatest.lpg) +
+        (latestMonth.supplies ?? mockLatest.supplies) +
+        (latestMonth.bankCharges ?? mockLatest.bankCharges) +
+        (latestMonth.othersExpenses ?? mockLatest.othersExpenses),
     },
   ];
 
   const seminaryPeriodComparison = useMemo(() => {
     const getValue = (month: string, year: SemCmpYear) => {
-      const row = seminaryMockData.find((item) => item.month === month) || seminaryMockData[0];
+      const row = activeData.find((item) => item.month === month) || activeData[0];
       const baseValue = periodMetric === 'collections' ? row.totalIncome : row.totalExpenses;
       return Math.round(baseValue * SEM_CMP_YEAR_FACTOR[year]);
     };
@@ -576,10 +581,10 @@ export default function SeminaryAnalyticsDashboard({
     const personnelPct =
       (latestMonth.salaries + latestMonth.benefits + latestMonth.incentives) / latestMonth.totalExpenses;
     const efficiencyScore = Math.max(0, Math.min(100, Math.round((1 - personnelPct) * 140)));
-    const last3 = seminaryMockData.slice(-3);
+    const last3 = activeData.slice(-3);
     const avgNet = last3.reduce((s, d) => s + d.netSurplus, 0) / 3;
     const stabilityScore = Math.max(0, Math.min(100, Math.round(50 + (avgNet / latestMonth.totalIncome) * 50)));
-    const prev = seminaryMockData[seminaryMockData.length - 4];
+    const prev = activeData[activeData.length - 4] ?? activeData[0];
     const growthScore = Math.max(
       0,
       Math.min(100, Math.round(50 + ((latestMonth.totalIncome - prev.totalIncome) / prev.totalIncome) * 100)),
@@ -777,22 +782,28 @@ export default function SeminaryAnalyticsDashboard({
     ];
 
     // Collections breakdown by category monthly
-    const collectionsBreakdownData = seminaryMockData.map((d) => ({
-      month: d.month,
-      'Mass Collections': d.massCollections,
-      'Seminary Fees': d.fees,
-      Donations: d.donations,
-      'Other Sources': d.otherSources,
-      'RCBSP Subsidy': d.subsidyRCBSP,
-    }));
+    const collectionsBreakdownData = activeData.map((d, i) => {
+      const fallback = seminaryMockData[i] ?? seminaryMockData[seminaryMockData.length - 1];
+      return {
+        month: d.month,
+        'Mass Collections': d.massCollections ?? fallback.massCollections,
+        'Seminary Fees': d.fees ?? fallback.fees,
+        Donations: d.donations ?? fallback.donations,
+        'Other Sources': d.otherSources ?? fallback.otherSources,
+        'RCBSP Subsidy': d.subsidyRCBSP ?? fallback.subsidyRCBSP,
+      };
+    });
 
     // Disbursement breakdown monthly (grouped)
-    const disbursementBreakdownData = seminaryMockData.map((d) => ({
-      month: d.month,
-      Personnel: d.salaries + d.benefits + d.incentives,
-      Operations: d.utilities + d.lpg + d.supplies + d.purchases,
-      Maintenance: d.repairs + d.construction,
-    }));
+    const disbursementBreakdownData = activeData.map((d, i) => {
+      const fallback = seminaryMockData[i] ?? seminaryMockData[seminaryMockData.length - 1];
+      return {
+        month: d.month,
+        Personnel: (d.salaries ?? fallback.salaries) + (d.benefits ?? fallback.benefits) + (d.incentives ?? fallback.incentives),
+        Operations: (d.utilities ?? fallback.utilities) + (d.lpg ?? fallback.lpg) + (d.supplies ?? fallback.supplies) + (d.purchases ?? fallback.purchases),
+        Maintenance: (d.repairs ?? fallback.repairs) + (d.construction ?? fallback.construction),
+      };
+    });
 
     // Decline monitor data per seminary
     const declineMonitorData = [
@@ -813,40 +824,64 @@ export default function SeminaryAnalyticsDashboard({
               </div>
             </div>
             <div className="h-[320px]">
-              <ResponsiveContainer width="100%" height="100%">
-                <BarChart
-                  data={seminaryComparisonData}
-                  margin={{ top: 20, right: 30, left: 40, bottom: 20 }}
-                  barCategoryGap="20%"
-                >
-                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#F3F4F6" />
-                  <XAxis dataKey="name" tick={{ fill: '#6B7280', fontSize: 11 }} />
-                  <YAxis
-                    tickFormatter={(v) => `${(v / 1000000).toFixed(1)}M`}
-                    tick={{ fill: '#9CA3AF', fontSize: 11 }}
-                    label={{
-                      value: 'Amount (PHP)',
-                      angle: -90,
-                      position: 'insideLeft',
-                      style: { fill: '#9CA3AF', fontSize: 10, fontWeight: 'bold' },
-                      offset: -20,
-                    }}
-                  />
-                  <Tooltip
-                    formatter={(v) => formatCurrency(Number(v ?? 0))}
-                    contentStyle={{ borderRadius: '16px', border: 'none', boxShadow: '0 10px 25px rgba(0,0,0,0.1)' }}
-                  />
-                  <Legend verticalAlign="top" height={36} iconType="circle" />
-                  <Bar dataKey="collections" name="collections" fill="#D4AF37" radius={[8, 8, 0, 0]} maxBarSize={50} />
-                  <Bar
-                    dataKey="disbursements"
-                    name="disbursements"
-                    fill="#1a472a"
-                    radius={[8, 8, 0, 0]}
-                    maxBarSize={50}
-                  />
-                </BarChart>
-              </ResponsiveContainer>
+              <ReactECharts
+                option={{
+                  color: ['#D4AF37', '#1a472a'],
+                  tooltip: {
+                    trigger: 'axis',
+                    formatter: (params: any) =>
+                      `${params[0].axisValue}<br/>` +
+                      params.map((p: any) => `${p.marker}${p.seriesName}: ${formatCurrency(p.value)}`).join('<br/>'),
+                    backgroundColor: '#fff',
+                    borderRadius: 16,
+                    borderColor: 'transparent',
+                    extraCssText: 'box-shadow: 0 10px 25px rgba(0,0,0,0.1);',
+                  },
+                  legend: { top: 0, icon: 'circle' },
+                  grid: { top: 40, right: 30, left: 60, bottom: 40 },
+                  xAxis: {
+                    type: 'category',
+                    data: seminaryComparisonData.map((d: any) => d.name),
+                    axisLabel: { color: '#6B7280', fontSize: 11 },
+                    axisTick: { show: false },
+                    axisLine: { show: false },
+                  },
+                  yAxis: {
+                    type: 'value',
+                    axisLabel: {
+                      color: '#9CA3AF',
+                      fontSize: 11,
+                      formatter: (v: number) => `${(v / 1000000).toFixed(1)}M`,
+                    },
+                    splitLine: { lineStyle: { color: '#F3F4F6' } },
+                    name: 'Amount (PHP)',
+                    nameLocation: 'middle',
+                    nameGap: 50,
+                    nameTextStyle: { color: '#9CA3AF', fontSize: 10, fontWeight: 'bold' },
+                  },
+                  series: [
+                    {
+                      name: 'collections',
+                      type: 'bar',
+                      barMaxWidth: 50,
+                      data: seminaryComparisonData.map((d: any) => ({
+                        value: d.collections,
+                        itemStyle: { color: '#D4AF37', borderRadius: [8, 8, 0, 0] },
+                      })),
+                    },
+                    {
+                      name: 'disbursements',
+                      type: 'bar',
+                      barMaxWidth: 50,
+                      data: seminaryComparisonData.map((d: any) => ({
+                        value: d.disbursements,
+                        itemStyle: { color: '#1a472a', borderRadius: [8, 8, 0, 0] },
+                      })),
+                    },
+                  ],
+                }}
+                style={{ height: '100%', width: '100%' }}
+              />
             </div>
             <div className="flex items-center gap-6 justify-center mt-4">
               <div className="flex items-center gap-2">
@@ -959,45 +994,21 @@ export default function SeminaryAnalyticsDashboard({
           </div>
 
           <div className="h-[280px] mb-6">
-            <ResponsiveContainer width="100%" height="100%">
-              <BarChart
-                data={seminaryPeriodComparison.barData}
-                margin={{ top: 20, right: 30, left: 20, bottom: 10 }}
-                barCategoryGap="40%"
-              >
-                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#F3F4F6" />
-                <XAxis
-                  dataKey="period"
-                  tick={{ fill: '#6B7280', fontSize: 11, fontWeight: 700 }}
-                  axisLine={false}
-                  tickLine={false}
-                />
-                <YAxis
-                  tick={{ fill: '#9CA3AF', fontSize: 10 }}
-                  tickFormatter={(value) => `${(value / 1_000_000).toFixed(1)}M`}
-                  axisLine={false}
-                  tickLine={false}
-                  width={55}
-                />
-                <Tooltip
-                  formatter={(value) => [
-                    formatCurrency(Number(value ?? 0)),
-                    periodMetric === 'collections' ? 'Receipts' : 'Disbursements',
-                  ]}
-                  contentStyle={{
-                    borderRadius: 16,
-                    border: 'none',
-                    boxShadow: '0 10px 25px rgba(0,0,0,0.1)',
-                    fontSize: 12,
-                  }}
-                />
-                <Bar dataKey="value" radius={[10, 10, 0, 0]} maxBarSize={90}>
-                  {seminaryPeriodComparison.barData.map((_, index) => (
-                    <Cell key={index} fill={index === 0 ? '#1a472a' : '#D4AF37'} />
-                  ))}
-                </Bar>
-              </BarChart>
-            </ResponsiveContainer>
+            <ReactECharts
+              option={{
+                color: ['#6366f1', '#8b5cf6', '#06b6d4', '#10b981', '#f59e0b', '#ef4444'],
+                tooltip: { trigger: 'axis', formatter: (params: any[]) => `${params[0].axisValue}: ${formatCurrency(params[0].value)}`, extraCssText: 'border-radius:16px;border:none;box-shadow:0 10px 25px rgba(0,0,0,0.1);font-size:12px' },
+                grid: { top: 20, right: 30, left: 60, bottom: 30 },
+                xAxis: { type: 'category', data: seminaryPeriodComparison.barData.map((d) => d.period), axisLine: { show: false }, axisTick: { show: false }, axisLabel: { color: '#6B7280', fontSize: 11, fontWeight: 700 } },
+                yAxis: { type: 'value', axisLine: { show: false }, axisTick: { show: false }, axisLabel: { color: '#9CA3AF', fontSize: 10, formatter: (v: number) => `${(v / 1_000_000).toFixed(1)}M` }, splitLine: { lineStyle: { color: '#F3F4F6' } } },
+                series: [{
+                  type: 'bar',
+                  data: seminaryPeriodComparison.barData.map((d, i) => ({ value: d.value, itemStyle: { color: i === 0 ? '#1a472a' : '#D4AF37', borderRadius: [10, 10, 0, 0] } })),
+                  barMaxWidth: 90,
+                }],
+              }}
+              style={{ height: '100%', width: '100%' }}
+            />
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -1051,38 +1062,24 @@ export default function SeminaryAnalyticsDashboard({
             </div>
           </div>
           <div className="h-[320px] mt-4">
-            <ResponsiveContainer width="100%" height="100%">
-              <BarChart
-                data={collectionsBreakdownData}
-                margin={{ top: 10, right: 20, left: 10, bottom: 5 }}
-                barCategoryGap="20%"
-                barGap={2}
-              >
-                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#E5E7EB" />
-                <XAxis dataKey="month" tick={{ fill: '#6B7280', fontSize: 10 }} />
-                <YAxis
-                  tickFormatter={(v) => `${(v / 1000000).toFixed(1)}M`}
-                  tick={{ fill: '#6B7280', fontSize: 10 }}
-                  label={{
-                    value: 'Amount (Millions)',
-                    angle: -90,
-                    position: 'insideLeft',
-                    style: { fill: '#9CA3AF', fontSize: 9, fontWeight: 'bold' },
-                    offset: -5,
-                  }}
-                />
-                <Tooltip
-                  formatter={(v) => formatCurrency(Number(v ?? 0))}
-                  contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 4px 20px rgba(0,0,0,0.08)' }}
-                />
-                <Legend verticalAlign="bottom" height={36} iconType="circle" />
-                <Bar dataKey="Mass Collections" fill="#D4AF37" radius={[4, 4, 0, 0]} maxBarSize={14} />
-                <Bar dataKey="Seminary Fees" fill="#1a472a" radius={[4, 4, 0, 0]} maxBarSize={14} />
-                <Bar dataKey="Donations" fill="#10B981" radius={[4, 4, 0, 0]} maxBarSize={14} />
-                <Bar dataKey="RCBSP Subsidy" fill="#3B82F6" radius={[4, 4, 0, 0]} maxBarSize={14} />
-                <Bar dataKey="Other Sources" fill="#F59E0B" radius={[4, 4, 0, 0]} maxBarSize={14} />
-              </BarChart>
-            </ResponsiveContainer>
+            <ReactECharts
+              option={{
+                color: ['#6366f1', '#8b5cf6', '#06b6d4', '#10b981', '#f59e0b', '#ef4444'],
+                tooltip: { trigger: 'axis', formatter: (params: any[]) => `${params[0].axisValue}<br/>${params.map((p) => `${p.marker} ${p.seriesName}: ${formatCurrency(p.value)}`).join('<br/>')}`, extraCssText: 'border-radius:12px;border:none;box-shadow:0 4px 20px rgba(0,0,0,0.08)' },
+                legend: { bottom: 0, textStyle: { fontSize: 10 }, icon: 'circle' },
+                grid: { top: 10, right: 20, left: 60, bottom: 60 },
+                xAxis: { type: 'category', data: collectionsBreakdownData.map((d: any) => d.month), axisLabel: { color: '#6B7280', fontSize: 10 } },
+                yAxis: { type: 'value', name: 'Amount (Millions)', nameLocation: 'middle', nameGap: 45, nameRotate: 90, axisLabel: { color: '#6B7280', fontSize: 10, formatter: (v: number) => `${(v / 1000000).toFixed(1)}M` }, splitLine: { lineStyle: { color: '#E5E7EB', type: 'dashed' } } },
+                series: [
+                  { name: 'Mass Collections', type: 'bar', data: collectionsBreakdownData.map((d: any) => ({ value: d['Mass Collections'], itemStyle: { color: '#D4AF37', borderRadius: [4, 4, 0, 0] } })), barMaxWidth: 14 },
+                  { name: 'Seminary Fees', type: 'bar', data: collectionsBreakdownData.map((d: any) => ({ value: d['Seminary Fees'], itemStyle: { color: '#1a472a', borderRadius: [4, 4, 0, 0] } })), barMaxWidth: 14 },
+                  { name: 'Donations', type: 'bar', data: collectionsBreakdownData.map((d: any) => ({ value: d['Donations'], itemStyle: { color: '#10B981', borderRadius: [4, 4, 0, 0] } })), barMaxWidth: 14 },
+                  { name: 'RCBSP Subsidy', type: 'bar', data: collectionsBreakdownData.map((d: any) => ({ value: d['RCBSP Subsidy'], itemStyle: { color: '#3B82F6', borderRadius: [4, 4, 0, 0] } })), barMaxWidth: 14 },
+                  { name: 'Other Sources', type: 'bar', data: collectionsBreakdownData.map((d: any) => ({ value: d['Other Sources'], itemStyle: { color: '#F59E0B', borderRadius: [4, 4, 0, 0] } })), barMaxWidth: 14 },
+                ],
+              }}
+              style={{ height: '100%', width: '100%' }}
+            />
           </div>
         </div>
 
@@ -1093,31 +1090,22 @@ export default function SeminaryAnalyticsDashboard({
             <p className="text-sm text-gray-400 mt-1">Breakdown of expenses across the seminary.</p>
           </div>
           <div className="h-[320px] mt-4">
-            <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={disbursementBreakdownData} margin={{ top: 10, right: 20, left: 10, bottom: 5 }}>
-                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#E5E7EB" />
-                <XAxis dataKey="month" tick={{ fill: '#6B7280', fontSize: 10 }} />
-                <YAxis
-                  tickFormatter={(v) => `${(v / 1000000).toFixed(1)}M`}
-                  tick={{ fill: '#6B7280', fontSize: 10 }}
-                  label={{
-                    value: 'Amount (Millions)',
-                    angle: -90,
-                    position: 'insideLeft',
-                    style: { fill: '#9CA3AF', fontSize: 9, fontWeight: 'bold' },
-                    offset: -5,
-                  }}
-                />
-                <Tooltip
-                  formatter={(v) => formatCurrency(Number(v ?? 0))}
-                  contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 4px 20px rgba(0,0,0,0.08)' }}
-                />
-                <Legend verticalAlign="bottom" height={36} iconType="circle" />
-                <Bar dataKey="Personnel" fill="#1a472a" radius={[0, 0, 0, 0]} />
-                <Bar dataKey="Operations" fill="#D4AF37" radius={[0, 0, 0, 0]} />
-                <Bar dataKey="Maintenance" fill="#10B981" radius={[4, 4, 0, 0]} />
-              </BarChart>
-            </ResponsiveContainer>
+            <ReactECharts
+              option={{
+                color: ['#6366f1', '#8b5cf6', '#06b6d4', '#10b981', '#f59e0b', '#ef4444'],
+                tooltip: { trigger: 'axis', formatter: (params: any[]) => `${params[0].axisValue}<br/>${params.map((p) => `${p.marker} ${p.seriesName}: ${formatCurrency(p.value)}`).join('<br/>')}`, extraCssText: 'border-radius:12px;border:none;box-shadow:0 4px 20px rgba(0,0,0,0.08)' },
+                legend: { bottom: 0, textStyle: { fontSize: 10 }, icon: 'circle' },
+                grid: { top: 10, right: 20, left: 60, bottom: 60 },
+                xAxis: { type: 'category', data: disbursementBreakdownData.map((d: any) => d.month), axisLabel: { color: '#6B7280', fontSize: 10 } },
+                yAxis: { type: 'value', name: 'Amount (Millions)', nameLocation: 'middle', nameGap: 45, nameRotate: 90, axisLabel: { color: '#6B7280', fontSize: 10, formatter: (v: number) => `${(v / 1000000).toFixed(1)}M` }, splitLine: { lineStyle: { color: '#E5E7EB', type: 'dashed' } } },
+                series: [
+                  { name: 'Personnel', type: 'bar', data: disbursementBreakdownData.map((d: any) => ({ value: d['Personnel'], itemStyle: { color: '#1a472a' } })) },
+                  { name: 'Operations', type: 'bar', data: disbursementBreakdownData.map((d: any) => ({ value: d['Operations'], itemStyle: { color: '#D4AF37' } })) },
+                  { name: 'Maintenance', type: 'bar', data: disbursementBreakdownData.map((d: any) => ({ value: d['Maintenance'], itemStyle: { color: '#10B981', borderRadius: [4, 4, 0, 0] } })) },
+                ],
+              }}
+              style={{ height: '100%', width: '100%' }}
+            />
           </div>
         </div>
 
@@ -1197,39 +1185,21 @@ export default function SeminaryAnalyticsDashboard({
                 Amount (PHP)
               </span>
             </div>
-            <ResponsiveContainer width="100%" height="100%">
-              <ComposedChart data={seminaryMockData} margin={{ top: 10, right: 20, left: 10, bottom: 10 }}>
-                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#E5E7EB" />
-                <XAxis dataKey="month" axisLine={true} tickLine={true} tick={{ fill: '#6B7280', fontSize: 11 }} />
-                <YAxis
-                  axisLine={true}
-                  tickLine={true}
-                  tick={{ fill: '#6B7280', fontSize: 11 }}
-                  tickFormatter={(v) => `${v / 1000}k`}
-                  width={55}
-                />
-                <Tooltip
-                  formatter={(val) => formatCurrency(Number(val ?? 0))}
-                  contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 4px 20px rgba(0,0,0,0.08)' }}
-                />
-                <Bar dataKey="totalIncome" name="Total Receipts" fill="#1a472a" radius={[4, 4, 0, 0]} maxBarSize={30} />
-                <Bar
-                  dataKey="totalExpenses"
-                  name="Total Disbursements"
-                  fill="#D4AF37"
-                  radius={[4, 4, 0, 0]}
-                  maxBarSize={30}
-                />
-                <Line
-                  type="monotone"
-                  dataKey="netSurplus"
-                  name="Net Surplus/Deficit"
-                  stroke="#EF4444"
-                  strokeWidth={2}
-                  dot={{ r: 3 }}
-                />
-              </ComposedChart>
-            </ResponsiveContainer>
+            <ReactECharts
+              option={{
+                color: ['#6366f1', '#8b5cf6', '#06b6d4', '#10b981', '#f59e0b', '#ef4444'],
+                tooltip: { trigger: 'axis', formatter: (params: any[]) => `${params[0].axisValue}<br/>${params.map((p) => `${p.marker} ${p.seriesName}: ${formatCurrency(p.value)}`).join('<br/>')}`, extraCssText: 'border-radius:12px;border:none;box-shadow:0 4px 20px rgba(0,0,0,0.08)' },
+                grid: { top: 10, right: 20, left: 60, bottom: 30 },
+                xAxis: { type: 'category', data: activeData.map((d: any) => d.month), axisLabel: { color: '#6B7280', fontSize: 11 } },
+                yAxis: { type: 'value', axisLabel: { color: '#6B7280', fontSize: 11, formatter: (v: number) => `${v / 1000}k` }, splitLine: { lineStyle: { color: '#E5E7EB', type: 'dashed' } } },
+                series: [
+                  { name: 'Total Receipts', type: 'bar', data: activeData.map((d: any) => ({ value: d.totalIncome, itemStyle: { color: '#1a472a', borderRadius: [4, 4, 0, 0] } })), barMaxWidth: 30 },
+                  { name: 'Total Disbursements', type: 'bar', data: activeData.map((d: any) => ({ value: d.totalExpenses, itemStyle: { color: '#D4AF37', borderRadius: [4, 4, 0, 0] } })), barMaxWidth: 30 },
+                  { name: 'Net Surplus/Deficit', type: 'line', data: activeData.map((d: any) => d.netSurplus), lineStyle: { color: '#EF4444', width: 2 }, itemStyle: { color: '#EF4444' }, symbolSize: 6 },
+                ],
+              }}
+              style={{ height: '100%', width: '100%' }}
+            />
           </div>
           <div className="mt-auto flex flex-wrap items-center gap-x-6 gap-y-2 justify-center border-t border-gray-100 pt-4">
             <div className="flex items-center gap-2">
@@ -1251,8 +1221,8 @@ export default function SeminaryAnalyticsDashboard({
   };
 
   const renderPredictive = () => {
-    const forecastData = getLinearForecast(seminaryMockData, 'totalIncome', 4);
-    const expenseData = seminaryMockData.map((d) => ({
+    const forecastData = getLinearForecast(activeData, 'totalIncome', 4);
+    const expenseData = activeData.map((d) => ({
       ...d,
       isHigh: d.totalExpenses > 1300000 ? d.totalExpenses : null,
       isNormal: d.totalExpenses <= 1300000 ? d.totalExpenses : null,
@@ -1529,7 +1499,7 @@ export default function SeminaryAnalyticsDashboard({
   );
 
   return (
-    <div className="w-full">
+    <div className={`w-full transition-opacity duration-300 ${apiLoading ? 'opacity-60' : 'opacity-100'}`}>
       {/* Tabs Navigation - Matches Parish BishopDashboard style exactly */}
       <div className="flex justify-center mb-8">
         <div className="inline-flex bg-black rounded-full p-1.5 w-full max-w-6xl items-center shadow-xl">

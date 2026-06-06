@@ -29,29 +29,7 @@ import {
   Activity,
 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/Card';
-import {
-  BarChart,
-  Bar,
-  XAxis,
-  YAxis,
-  CartesianGrid,
-  Tooltip,
-  Legend,
-  ResponsiveContainer,
-  PieChart,
-  Pie,
-  Cell,
-  LineChart,
-  Line,
-  AreaChart,
-  Area,
-  ComposedChart,
-  FunnelChart,
-  Funnel,
-  LabelList,
-  ReferenceArea,
-  ReferenceLine,
-} from 'recharts';
+import ReactECharts from 'echarts-for-react';
 import { ALL_PARISHES, APP_CONFIG, VICARIATES } from '../constants';
 import dynamic from 'next/dynamic';
 const GeospatialHeatMap = dynamic(
@@ -305,38 +283,6 @@ const vocationPipelineData = [
   { stage: 'Accepted', count: 20, fill: '#1a472a', dropOff: '-56%' },
 ];
 
-const CustomForecastTooltip = ({ active, payload, label }: any) => {
-  if (active && payload && payload.length) {
-    // Filter out null values (future actuals)
-    const validPayload = payload.filter((entry: any) => entry.value !== null && entry.value !== undefined);
-
-    if (validPayload.length === 0) return null;
-
-    return (
-      <div className="bg-white p-4 border border-gray-100 shadow-xl rounded-xl">
-        <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-2">{label}</p>
-        <div className="space-y-1.5">
-          {validPayload.map((entry: any, index: number) => (
-            <div key={index} className="flex items-center justify-between gap-4">
-              <div className="flex items-center gap-2">
-                <div className="w-2 h-2 rounded-full" style={{ backgroundColor: entry.color }}></div>
-                <span className="text-xs font-medium text-gray-600">{entry.name}:</span>
-              </div>
-              <span className="text-xs font-bold text-church-black">
-                {new Intl.NumberFormat('en-PH', {
-                  style: 'currency',
-                  currency: 'PHP',
-                  maximumFractionDigits: 0,
-                }).format(entry.value)}
-              </span>
-            </div>
-          ))}
-        </div>
-      </div>
-    );
-  }
-  return null;
-};
 
 const AdvancedForecastChart = ({
   data,
@@ -444,6 +390,101 @@ const AdvancedForecastChart = ({
     });
   }, [data, actualKey, forecastKey, presentEnd, pastEnd]);
 
+  const bishopForecastOption = {
+    color: ['#6366f1', '#8b5cf6', '#06b6d4', '#10b981', '#f59e0b', '#ef4444'],
+    tooltip: {
+      trigger: 'axis',
+      formatter: (params: any[]) => {
+        const validParams = params.filter((p) => p.value !== null && p.value !== undefined);
+        if (!validParams.length) return '';
+        const label = validParams[0].axisValue;
+        const lines = validParams
+          .map(
+            (p) =>
+              `<div style="display:flex;align-items:center;gap:8px;justify-content:space-between">
+                <span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:${p.color}"></span>
+                <span style="font-size:11px;color:#6B7280">${p.seriesName}:</span>
+                <span style="font-size:11px;font-weight:700">${new Intl.NumberFormat('en-PH', { style: 'currency', currency: 'PHP', maximumFractionDigits: 0 }).format(p.value)}</span>
+              </div>`,
+          )
+          .join('');
+        return `<div style="padding:8px"><p style="font-size:10px;font-weight:700;color:#9CA3AF;text-transform:uppercase;letter-spacing:0.1em;margin-bottom:6px">${label}</p>${lines}</div>`;
+      },
+      backgroundColor: '#fff',
+      borderColor: '#E5E7EB',
+      borderWidth: 1,
+      extraCssText: 'border-radius:12px;box-shadow:0 10px 25px -5px rgba(0,0,0,0.1)',
+    },
+    legend: {
+      top: 0,
+      right: 0,
+      textStyle: { fontSize: 10, fontWeight: 700, color: '#4B5563' },
+      icon: 'circle',
+      data: ['Historical (Actual)', 'Forecast (ML Model)'],
+    },
+    grid: { top: 55, right: 30, left: 50, bottom: 30 },
+    xAxis: {
+      type: 'category',
+      data: processedData.map((d: any) => d.month),
+      axisLine: { show: false },
+      axisTick: { show: false },
+      axisLabel: { color: '#9CA3AF', fontSize: 11, fontWeight: 600 },
+      splitLine: { show: true, lineStyle: { color: '#F3F4F6', type: 'dashed' } },
+    },
+    yAxis: {
+      type: 'value',
+      axisLine: { show: false },
+      axisTick: { show: false },
+      axisLabel: { color: '#9CA3AF', fontSize: 11, formatter: (v: number) => `${v / 1000000}M` },
+      splitLine: { show: true, lineStyle: { color: '#F3F4F6' } },
+    },
+    series: [
+      {
+        name: 'Historical (Actual)',
+        type: 'line',
+        data: processedData.map((d: any) => d[actualKey] ?? null),
+        smooth: true,
+        lineStyle: { color: '#1a472a', width: 4 },
+        itemStyle: { color: '#1a472a', borderColor: '#fff', borderWidth: 2 },
+        symbolSize: 8,
+        connectNulls: false,
+        markArea: {
+          silent: true,
+          data: [
+            [
+              { xAxis: 'Jan', itemStyle: { color: '#F0F9FF', opacity: 0.4 }, label: { show: true, position: 'insideTopLeft', value: 'PAST (Train)', color: '#0EA5E9', fontSize: 9, fontWeight: 700 } },
+              { xAxis: pastEnd },
+            ],
+            [
+              { xAxis: pastEnd, itemStyle: { color: '#FFF7ED', opacity: 0.4 }, label: { show: true, position: 'insideTopLeft', value: 'PRESENT (Holdout)', color: '#F97316', fontSize: 9, fontWeight: 700 } },
+              { xAxis: presentEnd },
+            ],
+            [
+              { xAxis: presentEnd, itemStyle: { color: '#F0FDF4', opacity: 0.4 }, label: { show: true, position: 'insideTopLeft', value: 'FUTURE (Forecast)', color: '#22C55E', fontSize: 9, fontWeight: 700 } },
+              { xAxis: futureEnd },
+            ],
+          ],
+        },
+        markLine: {
+          silent: true,
+          symbol: 'none',
+          data: [{ xAxis: presentEnd, lineStyle: { color: '#D1D5DB', type: 'dashed' } }],
+          label: { show: false },
+        },
+      },
+      {
+        name: 'Forecast (ML Model)',
+        type: 'line',
+        data: processedData.map((d: any) => d[forecastKey] ?? null),
+        smooth: true,
+        lineStyle: { color: '#D4AF37', width: 4, type: 'dashed' },
+        itemStyle: { color: '#D4AF37', borderColor: '#fff', borderWidth: 2 },
+        symbolSize: 8,
+        connectNulls: false,
+      },
+    ],
+  };
+
   return (
     <div className="flex flex-col w-full bg-white/50 rounded-2xl p-4 border border-gray-100/50">
       <div className="h-[340px] flex items-center">
@@ -452,106 +493,7 @@ const AdvancedForecastChart = ({
             {yAxisLabel}
           </span>
         </div>
-        <ResponsiveContainer width="100%" height="100%">
-          <LineChart data={processedData} margin={{ top: 30, right: 30, left: 10, bottom: 10 }}>
-            <CartesianGrid strokeDasharray="3 3" vertical={true} stroke="#F3F4F6" />
-            <XAxis
-              dataKey="month"
-              axisLine={false}
-              tickLine={false}
-              tick={{ fill: '#9CA3AF', fontSize: 11, fontWeight: 600 }}
-              dy={10}
-            />
-            <YAxis
-              axisLine={false}
-              tickLine={false}
-              tick={{ fill: '#9CA3AF', fontSize: 11, fontWeight: 600 }}
-              tickFormatter={(value) => `${value / 1000000}M`}
-              width={45}
-            />
-            <Tooltip content={<CustomForecastTooltip />} />
-
-            <ReferenceArea
-              x1="Jan"
-              x2={pastEnd}
-              fill="#F0F9FF"
-              fillOpacity={0.4}
-              label={{
-                position: 'insideTopLeft',
-                value: 'PAST (Train)',
-                fill: '#0EA5E9',
-                fontSize: 9,
-                fontWeight: 800,
-                offset: 10,
-              }}
-            />
-            <ReferenceArea
-              x1={pastEnd}
-              x2={presentEnd}
-              fill="#FFF7ED"
-              fillOpacity={0.4}
-              label={{
-                position: 'insideTopLeft',
-                value: 'PRESENT (Holdout)',
-                fill: '#F97316',
-                fontSize: 9,
-                fontWeight: 800,
-                offset: 10,
-              }}
-            />
-            <ReferenceArea
-              x1={presentEnd}
-              x2={futureEnd}
-              fill="#F0FDF4"
-              fillOpacity={0.4}
-              label={{
-                position: 'insideTopLeft',
-                value: 'FUTURE (Forecast)',
-                fill: '#22C55E',
-                fontSize: 9,
-                fontWeight: 800,
-                offset: 10,
-              }}
-            />
-
-            <ReferenceLine x={presentEnd} stroke="#D1D5DB" strokeDasharray="4 4" />
-
-            <Line
-              type="monotone"
-              dataKey={actualKey}
-              name="Historical (Actual)"
-              stroke="#1a472a"
-              strokeWidth={4}
-              dot={{ r: 4, fill: '#1a472a', strokeWidth: 2, stroke: '#fff' }}
-              activeDot={{ r: 7, strokeWidth: 0 }}
-              connectNulls={false}
-            />
-            <Line
-              type="monotone"
-              dataKey={forecastKey}
-              name="Forecast (ML Model)"
-              stroke="#D4AF37"
-              strokeWidth={4}
-              strokeDasharray="8 4"
-              dot={{ r: 4, fill: '#D4AF37', strokeWidth: 2, stroke: '#fff' }}
-              activeDot={{ r: 7, strokeWidth: 0 }}
-            />
-
-            <Legend
-              verticalAlign="top"
-              align="right"
-              height={50}
-              iconType="circle"
-              wrapperStyle={{
-                fontSize: '10px',
-                fontWeight: 700,
-                textTransform: 'uppercase',
-                letterSpacing: '0.05em',
-                color: '#4B5563',
-              }}
-            />
-          </LineChart>
-        </ResponsiveContainer>
+        <ReactECharts option={bishopForecastOption} style={{ height: '100%', width: '100%' }} />
       </div>
 
       <div className="mt-8 bg-gray-50/50 rounded-xl p-4 border border-gray-100">
@@ -2499,46 +2441,21 @@ export function BishopDashboard({
                                 Formation Stage
                               </span>
                             </div>
-                            <ResponsiveContainer width="100%" height="100%">
-                              <BarChart
-                                data={seminaryCohortData}
-                                layout="vertical"
-                                margin={{ top: 20, right: 30, left: 40, bottom: 20 }}
-                              >
-                                <CartesianGrid
-                                  strokeDasharray="3 3"
-                                  horizontal={true}
-                                  vertical={false}
-                                  stroke="#E5E7EB"
-                                />
-                                <XAxis
-                                  type="number"
-                                  axisLine={true}
-                                  tickLine={true}
-                                  tick={{ fill: '#6B7280', fontSize: 12 }}
-                                />
-                                <YAxis
-                                  dataKey="stage"
-                                  type="category"
-                                  axisLine={true}
-                                  tickLine={true}
-                                  tick={{ fill: '#6B7280', fontSize: 12 }}
-                                />
-                                <Tooltip
-                                  cursor={{ fill: '#F3F4F6' }}
-                                  contentStyle={{
-                                    borderRadius: '12px',
-                                    border: 'none',
-                                    boxShadow: '0 4px 20px rgba(0,0,0,0.08)',
-                                  }}
-                                />
-                                <Bar dataKey="count" radius={[0, 6, 6, 0]} barSize={40}>
-                                  {seminaryCohortData.map((entry, index) => (
-                                    <Cell key={`cell-${index}`} fill={entry.color} />
-                                  ))}
-                                </Bar>
-                              </BarChart>
-                            </ResponsiveContainer>
+                            <ReactECharts
+                              option={{
+                                color: ['#6366f1', '#8b5cf6', '#06b6d4', '#10b981', '#f59e0b', '#ef4444'],
+                                tooltip: { trigger: 'axis', extraCssText: 'border-radius:12px;border:none;box-shadow:0 4px 20px rgba(0,0,0,0.08)' },
+                                grid: { top: 20, right: 30, left: 100, bottom: 20 },
+                                xAxis: { type: 'value', axisLabel: { color: '#6B7280', fontSize: 12 } },
+                                yAxis: { type: 'category', data: seminaryCohortData.map((d) => d.stage), axisLabel: { color: '#6B7280', fontSize: 12 } },
+                                series: [{
+                                  type: 'bar',
+                                  data: seminaryCohortData.map((d) => ({ value: d.count, itemStyle: { color: d.color, borderRadius: [0, 6, 6, 0] } })),
+                                  barWidth: 40,
+                                }],
+                              }}
+                              style={{ height: '100%', width: '100%' }}
+                            />
                           </div>
                           <div className="text-center mt-2 text-[10px] font-bold text-gray-400 uppercase tracking-[0.3em]">
                             Count
@@ -2555,33 +2472,21 @@ export function BishopDashboard({
                         </CardHeader>
                         <CardContent className="w-full mt-4">
                           <div className="h-[450px]">
-                            <ResponsiveContainer width="100%" height="100%">
-                              <PieChart>
-                                <Pie
-                                  data={seminaryOriginData}
-                                  cx="50%"
-                                  cy="50%"
-                                  innerRadius={60}
-                                  outerRadius={90}
-                                  paddingAngle={5}
-                                  dataKey="count"
-                                >
-                                  {seminaryOriginData.map((entry, index) => (
-                                    <Cell
-                                      key={`cell-${index}`}
-                                      fill={SEMINARY_COST_COLORS[index % SEMINARY_COST_COLORS.length]}
-                                    />
-                                  ))}
-                                </Pie>
-                                <Tooltip
-                                  contentStyle={{
-                                    borderRadius: '12px',
-                                    border: 'none',
-                                    boxShadow: '0 4px 20px rgba(0,0,0,0.08)',
-                                  }}
-                                />
-                              </PieChart>
-                            </ResponsiveContainer>
+                            <ReactECharts
+                              option={{
+                                color: SEMINARY_COST_COLORS,
+                                tooltip: { trigger: 'item', formatter: '{b}: {c} ({d}%)', extraCssText: 'border-radius:12px;border:none;box-shadow:0 4px 20px rgba(0,0,0,0.08)' },
+                                series: [{
+                                  type: 'pie',
+                                  radius: ['40%', '60%'],
+                                  center: ['50%', '50%'],
+                                  padAngle: 5,
+                                  data: seminaryOriginData.map((d, i) => ({ name: d.name, value: d.count, itemStyle: { color: SEMINARY_COST_COLORS[i % SEMINARY_COST_COLORS.length] } })),
+                                  label: { show: false },
+                                }],
+                              }}
+                              style={{ height: '100%', width: '100%' }}
+                            />
                           </div>
                           <div className="flex flex-wrap justify-center gap-x-4 gap-y-1 mt-2">
                             {seminaryOriginData.map((item, i) => (
@@ -2614,32 +2519,17 @@ export function BishopDashboard({
                                 Count
                               </span>
                             </div>
-                            <ResponsiveContainer width="100%" height="100%">
-                              <BarChart data={seminaryAgeData} margin={{ top: 20, right: 30, left: 10, bottom: 10 }}>
-                                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#E5E7EB" />
-                                <XAxis
-                                  dataKey="age"
-                                  axisLine={true}
-                                  tickLine={true}
-                                  tick={{ fill: '#6B7280', fontSize: 12 }}
-                                />
-                                <YAxis
-                                  axisLine={true}
-                                  tickLine={true}
-                                  tick={{ fill: '#6B7280', fontSize: 12 }}
-                                  width={40}
-                                />
-                                <Tooltip
-                                  cursor={{ fill: '#F3F4F6' }}
-                                  contentStyle={{
-                                    borderRadius: '12px',
-                                    border: 'none',
-                                    boxShadow: '0 4px 20px rgba(0,0,0,0.08)',
-                                  }}
-                                />
-                                <Bar dataKey="count" fill="#D4AF37" radius={[6, 6, 0, 0]} maxBarSize={50} />
-                              </BarChart>
-                            </ResponsiveContainer>
+                            <ReactECharts
+                              option={{
+                                color: ['#6366f1', '#8b5cf6', '#06b6d4', '#10b981', '#f59e0b', '#ef4444'],
+                                tooltip: { trigger: 'axis', extraCssText: 'border-radius:12px;border:none;box-shadow:0 4px 20px rgba(0,0,0,0.08)' },
+                                grid: { top: 20, right: 30, left: 45, bottom: 30 },
+                                xAxis: { type: 'category', data: seminaryAgeData.map((d) => d.age), axisLabel: { color: '#6B7280', fontSize: 12 } },
+                                yAxis: { type: 'value', axisLabel: { color: '#6B7280', fontSize: 12 }, splitLine: { lineStyle: { color: '#E5E7EB', type: 'dashed' } } },
+                                series: [{ type: 'bar', data: seminaryAgeData.map((d) => ({ value: d.count, itemStyle: { color: '#D4AF37', borderRadius: [6, 6, 0, 0] } })), barMaxWidth: 50 }],
+                              }}
+                              style={{ height: '100%', width: '100%' }}
+                            />
                           </div>
                           <div className="text-center mt-2 text-[10px] font-bold text-gray-400 uppercase tracking-[0.3em]">
                             Age Group
@@ -2661,57 +2551,22 @@ export function BishopDashboard({
                                 Count
                               </span>
                             </div>
-                            <ResponsiveContainer width="100%" height="100%">
-                              <LineChart
-                                data={formationProgressData}
-                                margin={{ top: 20, right: 30, left: 10, bottom: 10 }}
-                              >
-                                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#E5E7EB" />
-                                <XAxis
-                                  dataKey="year"
-                                  axisLine={true}
-                                  tickLine={true}
-                                  tick={{ fill: '#6B7280', fontSize: 12 }}
-                                />
-                                <YAxis
-                                  axisLine={true}
-                                  tickLine={true}
-                                  tick={{ fill: '#6B7280', fontSize: 12 }}
-                                  width={40}
-                                />
-                                <Tooltip
-                                  contentStyle={{
-                                    borderRadius: '12px',
-                                    border: 'none',
-                                    boxShadow: '0 4px 20px rgba(0,0,0,0.08)',
-                                  }}
-                                />
-                                <Line
-                                  type="monotone"
-                                  dataKey="propaedeutic"
-                                  name="Propaedeutic"
-                                  stroke="#1a472a"
-                                  strokeWidth={2}
-                                  dot={{ r: 4 }}
-                                />
-                                <Line
-                                  type="monotone"
-                                  dataKey="philosophy"
-                                  name="Philosophy"
-                                  stroke="#D4AF37"
-                                  strokeWidth={2}
-                                  dot={{ r: 4 }}
-                                />
-                                <Line
-                                  type="monotone"
-                                  dataKey="theology"
-                                  name="Theology"
-                                  stroke="#1a472a"
-                                  strokeWidth={2}
-                                  dot={{ r: 4 }}
-                                />
-                              </LineChart>
-                            </ResponsiveContainer>
+                            <ReactECharts
+                              option={{
+                                color: ['#6366f1', '#8b5cf6', '#06b6d4', '#10b981', '#f59e0b', '#ef4444'],
+                                tooltip: { trigger: 'axis', extraCssText: 'border-radius:12px;border:none;box-shadow:0 4px 20px rgba(0,0,0,0.08)' },
+                                legend: { top: 0, data: ['Propaedeutic', 'Philosophy', 'Theology'] },
+                                grid: { top: 40, right: 30, left: 45, bottom: 30 },
+                                xAxis: { type: 'category', data: formationProgressData.map((d) => d.year), axisLabel: { color: '#6B7280', fontSize: 12 } },
+                                yAxis: { type: 'value', axisLabel: { color: '#6B7280', fontSize: 12 }, splitLine: { lineStyle: { color: '#E5E7EB', type: 'dashed' } } },
+                                series: [
+                                  { name: 'Propaedeutic', type: 'line', data: formationProgressData.map((d) => d.propaedeutic), lineStyle: { color: '#1a472a', width: 2 }, itemStyle: { color: '#1a472a' }, symbolSize: 8 },
+                                  { name: 'Philosophy', type: 'line', data: formationProgressData.map((d) => d.philosophy), lineStyle: { color: '#D4AF37', width: 2 }, itemStyle: { color: '#D4AF37' }, symbolSize: 8 },
+                                  { name: 'Theology', type: 'line', data: formationProgressData.map((d) => d.theology), lineStyle: { color: '#06b6d4', width: 2 }, itemStyle: { color: '#06b6d4' }, symbolSize: 8 },
+                                ],
+                              }}
+                              style={{ height: '100%', width: '100%' }}
+                            />
                           </div>
                           <div className="text-center mt-2 text-[10px] font-bold text-gray-400 uppercase tracking-[0.3em]">
                             Year
@@ -2758,33 +2613,17 @@ export function BishopDashboard({
                                 Percentage (%)
                               </span>
                             </div>
-                            <ResponsiveContainer width="100%" height="100%">
-                              <BarChart data={seminaryCostData} margin={{ top: 20, right: 30, left: 10, bottom: 10 }}>
-                                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#E5E7EB" />
-                                <XAxis
-                                  dataKey="name"
-                                  axisLine={true}
-                                  tickLine={true}
-                                  tick={{ fill: '#6B7280', fontSize: 12 }}
-                                />
-                                <YAxis
-                                  axisLine={true}
-                                  tickLine={true}
-                                  tick={{ fill: '#6B7280', fontSize: 12 }}
-                                  unit="%"
-                                  width={50}
-                                />
-                                <Tooltip
-                                  cursor={{ fill: '#F3F4F6' }}
-                                  contentStyle={{
-                                    borderRadius: '12px',
-                                    border: 'none',
-                                    boxShadow: '0 4px 20px rgba(0,0,0,0.08)',
-                                  }}
-                                />
-                                <Bar dataKey="value" fill="#1a472a" radius={[6, 6, 0, 0]} />
-                              </BarChart>
-                            </ResponsiveContainer>
+                            <ReactECharts
+                              option={{
+                                color: ['#6366f1', '#8b5cf6', '#06b6d4', '#10b981', '#f59e0b', '#ef4444'],
+                                tooltip: { trigger: 'axis', formatter: (params: any[]) => `${params[0].axisValue}: ${params[0].value}%`, extraCssText: 'border-radius:12px;border:none;box-shadow:0 4px 20px rgba(0,0,0,0.08)' },
+                                grid: { top: 20, right: 30, left: 55, bottom: 30 },
+                                xAxis: { type: 'category', data: seminaryCostData.map((d) => d.name), axisLabel: { color: '#6B7280', fontSize: 12 } },
+                                yAxis: { type: 'value', axisLabel: { color: '#6B7280', fontSize: 12, formatter: (v: number) => `${v}%` }, splitLine: { lineStyle: { color: '#E5E7EB', type: 'dashed' } } },
+                                series: [{ type: 'bar', data: seminaryCostData.map((d) => ({ value: d.value, itemStyle: { color: '#1a472a', borderRadius: [6, 6, 0, 0] } })) }],
+                              }}
+                              style={{ height: '100%', width: '100%' }}
+                            />
                           </div>
                           <div className="text-center mt-2 text-[10px] font-bold text-gray-400 uppercase tracking-[0.3em]">
                             Category
@@ -2819,52 +2658,30 @@ export function BishopDashboard({
                                 Count
                               </span>
                             </div>
-                            <ResponsiveContainer width="100%" height="100%">
-                              <BarChart
-                                data={seminaryEnrollmentData}
-                                margin={{ top: 20, right: 30, left: 10, bottom: 10 }}
-                              >
-                                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#E5E7EB" />
-                                <XAxis
-                                  dataKey="name"
-                                  axisLine={true}
-                                  tickLine={true}
-                                  tick={{ fill: '#6B7280', fontSize: 12 }}
-                                />
-                                <YAxis
-                                  axisLine={true}
-                                  tickLine={true}
-                                  tick={{ fill: '#6B7280', fontSize: 12 }}
-                                  width={40}
-                                />
-                                <Tooltip
-                                  cursor={{ fill: '#F3F4F6' }}
-                                  contentStyle={{
-                                    borderRadius: '12px',
-                                    border: 'none',
-                                    boxShadow: '0 4px 20px rgba(0,0,0,0.08)',
-                                  }}
-                                />
-                                {(staffRatioFilter === 'all' || staffRatioFilter === 'seminarians') && (
-                                  <Bar
-                                    dataKey="enrollment"
-                                    name="Seminarians"
-                                    fill="#D4AF37"
-                                    radius={[6, 6, 0, 0]}
-                                    barSize={staffRatioFilter === 'all' ? 25 : 50}
-                                  />
-                                )}
-                                {(staffRatioFilter === 'all' || staffRatioFilter === 'staff') && (
-                                  <Bar
-                                    dataKey="staff"
-                                    name="Staff/Faculty"
-                                    fill="#1a472a"
-                                    radius={[6, 6, 0, 0]}
-                                    barSize={staffRatioFilter === 'all' ? 25 : 50}
-                                  />
-                                )}
-                              </BarChart>
-                            </ResponsiveContainer>
+                            <ReactECharts
+                              option={{
+                                color: ['#6366f1', '#8b5cf6', '#06b6d4', '#10b981', '#f59e0b', '#ef4444'],
+                                tooltip: { trigger: 'axis', extraCssText: 'border-radius:12px;border:none;box-shadow:0 4px 20px rgba(0,0,0,0.08)' },
+                                grid: { top: 20, right: 30, left: 45, bottom: 30 },
+                                xAxis: { type: 'category', data: seminaryEnrollmentData.map((d) => d.name), axisLabel: { color: '#6B7280', fontSize: 12 } },
+                                yAxis: { type: 'value', axisLabel: { color: '#6B7280', fontSize: 12 }, splitLine: { lineStyle: { color: '#E5E7EB', type: 'dashed' } } },
+                                series: [
+                                  ...(staffRatioFilter === 'all' || staffRatioFilter === 'seminarians' ? [{
+                                    name: 'Seminarians',
+                                    type: 'bar',
+                                    data: seminaryEnrollmentData.map((d) => ({ value: d.enrollment, itemStyle: { color: '#D4AF37', borderRadius: [6, 6, 0, 0] } })),
+                                    barWidth: staffRatioFilter === 'all' ? 25 : 50,
+                                  }] : []),
+                                  ...(staffRatioFilter === 'all' || staffRatioFilter === 'staff' ? [{
+                                    name: 'Staff/Faculty',
+                                    type: 'bar',
+                                    data: seminaryEnrollmentData.map((d) => ({ value: d.staff, itemStyle: { color: '#1a472a', borderRadius: [6, 6, 0, 0] } })),
+                                    barWidth: staffRatioFilter === 'all' ? 25 : 50,
+                                  }] : []),
+                                ],
+                              }}
+                              style={{ height: '100%', width: '100%' }}
+                            />
                           </div>
                           <div className="text-center mt-2 text-[10px] font-bold text-gray-400 uppercase tracking-[0.3em]">
                             Year
@@ -2943,183 +2760,69 @@ export function BishopDashboard({
                         </CardHeader>
                         <CardContent className="mt-4 px-8 pb-4">
                           <div className="h-[400px] w-full mt-4">
-                            <ResponsiveContainer width="100%" height="100%">
-                              <BarChart
-                                data={barChartData}
-                                margin={{ top: 20, right: 30, left: 40, bottom: 20 }}
-                                barCategoryGap="15%"
-                              >
-                                <CartesianGrid
-                                  strokeDasharray="3 3"
-                                  vertical={false}
-                                  horizontal={true}
-                                  stroke="#F3F4F6"
-                                />
-                                <XAxis
-                                  dataKey="name"
-                                  axisLine={{ stroke: '#E5E7EB', strokeWidth: 1 }}
-                                  tickLine={true}
-                                  tick={<CustomizedTick fontSize={11} />}
-                                  interval={0}
-                                  height={75}
-                                />
-                                <YAxis
-                                  axisLine={{ stroke: '#E5E7EB', strokeWidth: 1 }}
-                                  tickLine={true}
-                                  tick={{ fill: '#9CA3AF', fontSize: 11, fontWeight: 500 }}
-                                  tickFormatter={(value) => (value === 0 ? '0' : `${Math.round(value / 1000000)}M`)}
-                                  domain={[0, (dataMax: number) => dataMax * 1.15]}
-                                  label={{
-                                    value: 'Amount (PHP)',
-                                    angle: -90,
-                                    position: 'insideLeft',
-                                    style: {
-                                      textAnchor: 'middle',
-                                      fill: '#9CA3AF',
-                                      fontSize: 10,
-                                      fontWeight: 'bold',
-                                      letterSpacing: '0.1em',
-                                    },
-                                    offset: -20,
-                                  }}
-                                />
-                                <Tooltip
-                                  cursor={{ fill: '#F9FAFB' }}
-                                  formatter={(value, name) => {
-                                    const label =
-                                      name === 'collections'
-                                        ? selectedBarVicariate
-                                          ? entityType === 'Diocesan Schools'
-                                            ? 'School Collections'
-                                            : 'Parish Collections'
-                                          : entityType === 'Diocesan Schools'
-                                            ? 'Cluster Collections'
-                                            : 'Vicariate Collections'
+                            <ReactECharts
+                              option={{
+                                color: ['#6366f1', '#8b5cf6', '#06b6d4', '#10b981', '#f59e0b', '#ef4444'],
+                                tooltip: {
+                                  trigger: 'axis',
+                                  formatter: (params: any[]) => {
+                                    const lines = params.map((p) => {
+                                      const label = p.seriesName === 'collections'
+                                        ? (selectedBarVicariate ? (entityType === 'Diocesan Schools' ? 'School Collections' : 'Parish Collections') : (entityType === 'Diocesan Schools' ? 'Cluster Collections' : 'Vicariate Collections'))
                                         : 'Disbursements';
-                                    return [formatCurrency(Number(value ?? 0)), label];
-                                  }}
-                                  contentStyle={{
-                                    borderRadius: '16px',
-                                    border: 'none',
-                                    boxShadow:
-                                      '0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1)',
-                                    padding: '12px 16px',
-                                  }}
-                                />
-                                {(collectionsDisbursementsFilter === 'all' ||
-                                  collectionsDisbursementsFilter === 'collections') && (
-                                  <Bar
-                                    dataKey="collections"
-                                    name="collections"
-                                    fill="#D4AF37"
-                                    radius={[8, 8, 0, 0]}
-                                    maxBarSize={40}
-                                    onClick={(data) => {
-                                      if (!selectedBarVicariate && data && data.name && entityType !== 'Seminaries') {
-                                        setSelectedBarVicariate(data.name);
-                                      }
-                                      if (data && data.name) {
-                                        handleDiagnosticRequest(data.name);
-                                      }
-                                    }}
-                                    className={
-                                      !selectedBarVicariate && entityType !== 'Seminaries'
-                                        ? 'cursor-pointer hover:opacity-90 transition-all duration-300'
-                                        : ''
+                                      return `${p.marker} ${label}: ${formatCurrency(p.value)}`;
+                                    }).join('<br/>');
+                                    return `${params[0].axisValue}<br/>${lines}`;
+                                  },
+                                  extraCssText: 'border-radius:16px;border:none;box-shadow:0 10px 25px -5px rgba(0,0,0,0.1);padding:12px 16px',
+                                },
+                                grid: { top: 20, right: 30, left: 60, bottom: 80 },
+                                xAxis: {
+                                  type: 'category',
+                                  data: barChartData.map((d) => d.name),
+                                  axisLabel: { color: '#9CA3AF', fontSize: 10, rotate: 25, interval: 0 },
+                                  axisLine: { lineStyle: { color: '#E5E7EB' } },
+                                },
+                                yAxis: {
+                                  type: 'value',
+                                  name: 'Amount (PHP)',
+                                  nameLocation: 'middle',
+                                  nameGap: 45,
+                                  nameRotate: 90,
+                                  axisLabel: { color: '#9CA3AF', fontSize: 11, formatter: (v: number) => v === 0 ? '0' : `${Math.round(v / 1000000)}M` },
+                                  axisLine: { lineStyle: { color: '#E5E7EB' } },
+                                  splitLine: { lineStyle: { color: '#F3F4F6' } },
+                                },
+                                series: [
+                                  ...(collectionsDisbursementsFilter === 'all' || collectionsDisbursementsFilter === 'collections' ? [{
+                                    name: 'collections',
+                                    type: 'bar',
+                                    data: barChartData.map((d) => ({ value: d.collections, itemStyle: { color: '#D4AF37', borderRadius: [8, 8, 0, 0] } })),
+                                    barMaxWidth: 40,
+                                    label: { show: true, position: 'top', formatter: (params: any) => params.value > 0 ? `${(params.value / 1000000).toFixed(1)}M` : '', color: '#9CA3AF', fontSize: 9, fontWeight: 700 },
+                                  }] : []),
+                                  ...(collectionsDisbursementsFilter === 'all' || collectionsDisbursementsFilter === 'disbursements' ? [{
+                                    name: 'disbursements',
+                                    type: 'bar',
+                                    data: barChartData.map((d) => ({ value: d.disbursements, itemStyle: { color: '#1a472a', borderRadius: [8, 8, 0, 0] } })),
+                                    barMaxWidth: 40,
+                                    label: { show: true, position: 'top', formatter: (params: any) => params.value > 0 ? `${(params.value / 1000000).toFixed(1)}M` : '', color: '#9CA3AF', fontSize: 9, fontWeight: 700 },
+                                  }] : []),
+                                ],
+                              }}
+                              onEvents={{
+                                click: (params: any) => {
+                                  const name = barChartData[params.dataIndex]?.name;
+                                  if (name) {
+                                    if (!selectedBarVicariate && entityType !== 'Seminaries') {
+                                      setSelectedBarVicariate(name);
                                     }
-                                  >
-                                    <LabelList
-                                      dataKey="collections"
-                                      position="top"
-                                      content={(props: any) => {
-                                        const { x, y, width, value } = props;
-                                        if (!value || value === 0) return null;
-                                        return (
-                                          <g>
-                                            <text
-                                              x={x + width / 2}
-                                              y={y - 22}
-                                              fill="#9CA3AF"
-                                              textAnchor="middle"
-                                              fontSize={9}
-                                              fontWeight="bold"
-                                            >
-                                              PHP
-                                            </text>
-                                            <text
-                                              x={x + width / 2}
-                                              y={y - 10}
-                                              fill="#9CA3AF"
-                                              textAnchor="middle"
-                                              fontSize={9}
-                                              fontWeight="bold"
-                                            >
-                                              {(value / 1000000).toFixed(1)}M
-                                            </text>
-                                          </g>
-                                        );
-                                      }}
-                                    />
-                                  </Bar>
-                                )}
-                                {(collectionsDisbursementsFilter === 'all' ||
-                                  collectionsDisbursementsFilter === 'disbursements') && (
-                                  <Bar
-                                    dataKey="disbursements"
-                                    name="disbursements"
-                                    fill="#1a472a"
-                                    radius={[8, 8, 0, 0]}
-                                    maxBarSize={40}
-                                    onClick={(data) => {
-                                      if (!selectedBarVicariate && data && data.name && entityType !== 'Seminaries') {
-                                        setSelectedBarVicariate(data.name);
-                                      }
-                                      if (data && data.name) {
-                                        handleDiagnosticRequest(data.name);
-                                      }
-                                    }}
-                                    className={
-                                      !selectedBarVicariate && entityType !== 'Seminaries'
-                                        ? 'cursor-pointer hover:opacity-90 transition-all duration-300'
-                                        : ''
-                                    }
-                                  >
-                                    <LabelList
-                                      dataKey="disbursements"
-                                      position="top"
-                                      content={(props: any) => {
-                                        const { x, y, width, value } = props;
-                                        if (!value || value === 0) return null;
-                                        return (
-                                          <g>
-                                            <text
-                                              x={x + width / 2}
-                                              y={y - 22}
-                                              fill="#9CA3AF"
-                                              textAnchor="middle"
-                                              fontSize={9}
-                                              fontWeight="bold"
-                                            >
-                                              PHP
-                                            </text>
-                                            <text
-                                              x={x + width / 2}
-                                              y={y - 10}
-                                              fill="#9CA3AF"
-                                              textAnchor="middle"
-                                              fontSize={9}
-                                              fontWeight="bold"
-                                            >
-                                              {(value / 1000000).toFixed(1)}M
-                                            </text>
-                                          </g>
-                                        );
-                                      }}
-                                    />
-                                  </Bar>
-                                )}
-                              </BarChart>
-                            </ResponsiveContainer>
+                                    handleDiagnosticRequest(name);
+                                  }
+                                },
+                              }}
+                              style={{ height: '100%', width: '100%' }}
+                            />
                           </div>
                           <div className="flex items-center gap-6 justify-center mt-4">
                             <div
@@ -3197,55 +2900,21 @@ export function BishopDashboard({
                               Amount (Millions)
                             </span>
                           </div>
-                          <ResponsiveContainer width="100%" height="100%">
-                            <BarChart
-                              data={filteredCollectionsData}
-                              margin={{ top: 20, right: 30, left: 10, bottom: 10 }}
-                            >
-                              <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#E5E7EB" />
-                              <XAxis
-                                dataKey="month"
-                                axisLine={true}
-                                tickLine={true}
-                                tick={{ fill: '#6B7280', fontSize: 12 }}
-                              />
-                              <YAxis
-                                axisLine={true}
-                                tickLine={true}
-                                tick={{ fill: '#6B7280', fontSize: 12 }}
-                                tickFormatter={(value) => `${value / 1000000}M`}
-                                width={50}
-                              />
-                              <Tooltip formatter={(value) => formatCurrency(Number(value ?? 0))} />
-                              {(collectionsFilter === 'all' || collectionsFilter === 'collections_mass') && (
-                                <Bar
-                                  dataKey="collections_mass"
-                                  name="Mass Collections"
-                                  fill="#D4AF37"
-                                  radius={[4, 4, 0, 0]}
-                                  barSize={collectionsFilter === 'all' ? 20 : 40}
-                                />
-                              )}
-                              {(collectionsFilter === 'all' || collectionsFilter === 'sacraments_rate') && (
-                                <Bar
-                                  dataKey="sacraments_rate"
-                                  name="Sacraments"
-                                  fill="#1a472a"
-                                  radius={[4, 4, 0, 0]}
-                                  barSize={collectionsFilter === 'all' ? 20 : 40}
-                                />
-                              )}
-                              {(collectionsFilter === 'all' || collectionsFilter === 'collections_other') && (
-                                <Bar
-                                  dataKey="collections_other"
-                                  name="Other Collections"
-                                  fill="#4ade80"
-                                  radius={[4, 4, 0, 0]}
-                                  barSize={collectionsFilter === 'all' ? 20 : 40}
-                                />
-                              )}
-                            </BarChart>
-                          </ResponsiveContainer>
+                          <ReactECharts
+                            option={{
+                              color: ['#6366f1', '#8b5cf6', '#06b6d4', '#10b981', '#f59e0b', '#ef4444'],
+                              tooltip: { trigger: 'axis', formatter: (params: any[]) => `${params[0].axisValue}<br/>${params.map((p) => `${p.marker} ${p.seriesName}: ${formatCurrency(p.value)}`).join('<br/>')}` },
+                              grid: { top: 20, right: 30, left: 55, bottom: 30 },
+                              xAxis: { type: 'category', data: filteredCollectionsData.map((d) => d.month), axisLabel: { color: '#6B7280', fontSize: 12 } },
+                              yAxis: { type: 'value', axisLabel: { color: '#6B7280', fontSize: 12, formatter: (v: number) => `${v / 1000000}M` }, splitLine: { lineStyle: { color: '#E5E7EB', type: 'dashed' } } },
+                              series: [
+                                ...(collectionsFilter === 'all' || collectionsFilter === 'collections_mass' ? [{ name: 'Mass Collections', type: 'bar', data: filteredCollectionsData.map((d) => ({ value: d.collections_mass, itemStyle: { color: '#D4AF37', borderRadius: [4, 4, 0, 0] } })), barWidth: collectionsFilter === 'all' ? 20 : 40 }] : []),
+                                ...(collectionsFilter === 'all' || collectionsFilter === 'sacraments_rate' ? [{ name: 'Sacraments', type: 'bar', data: filteredCollectionsData.map((d) => ({ value: d.sacraments_rate, itemStyle: { color: '#1a472a', borderRadius: [4, 4, 0, 0] } })), barWidth: collectionsFilter === 'all' ? 20 : 40 }] : []),
+                                ...(collectionsFilter === 'all' || collectionsFilter === 'collections_other' ? [{ name: 'Other Collections', type: 'bar', data: filteredCollectionsData.map((d) => ({ value: d.collections_other, itemStyle: { color: '#4ade80', borderRadius: [4, 4, 0, 0] } })), barWidth: collectionsFilter === 'all' ? 20 : 40 }] : []),
+                              ],
+                            }}
+                            style={{ height: '100%', width: '100%' }}
+                          />
                         </div>
                         <div className="text-center mt-2 text-[10px] font-bold text-gray-400 uppercase tracking-[0.3em]">
                           Month
@@ -3280,37 +2949,39 @@ export function BishopDashboard({
                     {/* Detailed Disbursement Analytics */}
                     <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mt-6">
                       <Card className="border-none shadow-sm">
-                        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                          <div>
-                            <h3 className="text-2xl font-bold text-church-green uppercase tracking-wide">
-                              Disbursement Breakdown
-                            </h3>
-                            <p className="text-sm text-gray-400 mt-1">Breakdown of expenses across the diocese.</p>
-                          </div>
-                          <div className="flex items-center gap-4">
-                            <div className="flex bg-gray-100 p-1 rounded-lg">
-                              <button
-                                onClick={() => setDisbursementsTimeframe('6m')}
-                                className={`px-3 py-1 text-[10px] font-bold rounded-md transition-all ${disbursementsTimeframe === '6m' ? 'bg-white text-church-green shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}
-                              >
-                                6M
-                              </button>
-                              <button
-                                onClick={() => setDisbursementsTimeframe('12m')}
-                                className={`px-3 py-1 text-[10px] font-bold rounded-md transition-all ${disbursementsTimeframe === '12m' ? 'bg-white text-church-green shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}
-                              >
-                                12M
-                              </button>
+                        <CardHeader className="pb-2">
+                          <div className="flex flex-row items-start justify-between gap-4">
+                            <div>
+                              <h3 className="text-2xl font-bold text-church-green uppercase tracking-wide leading-tight">
+                                Disbursement Breakdown
+                              </h3>
+                              <p className="text-sm text-gray-400 mt-1">Breakdown of expenses across the diocese.</p>
                             </div>
-                            <select
-                              value={disbursementsFilter}
-                              onChange={(e) => setDisbursementsFilter(e.target.value as any)}
-                              className="bg-gray-100 border-none text-[10px] font-bold text-church-green rounded-lg px-3 py-2 outline-none cursor-pointer hover:bg-gray-200 transition-colors"
-                            >
-                              <option value="all">ALL CATEGORIES</option>
-                              <option value="expenses_parish">PARISH EXPENSES</option>
-                              <option value="expenses_pastoral">PASTORAL EXPENSES</option>
-                            </select>
+                            <div className="flex items-center gap-3 flex-shrink-0 pt-1">
+                              <div className="flex bg-gray-100 p-1 rounded-lg">
+                                <button
+                                  onClick={() => setDisbursementsTimeframe('6m')}
+                                  className={`px-3 py-1 text-[10px] font-bold rounded-md transition-all ${disbursementsTimeframe === '6m' ? 'bg-white text-church-green shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}
+                                >
+                                  6M
+                                </button>
+                                <button
+                                  onClick={() => setDisbursementsTimeframe('12m')}
+                                  className={`px-3 py-1 text-[10px] font-bold rounded-md transition-all ${disbursementsTimeframe === '12m' ? 'bg-white text-church-green shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}
+                                >
+                                  12M
+                                </button>
+                              </div>
+                              <select
+                                value={disbursementsFilter}
+                                onChange={(e) => setDisbursementsFilter(e.target.value as any)}
+                                className="bg-gray-100 border-none text-[10px] font-bold text-church-green rounded-lg px-3 py-2 outline-none cursor-pointer hover:bg-gray-200 transition-colors"
+                              >
+                                <option value="all">ALL CATEGORIES</option>
+                                <option value="expenses_parish">PARISH EXPENSES</option>
+                                <option value="expenses_pastoral">PASTORAL EXPENSES</option>
+                              </select>
+                            </div>
                           </div>
                         </CardHeader>
                         <CardContent className="mt-4">
@@ -3320,46 +2991,20 @@ export function BishopDashboard({
                                 Amount (Millions)
                               </span>
                             </div>
-                            <ResponsiveContainer width="100%" height="100%">
-                              <BarChart
-                                data={filteredDisbursementsData}
-                                margin={{ top: 20, right: 30, left: 10, bottom: 10 }}
-                              >
-                                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#E5E7EB" />
-                                <XAxis
-                                  dataKey="month"
-                                  axisLine={true}
-                                  tickLine={true}
-                                  tick={{ fill: '#6B7280', fontSize: 12 }}
-                                />
-                                <YAxis
-                                  axisLine={true}
-                                  tickLine={true}
-                                  tick={{ fill: '#6B7280', fontSize: 12 }}
-                                  tickFormatter={(value) => `${value / 1000000}M`}
-                                  width={50}
-                                />
-                                <Tooltip formatter={(value) => formatCurrency(Number(value ?? 0))} />
-                                {(disbursementsFilter === 'all' || disbursementsFilter === 'expenses_parish') && (
-                                  <Bar
-                                    dataKey="expenses_parish"
-                                    name="Parish Expenses"
-                                    fill="#1a472a"
-                                    radius={[4, 4, 0, 0]}
-                                    barSize={disbursementsFilter === 'all' ? 25 : 50}
-                                  />
-                                )}
-                                {(disbursementsFilter === 'all' || disbursementsFilter === 'expenses_pastoral') && (
-                                  <Bar
-                                    dataKey="expenses_pastoral"
-                                    name="Pastoral Expenses"
-                                    fill="#D4AF37"
-                                    radius={[4, 4, 0, 0]}
-                                    barSize={disbursementsFilter === 'all' ? 25 : 50}
-                                  />
-                                )}
-                              </BarChart>
-                            </ResponsiveContainer>
+                            <ReactECharts
+                              option={{
+                                color: ['#6366f1', '#8b5cf6', '#06b6d4', '#10b981', '#f59e0b', '#ef4444'],
+                                tooltip: { trigger: 'axis', formatter: (params: any[]) => `${params[0].axisValue}<br/>${params.map((p) => `${p.marker} ${p.seriesName}: ${formatCurrency(p.value)}`).join('<br/>')}` },
+                                grid: { top: 20, right: 30, left: 55, bottom: 30 },
+                                xAxis: { type: 'category', data: filteredDisbursementsData.map((d) => d.month), axisLabel: { color: '#6B7280', fontSize: 12 } },
+                                yAxis: { type: 'value', axisLabel: { color: '#6B7280', fontSize: 12, formatter: (v: number) => `${v / 1000000}M` }, splitLine: { lineStyle: { color: '#E5E7EB', type: 'dashed' } } },
+                                series: [
+                                  ...(disbursementsFilter === 'all' || disbursementsFilter === 'expenses_parish' ? [{ name: 'Parish Expenses', type: 'bar', data: filteredDisbursementsData.map((d) => ({ value: d.expenses_parish, itemStyle: { color: '#1a472a', borderRadius: [4, 4, 0, 0] } })), barMaxWidth: disbursementsFilter === 'all' ? 14 : 30 }] : []),
+                                  ...(disbursementsFilter === 'all' || disbursementsFilter === 'expenses_pastoral' ? [{ name: 'Pastoral Expenses', type: 'bar', data: filteredDisbursementsData.map((d) => ({ value: d.expenses_pastoral, itemStyle: { color: '#D4AF37', borderRadius: [4, 4, 0, 0] } })), barMaxWidth: disbursementsFilter === 'all' ? 14 : 30 }] : []),
+                                ],
+                              }}
+                              style={{ height: '100%', width: '100%' }}
+                            />
                           </div>
                           <div className="text-center mt-2 text-[10px] font-bold text-gray-400 uppercase tracking-[0.3em]">
                             Month
@@ -3399,45 +3044,17 @@ export function BishopDashboard({
                                 Category
                               </span>
                             </div>
-                            <ResponsiveContainer width="100%" height="100%">
-                              <BarChart
-                                data={topDisbursementCategories}
-                                layout="vertical"
-                                margin={{ top: 20, right: 30, left: 40, bottom: 20 }}
-                              >
-                                <CartesianGrid
-                                  strokeDasharray="3 3"
-                                  horizontal={true}
-                                  vertical={false}
-                                  stroke="#E5E7EB"
-                                />
-                                <XAxis
-                                  type="number"
-                                  axisLine={true}
-                                  tickLine={true}
-                                  tick={{ fill: '#6B7280', fontSize: 10 }}
-                                  tickFormatter={(value) => `${value / 1000}k`}
-                                />
-                                <YAxis
-                                  dataKey="category"
-                                  type="category"
-                                  axisLine={true}
-                                  tickLine={true}
-                                  tick={{ fill: '#6B7280', fontSize: 10 }}
-                                  width={130}
-                                />
-                                <Tooltip
-                                  formatter={(value) => formatCurrency(Number(value ?? 0))}
-                                  cursor={{ fill: '#F3F4F6' }}
-                                  contentStyle={{
-                                    borderRadius: '12px',
-                                    border: 'none',
-                                    boxShadow: '0 4px 20px rgba(0,0,0,0.08)',
-                                  }}
-                                />
-                                <Bar dataKey="amount" fill="#1a472a" radius={[0, 6, 6, 0]} barSize={55} />
-                              </BarChart>
-                            </ResponsiveContainer>
+                            <ReactECharts
+                              option={{
+                                color: ['#6366f1', '#8b5cf6', '#06b6d4', '#10b981', '#f59e0b', '#ef4444'],
+                                tooltip: { trigger: 'axis', formatter: (params: any[]) => `${params[0].axisValue}: ${formatCurrency(params[0].value)}`, extraCssText: 'border-radius:12px;border:none;box-shadow:0 4px 20px rgba(0,0,0,0.08)' },
+                                grid: { top: 20, right: 30, left: 135, bottom: 20 },
+                                xAxis: { type: 'value', axisLabel: { color: '#6B7280', fontSize: 10, formatter: (v: number) => `${v / 1000}k` }, splitLine: { lineStyle: { color: '#E5E7EB', type: 'dashed' } } },
+                                yAxis: { type: 'category', inverse: true, data: topDisbursementCategories.map((d) => d.category), axisLabel: { color: '#6B7280', fontSize: 10 } },
+                                series: [{ type: 'bar', data: topDisbursementCategories.map((d) => ({ value: d.amount, itemStyle: { color: '#1a472a', borderRadius: [0, 6, 6, 0] } })), barMaxWidth: 36 }],
+                              }}
+                              style={{ height: '100%', width: '100%' }}
+                            />
                           </div>
                           <div className="text-center mt-2 text-[10px] font-bold text-gray-400 uppercase tracking-[0.3em]">
                             Amount (PHP)
@@ -3777,52 +3394,25 @@ export function BishopDashboard({
                           </span>
                         </div>
                         <div className="flex-1 h-full">
-                          <ResponsiveContainer width="100%" height="100%">
-                            <AreaChart
-                              data={dynamicSeasonalityData}
-                              margin={{ top: 10, right: 10, left: 0, bottom: 0 }}
-                            >
-                              <defs>
-                                <linearGradient id="colorSeasonality" x1="0" y1="0" x2="0" y2="1">
-                                  <stop offset="5%" stopColor="#D4AF37" stopOpacity={0.3} />
-                                  <stop offset="95%" stopColor="#D4AF37" stopOpacity={0} />
-                                </linearGradient>
-                              </defs>
-                              <XAxis
-                                dataKey="month"
-                                axisLine={{ stroke: '#333' }}
-                                tickLine={false}
-                                tick={{ fill: '#9CA3AF', fontSize: 10, fontWeight: 600 }}
-                                dy={10}
-                              />
-                              <YAxis
-                                axisLine={false}
-                                tickLine={false}
-                                tick={{ fill: '#9CA3AF', fontSize: 10, fontWeight: 600 }}
-                                width={45}
-                                tickFormatter={(value) =>
-                                  value >= 1000000 ? `${(value / 1000000).toFixed(1)}M` : value
-                                }
-                              />
-                              <Tooltip
-                                contentStyle={{
-                                  borderRadius: '12px',
-                                  border: 'none',
-                                  backgroundColor: '#2D2D2D',
-                                  color: '#fff',
-                                }}
-                                itemStyle={{ color: '#D4AF37' }}
-                              />
-                              <Area
-                                type="monotone"
-                                dataKey="value"
-                                stroke="#D4AF37"
-                                strokeWidth={3}
-                                fillOpacity={1}
-                                fill="url(#colorSeasonality)"
-                              />
-                            </AreaChart>
-                          </ResponsiveContainer>
+                          <ReactECharts
+                            option={{
+                              color: ['#6366f1', '#8b5cf6', '#06b6d4', '#10b981', '#f59e0b', '#ef4444'],
+                              tooltip: { trigger: 'axis', itemStyle: { color: '#D4AF37' }, extraCssText: 'border-radius:12px;border:none;background:#2D2D2D;color:#fff' },
+                              grid: { top: 10, right: 10, left: 50, bottom: 30 },
+                              xAxis: { type: 'category', data: dynamicSeasonalityData.map((d) => d.month), axisLabel: { color: '#9CA3AF', fontSize: 10, fontWeight: 600 }, axisLine: { lineStyle: { color: '#333' } }, axisTick: { show: false } },
+                              yAxis: { type: 'value', axisLabel: { color: '#9CA3AF', fontSize: 10, formatter: (v: number) => v >= 1000000 ? `${(v / 1000000).toFixed(1)}M` : String(v) }, axisLine: { show: false }, axisTick: { show: false }, splitLine: { lineStyle: { color: 'rgba(255,255,255,0.05)' } } },
+                              series: [{
+                                type: 'line',
+                                data: dynamicSeasonalityData.map((d) => d.value),
+                                smooth: true,
+                                lineStyle: { color: '#D4AF37', width: 3 },
+                                itemStyle: { color: '#D4AF37' },
+                                areaStyle: { color: { type: 'linear', x: 0, y: 0, x2: 0, y2: 1, colorStops: [{ offset: 0, color: 'rgba(212,175,55,0.3)' }, { offset: 1, color: 'rgba(212,175,55,0)' }] } },
+                                showSymbol: false,
+                              }],
+                            }}
+                            style={{ height: '100%', width: '100%' }}
+                          />
                         </div>
                       </div>
                       <div className="text-center text-[10px] font-bold text-gray-500 uppercase tracking-[0.4em]">
@@ -3984,38 +3574,29 @@ export function BishopDashboard({
                             </div>
 
                             {/* Donut chart */}
-                            <div className="relative">
-                              <ResponsiveContainer width={220} height={220}>
-                                <PieChart>
-                                  <Pie
-                                    data={pieData}
-                                    cx="50%"
-                                    cy="50%"
-                                    innerRadius={62}
-                                    outerRadius={90}
-                                    paddingAngle={3}
-                                    dataKey="value"
-                                    strokeWidth={0}
-                                  >
-                                    {pieData.map((entry, idx) => (
-                                      <Cell key={idx} fill={entry.color} opacity={0.9} />
-                                    ))}
-                                  </Pie>
-                                  <Tooltip
-                                    contentStyle={{
-                                      background: '#111',
-                                      border: '1px solid rgba(255,255,255,0.1)',
-                                      borderRadius: 12,
-                                      fontSize: 12,
-                                    }}
-                                    itemStyle={{ color: '#fff', fontWeight: 700 }}
-                                    formatter={(v) => [
-                                      `${Number(v ?? 0)} parishes (${Math.round((Number(v ?? 0) / total) * 100)}%)`,
-                                      '',
-                                    ]}
-                                  />
-                                </PieChart>
-                              </ResponsiveContainer>
+                            <div className="relative" style={{ width: 220, height: 220 }}>
+                              <ReactECharts
+                                option={{
+                                  tooltip: {
+                                    trigger: 'item',
+                                    formatter: (params: any) => `${params.name}: ${params.value} parishes (${Math.round((params.value / total) * 100)}%)`,
+                                    backgroundColor: '#111',
+                                    borderColor: 'rgba(255,255,255,0.1)',
+                                    textStyle: { color: '#fff', fontWeight: 700, fontSize: 12 },
+                                    extraCssText: 'border-radius:12px',
+                                  },
+                                  series: [{
+                                    type: 'pie',
+                                    radius: ['56%', '82%'],
+                                    center: ['50%', '50%'],
+                                    padAngle: 3,
+                                    data: pieData.map((d) => ({ name: d.name, value: d.value, itemStyle: { color: d.color, opacity: 0.9 } })),
+                                    label: { show: false },
+                                    emphasis: { scale: false },
+                                  }],
+                                }}
+                                style={{ width: '100%', height: '100%' }}
+                              />
                               {/* Center label */}
                               <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
                                 <p className="text-3xl font-black text-white leading-none">{total}</p>
@@ -4183,45 +3764,21 @@ export function BishopDashboard({
                       <>
                         {/* Bar chart */}
                         <div className="h-[280px] mb-6">
-                          <ResponsiveContainer width="100%" height="100%">
-                            <BarChart
-                              data={cmpResult.barData}
-                              margin={{ top: 20, right: 30, left: 20, bottom: 10 }}
-                              barCategoryGap="40%"
-                            >
-                              <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#F3F4F6" />
-                              <XAxis
-                                dataKey="period"
-                                tick={{ fill: '#6B7280', fontSize: 11, fontWeight: 700 }}
-                                axisLine={false}
-                                tickLine={false}
-                              />
-                              <YAxis
-                                tick={{ fill: '#9CA3AF', fontSize: 10 }}
-                                tickFormatter={(v) => `${(v / 1_000_000).toFixed(1)}M`}
-                                axisLine={false}
-                                tickLine={false}
-                                width={55}
-                              />
-                              <Tooltip
-                                formatter={(v) => [
-                                  formatCurrency(Number(v ?? 0)),
-                                  cmpMetric === 'collections' ? 'Collections' : 'Disbursements',
-                                ]}
-                                contentStyle={{
-                                  borderRadius: 16,
-                                  border: 'none',
-                                  boxShadow: '0 10px 25px rgba(0,0,0,0.1)',
-                                  fontSize: 12,
-                                }}
-                              />
-                              <Bar dataKey="value" radius={[10, 10, 0, 0]} maxBarSize={90}>
-                                {cmpResult.barData.map((_, i) => (
-                                  <Cell key={i} fill={i === 0 ? '#1a472a' : '#D4AF37'} />
-                                ))}
-                              </Bar>
-                            </BarChart>
-                          </ResponsiveContainer>
+                          <ReactECharts
+                            option={{
+                              color: ['#6366f1', '#8b5cf6', '#06b6d4', '#10b981', '#f59e0b', '#ef4444'],
+                              tooltip: { trigger: 'axis', formatter: (params: any[]) => `${params[0].axisValue}: ${formatCurrency(params[0].value)}`, extraCssText: 'border-radius:16px;border:none;box-shadow:0 10px 25px rgba(0,0,0,0.1);font-size:12px' },
+                              grid: { top: 20, right: 30, left: 60, bottom: 30 },
+                              xAxis: { type: 'category', data: cmpResult.barData.map((d) => d.period), axisLine: { show: false }, axisTick: { show: false }, axisLabel: { color: '#6B7280', fontSize: 11, fontWeight: 700 } },
+                              yAxis: { type: 'value', axisLine: { show: false }, axisTick: { show: false }, axisLabel: { color: '#9CA3AF', fontSize: 10, formatter: (v: number) => `${(v / 1_000_000).toFixed(1)}M` }, splitLine: { lineStyle: { color: '#F3F4F6' } } },
+                              series: [{
+                                type: 'bar',
+                                data: cmpResult.barData.map((d, i) => ({ value: d.value, itemStyle: { color: i === 0 ? '#1a472a' : '#D4AF37', borderRadius: [10, 10, 0, 0] } })),
+                                barMaxWidth: 90,
+                              }],
+                            }}
+                            style={{ height: '100%', width: '100%' }}
+                          />
                         </div>
 
                         {/* Summary cards */}
@@ -4419,48 +3976,26 @@ export function BishopDashboard({
                                 Count
                               </span>
                             </div>
-                            <ResponsiveContainer width="100%" height="100%">
-                              <AreaChart
-                                data={ordinationForecastData}
-                                margin={{ top: 20, right: 30, left: 10, bottom: 10 }}
-                              >
-                                <defs>
-                                  <linearGradient id="colorOrd" x1="0" y1="0" x2="0" y2="1">
-                                    <stop offset="5%" stopColor="#D4AF37" stopOpacity={0.3} />
-                                    <stop offset="95%" stopColor="#D4AF37" stopOpacity={0} />
-                                  </linearGradient>
-                                </defs>
-                                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#E5E7EB" />
-                                <XAxis
-                                  dataKey="year"
-                                  axisLine={true}
-                                  tickLine={true}
-                                  tick={{ fill: '#6B7280', fontSize: 12 }}
-                                />
-                                <YAxis
-                                  axisLine={true}
-                                  tickLine={true}
-                                  tick={{ fill: '#6B7280', fontSize: 12 }}
-                                  width={40}
-                                />
-                                <Tooltip
-                                  contentStyle={{
-                                    borderRadius: '12px',
-                                    border: 'none',
-                                    boxShadow: '0 4px 20px rgba(0,0,0,0.08)',
-                                  }}
-                                />
-                                <Area
-                                  type="monotone"
-                                  dataKey="predicted"
-                                  name="Predicted Ordinations"
-                                  stroke="#D4AF37"
-                                  strokeWidth={3}
-                                  fillOpacity={1}
-                                  fill="url(#colorOrd)"
-                                />
-                              </AreaChart>
-                            </ResponsiveContainer>
+                            <ReactECharts
+                              option={{
+                                color: ['#6366f1', '#8b5cf6', '#06b6d4', '#10b981', '#f59e0b', '#ef4444'],
+                                tooltip: { trigger: 'axis', extraCssText: 'border-radius:12px;border:none;box-shadow:0 4px 20px rgba(0,0,0,0.08)' },
+                                grid: { top: 20, right: 30, left: 45, bottom: 30 },
+                                xAxis: { type: 'category', data: ordinationForecastData.map((d) => d.year), axisLabel: { color: '#6B7280', fontSize: 12 } },
+                                yAxis: { type: 'value', axisLabel: { color: '#6B7280', fontSize: 12 }, splitLine: { lineStyle: { color: '#E5E7EB', type: 'dashed' } } },
+                                series: [{
+                                  name: 'Predicted Ordinations',
+                                  type: 'line',
+                                  data: ordinationForecastData.map((d) => d.predicted),
+                                  smooth: true,
+                                  lineStyle: { color: '#D4AF37', width: 3 },
+                                  itemStyle: { color: '#D4AF37' },
+                                  areaStyle: { color: { type: 'linear', x: 0, y: 0, x2: 0, y2: 1, colorStops: [{ offset: 0, color: 'rgba(212,175,55,0.3)' }, { offset: 1, color: 'rgba(212,175,55,0)' }] } },
+                                  symbolSize: 8,
+                                }],
+                              }}
+                              style={{ height: '100%', width: '100%' }}
+                            />
                           </div>
                           <div className="text-center mt-2 text-[10px] font-bold text-gray-400 uppercase tracking-[0.3em]">
                             Year
@@ -4482,38 +4017,25 @@ export function BishopDashboard({
                                 Risk Level (%)
                               </span>
                             </div>
-                            <ResponsiveContainer width="100%" height="100%">
-                              <LineChart data={attritionRiskData} margin={{ top: 20, right: 30, left: 10, bottom: 10 }}>
-                                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#E5E7EB" />
-                                <XAxis
-                                  dataKey="year"
-                                  axisLine={true}
-                                  tickLine={true}
-                                  tick={{ fill: '#6B7280', fontSize: 12 }}
-                                />
-                                <YAxis
-                                  axisLine={true}
-                                  tickLine={true}
-                                  tick={{ fill: '#6B7280', fontSize: 12 }}
-                                  width={40}
-                                />
-                                <Tooltip
-                                  contentStyle={{
-                                    borderRadius: '12px',
-                                    border: 'none',
-                                    boxShadow: '0 4px 20px rgba(0,0,0,0.08)',
-                                  }}
-                                />
-                                <Line
-                                  type="monotone"
-                                  dataKey="risk"
-                                  name="Risk Level (%)"
-                                  stroke="#EF4444"
-                                  strokeWidth={3}
-                                  dot={{ r: 4, fill: '#EF4444' }}
-                                />
-                              </LineChart>
-                            </ResponsiveContainer>
+                            <ReactECharts
+                              option={{
+                                color: ['#6366f1', '#8b5cf6', '#06b6d4', '#10b981', '#f59e0b', '#ef4444'],
+                                tooltip: { trigger: 'axis', extraCssText: 'border-radius:12px;border:none;box-shadow:0 4px 20px rgba(0,0,0,0.08)' },
+                                grid: { top: 20, right: 30, left: 45, bottom: 30 },
+                                xAxis: { type: 'category', data: attritionRiskData.map((d) => d.year), axisLabel: { color: '#6B7280', fontSize: 12 } },
+                                yAxis: { type: 'value', axisLabel: { color: '#6B7280', fontSize: 12 }, splitLine: { lineStyle: { color: '#E5E7EB', type: 'dashed' } } },
+                                series: [{
+                                  name: 'Risk Level (%)',
+                                  type: 'line',
+                                  data: attritionRiskData.map((d) => d.risk),
+                                  smooth: true,
+                                  lineStyle: { color: '#EF4444', width: 3 },
+                                  itemStyle: { color: '#EF4444' },
+                                  symbolSize: 8,
+                                }],
+                              }}
+                              style={{ height: '100%', width: '100%' }}
+                            />
                           </div>
                           <div className="text-center mt-2 text-[10px] font-bold text-gray-400 uppercase tracking-[0.3em]">
                             Year
@@ -4549,53 +4071,20 @@ export function BishopDashboard({
                                 Count
                               </span>
                             </div>
-                            <ResponsiveContainer width="100%" height="100%">
-                              <ComposedChart
-                                data={enrollmentForecastData}
-                                margin={{ top: 20, right: 30, left: 10, bottom: 10 }}
-                              >
-                                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#E5E7EB" />
-                                <XAxis
-                                  dataKey="year"
-                                  axisLine={true}
-                                  tickLine={true}
-                                  tick={{ fill: '#6B7280', fontSize: 12 }}
-                                />
-                                <YAxis
-                                  axisLine={true}
-                                  tickLine={true}
-                                  tick={{ fill: '#6B7280', fontSize: 12 }}
-                                  width={40}
-                                />
-                                <Tooltip
-                                  contentStyle={{
-                                    borderRadius: '12px',
-                                    border: 'none',
-                                    boxShadow: '0 4px 20px rgba(0,0,0,0.08)',
-                                  }}
-                                />
-                                {(enrollmentForecastFilter === 'all' || enrollmentForecastFilter === 'enrollment') && (
-                                  <Bar
-                                    dataKey="enrollment"
-                                    name="Projected Enrollment"
-                                    fill="#D4AF37"
-                                    radius={[6, 6, 0, 0]}
-                                    barSize={enrollmentForecastFilter === 'all' ? 30 : 60}
-                                  />
-                                )}
-                                {(enrollmentForecastFilter === 'all' || enrollmentForecastFilter === 'capacity') && (
-                                  <Line
-                                    type="monotone"
-                                    dataKey="capacity"
-                                    name="Maximum Capacity"
-                                    stroke="#EF4444"
-                                    strokeWidth={2}
-                                    strokeDasharray="5 5"
-                                    dot={false}
-                                  />
-                                )}
-                              </ComposedChart>
-                            </ResponsiveContainer>
+                            <ReactECharts
+                              option={{
+                                color: ['#6366f1', '#8b5cf6', '#06b6d4', '#10b981', '#f59e0b', '#ef4444'],
+                                tooltip: { trigger: 'axis', extraCssText: 'border-radius:12px;border:none;box-shadow:0 4px 20px rgba(0,0,0,0.08)' },
+                                grid: { top: 20, right: 30, left: 45, bottom: 30 },
+                                xAxis: { type: 'category', data: enrollmentForecastData.map((d) => d.year), axisLabel: { color: '#6B7280', fontSize: 12 } },
+                                yAxis: { type: 'value', axisLabel: { color: '#6B7280', fontSize: 12 }, splitLine: { lineStyle: { color: '#E5E7EB', type: 'dashed' } } },
+                                series: [
+                                  ...(enrollmentForecastFilter === 'all' || enrollmentForecastFilter === 'enrollment' ? [{ name: 'Projected Enrollment', type: 'bar', data: enrollmentForecastData.map((d) => ({ value: d.enrollment, itemStyle: { color: '#D4AF37', borderRadius: [6, 6, 0, 0] } })), barWidth: enrollmentForecastFilter === 'all' ? 30 : 60 }] : []),
+                                  ...(enrollmentForecastFilter === 'all' || enrollmentForecastFilter === 'capacity' ? [{ name: 'Maximum Capacity', type: 'line', data: enrollmentForecastData.map((d) => d.capacity), lineStyle: { color: '#EF4444', width: 2, type: 'dashed' }, itemStyle: { color: '#EF4444' }, showSymbol: false }] : []),
+                                ],
+                              }}
+                              style={{ height: '100%', width: '100%' }}
+                            />
                           </div>
                           <div className="text-center mt-2 text-[10px] font-bold text-gray-400 uppercase tracking-[0.3em]">
                             Year
@@ -4630,25 +4119,26 @@ export function BishopDashboard({
                         </CardHeader>
                         <CardContent className="w-full mt-4">
                           <div className="h-[450px]">
-                            <ChartErrorBoundary>
-                              <ResponsiveContainer width="100%" height="100%">
-                                <FunnelChart margin={{ top: 20, right: 80, left: 80, bottom: 20 }}>
-                                  <Tooltip
-                                    cursor={{ fill: '#F3F4F6' }}
-                                    contentStyle={{
-                                      borderRadius: '12px',
-                                      border: 'none',
-                                      boxShadow: '0 4px 20px rgba(0,0,0,0.08)',
-                                    }}
-                                  />
-                                  <Funnel dataKey="count" data={vocationPipelineData} isAnimationActive>
-                                    <LabelList position="right" fill="#6B7280" stroke="none" dataKey="stage" />
-                                    <LabelList position="center" fill="#fff" stroke="none" dataKey="count" />
-                                    <LabelList position="left" fill="#D4AF37" stroke="none" dataKey="dropOff" />
-                                  </Funnel>
-                                </FunnelChart>
-                              </ResponsiveContainer>
-                            </ChartErrorBoundary>
+                            <ReactECharts
+                              option={{
+                                color: ['#6366f1', '#8b5cf6', '#06b6d4', '#10b981', '#f59e0b', '#ef4444'],
+                                tooltip: { trigger: 'item', formatter: (params: any) => `${params.name}: ${params.value}` },
+                                series: [{
+                                  type: 'funnel',
+                                  left: '10%',
+                                  width: '80%',
+                                  min: 0,
+                                  max: 120,
+                                  minSize: '0%',
+                                  maxSize: '100%',
+                                  sort: 'descending',
+                                  gap: 4,
+                                  label: { show: true, position: 'inside', color: '#fff', fontSize: 12, fontWeight: 700, formatter: (params: any) => `${params.name}: ${params.value}` },
+                                  data: vocationPipelineData.map((d) => ({ name: d.stage, value: d.count, itemStyle: { color: d.fill } })),
+                                }],
+                              }}
+                              style={{ height: '100%', width: '100%' }}
+                            />
                           </div>
                         </CardContent>
                       </Card>
@@ -4670,49 +4160,26 @@ export function BishopDashboard({
                                 Amount (PHP)
                               </span>
                             </div>
-                            <ResponsiveContainer width="100%" height="100%">
-                              <AreaChart
-                                data={endowmentGrowthData}
-                                margin={{ top: 20, right: 30, left: 10, bottom: 10 }}
-                              >
-                                <defs>
-                                  <linearGradient id="colorValue" x1="0" y1="0" x2="0" y2="1">
-                                    <stop offset="5%" stopColor="#D4AF37" stopOpacity={0.3} />
-                                    <stop offset="95%" stopColor="#D4AF37" stopOpacity={0} />
-                                  </linearGradient>
-                                </defs>
-                                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#E5E7EB" />
-                                <XAxis
-                                  dataKey="year"
-                                  axisLine={true}
-                                  tickLine={true}
-                                  tick={{ fill: '#6B7280', fontSize: 12 }}
-                                />
-                                <YAxis
-                                  axisLine={true}
-                                  tickLine={true}
-                                  tick={{ fill: '#6B7280', fontSize: 12 }}
-                                  tickFormatter={(value) => `${value / 1000000}M`}
-                                  width={50}
-                                />
-                                <Tooltip
-                                  contentStyle={{
-                                    borderRadius: '12px',
-                                    border: 'none',
-                                    boxShadow: '0 4px 20px rgba(0,0,0,0.08)',
-                                  }}
-                                />
-                                <Area
-                                  type="monotone"
-                                  dataKey="value"
-                                  name="Endowment Value"
-                                  stroke="#D4AF37"
-                                  fillOpacity={1}
-                                  fill="url(#colorValue)"
-                                  strokeWidth={3}
-                                />
-                              </AreaChart>
-                            </ResponsiveContainer>
+                            <ReactECharts
+                              option={{
+                                color: ['#6366f1', '#8b5cf6', '#06b6d4', '#10b981', '#f59e0b', '#ef4444'],
+                                tooltip: { trigger: 'axis', formatter: (params: any[]) => `${params[0].axisValue}: ${formatCurrency(params[0].value)}`, extraCssText: 'border-radius:12px;border:none;box-shadow:0 4px 20px rgba(0,0,0,0.08)' },
+                                grid: { top: 20, right: 30, left: 55, bottom: 30 },
+                                xAxis: { type: 'category', data: endowmentGrowthData.map((d) => d.year), axisLabel: { color: '#6B7280', fontSize: 12 } },
+                                yAxis: { type: 'value', axisLabel: { color: '#6B7280', fontSize: 12, formatter: (v: number) => `${v / 1000000}M` }, splitLine: { lineStyle: { color: '#E5E7EB', type: 'dashed' } } },
+                                series: [{
+                                  name: 'Endowment Value',
+                                  type: 'line',
+                                  data: endowmentGrowthData.map((d) => d.value),
+                                  smooth: true,
+                                  lineStyle: { color: '#D4AF37', width: 3 },
+                                  itemStyle: { color: '#D4AF37' },
+                                  areaStyle: { color: { type: 'linear', x: 0, y: 0, x2: 0, y2: 1, colorStops: [{ offset: 0, color: 'rgba(212,175,55,0.3)' }, { offset: 1, color: 'rgba(212,175,55,0)' }] } },
+                                  symbolSize: 8,
+                                }],
+                              }}
+                              style={{ height: '100%', width: '100%' }}
+                            />
                           </div>
                           <div className="text-center mt-2 text-[10px] font-bold text-gray-400 uppercase tracking-[0.3em]">
                             Year
@@ -4734,42 +4201,25 @@ export function BishopDashboard({
                                 Inquiries
                               </span>
                             </div>
-                            <ResponsiveContainer width="100%" height="100%">
-                              <LineChart
-                                data={vocationInterestData}
-                                margin={{ top: 20, right: 30, left: 10, bottom: 10 }}
-                              >
-                                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#E5E7EB" />
-                                <XAxis
-                                  dataKey="month"
-                                  axisLine={true}
-                                  tickLine={true}
-                                  tick={{ fill: '#6B7280', fontSize: 12 }}
-                                />
-                                <YAxis
-                                  axisLine={true}
-                                  tickLine={true}
-                                  tick={{ fill: '#6B7280', fontSize: 12 }}
-                                  width={40}
-                                />
-                                <Tooltip
-                                  contentStyle={{
-                                    borderRadius: '12px',
-                                    border: 'none',
-                                    boxShadow: '0 4px 20px rgba(0,0,0,0.08)',
-                                  }}
-                                />
-                                <Line
-                                  type="monotone"
-                                  dataKey="inquiries"
-                                  name="Monthly Inquiries"
-                                  stroke="#1a472a"
-                                  strokeWidth={3}
-                                  dot={{ r: 4, fill: '#1a472a' }}
-                                  activeDot={{ r: 6 }}
-                                />
-                              </LineChart>
-                            </ResponsiveContainer>
+                            <ReactECharts
+                              option={{
+                                color: ['#6366f1', '#8b5cf6', '#06b6d4', '#10b981', '#f59e0b', '#ef4444'],
+                                tooltip: { trigger: 'axis', extraCssText: 'border-radius:12px;border:none;box-shadow:0 4px 20px rgba(0,0,0,0.08)' },
+                                grid: { top: 20, right: 30, left: 45, bottom: 30 },
+                                xAxis: { type: 'category', data: vocationInterestData.map((d) => d.month), axisLabel: { color: '#6B7280', fontSize: 12 } },
+                                yAxis: { type: 'value', axisLabel: { color: '#6B7280', fontSize: 12 }, splitLine: { lineStyle: { color: '#E5E7EB', type: 'dashed' } } },
+                                series: [{
+                                  name: 'Monthly Inquiries',
+                                  type: 'line',
+                                  data: vocationInterestData.map((d) => d.inquiries),
+                                  smooth: true,
+                                  lineStyle: { color: '#1a472a', width: 3 },
+                                  itemStyle: { color: '#1a472a' },
+                                  symbolSize: 8,
+                                }],
+                              }}
+                              style={{ height: '100%', width: '100%' }}
+                            />
                           </div>
                           <div className="text-center mt-2 text-[10px] font-bold text-gray-400 uppercase tracking-[0.3em]">
                             Month
@@ -4794,43 +4244,21 @@ export function BishopDashboard({
                                 Count
                               </span>
                             </div>
-                            <ResponsiveContainer width="100%" height="100%">
-                              <BarChart data={priestGapData} margin={{ top: 20, right: 30, left: 10, bottom: 10 }}>
-                                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#E5E7EB" />
-                                <XAxis
-                                  dataKey="year"
-                                  axisLine={true}
-                                  tickLine={true}
-                                  tick={{ fill: '#6B7280', fontSize: 12 }}
-                                />
-                                <YAxis
-                                  axisLine={true}
-                                  tickLine={true}
-                                  tick={{ fill: '#6B7280', fontSize: 12 }}
-                                  width={40}
-                                />
-                                <Tooltip
-                                  cursor={{ fill: '#F3F4F6' }}
-                                  contentStyle={{
-                                    borderRadius: '12px',
-                                    border: 'none',
-                                    boxShadow: '0 4px 20px rgba(0,0,0,0.08)',
-                                  }}
-                                />
-                                <Bar
-                                  dataKey="retirements"
-                                  name="Projected Retirements"
-                                  fill="#1a472a"
-                                  radius={[6, 6, 0, 0]}
-                                />
-                                <Bar
-                                  dataKey="ordinations"
-                                  name="Projected Ordinations"
-                                  fill="#D4AF37"
-                                  radius={[6, 6, 0, 0]}
-                                />
-                              </BarChart>
-                            </ResponsiveContainer>
+                            <ReactECharts
+                              option={{
+                                color: ['#6366f1', '#8b5cf6', '#06b6d4', '#10b981', '#f59e0b', '#ef4444'],
+                                tooltip: { trigger: 'axis', extraCssText: 'border-radius:12px;border:none;box-shadow:0 4px 20px rgba(0,0,0,0.08)' },
+                                legend: { top: 0, data: ['Projected Retirements', 'Projected Ordinations'] },
+                                grid: { top: 40, right: 30, left: 45, bottom: 30 },
+                                xAxis: { type: 'category', data: priestGapData.map((d) => d.year), axisLabel: { color: '#6B7280', fontSize: 12 } },
+                                yAxis: { type: 'value', axisLabel: { color: '#6B7280', fontSize: 12 }, splitLine: { lineStyle: { color: '#E5E7EB', type: 'dashed' } } },
+                                series: [
+                                  { name: 'Projected Retirements', type: 'bar', data: priestGapData.map((d) => ({ value: d.retirements, itemStyle: { color: '#1a472a', borderRadius: [6, 6, 0, 0] } })) },
+                                  { name: 'Projected Ordinations', type: 'bar', data: priestGapData.map((d) => ({ value: d.ordinations, itemStyle: { color: '#D4AF37', borderRadius: [6, 6, 0, 0] } })) },
+                                ],
+                              }}
+                              style={{ height: '100%', width: '100%' }}
+                            />
                           </div>
                           <div className="text-center mt-2 text-[10px] font-bold text-gray-400 uppercase tracking-[0.3em]">
                             Year

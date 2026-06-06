@@ -152,6 +152,82 @@ export const apiClient = {
   },
 
   // ----------------------------------------------------------------
+  // Analytics — descriptive
+  // ----------------------------------------------------------------
+  getFinancialTrend: (entityType: string, institutionId: string) =>
+    get(`/api/analytics/descriptive/financial-trend/${entityType}/${institutionId}`),
+
+  getPastoralAssignment: (institutionId: string) =>
+    get(`/api/analytics/descriptive/pastoral-assignment/${institutionId}`),
+
+  getParishCluster: () =>
+    get('/api/analytics/descriptive/parish-cluster'),
+
+  getSeasonalityTrend: (entityType: string, institutionId: string) =>
+    get(`/api/analytics/descriptive/seasonality/${entityType}/${institutionId}`),
+
+  getProjectsDescriptive: (institutionId: string) =>
+    get(`/api/analytics/descriptive/projects/${institutionId}`),
+
+  // ----------------------------------------------------------------
+  // Analytics — diagnostic
+  // ----------------------------------------------------------------
+  getPriestFinancialDiagnostic: (institutionId: string) =>
+    get(`/api/analytics/diagnostic/priest-financial/${institutionId}`),
+
+  getClusterSeasonalDiagnostic: (entityType: string, institutionId: string) =>
+    get(`/api/analytics/diagnostic/cluster-seasonal/${entityType}/${institutionId}`),
+
+  getProjectRiskDiagnostic: (institutionId: string) =>
+    get(`/api/analytics/diagnostic/project-risk/${institutionId}`),
+
+  // ----------------------------------------------------------------
+  // Analytics — predictive
+  // ----------------------------------------------------------------
+  getFinancialForecast: (entityType: string, institutionId: string, periods = 12) =>
+    get(`/api/analytics/predictive/financial-forecast/${entityType}/${institutionId}`, {
+      periods: String(periods),
+    }),
+
+  getPastoralForecast: (institutionId: string, periods = 6) =>
+    get(`/api/analytics/predictive/pastoral-forecast/${institutionId}`, { periods: String(periods) }),
+
+  getClusterForecast: () =>
+    get('/api/analytics/predictive/cluster-forecast'),
+
+  getSeasonalForecast: (entityType: string, institutionId: string, periods = 6) =>
+    get(`/api/analytics/predictive/seasonal-forecast/${entityType}/${institutionId}`, {
+      periods: String(periods),
+    }),
+
+  getProjectForecast: (institutionId: string) =>
+    get(`/api/analytics/predictive/project-forecast/${institutionId}`),
+
+  // ----------------------------------------------------------------
+  // Analytics — prescriptive
+  // ----------------------------------------------------------------
+  getFinancialRecommendation: (entityType: string, institutionId: string) =>
+    get(`/api/analytics/prescriptive/financial-recommendation/${entityType}/${institutionId}`),
+
+  runInstitutionSimulation: (entityType: string, institutionId: string, body: object) =>
+    post(`/api/analytics/prescriptive/institution-simulation/${entityType}/${institutionId}`, body),
+
+  getPastoralAction: (institutionId: string) =>
+    get(`/api/analytics/prescriptive/pastoral-action/${institutionId}`),
+
+  runPastoralSimulation: (institutionId: string, body: object) =>
+    post(`/api/analytics/prescriptive/pastoral-simulation/${institutionId}`, body),
+
+  getParishUpgrade: () =>
+    get('/api/analytics/prescriptive/parish-upgrade'),
+
+  getSeasonalStrategy: (entityType: string, institutionId: string) =>
+    get(`/api/analytics/prescriptive/seasonal-strategy/${entityType}/${institutionId}`),
+
+  getProjectPortfolio: (institutionId: string) =>
+    get(`/api/analytics/prescriptive/project-portfolio/${institutionId}`),
+
+  // ----------------------------------------------------------------
   // Projects
   // ----------------------------------------------------------------
   async getProjects(entityId?: string, entityType?: string): Promise<Project[]> {
@@ -225,5 +301,18 @@ export const apiClient = {
 
   subscribeToExpenses(callback: (expenses: ProjectExpense[]) => void, projectId?: string) {
     return createPoller(() => this.getExpenses(projectId), callback);
+  },
+
+  // ----------------------------------------------------------------
+  // Submissions — real file upload to Supabase Storage + DB record
+  // ----------------------------------------------------------------
+  async submitReport(formData: FormData): Promise<{ submissionId: string; filePath: string; validationStatus: string }> {
+    const res = await fetch('/api/submissions', {
+      method: 'POST',
+      credentials: 'include',
+      body: formData, // do NOT set Content-Type — browser sets multipart boundary automatically
+    });
+    if (!res.ok) throw new Error(`POST /api/submissions → ${res.status}`);
+    return res.json();
   },
 };

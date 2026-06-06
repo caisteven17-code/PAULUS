@@ -5,6 +5,8 @@ export const SERVICE_PORTS = {
   financial: Number(process.env.FINANCIAL_SERVICE_PORT || 4103),
   project: Number(process.env.PROJECT_SERVICE_PORT || 4104),
   analytics: Number(process.env.ANALYTICS_SERVICE_PORT || 4105),
+  announcement: Number(process.env.ANNOUNCEMENT_SERVICE_PORT || 4106),
+  auditLog: Number(process.env.AUDIT_LOG_SERVICE_PORT || 4107),
 } as const;
 
 const resolveServiceUrl = (envName: string, fallbackPort: number) => {
@@ -22,4 +24,6 @@ export const SERVICE_URLS = {
   financial: resolveServiceUrl('FINANCIAL_SERVICE_URL', SERVICE_PORTS.financial),
   project: resolveServiceUrl('PROJECT_SERVICE_URL', SERVICE_PORTS.project),
   analytics: resolveServiceUrl('ANALYTICS_SERVICE_URL', SERVICE_PORTS.analytics),
+  announcement: resolveServiceUrl('ANNOUNCEMENT_SERVICE_URL', SERVICE_PORTS.announcement),
+  auditLog: resolveServiceUrl('AUDIT_LOG_SERVICE_URL', SERVICE_PORTS.auditLog),
 } as const;
