@@ -79,7 +79,7 @@ export function Sidebar({ activeTab = '', onNavigate, role, timeframe = '6m', on
 
   const parishSubtabs = [
     { id: 'parish-dashboard', label: 'Dashboard', icon: BarChart3, section: 'PARISH' },
-    { id: 'parish-aitwin', label: 'Simulator', icon: Zap, section: 'PARISH' },
+    { id: 'parish-whatif', label: 'Simulator', icon: Zap, section: 'PARISH' },
   ];
 
   const priestSubtabs = [

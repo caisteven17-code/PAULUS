@@ -1594,6 +1594,6 @@ function PriestAITwin() {
   );
 }
 
-export function AITwin({ mode = 'parish' }: AITwinProps) {
+export function WhatIfSimulator({ mode = 'parish' }: AITwinProps) {
   return mode === 'priest' ? <PriestAITwin /> : <ParishAITwin mode={mode} />;
 }
