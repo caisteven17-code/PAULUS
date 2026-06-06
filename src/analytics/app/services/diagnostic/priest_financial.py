@@ -18,8 +18,7 @@ from app.services.data_definitions import (
     build_date_index,
     safe_div,
 )
-from app.services.supabase_client import get_supabase, get_table
-
+from app.services.supabase_client import get_table
 
 # ── LLM narrative ─────────────────────────────────────────────────────────────
 

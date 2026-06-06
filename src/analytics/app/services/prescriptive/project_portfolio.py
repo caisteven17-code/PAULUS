@@ -15,7 +15,7 @@ import numpy as np
 import pandas as pd
 
 from app.services.data_definitions import safe_div
-from app.services.supabase_client import get_supabase, get_table
+from app.services.supabase_client import get_table
 
 
 def _beta_triangle(optimistic: float, most_likely: float, pessimistic: float) -> float:
@@ -69,7 +69,7 @@ def _fetch_and_process(institution_id: str, total_budget: float) -> dict[str, An
         current = float(p.get("current_amount") or 0) + don_total.get(pid, 0.0)
         start_s = p.get("start_date")
         end_s = p.get("end_date")
-        status = str(p.get("status") or "active").lower()
+        _status = str(p.get("status") or "active").lower()  # noqa: F841
 
         completion = safe_div(current, target) if target > 0 else 0.0
 

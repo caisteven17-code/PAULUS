@@ -13,7 +13,7 @@ import numpy as np
 import pandas as pd
 
 from app.services.data_definitions import _SCHEMA_MAP, build_date_index, safe_div
-from app.services.supabase_client import get_supabase, get_table
+from app.services.supabase_client import get_table
 
 
 def _compute_health_score(avg_receipts: float, avg_expenses: float, avg_consumable: float) -> float:

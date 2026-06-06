@@ -12,18 +12,18 @@ from typing import Any
 import numpy as np
 import pandas as pd
 
+from app.services._institution_pool import run_parallel
 from app.services.data_definitions import (
     PARISH_EXPENSES,
     PARISH_RECEIPTS,
     build_date_index,
     safe_div,
 )
-from app.services.supabase_client import get_supabase, get_table
-from app.services._institution_pool import run_parallel
+from app.services.supabase_client import get_table
 
 _CLUSTER_LABELS = ["High-Performing", "Growing", "Stable", "At-Risk"]
-_LABEL_TO_IDX = {l: i for i, l in enumerate(_CLUSTER_LABELS)}
-_IDX_TO_LABEL = {i: l for i, l in enumerate(_CLUSTER_LABELS)}
+_LABEL_TO_IDX = {lbl: i for i, lbl in enumerate(_CLUSTER_LABELS)}
+_IDX_TO_LABEL = {i: lbl for i, lbl in enumerate(_CLUSTER_LABELS)}
 
 
 def _rule_cluster(avg: float, growth: float, deficit_rate: float, cv: float) -> int:
@@ -91,7 +91,7 @@ def _fetch_and_process() -> dict[str, Any]:
             "data_sufficient": False,
             "parish_predictions": [],
             "transition_matrix": {},
-            "movement_summary": {l: 0 for l in _CLUSTER_LABELS},
+            "movement_summary": {lbl: 0 for lbl in _CLUSTER_LABELS},
             "timestamp": ts,
         }
 
@@ -129,7 +129,7 @@ def _fetch_and_process() -> dict[str, Any]:
             "data_sufficient": False,
             "parish_predictions": [],
             "transition_matrix": {},
-            "movement_summary": {l: 0 for l in _CLUSTER_LABELS},
+            "movement_summary": {lbl: 0 for lbl in _CLUSTER_LABELS},
             "timestamp": ts,
         }
 
@@ -139,7 +139,6 @@ def _fetch_and_process() -> dict[str, Any]:
 
     # XGBoost classifier
     import xgboost as xgb
-    from sklearn.model_selection import cross_val_predict
 
     clf = xgb.XGBClassifier(
         n_estimators=100, max_depth=3, learning_rate=0.1,
@@ -171,7 +170,7 @@ def _fetch_and_process() -> dict[str, Any]:
         for i in range(4)
     }
 
-    movement_summary = {l: 0 for l in _CLUSTER_LABELS}
+    movement_summary = {lbl: 0 for lbl in _CLUSTER_LABELS}
     parish_predictions = []
     for i, r in enumerate(rows):
         current_label = _IDX_TO_LABEL.get(int(r["cluster_idx"]), "Stable")

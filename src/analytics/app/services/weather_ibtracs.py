@@ -32,11 +32,9 @@ import io
 import json
 import logging
 import math
-import os
 import urllib.request
 from datetime import date, datetime, timedelta
 from pathlib import Path
-from typing import Optional
 
 logger = logging.getLogger(__name__)
 

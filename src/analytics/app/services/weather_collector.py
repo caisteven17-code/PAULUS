@@ -33,11 +33,9 @@ from __future__ import annotations
 
 import json
 import logging
-import math
-import os
 import time
-import urllib.request
 import urllib.parse
+import urllib.request
 from datetime import date, datetime, timedelta
 from pathlib import Path
 from typing import Optional
@@ -244,7 +242,7 @@ def _score_source(records: list[dict], all_sources: dict[str, list[dict]]) -> di
     total = len(records)
 
     # Build date-indexed lookup for cross-source consistency
-    by_date: dict[str, float | None] = {r["date"]: r.get("temp_avg_c") for r in records}
+    _by_date: dict[str, float | None] = {r["date"]: r.get("temp_avg_c") for r in records}  # noqa: F841
 
     # Cross-source medians for consistency check
     source_by_date: dict[str, list[float]] = {}
@@ -327,11 +325,16 @@ def _aggregate_monthly(records: list[dict], typhoon_flags: dict) -> list[dict]:
             }
 
         m = monthly[ym]
-        if r.get("temp_avg_c") is not None: m["temp_avg_c"].append(r["temp_avg_c"])
-        if r.get("temp_max_c") is not None: m["temp_max_c"].append(r["temp_max_c"])
-        if r.get("temp_min_c") is not None: m["temp_min_c"].append(r["temp_min_c"])
-        if r.get("rainfall_mm") is not None: m["rainfall_mm"].append(r["rainfall_mm"])
-        if r.get("wind_ms") is not None:    m["wind_ms"].append(r["wind_ms"])
+        if r.get("temp_avg_c") is not None:
+            m["temp_avg_c"].append(r["temp_avg_c"])
+        if r.get("temp_max_c") is not None:
+            m["temp_max_c"].append(r["temp_max_c"])
+        if r.get("temp_min_c") is not None:
+            m["temp_min_c"].append(r["temp_min_c"])
+        if r.get("rainfall_mm") is not None:
+            m["rainfall_mm"].append(r["rainfall_mm"])
+        if r.get("wind_ms") is not None:
+            m["wind_ms"].append(r["wind_ms"])
 
         # Merge IBTrACS flags
         flag = typhoon_flags.get(d)

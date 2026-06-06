@@ -7,11 +7,11 @@ from typing import Literal
 
 from fastapi import APIRouter, HTTPException, Query
 
+from app.services.predictive import cluster_forecast as svc_cf
 from app.services.predictive import financial_forecast as svc_ff
 from app.services.predictive import pastoral_forecast as svc_pf
-from app.services.predictive import cluster_forecast as svc_cf
-from app.services.predictive import seasonal_forecast as svc_sf
 from app.services.predictive import project_forecast as svc_proj
+from app.services.predictive import seasonal_forecast as svc_sf
 
 router = APIRouter(tags=["predictive"])
 

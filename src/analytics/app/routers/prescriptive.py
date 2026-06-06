@@ -3,18 +3,18 @@ Prescriptive analytics router — What should we do?
 Prefix: /analytics/prescriptive
 """
 
-from typing import Literal, Optional
+from typing import Literal
 
 from fastapi import APIRouter, HTTPException, Query
 from pydantic import BaseModel
 
 from app.services.prescriptive import financial_recommendation as svc_fr
 from app.services.prescriptive import institution_simulation as svc_is
+from app.services.prescriptive import parish_upgrade as svc_pu
 from app.services.prescriptive import pastoral_action as svc_pa
 from app.services.prescriptive import pastoral_simulation as svc_ps
-from app.services.prescriptive import parish_upgrade as svc_pu
-from app.services.prescriptive import seasonal_strategy as svc_ss
 from app.services.prescriptive import project_portfolio as svc_pp
+from app.services.prescriptive import seasonal_strategy as svc_ss
 
 router = APIRouter(tags=["prescriptive"])
 

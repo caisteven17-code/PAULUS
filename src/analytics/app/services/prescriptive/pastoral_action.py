@@ -13,7 +13,7 @@ import numpy as np
 import pandas as pd
 
 from app.services.data_definitions import _SCHEMA_MAP, build_date_index, safe_div
-from app.services.supabase_client import get_supabase, get_table
+from app.services.supabase_client import get_table
 
 
 def _dea_efficiency(inputs: np.ndarray, outputs: np.ndarray) -> list[float]:
@@ -31,7 +31,7 @@ def _dea_efficiency(inputs: np.ndarray, outputs: np.ndarray) -> list[float]:
         for i in range(n):
             prob = pulp.LpProblem(f"DEA_{i}", pulp.LpMaximize)
             lambdas = [pulp.LpVariable(f"l_{j}", lowBound=0) for j in range(n)]
-            theta = pulp.LpVariable("theta", lowBound=0)
+            _theta = pulp.LpVariable("theta", lowBound=0)  # noqa: F841
 
             # Maximize weighted output
             prob += pulp.lpSum(outputs[j] * lambdas[j] for j in range(n))
@@ -158,7 +158,7 @@ def _fetch_and_process(institution_id: str) -> dict[str, Any]:
 
     mlp = MLPRegressor(hidden_layer_sizes=(32, 16), max_iter=500, random_state=42)
     mlp.fit(X_scaled, y)
-    y_pred = mlp.predict(X_scaled)
+    _y_pred = mlp.predict(X_scaled)  # noqa: F841
 
     # DEA: inputs = time index, outputs = avg_collection
     time_inputs = np.arange(1, n + 1).astype(float)

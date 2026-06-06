@@ -7,8 +7,8 @@ from typing import Literal
 
 from fastapi import APIRouter, HTTPException
 
-from app.services.diagnostic import priest_financial as svc_pf
 from app.services.diagnostic import cluster_seasonal as svc_cs
+from app.services.diagnostic import priest_financial as svc_pf
 from app.services.diagnostic import project_risk as svc_pr
 
 router = APIRouter(tags=["diagnostic"])

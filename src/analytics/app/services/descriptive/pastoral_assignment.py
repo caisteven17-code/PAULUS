@@ -14,12 +14,11 @@ import numpy as np
 import pandas as pd
 
 from app.services.data_definitions import (
-    MONTH_ORDER,
     _SCHEMA_MAP,
     build_date_index,
     safe_div,
 )
-from app.services.supabase_client import get_supabase, get_table
+from app.services.supabase_client import get_table
 
 
 def _period_stats(sub: pd.DataFrame, label: str) -> dict[str, Any]:

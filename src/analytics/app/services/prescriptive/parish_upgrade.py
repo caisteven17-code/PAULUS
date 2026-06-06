@@ -12,14 +12,14 @@ from typing import Any
 import numpy as np
 import pandas as pd
 
+from app.services._institution_pool import run_parallel
 from app.services.data_definitions import (
     PARISH_EXPENSES,
     PARISH_RECEIPTS,
     build_date_index,
     safe_div,
 )
-from app.services.supabase_client import get_supabase, get_table
-from app.services._institution_pool import run_parallel
+from app.services.supabase_client import get_table
 
 _CLUSTER_LABELS = ["High-Performing", "Growing", "Stable", "At-Risk"]
 
@@ -197,7 +197,7 @@ def _fetch_and_process(budget: float = 500000.0, upgrade_cost: float = 50000.0) 
 
     # DEA efficiency for budget allocation priority
     outputs = np.array([p["avg_collection"] for p in parishes])
-    inputs = np.arange(1, len(parishes) + 1).astype(float)
+    _inputs = np.arange(1, len(parishes) + 1).astype(float)  # noqa: F841
     max_out = float(np.max(outputs)) or 1.0
     eff_scores = [round(safe_div(float(outputs[i]), max_out), 4) for i in range(len(parishes))]
     for i, p in enumerate(parishes):

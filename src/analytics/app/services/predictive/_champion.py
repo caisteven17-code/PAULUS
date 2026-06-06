@@ -24,7 +24,6 @@ from typing import Callable
 
 import numpy as np
 
-
 # ── WAPE ──────────────────────────────────────────────────────────────────────
 
 def wape(actual: np.ndarray, predicted: np.ndarray) -> float:

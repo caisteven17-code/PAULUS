@@ -13,12 +13,11 @@ import numpy as np
 import pandas as pd
 
 from app.services.data_definitions import _SCHEMA_MAP, build_date_index, safe_div
-from app.services.supabase_client import get_supabase, get_table
 from app.services.predictive._champion import (
-    markov_forecast,
     select_champion,
     train_test_split_ts,
 )
+from app.services.supabase_client import get_table
 
 
 def _prophet_trainer(train: np.ndarray, holdout: np.ndarray) -> np.ndarray:

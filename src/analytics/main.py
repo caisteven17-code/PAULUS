@@ -3,8 +3,7 @@ import os
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.routers import analytics, health
-from app.routers import descriptive, diagnostic, predictive, prescriptive
+from app.routers import analytics, descriptive, diagnostic, health, predictive, prescriptive
 
 app = FastAPI(title="Diocese Analytics API", version="2.0.0")
 

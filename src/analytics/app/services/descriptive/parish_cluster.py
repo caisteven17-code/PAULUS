@@ -12,14 +12,14 @@ from typing import Any
 import numpy as np
 import pandas as pd
 
+from app.services._institution_pool import run_parallel
 from app.services.data_definitions import (
     PARISH_EXPENSES,
     PARISH_RECEIPTS,
     build_date_index,
     safe_div,
 )
-from app.services.supabase_client import get_supabase, get_table
-from app.services._institution_pool import run_parallel
+from app.services.supabase_client import get_table
 
 # Cluster labels
 _CLUSTERS = ["High-Performing", "Growing", "Stable", "At-Risk"]
@@ -156,7 +156,7 @@ def _fetch_and_process() -> dict[str, Any]:
         return _parish_features(df, iid)
 
     parishes = run_parallel(_worker, institutions)
-    no_data_count = len(institutions) - len(parishes)
+    _no_data_count = len(institutions) - len(parishes)  # noqa: F841
 
     if not parishes:
         return {

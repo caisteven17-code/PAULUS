@@ -13,14 +13,13 @@ from typing import Any
 import numpy as np
 import pandas as pd
 
-from app.services.data_definitions import _SCHEMA_MAP, build_date_index, safe_div
-from app.services.supabase_client import get_supabase, get_table
+from app.services.data_definitions import _SCHEMA_MAP, build_date_index
 from app.services.predictive._champion import (
     markov_forecast,
-    markov_transition_matrix,
     select_champion,
     train_test_split_ts,
 )
+from app.services.supabase_client import get_table
 
 
 def _holtwinters_trainer(train: np.ndarray, holdout: np.ndarray) -> np.ndarray:
@@ -197,7 +196,7 @@ def _fetch_and_process(institution_id: str, periods: int) -> dict[str, Any]:
 
     # State prediction via Markov
     state_prediction = _state_of(series)
-    n_states = 3  # improving, stable, declining
+    _n_states = 3  # noqa: F841  # improving, stable, declining
     # Map continuous series to 3-state
     p33 = float(np.percentile(series, 33))
     p67 = float(np.percentile(series, 67))

@@ -110,7 +110,7 @@ def month_sort_key(month_str: str) -> int:
         return 0
 
 
-def build_date_index(df) -> "pd.DatetimeIndex":
+def build_date_index(df) -> "pd.DatetimeIndex":  # noqa: F821
     """Convert year + month columns to a DatetimeIndex."""
     import pandas as pd
     month_to_num = {m: i + 1 for i, m in enumerate(MONTH_ORDER)}

@@ -24,7 +24,6 @@ import logging
 import time
 from datetime import date, datetime, timedelta
 from pathlib import Path
-from typing import Optional
 
 logger = logging.getLogger(__name__)
 
@@ -56,9 +55,9 @@ def _fetch_for_source(
     end: date,
 ) -> list[dict]:
     from app.services.weather_collector import (
-        fetch_open_meteo,
         fetch_nasa_power_ag,
         fetch_nasa_power_sb,
+        fetch_open_meteo,
     )
     if source_name == "open_meteo":
         return fetch_open_meteo(lat, lon, start, end)

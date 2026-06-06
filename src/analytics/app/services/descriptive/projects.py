@@ -10,7 +10,7 @@ from datetime import datetime, timezone
 from typing import Any
 
 from app.services.data_definitions import safe_div
-from app.services.supabase_client import get_supabase, get_table
+from app.services.supabase_client import get_table
 
 
 def _fetch_and_process(institution_id: str) -> dict[str, Any]:

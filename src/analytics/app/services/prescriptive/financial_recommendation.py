@@ -9,11 +9,10 @@ import asyncio
 from datetime import datetime, timezone
 from typing import Any
 
-import numpy as np
 import pandas as pd
 
 from app.services.data_definitions import _SCHEMA_MAP, build_date_index, safe_div
-from app.services.supabase_client import get_supabase, get_table
+from app.services.supabase_client import get_table
 
 _DISBURSEMENT_CAP = 0.9347  # 93.47% of receipts per Diocese benchmark
 _BUDGET_CAP = 0.90          # total disbursements <= 90% of total_receipts
@@ -63,7 +62,7 @@ def _solve_lp(avg_receipts: float, category_avgs: dict[str, float]) -> dict[str,
             "total_disbursement": round(total_disb, 2),
         }
 
-    except Exception as exc:
+    except Exception:
         # Fallback: proportional allocation capped at 93.47%
         total_exp = sum(category_avgs.values())
         scale = min(1.0, (avg_receipts * _BUDGET_CAP) / total_exp) if total_exp > 0 else 1.0

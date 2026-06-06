@@ -18,7 +18,7 @@ from app.services.data_definitions import (
     build_date_index,
     safe_div,
 )
-from app.services.supabase_client import get_supabase, get_table
+from app.services.supabase_client import get_table
 
 
 def _llm_narrative(stats: dict[str, Any]) -> str:
@@ -163,8 +163,8 @@ def _fetch_and_process(entity_id: str, entity_type: str) -> dict[str, Any]:
     X = df[features].values
     y = df["total_receipts"].values
 
-    from sklearn.linear_model import LinearRegression
     import shap
+    from sklearn.linear_model import LinearRegression
 
     lr = LinearRegression()
     lr.fit(X, y)

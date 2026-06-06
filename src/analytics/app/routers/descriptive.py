@@ -8,10 +8,10 @@ from typing import Literal
 from fastapi import APIRouter, HTTPException
 
 from app.services.descriptive import financial_trend as svc_ft
-from app.services.descriptive import pastoral_assignment as svc_pa
 from app.services.descriptive import parish_cluster as svc_pc
-from app.services.descriptive import seasonality_trend as svc_st
+from app.services.descriptive import pastoral_assignment as svc_pa
 from app.services.descriptive import projects as svc_proj
+from app.services.descriptive import seasonality_trend as svc_st
 
 router = APIRouter(tags=["descriptive"])
 

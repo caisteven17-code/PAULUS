@@ -13,7 +13,7 @@ import numpy as np
 import pandas as pd
 
 from app.services.data_definitions import safe_div
-from app.services.supabase_client import get_supabase, get_table
+from app.services.supabase_client import get_table
 
 
 def _days_elapsed(start_str: str | None) -> float:

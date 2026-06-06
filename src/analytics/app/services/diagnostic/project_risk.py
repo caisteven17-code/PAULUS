@@ -14,7 +14,7 @@ import numpy as np
 import pandas as pd
 
 from app.services.data_definitions import safe_div
-from app.services.supabase_client import get_supabase, get_table
+from app.services.supabase_client import get_table
 
 
 def _llm_narrative(stats: dict[str, Any]) -> str:
@@ -130,7 +130,7 @@ def _fetch_and_process(institution_id: str) -> dict[str, Any]:
         budget_variance = safe_div(target - current, target) if target > 0 else 0.0
 
         # Schedule variance in days (negative = behind schedule)
-        expected_amount_by_now = target * time_elapsed_pct
+        _expected_amount_by_now = target * time_elapsed_pct  # noqa: F841
         schedule_variance_days = float(
             (completion_pct - time_elapsed_pct) * total_days
         ) if total_days > 0 else 0.0
@@ -171,8 +171,8 @@ def _fetch_and_process(institution_id: str) -> dict[str, Any]:
 
     if len(X) >= 4:
         try:
-            from sklearn.linear_model import LogisticRegression
             import shap
+            from sklearn.linear_model import LogisticRegression
 
             lr = LogisticRegression(max_iter=500)
             lr.fit(X, y)

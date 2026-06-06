@@ -7,21 +7,11 @@ from typing import Optional
 import pandas as pd
 
 from app.models.schemas import AnomalyResult, HealthDimensions, HealthScoreResponse
-from app.services.supabase_client import get_supabase, get_table
 from app.services.data_definitions import (
     _SCHEMA_MAP,
     MONTH_ORDER,
-    PARISH_RECEIPTS,
-    PARISH_EXPENSES,
-    PARISH_CONSUMABLE,
-    SCHOOL_RECEIPTS,
-    SCHOOL_EXPENSES,
-    SCHOOL_CONSUMABLE,
-    SEMINARY_RECEIPTS,
-    SEMINARY_EXPENSES,
-    SEMINARY_CONSUMABLE,
 )
-
+from app.services.supabase_client import get_supabase, get_table
 
 # ── Helpers ──────────────────────────────────────────────────────────────────
 
