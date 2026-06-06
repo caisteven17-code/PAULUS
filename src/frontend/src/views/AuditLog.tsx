@@ -1,21 +1,8 @@
 'use client';
 
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import {
-  BarChart,
-  Bar,
-  XAxis,
-  YAxis,
-  Tooltip,
-  ResponsiveContainer,
-  PieChart,
-  Pie,
-  Cell,
-  AreaChart,
-  Area,
-  CartesianGrid,
-} from 'recharts';
+import ReactECharts from 'echarts-for-react';
 import {
   Download,
   Search,
@@ -439,33 +426,33 @@ function groupByDate(logs: AuditEntry[]) {
   return groups;
 }
 
-// ─────────────────────────────────────────────
-// Analytics sub-components
-// ─────────────────────────────────────────────
-const TooltipBox = ({ active, payload, label }: any) => {
-  if (!active || !payload?.length) return null;
-  return (
-    <div className="bg-white border border-gray-100 rounded-xl shadow-lg px-3 py-2 text-xs">
-      <p className="font-bold text-gray-700 mb-1">{label}</p>
-      {payload.map((p: any, i: number) => (
-        <p key={i} style={{ color: p.color }} className="font-semibold">
-          {p.name}: {p.value}
-        </p>
-      ))}
-    </div>
-  );
-};
+// TooltipBox replaced by ECharts built-in tooltip
 
 // ─────────────────────────────────────────────
 // Component
 // ─────────────────────────────────────────────
 export function AuditLog() {
+  const [logs, setLogs] = useState<AuditEntry[]>(RAW_LOGS);
+  const [isLoading, setIsLoading] = useState(false);
+  useEffect(() => {
+    setIsLoading(true);
+    fetch('/api/audit-log', { credentials: 'include' })
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data: AuditEntry[] | null) => {
+        if (data && data.length > 0) setLogs(data);
+      })
+      .catch(() => {
+        /* keep fallback RAW_LOGS */
+      })
+      .finally(() => setIsLoading(false));
+  }, []);
+
   const [search, setSearch] = useState('');
   const [activeFilter, setActiveFilter] = useState<LogCategory>('all');
   const [showAnalytics, setShowAnalytics] = useState(false);
 
   const filtered = useMemo(() => {
-    return RAW_LOGS.filter((log) => {
+    return logs.filter((log) => {
       const matchCat = activeFilter === 'all' || log.category === activeFilter;
       const q = search.toLowerCase();
       const matchText =
@@ -479,10 +466,10 @@ export function AuditLog() {
 
   const stats = useMemo(
     () => ({
-      total: RAW_LOGS.length,
-      users: RAW_LOGS.filter((l) => !l.isSystem).length,
-      system: RAW_LOGS.filter((l) => l.isSystem).length,
-      alerts: RAW_LOGS.filter((l) => l.severity === 'warning' || l.severity === 'error').length,
+      total: logs.length,
+      users: logs.filter((l) => !l.isSystem).length,
+      system: logs.filter((l) => l.isSystem).length,
+      alerts: logs.filter((l) => l.severity === 'warning' || l.severity === 'error').length,
     }),
     [],
   );
@@ -490,7 +477,7 @@ export function AuditLog() {
   // ── Analytics data derived from logs ──────────
   const activityTrendData = useMemo(() => {
     const counts: Record<string, number> = {};
-    RAW_LOGS.forEach((l) => {
+    logs.forEach((l) => {
       counts[l.date] = (counts[l.date] || 0) + 1;
     });
     return Object.entries(counts)
@@ -500,7 +487,7 @@ export function AuditLog() {
 
   const categoryData = useMemo(() => {
     const counts: Partial<Record<Exclude<LogCategory, 'all'>, number>> = {};
-    RAW_LOGS.forEach((l) => {
+    logs.forEach((l) => {
       counts[l.category] = (counts[l.category] || 0) + 1;
     });
     return Object.entries(counts).map(([cat, count]) => ({
@@ -512,7 +499,7 @@ export function AuditLog() {
 
   const severityData = useMemo(() => {
     const counts: Partial<Record<LogSeverity, number>> = {};
-    RAW_LOGS.forEach((l) => {
+    logs.forEach((l) => {
       counts[l.severity] = (counts[l.severity] || 0) + 1;
     });
     return (['success', 'info', 'warning', 'error'] as LogSeverity[]).map((sev) => ({
@@ -524,9 +511,11 @@ export function AuditLog() {
 
   const topUsersData = useMemo(() => {
     const counts: Record<string, number> = {};
-    RAW_LOGS.filter((l) => !l.isSystem).forEach((l) => {
-      counts[l.user] = (counts[l.user] || 0) + 1;
-    });
+    logs
+      .filter((l) => !l.isSystem)
+      .forEach((l) => {
+        counts[l.user] = (counts[l.user] || 0) + 1;
+      });
     return Object.entries(counts)
       .sort((a, b) => b[1] - a[1])
       .slice(0, 5)
@@ -535,7 +524,7 @@ export function AuditLog() {
 
   const insightText = useMemo(() => {
     const topCat = categoryData.reduce((a, b) => (a.value > b.value ? a : b));
-    const warnings = RAW_LOGS.filter((l) => l.severity === 'warning' || l.severity === 'error').length;
+    const warnings = logs.filter((l) => l.severity === 'warning' || l.severity === 'error').length;
     const topUser = topUsersData[0];
     return [
       `Most frequent event category is ${topCat.name} with ${topCat.value} events in the last 30 days.`,
@@ -699,42 +688,54 @@ export function AuditLog() {
                     Event Volume by Day
                   </p>
                   <p className="text-xs text-gray-400 mb-4">Total system & user events recorded per day</p>
-                  <div className="h-[180px]">
-                    <ResponsiveContainer width="100%" height="100%">
-                      <AreaChart data={activityTrendData} margin={{ top: 5, right: 10, left: -20, bottom: 0 }}>
-                        <defs>
-                          <linearGradient id="auditGrad" x1="0" y1="0" x2="0" y2="1">
-                            <stop offset="5%" stopColor="#1a472a" stopOpacity={0.15} />
-                            <stop offset="95%" stopColor="#1a472a" stopOpacity={0} />
-                          </linearGradient>
-                        </defs>
-                        <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#F3F4F6" />
-                        <XAxis
-                          dataKey="date"
-                          tick={{ fontSize: 9, fill: '#9CA3AF', fontWeight: 700 }}
-                          tickLine={false}
-                          axisLine={false}
-                        />
-                        <YAxis
-                          tick={{ fontSize: 9, fill: '#9CA3AF' }}
-                          tickLine={false}
-                          axisLine={false}
-                          allowDecimals={false}
-                        />
-                        <Tooltip content={<TooltipBox />} />
-                        <Area
-                          type="monotone"
-                          dataKey="events"
-                          name="Events"
-                          stroke="#1a472a"
-                          strokeWidth={2.5}
-                          fill="url(#auditGrad)"
-                          dot={{ r: 4, fill: '#1a472a', strokeWidth: 0 }}
-                          activeDot={{ r: 6 }}
-                        />
-                      </AreaChart>
-                    </ResponsiveContainer>
-                  </div>
+                  <ReactECharts
+                    style={{ height: '180px', width: '100%' }}
+                    option={{
+                      color: ['#6366f1', '#8b5cf6', '#06b6d4', '#10b981', '#f59e0b', '#ef4444'],
+                      tooltip: { trigger: 'axis' },
+                      grid: { top: 5, right: 10, left: 20, bottom: 20 },
+                      xAxis: {
+                        type: 'category',
+                        data: activityTrendData.map((d) => d.date),
+                        axisLine: { show: false },
+                        axisTick: { show: false },
+                        axisLabel: { fontSize: 9, color: '#9CA3AF', fontWeight: 'bold' },
+                      },
+                      yAxis: {
+                        type: 'value',
+                        axisLine: { show: false },
+                        axisTick: { show: false },
+                        axisLabel: { fontSize: 9, color: '#9CA3AF' },
+                        splitLine: { lineStyle: { color: '#F3F4F6' } },
+                        minInterval: 1,
+                      },
+                      series: [
+                        {
+                          name: 'Events',
+                          type: 'line',
+                          data: activityTrendData.map((d) => d.events),
+                          smooth: true,
+                          symbol: 'circle',
+                          symbolSize: 8,
+                          lineStyle: { color: '#1a472a', width: 2.5 },
+                          itemStyle: { color: '#1a472a' },
+                          areaStyle: {
+                            color: {
+                              type: 'linear',
+                              x: 0,
+                              y: 0,
+                              x2: 0,
+                              y2: 1,
+                              colorStops: [
+                                { offset: 0, color: 'rgba(26,71,42,0.15)' },
+                                { offset: 1, color: 'rgba(26,71,42,0)' },
+                              ],
+                            },
+                          },
+                        },
+                      ],
+                    }}
+                  />
                 </div>
 
                 {/* Category Donut */}
@@ -743,34 +744,23 @@ export function AuditLog() {
                     Events by Category
                   </p>
                   <p className="text-xs text-gray-400 mb-2">Distribution across log types</p>
-                  <div className="h-[140px]">
-                    <ResponsiveContainer width="100%" height="100%">
-                      <PieChart>
-                        <Pie
-                          data={categoryData}
-                          cx="50%"
-                          cy="50%"
-                          innerRadius={38}
-                          outerRadius={60}
-                          paddingAngle={3}
-                          dataKey="value"
-                        >
-                          {categoryData.map((entry, i) => (
-                            <Cell key={i} fill={entry.color} />
-                          ))}
-                        </Pie>
-                        <Tooltip
-                          formatter={(v, n) => [Number(v ?? 0), n as string]}
-                          contentStyle={{
-                            borderRadius: '12px',
-                            border: 'none',
-                            boxShadow: '0 4px 20px rgba(0,0,0,0.08)',
-                            fontSize: 11,
-                          }}
-                        />
-                      </PieChart>
-                    </ResponsiveContainer>
-                  </div>
+                  <ReactECharts
+                    style={{ height: '140px', width: '100%' }}
+                    option={{
+                      color: categoryData.map((c) => c.color),
+                      tooltip: { trigger: 'item', formatter: '{b}: {c}' },
+                      series: [
+                        {
+                          type: 'pie',
+                          radius: ['40%', '70%'],
+                          center: ['50%', '50%'],
+                          padAngle: 3,
+                          data: categoryData.map((c) => ({ name: c.name, value: c.value })),
+                          label: { show: false },
+                        },
+                      ],
+                    }}
+                  />
                   <div className="grid grid-cols-2 gap-x-3 gap-y-1 mt-2">
                     {categoryData.map((c, i) => (
                       <div key={i} className="flex items-center gap-1.5">
@@ -790,37 +780,39 @@ export function AuditLog() {
                     Severity Distribution
                   </p>
                   <p className="text-xs text-gray-400 mb-4">Count of events by severity level</p>
-                  <div className="h-[160px]">
-                    <ResponsiveContainer width="100%" height="100%">
-                      <BarChart
-                        data={severityData}
-                        layout="vertical"
-                        margin={{ top: 0, right: 20, left: 0, bottom: 0 }}
-                      >
-                        <XAxis
-                          type="number"
-                          tick={{ fontSize: 9, fill: '#9CA3AF' }}
-                          tickLine={false}
-                          axisLine={false}
-                          allowDecimals={false}
-                        />
-                        <YAxis
-                          type="category"
-                          dataKey="name"
-                          tick={{ fontSize: 10, fill: '#6B7280', fontWeight: 700 }}
-                          tickLine={false}
-                          axisLine={false}
-                          width={55}
-                        />
-                        <Tooltip content={<TooltipBox />} />
-                        <Bar dataKey="count" name="Events" radius={[0, 6, 6, 0]} maxBarSize={18}>
-                          {severityData.map((entry, i) => (
-                            <Cell key={i} fill={entry.color} />
-                          ))}
-                        </Bar>
-                      </BarChart>
-                    </ResponsiveContainer>
-                  </div>
+                  <ReactECharts
+                    style={{ height: '160px', width: '100%' }}
+                    option={{
+                      color: severityData.map((d) => d.color),
+                      tooltip: { trigger: 'axis', axisPointer: { type: 'shadow' } },
+                      grid: { top: 5, right: 20, left: 60, bottom: 5 },
+                      xAxis: {
+                        type: 'value',
+                        axisLine: { show: false },
+                        axisTick: { show: false },
+                        axisLabel: { fontSize: 9, color: '#9CA3AF' },
+                        minInterval: 1,
+                      },
+                      yAxis: {
+                        type: 'category',
+                        data: severityData.map((d) => d.name),
+                        axisLine: { show: false },
+                        axisTick: { show: false },
+                        axisLabel: { fontSize: 10, color: '#6B7280', fontWeight: 'bold' },
+                      },
+                      series: [
+                        {
+                          name: 'Events',
+                          type: 'bar',
+                          data: severityData.map((d, i) => ({
+                            value: d.count,
+                            itemStyle: { color: d.color, borderRadius: [0, 6, 6, 0] },
+                          })),
+                          barMaxWidth: 18,
+                        },
+                      ],
+                    }}
+                  />
                 </div>
 
                 {/* Top Active Users */}
@@ -829,33 +821,39 @@ export function AuditLog() {
                     Top Active Users
                   </p>
                   <p className="text-xs text-gray-400 mb-4">Most frequent actors (excluding system)</p>
-                  <div className="h-[160px]">
-                    <ResponsiveContainer width="100%" height="100%">
-                      <BarChart
-                        data={topUsersData}
-                        layout="vertical"
-                        margin={{ top: 0, right: 20, left: 0, bottom: 0 }}
-                      >
-                        <XAxis
-                          type="number"
-                          tick={{ fontSize: 9, fill: '#9CA3AF' }}
-                          tickLine={false}
-                          axisLine={false}
-                          allowDecimals={false}
-                        />
-                        <YAxis
-                          type="category"
-                          dataKey="name"
-                          tick={{ fontSize: 9, fill: '#6B7280', fontWeight: 700 }}
-                          tickLine={false}
-                          axisLine={false}
-                          width={75}
-                        />
-                        <Tooltip content={<TooltipBox />} />
-                        <Bar dataKey="actions" name="Actions" fill="#D4AF37" radius={[0, 6, 6, 0]} maxBarSize={18} />
-                      </BarChart>
-                    </ResponsiveContainer>
-                  </div>
+                  <ReactECharts
+                    style={{ height: '160px', width: '100%' }}
+                    option={{
+                      color: ['#D4AF37'],
+                      tooltip: { trigger: 'axis', axisPointer: { type: 'shadow' } },
+                      grid: { top: 5, right: 20, left: 80, bottom: 5 },
+                      xAxis: {
+                        type: 'value',
+                        axisLine: { show: false },
+                        axisTick: { show: false },
+                        axisLabel: { fontSize: 9, color: '#9CA3AF' },
+                        minInterval: 1,
+                      },
+                      yAxis: {
+                        type: 'category',
+                        data: topUsersData.map((d) => d.name),
+                        axisLine: { show: false },
+                        axisTick: { show: false },
+                        axisLabel: { fontSize: 9, color: '#6B7280', fontWeight: 'bold' },
+                      },
+                      series: [
+                        {
+                          name: 'Actions',
+                          type: 'bar',
+                          data: topUsersData.map((d) => ({
+                            value: d.actions,
+                            itemStyle: { color: '#D4AF37', borderRadius: [0, 6, 6, 0] },
+                          })),
+                          barMaxWidth: 18,
+                        },
+                      ],
+                    }}
+                  />
                 </div>
 
                 {/* Descriptive Insights */}
@@ -971,7 +969,7 @@ export function AuditLog() {
         <div className="mt-12 flex items-center gap-4">
           <div className="flex-1 h-px bg-gray-100" />
           <p className="text-[10px] font-black text-gray-300 uppercase tracking-[0.3em] whitespace-nowrap">
-            {filtered.length} of {RAW_LOGS.length} events &nbsp;·&nbsp; 90-day retention
+            {filtered.length} of {logs.length} events &nbsp;·&nbsp; 90-day retention
           </p>
           <div className="flex-1 h-px bg-gray-100" />
         </div>

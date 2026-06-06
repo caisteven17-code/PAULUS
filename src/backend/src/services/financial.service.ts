@@ -19,116 +19,252 @@ export const DEFAULT_RECORDS: Omit<FinancialRecord, 'entityId' | 'entityType'>[]
   { month: 'Dec', collections: 1100000, consumableCollections: 900000, disbursements: 750000 },
 ];
 
-const INSTITUTION_SCORES: Record<string, { score: number; type: string }> = {
-  default: { score: 83, type: 'parish' },
-  parish_01: { score: 83, type: 'parish' },
-  school_01: { score: 76, type: 'school' },
-  seminary_01: { score: 72, type: 'seminary' },
-  'San Pablo Cathedral': { score: 91.4, type: 'parish' },
-  'San Isidro Labrador (Biñan)': { score: 88.7, type: 'parish' },
-  'St. John the Baptist (Calamba)': { score: 86.2, type: 'parish' },
-  'St. Polycarp (Cabuyao)': { score: 84.5, type: 'parish' },
-  'Immaculate Conception (Los Baños)': { score: 82.9, type: 'parish' },
-  'St. Rose of Lima (Sta. Rosa)': { score: 81.1, type: 'parish' },
-  'Holy Family Parish (Sta. Rosa)': { score: 79.8, type: 'parish' },
-  'San Antonio de Padua (Pila)': { score: 78.3, type: 'parish' },
-  'St. Augustine (Bay)': { score: 77.0, type: 'parish' },
-  'St. Sebastian (Lumban)': { score: 75.6, type: 'parish' },
-  'St. James the Apostle (Paete)': { score: 44.8, type: 'parish' },
-  'St. Gregory the Great (Majayjay)': { score: 42.1, type: 'parish' },
-  'St. Bartholomew (Nagcarlan)': { score: 39.5, type: 'parish' },
-  'St. Mary Magdalene (Magdalena)': { score: 37.2, type: 'parish' },
-  'St. John the Baptist (Liliw)': { score: 35.4, type: 'parish' },
-  'St. Peter of Alcantara (Pakil)': { score: 33.1, type: 'parish' },
-  'Our Lady of Holy Rosary (Luisiana)': { score: 31.8, type: 'parish' },
-  'St. Sebastian (Famy)': { score: 29.5, type: 'parish' },
-  'St. Joseph the Worker (Cavinti)': { score: 27.2, type: 'parish' },
-  'Our Lady of Nativity (Pangil)': { score: 25.1, type: 'parish' },
-  'San Lorenzo Ruiz (San Pablo)': { score: 18.5, type: 'parish' },
-  'St. Therese of the Child Jesus (Los Baños)': { score: 95.2, type: 'parish' },
-  'Liceo de San Pablo': { score: 69.4, type: 'school' },
-  'Liceo de Calamba': { score: 66.7, type: 'school' },
-  'Liceo de Cabuyao': { score: 63.5, type: 'school' },
-  'Liceo de Los Baños': { score: 60.2, type: 'school' },
-  'Liceo de Bay': { score: 57.8, type: 'school' },
-  "St. Peter's College Seminary": { score: 59.3, type: 'seminary' },
-  'San Pablo Formation House': { score: 56.1, type: 'seminary' },
-  'Diocesan Memorial Seminary': { score: 53.4, type: 'seminary' },
-  'Holy Cross Seminary': { score: 50.2, type: 'seminary' },
-  'Our Lady of Guadalupe Seminary': { score: 47.5, type: 'seminary' },
-};
-
 @Injectable()
 export class FinancialService {
   constructor(private readonly supabaseService: SupabaseService) {}
 
-  private toRecord(row: any): FinancialRecord {
+  // ------------------------------------------------------------------
+  // Domain schema helpers
+  // ------------------------------------------------------------------
+
+  private schema(entityType: string): string {
+    if (entityType === 'parish') return 'parishes';
+    if (entityType === 'school') return 'schools';
+    return 'seminaries';
+  }
+
+  private db(schema: string) {
+    return (this.supabaseService.supabaseServer as any).schema(schema);
+  }
+
+  private async resolveInstitutionId(name: string): Promise<string | null> {
+    try {
+      const { data } = await this.db('diocese').from('institutions').select('id').eq('name', name).single();
+      return data?.id ?? null;
+    } catch {
+      return null;
+    }
+  }
+
+  // ------------------------------------------------------------------
+  // Domain → FinancialRecord mapping per entity type
+  // ------------------------------------------------------------------
+
+  private num(v: any): number {
+    return v != null ? Number(v) : 0;
+  }
+
+  private parishToRecord(row: any, name: string, entityClass?: EntityClass): FinancialRecord {
+    const n = this.num.bind(this);
+    const collections =
+      n(row.sacraments_total) +
+      n(row.confirmation_total) +
+      n(row.mass_intentions_total) +
+      n(row.mass_collection_weekday) +
+      n(row.mass_collection_sunday) +
+      n(row.mass_collection_saturday) +
+      n(row.other_collections_total) +
+      n(row.donations) +
+      n(row.interest_income) +
+      n(row.subsidy_inflow) +
+      n(row.special_collections) +
+      n(row.second_collections) +
+      n(row.charge_over_above) +
+      n(row.other_receipts);
+    const disbursements =
+      n(row.priest_share) +
+      n(row.mass_stipend) +
+      n(row.other_pastoral_expenses) +
+      n(row.salaries_wages_benefits) +
+      n(row.govt_contributions) +
+      n(row.utilities) +
+      n(row.communications) +
+      n(row.other_rectory_expenses) +
+      n(row.construction_expenses) +
+      n(row.remittance_to_diocese) +
+      n(row.bishops_fund_share) +
+      n(row.special_collections_remittance);
     return {
       id: row.id,
       month: row.month,
       year: row.year != null ? Number(row.year) : undefined,
-      collections: Number(row.collections),
-      consumableCollections: Number(row.consumable_collections),
-      disbursements: Number(row.disbursements),
-      netReceipts: row.net_receipts != null ? Number(row.net_receipts) : undefined,
-      sacraments_rate: row.sacraments_rate != null ? Number(row.sacraments_rate) : undefined,
-      sacraments_arancel: row.sacraments_arancel != null ? Number(row.sacraments_arancel) : undefined,
-      sacraments_parishShare: row.sacraments_parish_share != null ? Number(row.sacraments_parish_share) : undefined,
-      sacraments_overAbove: row.sacraments_over_above != null ? Number(row.sacraments_over_above) : undefined,
-      collections_mass: row.collections_mass != null ? Number(row.collections_mass) : undefined,
-      collections_other: row.collections_other != null ? Number(row.collections_other) : undefined,
-      collections_otherReceipts:
-        row.collections_other_receipts != null ? Number(row.collections_other_receipts) : undefined,
-      expenses_pastoral: row.expenses_pastoral != null ? Number(row.expenses_pastoral) : undefined,
-      expenses_parish: row.expenses_parish != null ? Number(row.expenses_parish) : undefined,
-      others_massIntentionsNotClaimed:
-        row.others_mass_intentions_not_claimed != null ? Number(row.others_mass_intentions_not_claimed) : undefined,
-      others_massIntentionsClaimed:
-        row.others_mass_intentions_claimed != null ? Number(row.others_mass_intentions_claimed) : undefined,
-      others_specialCollections:
-        row.others_special_collections != null ? Number(row.others_special_collections) : undefined,
-      pastoralParishFundTotalNetReceipts:
-        row.pastoral_parish_fund_total_net_receipts != null
-          ? Number(row.pastoral_parish_fund_total_net_receipts)
-          : undefined,
-      entityId: row.entity_id,
-      entityType: row.entity_type,
-      entityClass: row.entity_class ?? undefined,
+      entityId: name,
+      entityType: 'parish',
+      entityClass: row.institution_class ?? entityClass,
+      collections,
+      consumableCollections: n(row.consumable_collections),
+      disbursements,
+      netReceipts: n(row.net_receipts),
+      expenses_pastoral: n(row.priest_share) + n(row.mass_stipend) + n(row.other_pastoral_expenses),
+      expenses_parish:
+        n(row.salaries_wages_benefits) +
+        n(row.govt_contributions) +
+        n(row.utilities) +
+        n(row.communications) +
+        n(row.other_rectory_expenses),
+      collections_mass:
+        n(row.mass_collection_weekday) + n(row.mass_collection_sunday) + n(row.mass_collection_saturday),
+      collections_other: n(row.other_collections_total),
+      collections_otherReceipts: n(row.other_receipts),
+      sacraments_rate: n(row.sacraments_total),
+      sacraments_arancel: n(row.confirmation_total),
+      sacraments_parishShare: n(row.mass_intentions_claimed),
+      sacraments_overAbove: n(row.charge_over_above),
+      others_massIntentionsClaimed: n(row.mass_intentions_claimed),
+      others_massIntentionsNotClaimed: n(row.mass_intentions_unclaimed),
+      others_specialCollections: n(row.special_collections),
+      pastoralParishFundTotalNetReceipts: n(row.pastoral_parish_fund_total_net_receipts),
       timestamp: row.record_timestamp ?? undefined,
     };
   }
 
-  private fromRecord(r: FinancialRecord): Record<string, unknown> {
-    const row: Record<string, unknown> = {
-      month: r.month,
-      year: r.year ?? null,
-      collections: r.collections,
-      consumable_collections: r.consumableCollections,
-      disbursements: r.disbursements,
-      net_receipts: r.netReceipts ?? null,
-      sacraments_rate: r.sacraments_rate ?? null,
-      sacraments_arancel: r.sacraments_arancel ?? null,
-      sacraments_parish_share: r.sacraments_parishShare ?? null,
-      sacraments_over_above: r.sacraments_overAbove ?? null,
-      collections_mass: r.collections_mass ?? null,
-      collections_other: r.collections_other ?? null,
-      collections_other_receipts: r.collections_otherReceipts ?? null,
-      expenses_pastoral: r.expenses_pastoral ?? null,
-      expenses_parish: r.expenses_parish ?? null,
-      others_mass_intentions_not_claimed: r.others_massIntentionsNotClaimed ?? null,
-      others_mass_intentions_claimed: r.others_massIntentionsClaimed ?? null,
-      others_special_collections: r.others_specialCollections ?? null,
-      pastoral_parish_fund_total_net_receipts: r.pastoralParishFundTotalNetReceipts ?? null,
-      entity_id: r.entityId,
-      entity_type: r.entityType,
-      entity_class: r.entityClass ?? null,
-      record_timestamp: r.timestamp ?? null,
+  private schoolToRecord(row: any, name: string, entityClass?: EntityClass): FinancialRecord {
+    const n = this.num.bind(this);
+    const collections =
+      n(row.tuition_revenues) + n(row.miscellaneous_fees) + n(row.other_income) + n(row.subsidy_inflow);
+    const disbursements =
+      n(row.faculty_payroll) +
+      n(row.admin_staff_payroll) +
+      n(row.utilities) +
+      n(row.facilities_maintenance) +
+      n(row.supplies) +
+      n(row.other_expenses);
+    return {
+      id: row.id,
+      month: row.month,
+      year: row.year != null ? Number(row.year) : undefined,
+      entityId: name,
+      entityType: 'school',
+      entityClass: row.institution_class ?? entityClass,
+      collections,
+      consumableCollections: n(row.tuition_revenues) + n(row.miscellaneous_fees) + n(row.other_income),
+      disbursements,
+      netReceipts: n(row.net_receipts),
+      expenses_pastoral: n(row.faculty_payroll),
+      expenses_parish:
+        n(row.admin_staff_payroll) +
+        n(row.utilities) +
+        n(row.facilities_maintenance) +
+        n(row.supplies) +
+        n(row.other_expenses),
+      timestamp: row.record_timestamp ?? undefined,
     };
-    if (r.id && r.id.startsWith('FIN-')) {
-      row.id = r.id;
-    }
-    return row;
   }
+
+  private seminaryToRecord(row: any, name: string, entityClass?: EntityClass): FinancialRecord {
+    const n = this.num.bind(this);
+    const collections =
+      n(row.donations) +
+      n(row.seminary_fees) +
+      n(row.mass_collections) +
+      n(row.other_sources) +
+      n(row.subsidy_from_rbscp) +
+      n(row.tuition_fees) +
+      n(row.board_lodging_fees) +
+      n(row.drm_modules) +
+      n(row.sra_reading_lab) +
+      n(row.retreat) +
+      n(row.honorarium_fee) +
+      n(row.miscellaneous_fees);
+    return {
+      id: row.id,
+      month: row.month,
+      year: row.year != null ? Number(row.year) : undefined,
+      entityId: name,
+      entityType: 'seminary',
+      entityClass: row.institution_class ?? entityClass,
+      collections,
+      consumableCollections:
+        n(row.seminary_fees) + n(row.mass_collections) + n(row.tuition_fees) + n(row.board_lodging_fees),
+      disbursements: n(row.total_expenses),
+      netReceipts: n(row.net_surplus),
+      expenses_pastoral: n(row.salaries_wages) + n(row.contribution_benefits) + n(row.cash_incentives),
+      expenses_parish:
+        n(row.daily_food) + n(row.food_others) + n(row.utilities) + n(row.repairs_maintenance) + n(row.other_expenses),
+      timestamp: row.record_timestamp ?? undefined,
+    };
+  }
+
+  private domainToRecord(row: any, name: string, entityType: string, entityClass?: EntityClass): FinancialRecord {
+    if (entityType === 'parish') return this.parishToRecord(row, name, entityClass);
+    if (entityType === 'school') return this.schoolToRecord(row, name, entityClass);
+    return this.seminaryToRecord(row, name, entityClass);
+  }
+
+  // ------------------------------------------------------------------
+  // Public API
+  // ------------------------------------------------------------------
+
+  async getRecords(
+    entityId: string,
+    entityType: 'parish' | 'seminary' | 'school',
+    entityClass?: EntityClass,
+  ): Promise<FinancialRecord[]> {
+    try {
+      const institutionId = await this.resolveInstitutionId(entityId);
+      if (!institutionId) return this.generateRecords(entityId, entityType, entityClass);
+
+      const { data, error } = await this.db(this.schema(entityType))
+        .from('financial_records')
+        .select('*')
+        .eq('institution_id', institutionId)
+        .order('record_timestamp', { ascending: true });
+
+      if (error || !data || data.length === 0) {
+        return this.generateRecords(entityId, entityType, entityClass);
+      }
+
+      return data.map((row: any) => this.domainToRecord(row, entityId, entityType, entityClass));
+    } catch {
+      return this.generateRecords(entityId, entityType, entityClass);
+    }
+  }
+
+  async getAllRecords(): Promise<FinancialRecord[]> {
+    const entityGroups: { name: string; type: 'parish' | 'school' | 'seminary'; class: EntityClass }[] = [];
+    ALL_PARISHES.forEach((p) => entityGroups.push({ name: p.name, type: 'parish', class: p.class as EntityClass }));
+    INITIAL_SCHOOLS.forEach((s) => entityGroups.push({ name: s.name, type: 'school', class: s.class as EntityClass }));
+    INITIAL_SEMINARIES.forEach((s) =>
+      entityGroups.push({ name: s.name, type: 'seminary', class: s.class as EntityClass }),
+    );
+
+    try {
+      const schemas: Array<'parish' | 'school' | 'seminary'> = ['parish', 'school', 'seminary'];
+      const results = await Promise.all(
+        schemas.map(async (type) => {
+          const { data, error } = await this.db(this.schema(type))
+            .from('financial_records')
+            .select('*, institution:institution_id(name)')
+            .order('record_timestamp', { ascending: true });
+
+          if (error || !data || data.length === 0) return [];
+          return data.map((row: any) => this.domainToRecord(row, row.institution?.name ?? row.institution_id, type));
+        }),
+      );
+
+      const allFromDb = results.flat();
+      if (allFromDb.length > 0) return allFromDb;
+    } catch {
+      // fall through to generated
+    }
+
+    // Fall back: generate for every known entity
+    return entityGroups.flatMap((e) => this.generateRecords(e.name, e.type, e.class));
+  }
+
+  async saveRecord(record: FinancialRecord): Promise<FinancialRecord> {
+    // Write path: domain tables require different column sets per entity type.
+    // For the prototype, writes are handled by the submission workflow.
+    return record;
+  }
+
+  async deleteRecord(_id: string): Promise<void> {
+    // Deletes are managed through the submission workflow, not directly here.
+  }
+
+  // ------------------------------------------------------------------
+  // Mock data generation (used when DB is empty or unreachable)
+  // ------------------------------------------------------------------
 
   private hashString(s: string): number {
     let h = 0;
@@ -152,10 +288,6 @@ export class FinancialService {
     const seed = this.hashString(entityId);
     let baseMultiplier = 0.1 + this.pseudoRandom(seed) * 9.9;
     let healthProfile = 0.2 + this.pseudoRandom(seed + 123) * 1.8;
-
-    if (INSTITUTION_SCORES[entityId]) {
-      healthProfile = 0.3 + ((INSTITUTION_SCORES[entityId].score - 25) / 70) * 1.5;
-    }
 
     let classBonus = 0;
     if (entityClass === 'Class A') {
@@ -243,96 +375,6 @@ export class FinancialService {
         };
       }),
     );
-  }
-
-  async getRecords(
-    entityId: string,
-    entityType: 'parish' | 'seminary' | 'school',
-    entityClass?: EntityClass,
-  ): Promise<FinancialRecord[]> {
-    const { data, error } = await this.supabaseService.supabaseServer
-      .from('financial_records')
-      .select('*')
-      .eq('entity_id', entityId)
-      .eq('entity_type', entityType)
-      .order('record_timestamp', { ascending: true });
-
-    if (error) {
-      console.error('[financial.service] getRecords error:', error.message);
-      return this.generateRecords(entityId, entityType, entityClass);
-    }
-
-    if (data && data.length > 0) return data.map((d) => this.toRecord(d));
-
-    // Seed data
-    const generated = this.generateRecords(entityId, entityType, entityClass);
-    const rows = generated.map((g) => this.fromRecord(g));
-    const { error: insertError } = await this.supabaseService.supabaseServer.from('financial_records').insert(rows);
-    if (insertError) console.error('[financial.service] seed insert error:', insertError.message);
-    return generated;
-  }
-
-  async getAllRecords(): Promise<FinancialRecord[]> {
-    const { data, error } = await this.supabaseService.supabaseServer
-      .from('financial_records')
-      .select('*')
-      .order('record_timestamp', { ascending: true });
-
-    if (error) {
-      console.error('[financial.service] getAllRecords error:', error.message);
-      return [];
-    }
-
-    if (data && data.length > 0) return data.map((d) => this.toRecord(d));
-
-    const entities: { id: string; type: 'parish' | 'seminary' | 'school'; class: EntityClass }[] = [];
-    ALL_PARISHES.forEach((p) => entities.push({ id: p.name, type: 'parish', class: p.class as EntityClass }));
-    INITIAL_SEMINARIES.forEach((s) => entities.push({ id: s.name, type: 'seminary', class: s.class as EntityClass }));
-    INITIAL_SCHOOLS.forEach((s) => entities.push({ id: s.name, type: 'school', class: s.class as EntityClass }));
-
-    Object.entries(INSTITUTION_SCORES).forEach(([name, info]) => {
-      if (!entities.find((e) => e.id === name)) {
-        let cls: EntityClass = 'Class C';
-        if (info.score > 85) cls = 'Class A';
-        else if (info.score > 75) cls = 'Class B';
-        else if (info.score < 35) cls = 'Class E';
-        else if (info.score < 45) cls = 'Class D';
-        entities.push({ id: name, type: info.type as any, class: cls });
-      }
-    });
-
-    const allGenerated: FinancialRecord[] = [];
-    for (const e of entities) {
-      const records = this.generateRecords(e.id, e.type, e.class);
-      allGenerated.push(...records);
-    }
-
-    const { error: bulkErr } = await this.supabaseService.supabaseServer
-      .from('financial_records')
-      .insert(allGenerated.map((g) => this.fromRecord(g)));
-    if (bulkErr) console.error('[financial.service] bulk seed error:', bulkErr.message);
-
-    return allGenerated;
-  }
-
-  async saveRecord(record: FinancialRecord): Promise<FinancialRecord> {
-    const row = this.fromRecord(record);
-    const { data, error } = await this.supabaseService.supabaseServer
-      .from('financial_records')
-      .upsert(row)
-      .select()
-      .single();
-
-    if (error || !data) {
-      console.error('[financial.service] saveRecord error:', error?.message);
-      return record;
-    }
-    return this.toRecord(data);
-  }
-
-  async deleteRecord(id: string): Promise<void> {
-    const { error } = await this.supabaseService.supabaseServer.from('financial_records').delete().eq('id', id);
-    if (error) console.error('[financial.service] deleteRecord error:', error.message);
   }
 
   parseCSV(

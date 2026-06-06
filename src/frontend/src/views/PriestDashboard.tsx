@@ -33,28 +33,7 @@ import {
   ArrowUp,
   Cpu,
 } from 'lucide-react';
-import {
-  BarChart,
-  Bar,
-  XAxis,
-  YAxis,
-  CartesianGrid,
-  ResponsiveContainer,
-  Line,
-  LineChart,
-  AreaChart,
-  Area,
-  ComposedChart,
-  PieChart,
-  Pie,
-  Cell,
-  Tooltip,
-  Legend,
-  ScatterChart,
-  Scatter,
-  ReferenceArea,
-  ReferenceLine,
-} from 'recharts';
+import ReactECharts from 'echarts-for-react';
 import { dataService } from '../services/dataService';
 import { FinancialRecord, FinancialHealthScore, DiagnosticResult } from '../types';
 import { auth } from '../firebase';
@@ -174,39 +153,6 @@ const CustomizedTick = (props: any) => {
   );
 };
 
-const CustomForecastTooltip = ({ active, payload, label }: any) => {
-  if (active && payload && payload.length) {
-    // Filter out null values (future actuals)
-    const validPayload = payload.filter((entry: any) => entry.value !== null && entry.value !== undefined);
-
-    if (validPayload.length === 0) return null;
-
-    return (
-      <div className="bg-white p-4 border border-gray-100 shadow-xl rounded-xl">
-        <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-2">{label}</p>
-        <div className="space-y-1.5">
-          {validPayload.map((entry: any, index: number) => (
-            <div key={index} className="flex items-center justify-between gap-4">
-              <div className="flex items-center gap-2">
-                <div className="w-2 h-2 rounded-full" style={{ backgroundColor: entry.color }}></div>
-                <span className="text-xs font-medium text-gray-600">{entry.name}:</span>
-              </div>
-              <span className="text-xs font-bold text-church-black">
-                {new Intl.NumberFormat('en-PH', {
-                  style: 'currency',
-                  currency: 'PHP',
-                  maximumFractionDigits: 0,
-                }).format(entry.value)}
-              </span>
-            </div>
-          ))}
-        </div>
-      </div>
-    );
-  }
-  return null;
-};
-
 const AdvancedForecastChart = ({
   data,
   actualKey,
@@ -252,6 +198,137 @@ const AdvancedForecastChart = ({
     });
   }, [data, actualKey, forecastKey, presentEnd, pastEnd]);
 
+  const actualFieldName = `${actualKey}_actual`;
+  const forecastFieldName = `${forecastKey}_forecast`;
+
+  const forecastChartOption = {
+    color: ['#6366f1', '#8b5cf6', '#06b6d4', '#10b981', '#f59e0b', '#ef4444'],
+    tooltip: {
+      trigger: 'axis',
+      formatter: (params: any[]) => {
+        const validParams = params.filter((p) => p.value !== null && p.value !== undefined);
+        if (!validParams.length) return '';
+        const label = validParams[0].axisValue;
+        const lines = validParams
+          .map(
+            (p) =>
+              `<div style="display:flex;align-items:center;gap:8px;justify-content:space-between">
+                <span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:${p.color}"></span>
+                <span style="font-size:11px;color:#6B7280">${p.seriesName}:</span>
+                <span style="font-size:11px;font-weight:700">${new Intl.NumberFormat('en-PH', { style: 'currency', currency: 'PHP', maximumFractionDigits: 0 }).format(p.value)}</span>
+              </div>`,
+          )
+          .join('');
+        return `<div style="padding:8px"><p style="font-size:10px;font-weight:700;color:#9CA3AF;text-transform:uppercase;letter-spacing:0.1em;margin-bottom:6px">${label}</p>${lines}</div>`;
+      },
+      backgroundColor: '#fff',
+      borderColor: '#E5E7EB',
+      borderWidth: 1,
+      extraCssText: 'border-radius:12px;box-shadow:0 10px 25px -5px rgba(0,0,0,0.1)',
+    },
+    legend: {
+      top: 0,
+      right: 0,
+      textStyle: { fontSize: 9, fontWeight: 700, color: '#4B5563' },
+      icon: 'circle',
+      data: ['Historical (Actual)', 'Forecast (ML Model)'],
+    },
+    grid: { top: 50, right: 20, left: 45, bottom: 30 },
+    xAxis: {
+      type: 'category',
+      data: processedData.map((d) => d.month),
+      axisLine: { show: false },
+      axisTick: { show: false },
+      axisLabel: { color: '#9CA3AF', fontSize: 10, fontWeight: 600 },
+      splitLine: { show: true, lineStyle: { color: '#F3F4F6', type: 'dashed' } },
+    },
+    yAxis: {
+      type: 'value',
+      axisLine: { show: false },
+      axisTick: { show: false },
+      axisLabel: { color: '#9CA3AF', fontSize: 10, formatter: (v: number) => `${v / 1000}k` },
+      splitLine: { show: true, lineStyle: { color: '#F3F4F6' } },
+    },
+    series: [
+      {
+        name: 'Historical (Actual)',
+        type: 'line',
+        data: processedData.map((d) => d[actualFieldName] ?? null),
+        smooth: true,
+        lineStyle: { color: '#1a472a', width: 3 },
+        itemStyle: { color: '#1a472a', borderColor: '#fff', borderWidth: 2 },
+        symbolSize: 6,
+        connectNulls: false,
+        markArea: {
+          silent: true,
+          data: [
+            [
+              {
+                xAxis: 'Jan',
+                itemStyle: { color: '#F0F9FF', opacity: 0.4 },
+                label: {
+                  show: true,
+                  position: 'insideTopLeft',
+                  value: 'PAST',
+                  color: '#0EA5E9',
+                  fontSize: 8,
+                  fontWeight: 700,
+                },
+              },
+              { xAxis: pastEnd },
+            ],
+            [
+              {
+                xAxis: pastEnd,
+                itemStyle: { color: '#FFF7ED', opacity: 0.4 },
+                label: {
+                  show: true,
+                  position: 'insideTopLeft',
+                  value: 'PRESENT',
+                  color: '#F97316',
+                  fontSize: 8,
+                  fontWeight: 700,
+                },
+              },
+              { xAxis: presentEnd },
+            ],
+            [
+              {
+                xAxis: presentEnd,
+                itemStyle: { color: '#F0FDF4', opacity: 0.4 },
+                label: {
+                  show: true,
+                  position: 'insideTopLeft',
+                  value: 'FUTURE',
+                  color: '#22C55E',
+                  fontSize: 8,
+                  fontWeight: 700,
+                },
+              },
+              { xAxis: futureEnd },
+            ],
+          ],
+        },
+        markLine: {
+          silent: true,
+          symbol: 'none',
+          data: [{ xAxis: presentEnd, lineStyle: { color: '#D1D5DB', type: 'dashed' } }],
+          label: { show: false },
+        },
+      },
+      {
+        name: 'Forecast (ML Model)',
+        type: 'line',
+        data: processedData.map((d) => d[forecastFieldName] ?? null),
+        smooth: true,
+        lineStyle: { color: '#D4AF37', width: 3, type: 'dashed' },
+        itemStyle: { color: '#D4AF37', borderColor: '#fff', borderWidth: 2 },
+        symbolSize: 6,
+        connectNulls: false,
+      },
+    ],
+  };
+
   return (
     <div className="flex flex-col w-full bg-white/50 rounded-2xl p-3 border border-gray-100/50">
       <div className="h-[240px] flex items-center">
@@ -260,106 +337,7 @@ const AdvancedForecastChart = ({
             {yAxisLabel}
           </span>
         </div>
-        <ResponsiveContainer width="100%" height="100%">
-          <LineChart data={processedData} margin={{ top: 20, right: 20, left: 5, bottom: 8 }}>
-            <CartesianGrid strokeDasharray="3 3" vertical={true} stroke="#F3F4F6" />
-            <XAxis
-              dataKey="month"
-              axisLine={false}
-              tickLine={false}
-              tick={{ fill: '#9CA3AF', fontSize: 10, fontWeight: 600 }}
-              dy={10}
-            />
-            <YAxis
-              axisLine={false}
-              tickLine={false}
-              tick={{ fill: '#9CA3AF', fontSize: 10, fontWeight: 600 }}
-              tickFormatter={(value) => `${value / 1000}k`}
-              width={40}
-            />
-            <Tooltip content={<CustomForecastTooltip />} />
-
-            <ReferenceArea
-              x1="Jan"
-              x2={pastEnd}
-              fill="#F0F9FF"
-              fillOpacity={0.4}
-              label={{
-                position: 'insideTopLeft',
-                value: 'PAST',
-                fill: '#0EA5E9',
-                fontSize: 8,
-                fontWeight: 800,
-                offset: 10,
-              }}
-            />
-            <ReferenceArea
-              x1={pastEnd}
-              x2={presentEnd}
-              fill="#FFF7ED"
-              fillOpacity={0.4}
-              label={{
-                position: 'insideTopLeft',
-                value: 'PRESENT',
-                fill: '#F97316',
-                fontSize: 8,
-                fontWeight: 800,
-                offset: 10,
-              }}
-            />
-            <ReferenceArea
-              x1={presentEnd}
-              x2={futureEnd}
-              fill="#F0FDF4"
-              fillOpacity={0.4}
-              label={{
-                position: 'insideTopLeft',
-                value: 'FUTURE',
-                fill: '#22C55E',
-                fontSize: 8,
-                fontWeight: 800,
-                offset: 10,
-              }}
-            />
-
-            <ReferenceLine x={presentEnd} stroke="#D1D5DB" strokeDasharray="4 4" />
-
-            <Line
-              type="monotone"
-              dataKey={`${actualKey}_actual`}
-              name="Historical (Actual)"
-              stroke="#1a472a"
-              strokeWidth={3}
-              dot={{ r: 3, fill: '#1a472a', strokeWidth: 2, stroke: '#fff' }}
-              activeDot={{ r: 6, strokeWidth: 0 }}
-              connectNulls={false}
-            />
-            <Line
-              type="monotone"
-              dataKey={`${forecastKey}_forecast`}
-              name="Forecast (ML Model)"
-              stroke="#D4AF37"
-              strokeWidth={3}
-              strokeDasharray="8 4"
-              dot={{ r: 3, fill: '#D4AF37', strokeWidth: 2, stroke: '#fff' }}
-              activeDot={{ r: 6, strokeWidth: 0 }}
-            />
-
-            <Legend
-              verticalAlign="top"
-              align="right"
-              height={40}
-              iconType="circle"
-              wrapperStyle={{
-                fontSize: '9px',
-                fontWeight: 700,
-                textTransform: 'uppercase',
-                letterSpacing: '0.05em',
-                color: '#4B5563',
-              }}
-            />
-          </LineChart>
-        </ResponsiveContainer>
+        <ReactECharts option={forecastChartOption} style={{ height: '100%', width: '100%' }} />
       </div>
 
       <div className="mt-6 bg-gray-50/50 rounded-xl p-3 border border-gray-100">
@@ -2748,44 +2726,46 @@ export function PriestDashboard({
                       <p className="text-[10px] font-bold text-gray-400">{diocesanStats.total} total</p>
                     </div>
                     <div className="h-[260px]">
-                      <ResponsiveContainer width="100%" height="100%">
-                        <BarChart
-                          data={priestHealthScoreAnalysis.distribution}
-                          margin={{ top: 12, right: 16, left: 0, bottom: 8 }}
-                        >
-                          <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#E5E7EB" />
-                          <XAxis
-                            dataKey="label"
-                            axisLine={false}
-                            tickLine={false}
-                            tick={{ fill: '#374151', fontSize: 10, fontWeight: 700 }}
-                          />
-                          <YAxis
-                            allowDecimals={false}
-                            axisLine={false}
-                            tickLine={false}
-                            tick={{ fill: '#6B7280', fontSize: 10 }}
-                          />
-                          <Tooltip
-                            formatter={(value) => [
-                              `${Number(value ?? 0)} priest${Number(value ?? 0) !== 1 ? 's' : ''}`,
-                              'Count',
-                            ]}
-                            labelFormatter={(label) => `${label} health score band`}
-                            contentStyle={{
-                              borderRadius: '12px',
-                              border: 'none',
-                              boxShadow: '0 10px 25px -5px rgba(0,0,0,0.1)',
-                              fontSize: '11px',
-                            }}
-                          />
-                          <Bar dataKey="count" radius={[8, 8, 0, 0]} barSize={44}>
-                            {priestHealthScoreAnalysis.distribution.map((entry) => (
-                              <Cell key={entry.id} fill={entry.fill} />
-                            ))}
-                          </Bar>
-                        </BarChart>
-                      </ResponsiveContainer>
+                      <ReactECharts
+                        option={{
+                          color: ['#6366f1', '#8b5cf6', '#06b6d4', '#10b981', '#f59e0b', '#ef4444'],
+                          tooltip: {
+                            trigger: 'axis',
+                            formatter: (params: any[]) => {
+                              const p = params[0];
+                              return `<div style="font-size:11px"><strong>${p.axisValue} health score band</strong><br/>${p.value} priest${p.value !== 1 ? 's' : ''}</div>`;
+                            },
+                            extraCssText: 'border-radius:12px;border:none;box-shadow:0 10px 25px -5px rgba(0,0,0,0.1)',
+                          },
+                          grid: { top: 12, right: 16, left: 40, bottom: 30 },
+                          xAxis: {
+                            type: 'category',
+                            data: priestHealthScoreAnalysis.distribution.map((d) => d.label),
+                            axisLine: { show: false },
+                            axisTick: { show: false },
+                            axisLabel: { color: '#374151', fontSize: 10, fontWeight: 700 },
+                          },
+                          yAxis: {
+                            type: 'value',
+                            axisLine: { show: false },
+                            axisTick: { show: false },
+                            axisLabel: { color: '#6B7280', fontSize: 10 },
+                            splitLine: { lineStyle: { color: '#E5E7EB' } },
+                            minInterval: 1,
+                          },
+                          series: [
+                            {
+                              type: 'bar',
+                              data: priestHealthScoreAnalysis.distribution.map((d) => ({
+                                value: d.count,
+                                itemStyle: { color: d.fill, borderRadius: [8, 8, 0, 0] },
+                              })),
+                              barWidth: 44,
+                            },
+                          ],
+                        }}
+                        style={{ height: '100%', width: '100%' }}
+                      />
                     </div>
                     <div className="grid grid-cols-2 gap-3">
                       {priestHealthScoreAnalysis.distribution.map((band) => (
@@ -2828,52 +2808,61 @@ export function PriestDashboard({
                       </div>
                     </div>
                     <div className="h-[300px]">
-                      <ResponsiveContainer width="100%" height="100%">
-                        <ScatterChart margin={{ top: 12, right: 24, left: 0, bottom: 12 }}>
-                          <CartesianGrid strokeDasharray="3 3" stroke="#E5E7EB" />
-                          <XAxis
-                            type="number"
-                            dataKey="growthRate"
-                            name="Collection growth"
-                            unit="%"
-                            domain={[-20, 25]}
-                            axisLine={false}
-                            tickLine={false}
-                            tick={{ fill: '#6B7280', fontSize: 10 }}
-                          />
-                          <YAxis
-                            type="number"
-                            dataKey="healthScore"
-                            name="Health score"
-                            unit="/100"
-                            domain={[0, 100]}
-                            axisLine={false}
-                            tickLine={false}
-                            tick={{ fill: '#6B7280', fontSize: 10 }}
-                          />
-                          <Tooltip
-                            cursor={{ strokeDasharray: '3 3' }}
-                            formatter={(value, name) => [
-                              name === 'Collection growth' ? `${Number(value ?? 0)}%` : `${Number(value ?? 0)}/100`,
-                              name as string,
-                            ]}
-                            labelFormatter={(_, payload) => payload?.[0]?.payload?.name || 'Priest'}
-                            contentStyle={{
-                              borderRadius: '12px',
-                              border: 'none',
-                              boxShadow: '0 10px 25px -5px rgba(0,0,0,0.1)',
-                              fontSize: '11px',
-                            }}
-                          />
-                          <ReferenceLine x={0} stroke="#94A3B8" strokeDasharray="4 4" />
-                          <ReferenceLine y={70} stroke="#94A3B8" strokeDasharray="4 4" />
-                          <Scatter data={priestHealthScoreAnalysis.growthHealthRows} name="Priests">
-                            {priestHealthScoreAnalysis.growthHealthRows.map((entry) => (
-                              <Cell key={entry.name} fill={entry.fill} />
-                            ))}
-                          </Scatter>
-                        </ScatterChart>
-                      </ResponsiveContainer>
+                      <ReactECharts
+                        option={{
+                          color: ['#6366f1', '#8b5cf6', '#06b6d4', '#10b981', '#f59e0b', '#ef4444'],
+                          tooltip: {
+                            trigger: 'item',
+                            formatter: (params: any) => {
+                              const d = params.data;
+                              return `<div style="font-size:11px"><strong>${d[2]}</strong><br/>Collection Growth: ${d[0]}%<br/>Health Score: ${d[1]}/100</div>`;
+                            },
+                            extraCssText: 'border-radius:12px;border:none;box-shadow:0 10px 25px -5px rgba(0,0,0,0.1)',
+                          },
+                          grid: { top: 12, right: 24, left: 40, bottom: 30 },
+                          xAxis: {
+                            type: 'value',
+                            name: 'Collection Growth %',
+                            min: -20,
+                            max: 25,
+                            axisLine: { show: false },
+                            axisTick: { show: false },
+                            axisLabel: { color: '#6B7280', fontSize: 10, formatter: (v: number) => `${v}%` },
+                            splitLine: { lineStyle: { color: '#E5E7EB', type: 'dashed' } },
+                          },
+                          yAxis: {
+                            type: 'value',
+                            name: 'Health Score',
+                            min: 0,
+                            max: 100,
+                            axisLine: { show: false },
+                            axisTick: { show: false },
+                            axisLabel: { color: '#6B7280', fontSize: 10 },
+                            splitLine: { lineStyle: { color: '#E5E7EB', type: 'dashed' } },
+                          },
+                          series: [
+                            {
+                              type: 'scatter',
+                              data: priestHealthScoreAnalysis.growthHealthRows.map((d) => [
+                                d.growthRate,
+                                d.healthScore,
+                                d.name,
+                                d.fill,
+                              ]),
+                              itemStyle: { color: (params: any) => params.data[3] },
+                              symbolSize: 10,
+                              markLine: {
+                                silent: true,
+                                symbol: 'none',
+                                lineStyle: { color: '#94A3B8', type: 'dashed' },
+                                data: [{ xAxis: 0 }, { yAxis: 70 }],
+                                label: { show: false },
+                              },
+                            },
+                          ],
+                        }}
+                        style={{ height: '100%', width: '100%' }}
+                      />
                     </div>
                     <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mt-4">
                       {[
@@ -2978,55 +2967,50 @@ export function PriestDashboard({
                       </div>
 
                       <div className="h-[220px]">
-                        <ResponsiveContainer width="100%" height="100%">
-                          <LineChart
-                            data={pastoralAssignmentAnalysis.trendData}
-                            margin={{ top: 8, right: 14, left: 0, bottom: 4 }}
-                          >
-                            <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#E5E7EB" />
-                            <XAxis
-                              dataKey="period"
-                              tick={{ fill: '#6B7280', fontSize: 10, fontWeight: 700 }}
-                              axisLine={false}
-                              tickLine={false}
-                            />
-                            <YAxis
-                              tick={{ fill: '#6B7280', fontSize: 10 }}
-                              tickFormatter={(value) => `${Number(value) / 1000}k`}
-                              width={42}
-                              axisLine={false}
-                              tickLine={false}
-                            />
-                            <Tooltip
-                              formatter={(value, name) => [
-                                name === 'averageCollections'
-                                  ? formatCurrency(Number(value ?? 0))
-                                  : `${Number(value ?? 0)}%`,
-                                name === 'averageCollections' ? 'Avg Collections' : 'Avg Change',
-                              ]}
-                              labelFormatter={(label, payload) => {
-                                const row = payload?.[0]?.payload;
-                                return row
-                                  ? `${label} assignment duration (${row.priestCount} priest${row.priestCount === 1 ? '' : 's'})`
-                                  : `${label} assignment duration`;
-                              }}
-                              contentStyle={{
-                                borderRadius: '12px',
-                                border: 'none',
-                                boxShadow: '0 10px 25px -5px rgba(0,0,0,0.1)',
-                                fontSize: '11px',
-                              }}
-                            />
-                            <Line
-                              type="monotone"
-                              dataKey="averageCollections"
-                              stroke="#1a472a"
-                              strokeWidth={3}
-                              dot={{ r: 4, fill: '#1a472a', stroke: '#fff', strokeWidth: 2 }}
-                              name="averageCollections"
-                            />
-                          </LineChart>
-                        </ResponsiveContainer>
+                        <ReactECharts
+                          option={{
+                            color: ['#6366f1', '#8b5cf6', '#06b6d4', '#10b981', '#f59e0b', '#ef4444'],
+                            tooltip: {
+                              trigger: 'axis',
+                              formatter: (params: any[]) => {
+                                const p = params[0];
+                                const row = pastoralAssignmentAnalysis.trendData[p.dataIndex];
+                                const header = row
+                                  ? `${p.axisValue} assignment duration (${row.priestCount} priest${row.priestCount === 1 ? '' : 's'})`
+                                  : `${p.axisValue} assignment duration`;
+                                return `<div style="font-size:11px"><strong>${header}</strong><br/>Avg Collections: ${formatCurrency(p.value)}</div>`;
+                              },
+                              extraCssText:
+                                'border-radius:12px;border:none;box-shadow:0 10px 25px -5px rgba(0,0,0,0.1)',
+                            },
+                            grid: { top: 8, right: 14, left: 45, bottom: 30 },
+                            xAxis: {
+                              type: 'category',
+                              data: pastoralAssignmentAnalysis.trendData.map((d) => d.period),
+                              axisLine: { show: false },
+                              axisTick: { show: false },
+                              axisLabel: { color: '#6B7280', fontSize: 10, fontWeight: 700 },
+                            },
+                            yAxis: {
+                              type: 'value',
+                              axisLine: { show: false },
+                              axisTick: { show: false },
+                              axisLabel: { color: '#6B7280', fontSize: 10, formatter: (v: number) => `${v / 1000}k` },
+                              splitLine: { lineStyle: { color: '#E5E7EB', type: 'dashed' } },
+                            },
+                            series: [
+                              {
+                                type: 'line',
+                                data: pastoralAssignmentAnalysis.trendData.map((d) => d.averageCollections),
+                                smooth: true,
+                                lineStyle: { color: '#1a472a', width: 3 },
+                                itemStyle: { color: '#1a472a', borderColor: '#fff', borderWidth: 2 },
+                                symbolSize: 8,
+                              },
+                            ],
+                          }}
+                          style={{ height: '100%', width: '100%' }}
+                        />
                       </div>
                       <div className="mt-3 grid grid-cols-2 md:grid-cols-5 gap-2">
                         {[
@@ -3129,27 +3113,46 @@ export function PriestDashboard({
                 <h3 className="text-lg font-bold text-church-green">Collections Trend</h3>
               </div>
               <div className="h-[320px]">
-                <ResponsiveContainer width="100%" height="100%">
-                  <LineChart data={fallbackMonthlyData} margin={{ top: 10, right: 20, left: 0, bottom: 5 }}>
-                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#E5E7EB" />
-                    <XAxis dataKey="month" tick={{ fill: '#6B7280', fontSize: 10 }} />
-                    <YAxis
-                      tick={{ fill: '#6B7280', fontSize: 10 }}
-                      tickFormatter={(value) => `${value / 1000}k`}
-                      width={50}
-                    />
-                    <Tooltip formatter={(value) => formatCurrency(Number(value ?? 0))} />
-                    <Legend />
-                    <Line
-                      type="monotone"
-                      dataKey="actual"
-                      stroke="#1a472a"
-                      strokeWidth={3}
-                      dot={{ r: 3 }}
-                      name="Actual Collections"
-                    />
-                  </LineChart>
-                </ResponsiveContainer>
+                <ReactECharts
+                  option={{
+                    color: ['#6366f1', '#8b5cf6', '#06b6d4', '#10b981', '#f59e0b', '#ef4444'],
+                    tooltip: {
+                      trigger: 'axis',
+                      formatter: (params: any[]) => {
+                        const p = params[0];
+                        return `${p.axisValue}<br/>${p.marker} Actual Collections: ${formatCurrency(p.value)}`;
+                      },
+                    },
+                    legend: { data: ['Actual Collections'], top: 0 },
+                    grid: { top: 30, right: 20, left: 55, bottom: 30 },
+                    xAxis: {
+                      type: 'category',
+                      data: fallbackMonthlyData.map((d) => d.month),
+                      axisLabel: { color: '#6B7280', fontSize: 10 },
+                      axisLine: { show: false },
+                      axisTick: { show: false },
+                    },
+                    yAxis: {
+                      type: 'value',
+                      axisLabel: { color: '#6B7280', fontSize: 10, formatter: (v: number) => `${v / 1000}k` },
+                      axisLine: { show: false },
+                      axisTick: { show: false },
+                      splitLine: { lineStyle: { color: '#E5E7EB', type: 'dashed' } },
+                    },
+                    series: [
+                      {
+                        name: 'Actual Collections',
+                        type: 'line',
+                        data: fallbackMonthlyData.map((d) => d.actual),
+                        smooth: true,
+                        lineStyle: { color: '#1a472a', width: 3 },
+                        itemStyle: { color: '#1a472a' },
+                        symbolSize: 6,
+                      },
+                    ],
+                  }}
+                  style={{ height: '100%', width: '100%' }}
+                />
               </div>
             </div>
           </div>
@@ -3196,79 +3199,103 @@ export function PriestDashboard({
                 ];
                 return (
                   <div className="h-[320px]">
-                    <ResponsiveContainer width="100%" height="100%">
-                      <LineChart data={scoreData} margin={{ top: 10, right: 30, left: 0, bottom: 5 }}>
-                        <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#E5E7EB" />
-                        <XAxis dataKey="month" tick={{ fill: '#6B7280', fontSize: 11 }} />
-                        <YAxis
-                          domain={[0, 100]}
-                          tick={{ fill: '#6B7280', fontSize: 11 }}
-                          tickFormatter={(v) => `${v}`}
-                          width={35}
-                        />
-                        <Tooltip
-                          formatter={(value, name) => [
-                            `${Number(value ?? 0)}/100`,
-                            name === 'score' ? 'Actual Score' : 'Forecasted Score',
-                          ]}
-                          contentStyle={{
-                            borderRadius: '12px',
-                            border: 'none',
-                            boxShadow: '0 4px 20px rgba(0,0,0,0.08)',
-                          }}
-                        />
-                        <ReferenceLine
-                          y={80}
-                          stroke="#10B981"
-                          strokeDasharray="4 4"
-                          label={{
-                            value: 'Target (80)',
-                            position: 'insideTopRight',
-                            fill: '#10B981',
-                            fontSize: 9,
-                            fontWeight: 700,
-                          }}
-                        />
-                        <ReferenceLine
-                          x="Jan"
-                          stroke="#D1D5DB"
-                          strokeDasharray="4 4"
-                          label={{ value: 'Today', position: 'top', fill: '#9CA3AF', fontSize: 9, fontWeight: 700 }}
-                        />
-                        <Line
-                          type="monotone"
-                          dataKey="score"
-                          name="score"
-                          stroke="#1a472a"
-                          strokeWidth={3}
-                          dot={{ r: 4, fill: '#1a472a', stroke: '#fff', strokeWidth: 2 }}
-                          connectNulls={false}
-                        />
-                        <Line
-                          type="monotone"
-                          dataKey="forecast"
-                          name="forecast"
-                          stroke="#D4AF37"
-                          strokeWidth={3}
-                          strokeDasharray="6 3"
-                          dot={{ r: 4, fill: '#D4AF37', stroke: '#fff', strokeWidth: 2 }}
-                          connectNulls={false}
-                        />
-                        <Legend
-                          verticalAlign="top"
-                          align="right"
-                          height={36}
-                          iconType="circle"
-                          wrapperStyle={{
-                            fontSize: '10px',
-                            fontWeight: 700,
-                            textTransform: 'uppercase',
-                            letterSpacing: '0.05em',
-                          }}
-                          formatter={(v) => (v === 'score' ? 'Actual Score' : 'Forecasted Score')}
-                        />
-                      </LineChart>
-                    </ResponsiveContainer>
+                    <ReactECharts
+                      option={{
+                        color: ['#6366f1', '#8b5cf6', '#06b6d4', '#10b981', '#f59e0b', '#ef4444'],
+                        tooltip: {
+                          trigger: 'axis',
+                          formatter: (params: any[]) => {
+                            const lines = params
+                              .filter((p) => p.value !== null)
+                              .map(
+                                (p) =>
+                                  `${p.marker} ${p.seriesName === 'score' ? 'Actual Score' : 'Forecasted Score'}: ${p.value}/100`,
+                              )
+                              .join('<br/>');
+                            return `${params[0].axisValue}<br/>${lines}`;
+                          },
+                          extraCssText: 'border-radius:12px;border:none;box-shadow:0 4px 20px rgba(0,0,0,0.08)',
+                        },
+                        legend: {
+                          top: 0,
+                          right: 0,
+                          textStyle: { fontSize: 10, fontWeight: 700 },
+                          icon: 'circle',
+                          formatter: (v: string) => (v === 'score' ? 'Actual Score' : 'Forecasted Score'),
+                        },
+                        grid: { top: 40, right: 30, left: 40, bottom: 30 },
+                        xAxis: {
+                          type: 'category',
+                          data: scoreData.map((d) => d.month),
+                          axisLabel: { color: '#6B7280', fontSize: 11 },
+                          axisLine: { show: false },
+                          axisTick: { show: false },
+                          splitLine: { lineStyle: { color: '#E5E7EB', type: 'dashed' } },
+                        },
+                        yAxis: {
+                          type: 'value',
+                          min: 0,
+                          max: 100,
+                          axisLabel: { color: '#6B7280', fontSize: 11 },
+                          axisLine: { show: false },
+                          axisTick: { show: false },
+                          splitLine: { lineStyle: { color: '#E5E7EB', type: 'dashed' } },
+                        },
+                        series: [
+                          {
+                            name: 'score',
+                            type: 'line',
+                            data: scoreData.map((d) => d.score ?? null),
+                            smooth: true,
+                            connectNulls: false,
+                            lineStyle: { color: '#1a472a', width: 3 },
+                            itemStyle: { color: '#1a472a', borderColor: '#fff', borderWidth: 2 },
+                            symbolSize: 8,
+                            markLine: {
+                              silent: true,
+                              symbol: 'none',
+                              data: [
+                                {
+                                  yAxis: 80,
+                                  lineStyle: { color: '#10B981', type: 'dashed' },
+                                  label: {
+                                    show: true,
+                                    position: 'insideEndTop',
+                                    formatter: 'Target (80)',
+                                    color: '#10B981',
+                                    fontSize: 9,
+                                    fontWeight: 700,
+                                  },
+                                },
+                                {
+                                  xAxis: 'Jan',
+                                  lineStyle: { color: '#D1D5DB', type: 'dashed' },
+                                  label: {
+                                    show: true,
+                                    position: 'start',
+                                    formatter: 'Today',
+                                    color: '#9CA3AF',
+                                    fontSize: 9,
+                                    fontWeight: 700,
+                                  },
+                                },
+                              ],
+                            },
+                          },
+                          {
+                            name: 'forecast',
+                            type: 'line',
+                            data: scoreData.map((d) => d.forecast ?? null),
+                            smooth: true,
+                            connectNulls: false,
+                            lineStyle: { color: '#D4AF37', width: 3, type: 'dashed' },
+                            itemStyle: { color: '#D4AF37', borderColor: '#fff', borderWidth: 2 },
+                            symbolSize: 8,
+                          },
+                        ],
+                      }}
+                      style={{ height: '100%', width: '100%' }}
+                    />
                   </div>
                 );
               })()}
@@ -3404,71 +3431,67 @@ export function PriestDashboard({
                     </div>
                   </div>
                   <div className="h-[360px]">
-                    <ResponsiveContainer width="100%" height="100%">
-                      <ScatterChart margin={{ top: 14, right: 22, left: 0, bottom: 18 }}>
-                        <CartesianGrid strokeDasharray="3 3" stroke="#E5E7EB" />
-                        <XAxis
-                          type="number"
-                          dataKey="financialRisk"
-                          name="Financial Risk"
-                          unit="%"
-                          domain={[0, 100]}
-                          axisLine={false}
-                          tickLine={false}
-                          tick={{ fill: '#6B7280', fontSize: 10 }}
-                          label={{
-                            value: 'Financial Risk',
-                            position: 'insideBottom',
-                            offset: -10,
-                            fill: '#6B7280',
-                            fontSize: 10,
-                            fontWeight: 700,
-                          }}
-                        />
-                        <YAxis
-                          type="number"
-                          dataKey="expectedImprovement"
-                          name="Improvement Target"
-                          unit="%"
-                          domain={[0, 35]}
-                          axisLine={false}
-                          tickLine={false}
-                          tick={{ fill: '#6B7280', fontSize: 10 }}
-                          label={{
-                            value: 'Improvement Target %',
-                            angle: -90,
-                            position: 'insideLeft',
-                            fill: '#6B7280',
-                            fontSize: 10,
-                            fontWeight: 700,
-                          }}
-                        />
-                        <ReferenceLine x={50} stroke="#94A3B8" strokeDasharray="4 4" />
-                        <ReferenceLine y={15} stroke="#94A3B8" strokeDasharray="4 4" />
-                        <Tooltip
-                          cursor={{ strokeDasharray: '3 3' }}
-                          formatter={(value, name) => [
-                            `${Number(value ?? 0)}%`,
-                            name === 'financialRisk' ? 'Financial Risk' : 'Improvement Target',
-                          ]}
-                          labelFormatter={(_, payload) => {
-                            const row = payload?.[0]?.payload;
-                            return row ? `${row.name} - ${row.action}` : 'Assignment';
-                          }}
-                          contentStyle={{
-                            borderRadius: '12px',
-                            border: 'none',
-                            boxShadow: '0 10px 25px -5px rgba(0,0,0,0.1)',
-                            fontSize: '11px',
-                          }}
-                        />
-                        <Scatter data={prescriptiveActionData.rows} name="Assignments">
-                          {prescriptiveActionData.rows.map((entry) => (
-                            <Cell key={entry.name} fill={entry.fill} />
-                          ))}
-                        </Scatter>
-                      </ScatterChart>
-                    </ResponsiveContainer>
+                    <ReactECharts
+                      option={{
+                        color: ['#6366f1', '#8b5cf6', '#06b6d4', '#10b981', '#f59e0b', '#ef4444'],
+                        tooltip: {
+                          trigger: 'item',
+                          formatter: (params: any) => {
+                            const d = params.data;
+                            return `<div style="font-size:11px"><strong>${d[2]} - ${d[4]}</strong><br/>Financial Risk: ${d[0]}%<br/>Improvement Target: ${d[1]}%</div>`;
+                          },
+                          extraCssText: 'border-radius:12px;border:none;box-shadow:0 10px 25px -5px rgba(0,0,0,0.1)',
+                        },
+                        grid: { top: 14, right: 22, left: 55, bottom: 45 },
+                        xAxis: {
+                          type: 'value',
+                          name: 'Financial Risk',
+                          nameLocation: 'middle',
+                          nameGap: 28,
+                          min: 0,
+                          max: 100,
+                          axisLine: { show: false },
+                          axisTick: { show: false },
+                          axisLabel: { color: '#6B7280', fontSize: 10, formatter: (v: number) => `${v}%` },
+                          splitLine: { lineStyle: { color: '#E5E7EB', type: 'dashed' } },
+                        },
+                        yAxis: {
+                          type: 'value',
+                          name: 'Improvement Target %',
+                          nameLocation: 'middle',
+                          nameGap: 40,
+                          nameRotate: 90,
+                          min: 0,
+                          max: 35,
+                          axisLine: { show: false },
+                          axisTick: { show: false },
+                          axisLabel: { color: '#6B7280', fontSize: 10, formatter: (v: number) => `${v}%` },
+                          splitLine: { lineStyle: { color: '#E5E7EB', type: 'dashed' } },
+                        },
+                        series: [
+                          {
+                            type: 'scatter',
+                            data: prescriptiveActionData.rows.map((d) => [
+                              d.financialRisk,
+                              d.expectedImprovement,
+                              d.name,
+                              d.fill,
+                              d.action,
+                            ]),
+                            itemStyle: { color: (params: any) => params.data[3] },
+                            symbolSize: 10,
+                            markLine: {
+                              silent: true,
+                              symbol: 'none',
+                              lineStyle: { color: '#94A3B8', type: 'dashed' },
+                              data: [{ xAxis: 50 }, { yAxis: 15 }],
+                              label: { show: false },
+                            },
+                          },
+                        ],
+                      }}
+                      style={{ height: '100%', width: '100%' }}
+                    />
                   </div>
                 </div>
 
@@ -3481,43 +3504,46 @@ export function PriestDashboard({
                     <p className="text-xs text-gray-500 mt-1">Count of assignments under each prescriptive action.</p>
                   </div>
                   <div className="h-[260px]">
-                    <ResponsiveContainer width="100%" height="100%">
-                      <BarChart
-                        data={prescriptiveActionData.summary}
-                        margin={{ top: 10, right: 14, left: 0, bottom: 8 }}
-                      >
-                        <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#E5E7EB" />
-                        <XAxis
-                          dataKey="action"
-                          axisLine={false}
-                          tickLine={false}
-                          tick={{ fill: '#374151', fontSize: 10, fontWeight: 700 }}
-                        />
-                        <YAxis
-                          allowDecimals={false}
-                          axisLine={false}
-                          tickLine={false}
-                          tick={{ fill: '#6B7280', fontSize: 10 }}
-                        />
-                        <Tooltip
-                          formatter={(value) => [
-                            `${Number(value ?? 0)} assignment${Number(value ?? 0) === 1 ? '' : 's'}`,
-                            'Count',
-                          ]}
-                          contentStyle={{
-                            borderRadius: '12px',
-                            border: 'none',
-                            boxShadow: '0 10px 25px -5px rgba(0,0,0,0.1)',
-                            fontSize: '11px',
-                          }}
-                        />
-                        <Bar dataKey="count" radius={[8, 8, 0, 0]} barSize={36}>
-                          {prescriptiveActionData.summary.map((entry) => (
-                            <Cell key={entry.action} fill={entry.fill} />
-                          ))}
-                        </Bar>
-                      </BarChart>
-                    </ResponsiveContainer>
+                    <ReactECharts
+                      option={{
+                        color: ['#6366f1', '#8b5cf6', '#06b6d4', '#10b981', '#f59e0b', '#ef4444'],
+                        tooltip: {
+                          trigger: 'axis',
+                          formatter: (params: any[]) => {
+                            const p = params[0];
+                            return `${p.axisValue}<br/>${p.value} assignment${p.value === 1 ? '' : 's'}`;
+                          },
+                          extraCssText: 'border-radius:12px;border:none;box-shadow:0 10px 25px -5px rgba(0,0,0,0.1)',
+                        },
+                        grid: { top: 10, right: 14, left: 40, bottom: 30 },
+                        xAxis: {
+                          type: 'category',
+                          data: prescriptiveActionData.summary.map((d) => d.action),
+                          axisLine: { show: false },
+                          axisTick: { show: false },
+                          axisLabel: { color: '#374151', fontSize: 10, fontWeight: 700 },
+                        },
+                        yAxis: {
+                          type: 'value',
+                          axisLine: { show: false },
+                          axisTick: { show: false },
+                          axisLabel: { color: '#6B7280', fontSize: 10 },
+                          splitLine: { lineStyle: { color: '#E5E7EB', type: 'dashed' } },
+                          minInterval: 1,
+                        },
+                        series: [
+                          {
+                            type: 'bar',
+                            data: prescriptiveActionData.summary.map((d) => ({
+                              value: d.count,
+                              itemStyle: { color: d.fill, borderRadius: [8, 8, 0, 0] },
+                            })),
+                            barWidth: 36,
+                          },
+                        ],
+                      }}
+                      style={{ height: '100%', width: '100%' }}
+                    />
                   </div>
                   <div className="grid grid-cols-1 gap-2 mt-4">
                     {prescriptiveActionData.summary.map((item) => (

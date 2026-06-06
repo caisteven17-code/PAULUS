@@ -6,6 +6,7 @@ import { motion, AnimatePresence } from 'motion/react';
 import { useAuth } from '../firebase';
 import { formatDate } from '../lib/format';
 import { usePermissions } from '../hooks/usePermissions';
+import { apiClient } from '../lib/api-client';
 
 interface PriestRecord {
   id: string;
@@ -45,6 +46,8 @@ export function HealthTracker() {
   const [selectedPriest, setSelectedPriest] = useState<PriestRecord | null>(null);
   const [filter, setFilter] = useState<'all' | 'birthdays' | 'checkups'>('all');
   const [search, setSearch] = useState('');
+  const [apiHealthScore, setApiHealthScore] = useState<number | null>(null);
+  const [healthScoreLoading, setHealthScoreLoading] = useState(false);
 
   const [formData, setFormData] = useState<{
     name: string;
@@ -68,9 +71,39 @@ export function HealthTracker() {
     phone: '',
   });
 
+  // Persist records to localStorage
   useEffect(() => {
     localStorage.setItem('priest_health_records', JSON.stringify(priests));
   }, [priests]);
+
+  // Fetch health score from the backend on mount
+  useEffect(() => {
+    let cancelled = false;
+    const entityId = (user as any)?.entityId ?? (user as any)?.parish ?? '';
+    const entityType = (user as any)?.entityType ?? 'parish';
+
+    setHealthScoreLoading(true);
+    apiClient
+      .calculateHealthScore(entityId, entityType)
+      .then((score) => {
+        if (cancelled) return;
+        if (score && typeof (score as any).composite_score === 'number') {
+          setApiHealthScore((score as any).composite_score);
+        } else if (score && typeof (score as any).score === 'number') {
+          setApiHealthScore((score as any).score);
+        }
+      })
+      .catch((err) => {
+        console.error('[HealthTracker] Health score fetch failed, using default behavior:', err);
+      })
+      .finally(() => {
+        if (!cancelled) setHealthScoreLoading(false);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [user]);
 
   const { permissions } = usePermissions();
 
@@ -240,7 +273,7 @@ export function HealthTracker() {
         </div>
 
         {/* Stats Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
+        <div className={`grid grid-cols-1 gap-4 mb-8 ${apiHealthScore !== null ? 'md:grid-cols-4' : 'md:grid-cols-3'}`}>
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
@@ -284,6 +317,46 @@ export function HealthTracker() {
               <Stethoscope className="w-12 h-12 text-slate-400" />
             </div>
           </motion.div>
+
+          {apiHealthScore !== null && (
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.3 }}
+              className="bg-white rounded-lg border border-slate-200 p-6"
+            >
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-slate-600 text-sm font-medium">Financial Health Score</p>
+                  <p
+                    className={`text-3xl font-bold mt-2 ${apiHealthScore >= 70 ? 'text-emerald-600' : apiHealthScore >= 40 ? 'text-amber-600' : 'text-rose-600'}`}
+                  >
+                    {apiHealthScore.toFixed(1)}
+                  </p>
+                </div>
+                <Heart
+                  className={`w-12 h-12 ${apiHealthScore >= 70 ? 'text-emerald-300' : apiHealthScore >= 40 ? 'text-amber-300' : 'text-rose-300'}`}
+                />
+              </div>
+            </motion.div>
+          )}
+
+          {healthScoreLoading && apiHealthScore === null && (
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.3 }}
+              className="bg-white rounded-lg border border-slate-200 p-6 animate-pulse"
+            >
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-slate-600 text-sm font-medium">Financial Health Score</p>
+                  <div className="h-9 w-20 bg-slate-200 rounded mt-2" />
+                </div>
+                <div className="w-12 h-12 bg-slate-200 rounded-full" />
+              </div>
+            </motion.div>
+          )}
         </div>
 
         {/* Filters + Search */}

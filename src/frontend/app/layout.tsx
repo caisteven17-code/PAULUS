@@ -3,14 +3,11 @@ import './globals.css';
 
 export const metadata: Metadata = {
   title: 'Diocese of San Pablo — Financial Analytics System',
-  description: 'Next generation ecclesiastical stewardship platform for the Diocese of San Pablo. Track, analyze, and manage financial data across parishes, seminaries, and diocesan schools.',
+  description:
+    'Next generation ecclesiastical stewardship platform for the Diocese of San Pablo. Track, analyze, and manage financial data across parishes, seminaries, and diocesan schools.',
 };
 
-export default function RootLayout({
-  children,
-}: {
-  children: React.ReactNode;
-}) {
+export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="en" suppressHydrationWarning>
       <head>
