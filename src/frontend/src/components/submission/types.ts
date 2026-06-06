@@ -4,7 +4,7 @@ export type SubmissionInstitutionType = 'parish' | 'seminary' | 'school';
 
 export type SubmissionStepId = 'upload' | 'cleaning' | 'anomaly' | 'validation' | 'loading' | 'success';
 
-export type SubmissionFlowState = 'idle' | 'running' | 'success' | 'anomaly';
+export type SubmissionFlowState = 'idle' | 'running' | 'success' | 'anomaly' | 'error';
 
 export type AnomalySimulationMode = 'auto' | 'force-clean' | 'force-anomaly';
 

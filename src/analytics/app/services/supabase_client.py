@@ -12,3 +12,8 @@ def get_supabase() -> Client:
             raise RuntimeError("SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY must be set in .env")
         _client = create_client(SUPABASE_URL, SUPABASE_KEY)
     return _client
+
+
+def get_table(schema: str, table: str):
+    """Return a PostgREST query builder for a non-public schema table."""
+    return get_supabase().schema(schema).table(table)

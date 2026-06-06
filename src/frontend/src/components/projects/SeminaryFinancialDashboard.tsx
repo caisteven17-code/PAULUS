@@ -1,25 +1,7 @@
 'use client';
 
-import React, { useMemo, useState } from 'react';
-import {
-  Area,
-  AreaChart,
-  Bar,
-  BarChart,
-  CartesianGrid,
-  Cell,
-  ErrorBar,
-  Legend,
-  Line,
-  LineChart,
-  Pie,
-  PieChart,
-  ResponsiveContainer,
-  Tooltip,
-  Treemap,
-  XAxis,
-  YAxis,
-} from 'recharts';
+import React, { useMemo, useState, useEffect } from 'react';
+import ReactECharts from 'echarts-for-react';
 import {
   ArrowDownRight,
   ArrowUpRight,
@@ -40,6 +22,7 @@ import {
   seminaryRoadmap,
 } from '../../utils/mockData.js';
 import { chartPalette, seminaryTheme } from '../../constants/theme.js';
+import { apiClient } from '../../lib/api-client';
 
 type TabKey = 'dashboard' | 'descriptive' | 'predictive' | 'prescriptive';
 
@@ -166,24 +149,40 @@ function KpiCard({ metric }: { metric: KpiMetric }) {
         <span className="font-bold text-gray-700">{formatMetricValue(metric.prior, metric.format)}</span>
       </div>
       <div className="h-16">
-        <ResponsiveContainer width="100%" height="100%">
-          <AreaChart data={metric.sparkline} margin={{ top: 4, right: 0, left: 0, bottom: 0 }}>
-            <defs>
-              <linearGradient id={`spark-${metric.title}`} x1="0" y1="0" x2="0" y2="1">
-                <stop offset="5%" stopColor={metric.accent} stopOpacity={0.32} />
-                <stop offset="95%" stopColor={metric.accent} stopOpacity={0} />
-              </linearGradient>
-            </defs>
-            <Tooltip formatter={(value) => compactCurrency(Number(value ?? 0))} labelFormatter={(label) => label} />
-            <Area
-              type="monotone"
-              dataKey="value"
-              stroke={metric.accent}
-              fill={`url(#spark-${metric.title})`}
-              strokeWidth={2}
-            />
-          </AreaChart>
-        </ResponsiveContainer>
+        <ReactECharts
+          option={{
+            grid: { top: 4, right: 0, left: 0, bottom: 0 },
+            xAxis: { type: 'category', show: false, data: metric.sparkline.map((d) => d.period) },
+            yAxis: { type: 'value', show: false },
+            tooltip: {
+              trigger: 'axis',
+              formatter: (params: any) => `${params[0].axisValue}: ${compactCurrency(params[0].value)}`,
+            },
+            series: [
+              {
+                type: 'line',
+                data: metric.sparkline.map((d) => d.value),
+                smooth: true,
+                showSymbol: false,
+                lineStyle: { color: metric.accent, width: 2 },
+                areaStyle: {
+                  color: {
+                    type: 'linear',
+                    x: 0,
+                    y: 0,
+                    x2: 0,
+                    y2: 1,
+                    colorStops: [
+                      { offset: 0.05, color: metric.accent + '52' },
+                      { offset: 0.95, color: metric.accent + '00' },
+                    ],
+                  },
+                },
+              },
+            ],
+          }}
+          style={{ height: '100%', width: '100%' }}
+        />
       </div>
     </div>
   );
@@ -230,10 +229,60 @@ function DataTable({
   );
 }
 
-export function SeminaryFinancialDashboard({ entityName, year }: { entityName: string; year: number }) {
+export function SeminaryFinancialDashboard({
+  entityName,
+  year,
+  institutionId,
+}: {
+  entityName: string;
+  year: number;
+  institutionId?: string;
+}) {
   const [activeTab, setActiveTab] = useState<TabKey>('dashboard');
-  const monthlyData = seminaryMonthlyData as MonthlyRecord[];
+  const [apiLoading, setApiLoading] = useState(false);
+  const [overrideMonthlyData, setOverrideMonthlyData] = useState<MonthlyRecord[] | null>(null);
   const palette = chartPalette as string[];
+
+  useEffect(() => {
+    if (!institutionId) return;
+    let cancelled = false;
+    setApiLoading(true);
+
+    Promise.all([
+      apiClient.getProjectsDescriptive(institutionId),
+      apiClient.getFinancialTrend('seminary', institutionId),
+    ])
+      .then(([, trendRes]) => {
+        if (cancelled) return;
+        const trend = trendRes as any;
+        if (trend?.data_sufficient !== false && Array.isArray(trend?.monthly_data) && trend.monthly_data.length > 0) {
+          const fallbackData = seminaryMonthlyData as MonthlyRecord[];
+          const mapped: MonthlyRecord[] = trend.monthly_data.map((item: any, idx: number) => {
+            const fallback = fallbackData[idx] ?? fallbackData[fallbackData.length - 1];
+            return {
+              ...fallback,
+              month: item.month ?? fallback.month,
+              totalIncome: item.total_receipts ?? fallback.totalIncome,
+              totalExpenses: item.total_expenses ?? fallback.totalExpenses,
+              net: item.net_balance ?? fallback.net,
+            };
+          });
+          setOverrideMonthlyData(mapped);
+        }
+      })
+      .catch((err) => {
+        console.error('[SeminaryFinancialDashboard] API fetch failed, using mock data:', err);
+      })
+      .finally(() => {
+        if (!cancelled) setApiLoading(false);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [institutionId]);
+
+  const monthlyData = (overrideMonthlyData ?? seminaryMonthlyData) as MonthlyRecord[];
   const latest = monthlyData[monthlyData.length - 1];
   const previous = monthlyData[monthlyData.length - 2];
 
@@ -604,7 +653,7 @@ export function SeminaryFinancialDashboard({ entityName, year }: { entityName: s
   const annualExpenses = Object.values(annualExpenseTotals).reduce((sum, value) => sum + value, 0);
 
   return (
-    <section className="space-y-5">
+    <section className={`space-y-5 transition-opacity duration-300 ${apiLoading ? 'opacity-60' : 'opacity-100'}`}>
       <div
         className="overflow-hidden rounded-[1.75rem] border border-gray-200 bg-white p-5 shadow-base md:p-6"
         style={{ boxShadow: seminaryTheme.cardShadow }}
@@ -696,20 +745,57 @@ export function SeminaryFinancialDashboard({ entityName, year }: { entityName: s
               subtitle="Monthly operating position with axis labels, tooltip, and legend."
             >
               <div className="h-80">
-                <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={operatingTrendData} margin={chartMargin}>
-                    <CartesianGrid strokeDasharray="3 3" stroke="#E5E7EB" />
-                    <XAxis dataKey="month" label={{ value: 'Month', position: 'insideBottom', offset: -8 }} />
-                    <YAxis
-                      tickFormatter={(value) => `${Math.round(Number(value) / 1000)}k`}
-                      label={{ value: 'PHP', angle: -90, position: 'insideLeft' }}
-                    />
-                    <Tooltip formatter={(value) => currencyFormatter(Number(value ?? 0))} />
-                    <Legend />
-                    <Bar dataKey="Income" fill={palette[0]} radius={[10, 10, 0, 0]} />
-                    <Bar dataKey="Expenses" fill={palette[1]} radius={[10, 10, 0, 0]} />
-                  </BarChart>
-                </ResponsiveContainer>
+                <ReactECharts
+                  option={{
+                    color: [palette[0], palette[1]],
+                    tooltip: {
+                      trigger: 'axis',
+                      formatter: (params: any) =>
+                        `${params[0].axisValue}<br/>` +
+                        params
+                          .map((p: any) => `${p.marker}${p.seriesName}: ${currencyFormatter(p.value)}`)
+                          .join('<br/>'),
+                    },
+                    legend: { bottom: 0 },
+                    grid: { top: 16, right: 24, left: 56, bottom: 48 },
+                    xAxis: {
+                      type: 'category',
+                      data: operatingTrendData.map((d) => d.month),
+                      name: 'Month',
+                      nameLocation: 'middle',
+                      nameGap: 28,
+                      axisLine: { show: false },
+                      axisTick: { show: false },
+                    },
+                    yAxis: {
+                      type: 'value',
+                      name: 'PHP',
+                      nameLocation: 'middle',
+                      nameGap: 44,
+                      axisLabel: { formatter: (v: number) => `${Math.round(v / 1000)}k` },
+                      splitLine: { lineStyle: { color: '#E5E7EB' } },
+                    },
+                    series: [
+                      {
+                        name: 'Income',
+                        type: 'bar',
+                        data: operatingTrendData.map((d) => ({
+                          value: d.Income,
+                          itemStyle: { color: palette[0], borderRadius: [10, 10, 0, 0] },
+                        })),
+                      },
+                      {
+                        name: 'Expenses',
+                        type: 'bar',
+                        data: operatingTrendData.map((d) => ({
+                          value: d.Expenses,
+                          itemStyle: { color: palette[1], borderRadius: [10, 10, 0, 0] },
+                        })),
+                      },
+                    ],
+                  }}
+                  style={{ height: '100%', width: '100%' }}
+                />
               </div>
             </ChartCard>
 
@@ -736,54 +822,77 @@ export function SeminaryFinancialDashboard({ entityName, year }: { entityName: s
                 </div>
               </div>
               <div className="mt-4 h-72">
-                <ResponsiveContainer width="100%" height="100%">
-                  <LineChart
-                    data={monthlyData.map((record, index) => ({
-                      month: record.month,
-                      Net: record.net,
-                      Dependency: Number(dependencySeries[index].value.toFixed(2)),
-                    }))}
-                    margin={chartMargin}
-                  >
-                    <CartesianGrid strokeDasharray="3 3" stroke="#E5E7EB" />
-                    <XAxis dataKey="month" label={{ value: 'Month', position: 'insideBottom', offset: -8 }} />
-                    <YAxis
-                      yAxisId="left"
-                      tickFormatter={(value) => `${Math.round(Number(value) / 1000)}k`}
-                      label={{ value: 'Net (PHP)', angle: -90, position: 'insideLeft' }}
-                    />
-                    <YAxis
-                      yAxisId="right"
-                      orientation="right"
-                      tickFormatter={(value) => `${value}%`}
-                      label={{ value: 'Dependency %', angle: 90, position: 'insideRight' }}
-                    />
-                    <Tooltip
-                      formatter={(value, name) =>
-                        name === 'Dependency'
-                          ? percentFormatter(Number(value ?? 0))
-                          : currencyFormatter(Number(value ?? 0))
-                      }
-                    />
-                    <Legend />
-                    <Line
-                      yAxisId="left"
-                      type="monotone"
-                      dataKey="Net"
-                      stroke={latest.net >= 0 ? seminaryTheme.success : seminaryTheme.danger}
-                      strokeWidth={3}
-                      dot={{ r: 3 }}
-                    />
-                    <Line
-                      yAxisId="right"
-                      type="monotone"
-                      dataKey="Dependency"
-                      stroke={palette[2]}
-                      strokeWidth={3}
-                      dot={{ r: 3 }}
-                    />
-                  </LineChart>
-                </ResponsiveContainer>
+                <ReactECharts
+                  option={{
+                    color: [latest.net >= 0 ? seminaryTheme.success : seminaryTheme.danger, palette[2]],
+                    tooltip: {
+                      trigger: 'axis',
+                      formatter: (params: any) =>
+                        `${params[0].axisValue}<br/>` +
+                        params
+                          .map(
+                            (p: any) =>
+                              `${p.marker}${p.seriesName}: ${p.seriesName === 'Dependency' ? percentFormatter(p.value) : currencyFormatter(p.value)}`,
+                          )
+                          .join('<br/>'),
+                    },
+                    legend: { bottom: 0 },
+                    grid: { top: 16, right: 60, left: 56, bottom: 40 },
+                    xAxis: {
+                      type: 'category',
+                      data: monthlyData.map((d) => d.month),
+                      name: 'Month',
+                      nameLocation: 'middle',
+                      nameGap: 28,
+                      axisLine: { show: false },
+                      axisTick: { show: false },
+                    },
+                    yAxis: [
+                      {
+                        type: 'value',
+                        name: 'Net (PHP)',
+                        nameLocation: 'middle',
+                        nameGap: 44,
+                        axisLabel: { formatter: (v: number) => `${Math.round(v / 1000)}k` },
+                        splitLine: { lineStyle: { color: '#E5E7EB' } },
+                      },
+                      {
+                        type: 'value',
+                        name: 'Dependency %',
+                        nameLocation: 'middle',
+                        nameGap: 44,
+                        position: 'right',
+                        axisLabel: { formatter: (v: number) => `${v}%` },
+                        splitLine: { show: false },
+                      },
+                    ],
+                    series: [
+                      {
+                        name: 'Net',
+                        type: 'line',
+                        yAxisIndex: 0,
+                        data: monthlyData.map((d) => d.net),
+                        smooth: true,
+                        symbol: 'circle',
+                        symbolSize: 6,
+                        lineStyle: { color: latest.net >= 0 ? seminaryTheme.success : seminaryTheme.danger, width: 3 },
+                        itemStyle: { color: latest.net >= 0 ? seminaryTheme.success : seminaryTheme.danger },
+                      },
+                      {
+                        name: 'Dependency',
+                        type: 'line',
+                        yAxisIndex: 1,
+                        data: monthlyData.map((_, index) => Number(dependencySeries[index].value.toFixed(2))),
+                        smooth: true,
+                        symbol: 'circle',
+                        symbolSize: 6,
+                        lineStyle: { color: palette[2], width: 3 },
+                        itemStyle: { color: palette[2] },
+                      },
+                    ],
+                  }}
+                  style={{ height: '100%', width: '100%' }}
+                />
               </div>
             </ChartCard>
           </div>
@@ -794,24 +903,26 @@ export function SeminaryFinancialDashboard({ entityName, year }: { entityName: s
         <div className="grid grid-cols-1 gap-5 xl:grid-cols-2 [&>*]:min-w-0">
           <ChartCard title="Revenue Mix" subtitle="Donut chart of income source contribution across the full year.">
             <div className="h-80">
-              <ResponsiveContainer width="100%" height="100%">
-                <PieChart>
-                  <Tooltip formatter={(value) => currencyFormatter(Number(value ?? 0))} />
-                  <Legend />
-                  <Pie
-                    data={revenueMixData}
-                    dataKey="value"
-                    nameKey="name"
-                    innerRadius={72}
-                    outerRadius={110}
-                    paddingAngle={3}
-                  >
-                    {revenueMixData.map((entry) => (
-                      <Cell key={entry.name} fill={entry.fill} />
-                    ))}
-                  </Pie>
-                </PieChart>
-              </ResponsiveContainer>
+              <ReactECharts
+                option={{
+                  color: ['#6366f1', '#8b5cf6', '#06b6d4', '#10b981', '#f59e0b', '#ef4444'],
+                  tooltip: {
+                    trigger: 'item',
+                    formatter: (params: any) => `${params.name}: ${currencyFormatter(params.value)}`,
+                  },
+                  legend: { bottom: 0, type: 'scroll' },
+                  series: [
+                    {
+                      type: 'pie',
+                      radius: ['40%', '65%'],
+                      padAngle: 3,
+                      data: revenueMixData.map((d) => ({ name: d.name, value: d.value, itemStyle: { color: d.fill } })),
+                      label: { show: false },
+                    },
+                  ],
+                }}
+                style={{ height: '100%', width: '100%' }}
+              />
             </div>
           </ChartCard>
 
@@ -820,33 +931,44 @@ export function SeminaryFinancialDashboard({ entityName, year }: { entityName: s
             subtitle="Horizontal bar chart of seminary fee sub-items with labeled axes."
           >
             <div className="h-80">
-              <ResponsiveContainer width="100%" height="100%">
-                <BarChart
-                  data={feeStructureData}
-                  layout="vertical"
-                  margin={{ top: 16, right: 24, left: 48, bottom: 16 }}
-                >
-                  <CartesianGrid strokeDasharray="3 3" stroke="#E5E7EB" />
-                  <XAxis
-                    type="number"
-                    tickFormatter={(value) => `${Math.round(Number(value) / 1000)}k`}
-                    label={{ value: 'Annual PHP', position: 'insideBottom', offset: -8 }}
-                  />
-                  <YAxis
-                    type="category"
-                    dataKey="name"
-                    width={140}
-                    label={{ value: 'Fee Components', angle: -90, position: 'insideLeft' }}
-                  />
-                  <Tooltip formatter={(value) => currencyFormatter(Number(value ?? 0))} />
-                  <Legend />
-                  <Bar dataKey="value" name="Fee Income" radius={[0, 10, 10, 0]}>
-                    {feeStructureData.map((entry) => (
-                      <Cell key={entry.name} fill={entry.fill} />
-                    ))}
-                  </Bar>
-                </BarChart>
-              </ResponsiveContainer>
+              <ReactECharts
+                option={{
+                  tooltip: {
+                    trigger: 'axis',
+                    formatter: (params: any) => `${params[0].axisValue}: ${currencyFormatter(params[0].value)}`,
+                  },
+                  legend: { bottom: 0 },
+                  grid: { top: 16, right: 24, left: 148, bottom: 40 },
+                  xAxis: {
+                    type: 'value',
+                    name: 'Annual PHP',
+                    nameLocation: 'middle',
+                    nameGap: 28,
+                    axisLabel: { formatter: (v: number) => `${Math.round(v / 1000)}k` },
+                    splitLine: { lineStyle: { color: '#E5E7EB' } },
+                  },
+                  yAxis: {
+                    type: 'category',
+                    name: 'Fee Components',
+                    nameLocation: 'middle',
+                    nameGap: 140,
+                    data: feeStructureData.map((d) => d.name),
+                    axisLine: { show: false },
+                    axisTick: { show: false },
+                  },
+                  series: [
+                    {
+                      name: 'Fee Income',
+                      type: 'bar',
+                      data: feeStructureData.map((d) => ({
+                        value: d.value,
+                        itemStyle: { color: d.fill, borderRadius: [0, 10, 10, 0] },
+                      })),
+                    },
+                  ],
+                }}
+                style={{ height: '100%', width: '100%' }}
+              />
             </div>
           </ChartCard>
 
@@ -855,13 +977,27 @@ export function SeminaryFinancialDashboard({ entityName, year }: { entityName: s
             subtitle="Treemap of annual expense categories with shared palette and tooltip."
           >
             <div className="h-80">
-              <ResponsiveContainer width="100%" height="100%">
-                <Treemap data={costCompositionData} dataKey="value" nameKey="name" stroke="#FFFFFF" fill={palette[0]}>
-                  {costCompositionData.map((entry) => (
-                    <Cell key={entry.name} fill={entry.fill} />
-                  ))}
-                </Treemap>
-              </ResponsiveContainer>
+              <ReactECharts
+                option={{
+                  tooltip: {
+                    trigger: 'item',
+                    formatter: (params: any) => `${params.name}: ${currencyFormatter(params.value)}`,
+                  },
+                  series: [
+                    {
+                      type: 'treemap',
+                      data: costCompositionData.map((d) => ({
+                        name: d.name,
+                        value: d.value,
+                        itemStyle: { color: d.fill, borderColor: '#FFFFFF', borderWidth: 2 },
+                      })),
+                      label: { show: true, formatter: (params: any) => params.name, fontSize: 11, color: '#fff' },
+                      breadcrumb: { show: false },
+                    },
+                  ],
+                }}
+                style={{ height: '100%', width: '100%' }}
+              />
             </div>
             <div className="mt-3 flex flex-wrap gap-3">
               {costCompositionData.slice(0, 6).map((entry) => (
@@ -881,20 +1017,55 @@ export function SeminaryFinancialDashboard({ entityName, year }: { entityName: s
             subtitle="Grouped column chart comparing monthly income and expenses."
           >
             <div className="h-80">
-              <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={operatingTrendData} margin={chartMargin}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#E5E7EB" />
-                  <XAxis dataKey="month" label={{ value: 'Month', position: 'insideBottom', offset: -8 }} />
-                  <YAxis
-                    tickFormatter={(value) => `${Math.round(Number(value) / 1000)}k`}
-                    label={{ value: 'PHP', angle: -90, position: 'insideLeft' }}
-                  />
-                  <Tooltip formatter={(value) => currencyFormatter(Number(value ?? 0))} />
-                  <Legend />
-                  <Bar dataKey="Income" fill={palette[0]} radius={[10, 10, 0, 0]} />
-                  <Bar dataKey="Expenses" fill={palette[1]} radius={[10, 10, 0, 0]} />
-                </BarChart>
-              </ResponsiveContainer>
+              <ReactECharts
+                option={{
+                  color: [palette[0], palette[1]],
+                  tooltip: {
+                    trigger: 'axis',
+                    formatter: (params: any) =>
+                      `${params[0].axisValue}<br/>` +
+                      params.map((p: any) => `${p.marker}${p.seriesName}: ${currencyFormatter(p.value)}`).join('<br/>'),
+                  },
+                  legend: { bottom: 0 },
+                  grid: { top: 16, right: 24, left: 56, bottom: 48 },
+                  xAxis: {
+                    type: 'category',
+                    data: operatingTrendData.map((d) => d.month),
+                    name: 'Month',
+                    nameLocation: 'middle',
+                    nameGap: 28,
+                    axisLine: { show: false },
+                    axisTick: { show: false },
+                  },
+                  yAxis: {
+                    type: 'value',
+                    name: 'PHP',
+                    nameLocation: 'middle',
+                    nameGap: 44,
+                    axisLabel: { formatter: (v: number) => `${Math.round(v / 1000)}k` },
+                    splitLine: { lineStyle: { color: '#E5E7EB' } },
+                  },
+                  series: [
+                    {
+                      name: 'Income',
+                      type: 'bar',
+                      data: operatingTrendData.map((d) => ({
+                        value: d.Income,
+                        itemStyle: { color: palette[0], borderRadius: [10, 10, 0, 0] },
+                      })),
+                    },
+                    {
+                      name: 'Expenses',
+                      type: 'bar',
+                      data: operatingTrendData.map((d) => ({
+                        value: d.Expenses,
+                        itemStyle: { color: palette[1], borderRadius: [10, 10, 0, 0] },
+                      })),
+                    },
+                  ],
+                }}
+                style={{ height: '100%', width: '100%' }}
+              />
             </div>
           </ChartCard>
 
@@ -903,20 +1074,57 @@ export function SeminaryFinancialDashboard({ entityName, year }: { entityName: s
             subtitle="Stacked bar of subsidies and donations against self-generated income."
           >
             <div className="h-80">
-              <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={dependencyRatioData} margin={chartMargin}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#E5E7EB" />
-                  <XAxis dataKey="month" label={{ value: 'Month', position: 'insideBottom', offset: -8 }} />
-                  <YAxis
-                    tickFormatter={(value) => `${Math.round(Number(value) / 1000)}k`}
-                    label={{ value: 'Income (PHP)', angle: -90, position: 'insideLeft' }}
-                  />
-                  <Tooltip formatter={(value) => currencyFormatter(Number(value ?? 0))} />
-                  <Legend />
-                  <Bar dataKey="Subsidies + Donations" stackId="dependency" fill={palette[2]} radius={[10, 10, 0, 0]} />
-                  <Bar dataKey="Self-Generated" stackId="dependency" fill={palette[0]} radius={[10, 10, 0, 0]} />
-                </BarChart>
-              </ResponsiveContainer>
+              <ReactECharts
+                option={{
+                  color: [palette[2], palette[0]],
+                  tooltip: {
+                    trigger: 'axis',
+                    formatter: (params: any) =>
+                      `${params[0].axisValue}<br/>` +
+                      params.map((p: any) => `${p.marker}${p.seriesName}: ${currencyFormatter(p.value)}`).join('<br/>'),
+                  },
+                  legend: { bottom: 0 },
+                  grid: { top: 16, right: 24, left: 64, bottom: 48 },
+                  xAxis: {
+                    type: 'category',
+                    data: dependencyRatioData.map((d) => d.month),
+                    name: 'Month',
+                    nameLocation: 'middle',
+                    nameGap: 28,
+                    axisLine: { show: false },
+                    axisTick: { show: false },
+                  },
+                  yAxis: {
+                    type: 'value',
+                    name: 'Income (PHP)',
+                    nameLocation: 'middle',
+                    nameGap: 52,
+                    axisLabel: { formatter: (v: number) => `${Math.round(v / 1000)}k` },
+                    splitLine: { lineStyle: { color: '#E5E7EB' } },
+                  },
+                  series: [
+                    {
+                      name: 'Subsidies + Donations',
+                      type: 'bar',
+                      stack: 'dependency',
+                      data: dependencyRatioData.map((d) => ({
+                        value: d['Subsidies + Donations'],
+                        itemStyle: { color: palette[2], borderRadius: [10, 10, 0, 0] },
+                      })),
+                    },
+                    {
+                      name: 'Self-Generated',
+                      type: 'bar',
+                      stack: 'dependency',
+                      data: dependencyRatioData.map((d) => ({
+                        value: d['Self-Generated'],
+                        itemStyle: { color: palette[0], borderRadius: [10, 10, 0, 0] },
+                      })),
+                    },
+                  ],
+                }}
+                style={{ height: '100%', width: '100%' }}
+              />
             </div>
           </ChartCard>
 
@@ -925,17 +1133,28 @@ export function SeminaryFinancialDashboard({ entityName, year }: { entityName: s
             subtitle="Donut chart split between personnel and non-personnel expenses."
           >
             <div className="h-80">
-              <ResponsiveContainer width="100%" height="100%">
-                <PieChart>
-                  <Tooltip formatter={(value) => currencyFormatter(Number(value ?? 0))} />
-                  <Legend />
-                  <Pie data={peopleOperationalData} dataKey="value" nameKey="name" innerRadius={72} outerRadius={110}>
-                    {peopleOperationalData.map((entry) => (
-                      <Cell key={entry.name} fill={entry.fill} />
-                    ))}
-                  </Pie>
-                </PieChart>
-              </ResponsiveContainer>
+              <ReactECharts
+                option={{
+                  tooltip: {
+                    trigger: 'item',
+                    formatter: (params: any) => `${params.name}: ${currencyFormatter(params.value)}`,
+                  },
+                  legend: { bottom: 0 },
+                  series: [
+                    {
+                      type: 'pie',
+                      radius: ['40%', '65%'],
+                      data: peopleOperationalData.map((d) => ({
+                        name: d.name,
+                        value: d.value,
+                        itemStyle: { color: d.fill },
+                      })),
+                      label: { show: false },
+                    },
+                  ],
+                }}
+                style={{ height: '100%', width: '100%' }}
+              />
             </div>
           </ChartCard>
 
@@ -948,41 +1167,123 @@ export function SeminaryFinancialDashboard({ entityName, year }: { entityName: s
               </p>
             </div>
             <div className="h-72">
-              <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={maintenanceBurden.monthly} margin={chartMargin}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#E5E7EB" />
-                  <XAxis dataKey="month" label={{ value: 'Month', position: 'insideBottom', offset: -8 }} />
-                  <YAxis
-                    tickFormatter={(value) => `${Math.round(Number(value) / 1000)}k`}
-                    label={{ value: 'PHP', angle: -90, position: 'insideLeft' }}
-                  />
-                  <Tooltip formatter={(value) => currencyFormatter(Number(value ?? 0))} />
-                  <Legend />
-                  <Bar dataKey="maintenance" name="Maintenance Spend" fill={palette[3]} radius={[10, 10, 0, 0]} />
-                </BarChart>
-              </ResponsiveContainer>
+              <ReactECharts
+                option={{
+                  color: [palette[3]],
+                  tooltip: {
+                    trigger: 'axis',
+                    formatter: (params: any) => `${params[0].axisValue}: ${currencyFormatter(params[0].value)}`,
+                  },
+                  legend: { bottom: 0 },
+                  grid: { top: 16, right: 24, left: 56, bottom: 48 },
+                  xAxis: {
+                    type: 'category',
+                    data: maintenanceBurden.monthly.map((d) => d.month),
+                    name: 'Month',
+                    nameLocation: 'middle',
+                    nameGap: 28,
+                    axisLine: { show: false },
+                    axisTick: { show: false },
+                  },
+                  yAxis: {
+                    type: 'value',
+                    name: 'PHP',
+                    nameLocation: 'middle',
+                    nameGap: 44,
+                    axisLabel: { formatter: (v: number) => `${Math.round(v / 1000)}k` },
+                    splitLine: { lineStyle: { color: '#E5E7EB' } },
+                  },
+                  series: [
+                    {
+                      name: 'Maintenance Spend',
+                      type: 'bar',
+                      data: maintenanceBurden.monthly.map((d) => ({
+                        value: d.maintenance,
+                        itemStyle: { color: palette[3], borderRadius: [10, 10, 0, 0] },
+                      })),
+                    },
+                  ],
+                }}
+                style={{ height: '100%', width: '100%' }}
+              />
             </div>
           </ChartCard>
 
           <ChartCard title="Monthly Trend" subtitle="Multi-line comparison of key income and expense lines.">
             <div className="h-80">
-              <ResponsiveContainer width="100%" height="100%">
-                <LineChart data={monthlyTrendData} margin={chartMargin}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#E5E7EB" />
-                  <XAxis dataKey="month" label={{ value: 'Month', position: 'insideBottom', offset: -8 }} />
-                  <YAxis
-                    tickFormatter={(value) => `${Math.round(Number(value) / 1000)}k`}
-                    label={{ value: 'PHP', angle: -90, position: 'insideLeft' }}
-                  />
-                  <Tooltip formatter={(value) => currencyFormatter(Number(value ?? 0))} />
-                  <Legend />
-                  <Line type="monotone" dataKey="Donations" stroke={palette[0]} strokeWidth={3} />
-                  <Line type="monotone" dataKey="Seminary Fees" stroke={palette[1]} strokeWidth={3} />
-                  <Line type="monotone" dataKey="Subsidy" stroke={palette[2]} strokeWidth={3} />
-                  <Line type="monotone" dataKey="Utilities" stroke={palette[3]} strokeWidth={3} />
-                  <Line type="monotone" dataKey="Salaries" stroke={palette[4]} strokeWidth={3} />
-                </LineChart>
-              </ResponsiveContainer>
+              <ReactECharts
+                option={{
+                  color: [palette[0], palette[1], palette[2], palette[3], palette[4]],
+                  tooltip: {
+                    trigger: 'axis',
+                    formatter: (params: any) =>
+                      `${params[0].axisValue}<br/>` +
+                      params.map((p: any) => `${p.marker}${p.seriesName}: ${currencyFormatter(p.value)}`).join('<br/>'),
+                  },
+                  legend: { bottom: 0, type: 'scroll' },
+                  grid: { top: 16, right: 24, left: 56, bottom: 48 },
+                  xAxis: {
+                    type: 'category',
+                    data: monthlyTrendData.map((d) => d.month),
+                    name: 'Month',
+                    nameLocation: 'middle',
+                    nameGap: 28,
+                    axisLine: { show: false },
+                    axisTick: { show: false },
+                  },
+                  yAxis: {
+                    type: 'value',
+                    name: 'PHP',
+                    nameLocation: 'middle',
+                    nameGap: 44,
+                    axisLabel: { formatter: (v: number) => `${Math.round(v / 1000)}k` },
+                    splitLine: { lineStyle: { color: '#E5E7EB' } },
+                  },
+                  series: [
+                    {
+                      name: 'Donations',
+                      type: 'line',
+                      data: monthlyTrendData.map((d) => d.Donations),
+                      smooth: true,
+                      lineStyle: { width: 3 },
+                      showSymbol: false,
+                    },
+                    {
+                      name: 'Seminary Fees',
+                      type: 'line',
+                      data: monthlyTrendData.map((d) => d['Seminary Fees']),
+                      smooth: true,
+                      lineStyle: { width: 3 },
+                      showSymbol: false,
+                    },
+                    {
+                      name: 'Subsidy',
+                      type: 'line',
+                      data: monthlyTrendData.map((d) => d.Subsidy),
+                      smooth: true,
+                      lineStyle: { width: 3 },
+                      showSymbol: false,
+                    },
+                    {
+                      name: 'Utilities',
+                      type: 'line',
+                      data: monthlyTrendData.map((d) => d.Utilities),
+                      smooth: true,
+                      lineStyle: { width: 3 },
+                      showSymbol: false,
+                    },
+                    {
+                      name: 'Salaries',
+                      type: 'line',
+                      data: monthlyTrendData.map((d) => d.Salaries),
+                      smooth: true,
+                      lineStyle: { width: 3 },
+                      showSymbol: false,
+                    },
+                  ],
+                }}
+                style={{ height: '100%', width: '100%' }}
+              />
             </div>
           </ChartCard>
         </div>
@@ -995,33 +1296,61 @@ export function SeminaryFinancialDashboard({ entityName, year }: { entityName: s
             subtitle="Actual versus projected income using simple linear regression in JavaScript."
           >
             <div className="h-80">
-              <ResponsiveContainer width="100%" height="100%">
-                <LineChart data={revenueForecastData} margin={chartMargin}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#E5E7EB" />
-                  <XAxis
-                    dataKey="label"
-                    angle={-25}
-                    textAnchor="end"
-                    height={60}
-                    label={{ value: 'Period', position: 'insideBottom', offset: -6 }}
-                  />
-                  <YAxis
-                    tickFormatter={(value) => `${Math.round(Number(value) / 1000)}k`}
-                    label={{ value: 'Income (PHP)', angle: -90, position: 'insideLeft' }}
-                  />
-                  <Tooltip formatter={(value) => currencyFormatter(Number(value ?? 0))} />
-                  <Legend />
-                  <Line type="monotone" dataKey="Actual" stroke={palette[1]} strokeWidth={3} connectNulls={false} />
-                  <Line
-                    type="monotone"
-                    dataKey="Projected"
-                    stroke={palette[0]}
-                    strokeWidth={3}
-                    strokeDasharray="6 4"
-                    connectNulls={false}
-                  />
-                </LineChart>
-              </ResponsiveContainer>
+              <ReactECharts
+                option={{
+                  color: [palette[1], palette[0]],
+                  tooltip: {
+                    trigger: 'axis',
+                    formatter: (params: any) =>
+                      `${params[0].axisValue}<br/>` +
+                      params
+                        .filter((p: any) => p.value != null)
+                        .map((p: any) => `${p.marker}${p.seriesName}: ${currencyFormatter(p.value)}`)
+                        .join('<br/>'),
+                  },
+                  legend: { bottom: 0 },
+                  grid: { top: 16, right: 24, left: 64, bottom: 56 },
+                  xAxis: {
+                    type: 'category',
+                    data: revenueForecastData.map((d) => d.label),
+                    name: 'Period',
+                    nameLocation: 'middle',
+                    nameGap: 40,
+                    axisLabel: { rotate: -25 },
+                    axisLine: { show: false },
+                    axisTick: { show: false },
+                  },
+                  yAxis: {
+                    type: 'value',
+                    name: 'Income (PHP)',
+                    nameLocation: 'middle',
+                    nameGap: 52,
+                    axisLabel: { formatter: (v: number) => `${Math.round(v / 1000)}k` },
+                    splitLine: { lineStyle: { color: '#E5E7EB' } },
+                  },
+                  series: [
+                    {
+                      name: 'Actual',
+                      type: 'line',
+                      data: revenueForecastData.map((d) => d.Actual),
+                      smooth: true,
+                      lineStyle: { width: 3 },
+                      showSymbol: false,
+                      connectNulls: false,
+                    },
+                    {
+                      name: 'Projected',
+                      type: 'line',
+                      data: revenueForecastData.map((d) => d.Projected),
+                      smooth: true,
+                      lineStyle: { width: 3, type: 'dashed' },
+                      showSymbol: false,
+                      connectNulls: false,
+                    },
+                  ],
+                }}
+                style={{ height: '100%', width: '100%' }}
+              />
             </div>
           </ChartCard>
 
@@ -1030,29 +1359,71 @@ export function SeminaryFinancialDashboard({ entityName, year }: { entityName: s
             subtitle="Warning view for facilities and payroll lines once they move above threshold."
           >
             <div className="h-80">
-              <ResponsiveContainer width="100%" height="100%">
-                <LineChart data={expenseEscalationData} margin={chartMargin}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#E5E7EB" />
-                  <XAxis dataKey="month" label={{ value: 'Month', position: 'insideBottom', offset: -8 }} />
-                  <YAxis
-                    tickFormatter={(value) => `${Math.round(Number(value) / 1000)}k`}
-                    label={{ value: 'Expense (PHP)', angle: -90, position: 'insideLeft' }}
-                  />
-                  <Tooltip formatter={(value) => currencyFormatter(Number(value ?? 0))} />
-                  <Legend />
-                  <Line type="monotone" dataKey="Facilities" stroke={palette[0]} strokeWidth={3} />
-                  <Line type="monotone" dataKey="Payroll" stroke={palette[1]} strokeWidth={3} />
-                  <Line type="monotone" dataKey="Logistics" stroke={palette[3]} strokeWidth={3} />
-                  <Line
-                    type="monotone"
-                    dataKey="Threshold"
-                    stroke={seminaryTheme.danger}
-                    strokeDasharray="5 5"
-                    strokeWidth={2}
-                    dot={false}
-                  />
-                </LineChart>
-              </ResponsiveContainer>
+              <ReactECharts
+                option={{
+                  color: [palette[0], palette[1], palette[3], seminaryTheme.danger],
+                  tooltip: {
+                    trigger: 'axis',
+                    formatter: (params: any) =>
+                      `${params[0].axisValue}<br/>` +
+                      params.map((p: any) => `${p.marker}${p.seriesName}: ${currencyFormatter(p.value)}`).join('<br/>'),
+                  },
+                  legend: { bottom: 0 },
+                  grid: { top: 16, right: 24, left: 64, bottom: 48 },
+                  xAxis: {
+                    type: 'category',
+                    data: expenseEscalationData.map((d) => d.month),
+                    name: 'Month',
+                    nameLocation: 'middle',
+                    nameGap: 28,
+                    axisLine: { show: false },
+                    axisTick: { show: false },
+                  },
+                  yAxis: {
+                    type: 'value',
+                    name: 'Expense (PHP)',
+                    nameLocation: 'middle',
+                    nameGap: 52,
+                    axisLabel: { formatter: (v: number) => `${Math.round(v / 1000)}k` },
+                    splitLine: { lineStyle: { color: '#E5E7EB' } },
+                  },
+                  series: [
+                    {
+                      name: 'Facilities',
+                      type: 'line',
+                      data: expenseEscalationData.map((d) => d.Facilities),
+                      smooth: true,
+                      lineStyle: { width: 3 },
+                      showSymbol: false,
+                    },
+                    {
+                      name: 'Payroll',
+                      type: 'line',
+                      data: expenseEscalationData.map((d) => d.Payroll),
+                      smooth: true,
+                      lineStyle: { width: 3 },
+                      showSymbol: false,
+                    },
+                    {
+                      name: 'Logistics',
+                      type: 'line',
+                      data: expenseEscalationData.map((d) => d.Logistics),
+                      smooth: true,
+                      lineStyle: { width: 3 },
+                      showSymbol: false,
+                    },
+                    {
+                      name: 'Threshold',
+                      type: 'line',
+                      data: expenseEscalationData.map((d) => d.Threshold),
+                      lineStyle: { width: 2, type: 'dashed', color: seminaryTheme.danger },
+                      itemStyle: { color: seminaryTheme.danger },
+                      showSymbol: false,
+                    },
+                  ],
+                }}
+                style={{ height: '100%', width: '100%' }}
+              />
             </div>
           </ChartCard>
 
@@ -1061,48 +1432,89 @@ export function SeminaryFinancialDashboard({ entityName, year }: { entityName: s
             subtitle="Projected surplus or deficit area view built from historical net results."
           >
             <div className="h-80">
-              <ResponsiveContainer width="100%" height="100%">
-                <AreaChart data={cashFlowProjectionData} margin={chartMargin}>
-                  <defs>
-                    <linearGradient id="actualNetFill" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%" stopColor={seminaryTheme.success} stopOpacity={0.35} />
-                      <stop offset="95%" stopColor={seminaryTheme.success} stopOpacity={0.02} />
-                    </linearGradient>
-                    <linearGradient id="projectedNetFill" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%" stopColor={palette[0]} stopOpacity={0.3} />
-                      <stop offset="95%" stopColor={palette[0]} stopOpacity={0.03} />
-                    </linearGradient>
-                  </defs>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#E5E7EB" />
-                  <XAxis
-                    dataKey="label"
-                    angle={-25}
-                    textAnchor="end"
-                    height={60}
-                    label={{ value: 'Period', position: 'insideBottom', offset: -6 }}
-                  />
-                  <YAxis
-                    tickFormatter={(value) => `${Math.round(Number(value) / 1000)}k`}
-                    label={{ value: 'Net (PHP)', angle: -90, position: 'insideLeft' }}
-                  />
-                  <Tooltip formatter={(value) => currencyFormatter(Number(value ?? 0))} />
-                  <Legend />
-                  <Area
-                    type="monotone"
-                    dataKey="Actual Net"
-                    stroke={seminaryTheme.success}
-                    fill="url(#actualNetFill)"
-                    strokeWidth={3}
-                  />
-                  <Area
-                    type="monotone"
-                    dataKey="Projected Net"
-                    stroke={palette[0]}
-                    fill="url(#projectedNetFill)"
-                    strokeWidth={3}
-                  />
-                </AreaChart>
-              </ResponsiveContainer>
+              <ReactECharts
+                option={{
+                  color: [seminaryTheme.success, palette[0]],
+                  tooltip: {
+                    trigger: 'axis',
+                    formatter: (params: any) =>
+                      `${params[0].axisValue}<br/>` +
+                      params
+                        .filter((p: any) => p.value != null)
+                        .map((p: any) => `${p.marker}${p.seriesName}: ${currencyFormatter(p.value)}`)
+                        .join('<br/>'),
+                  },
+                  legend: { bottom: 0 },
+                  grid: { top: 16, right: 24, left: 56, bottom: 56 },
+                  xAxis: {
+                    type: 'category',
+                    data: cashFlowProjectionData.map((d) => d.label),
+                    name: 'Period',
+                    nameLocation: 'middle',
+                    nameGap: 40,
+                    axisLabel: { rotate: -25 },
+                    axisLine: { show: false },
+                    axisTick: { show: false },
+                  },
+                  yAxis: {
+                    type: 'value',
+                    name: 'Net (PHP)',
+                    nameLocation: 'middle',
+                    nameGap: 44,
+                    axisLabel: { formatter: (v: number) => `${Math.round(v / 1000)}k` },
+                    splitLine: { lineStyle: { color: '#E5E7EB' } },
+                  },
+                  series: [
+                    {
+                      name: 'Actual Net',
+                      type: 'line',
+                      data: cashFlowProjectionData.map((d) => d['Actual Net']),
+                      smooth: true,
+                      lineStyle: { width: 3, color: seminaryTheme.success },
+                      itemStyle: { color: seminaryTheme.success },
+                      showSymbol: false,
+                      connectNulls: false,
+                      areaStyle: {
+                        color: {
+                          type: 'linear',
+                          x: 0,
+                          y: 0,
+                          x2: 0,
+                          y2: 1,
+                          colorStops: [
+                            { offset: 0.05, color: seminaryTheme.success + '59' },
+                            { offset: 0.95, color: seminaryTheme.success + '05' },
+                          ],
+                        },
+                      },
+                    },
+                    {
+                      name: 'Projected Net',
+                      type: 'line',
+                      data: cashFlowProjectionData.map((d) => d['Projected Net']),
+                      smooth: true,
+                      lineStyle: { width: 3, color: palette[0] },
+                      itemStyle: { color: palette[0] },
+                      showSymbol: false,
+                      connectNulls: false,
+                      areaStyle: {
+                        color: {
+                          type: 'linear',
+                          x: 0,
+                          y: 0,
+                          x2: 0,
+                          y2: 1,
+                          colorStops: [
+                            { offset: 0.05, color: palette[0] + '4D' },
+                            { offset: 0.95, color: palette[0] + '08' },
+                          ],
+                        },
+                      },
+                    },
+                  ],
+                }}
+                style={{ height: '100%', width: '100%' }}
+              />
             </div>
           </ChartCard>
 
@@ -1111,36 +1523,59 @@ export function SeminaryFinancialDashboard({ entityName, year }: { entityName: s
             subtitle="Mean monthly donor-related income with error bars for standard deviation."
           >
             <div className="h-80">
-              <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={donationVolatilityData} margin={chartMargin}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#E5E7EB" />
-                  <XAxis
-                    dataKey="source"
-                    angle={-18}
-                    textAnchor="end"
-                    height={70}
-                    label={{ value: 'Income Source', position: 'insideBottom', offset: -4 }}
-                  />
-                  <YAxis
-                    tickFormatter={(value) => `${Math.round(Number(value) / 1000)}k`}
-                    label={{ value: 'Mean Monthly PHP', angle: -90, position: 'insideLeft' }}
-                  />
-                  <Tooltip
-                    formatter={(value, name) =>
-                      name === 'stdDev'
-                        ? `${currencyFormatter(Number(value ?? 0))} std dev`
-                        : currencyFormatter(Number(value ?? 0))
-                    }
-                  />
-                  <Legend />
-                  <Bar dataKey="mean" name="Mean">
-                    {donationVolatilityData.map((entry) => (
-                      <Cell key={entry.source} fill={entry.fill} />
-                    ))}
-                    <ErrorBar dataKey="stdDev" width={4} stroke={seminaryTheme.ink} direction="y" />
-                  </Bar>
-                </BarChart>
-              </ResponsiveContainer>
+              <ReactECharts
+                option={{
+                  tooltip: {
+                    trigger: 'axis',
+                    formatter: (params: any) => {
+                      const d = donationVolatilityData[params[0].dataIndex];
+                      return `${params[0].axisValue}<br/>${params[0].marker}Mean: ${currencyFormatter(params[0].value)}<br/>Std Dev: ${currencyFormatter(d.stdDev)}`;
+                    },
+                  },
+                  legend: { bottom: 0 },
+                  grid: { top: 16, right: 24, left: 64, bottom: 60 },
+                  xAxis: {
+                    type: 'category',
+                    data: donationVolatilityData.map((d) => d.source),
+                    name: 'Income Source',
+                    nameLocation: 'middle',
+                    nameGap: 42,
+                    axisLabel: { rotate: -18, interval: 0 },
+                    axisLine: { show: false },
+                    axisTick: { show: false },
+                  },
+                  yAxis: {
+                    type: 'value',
+                    name: 'Mean Monthly PHP',
+                    nameLocation: 'middle',
+                    nameGap: 52,
+                    axisLabel: { formatter: (v: number) => `${Math.round(v / 1000)}k` },
+                    splitLine: { lineStyle: { color: '#E5E7EB' } },
+                  },
+                  series: [
+                    {
+                      name: 'Mean',
+                      type: 'bar',
+                      data: donationVolatilityData.map((d) => ({
+                        value: d.mean,
+                        itemStyle: { color: d.fill, borderRadius: [10, 10, 0, 0] },
+                      })),
+                      markLine: {
+                        silent: true,
+                        symbol: ['none', 'none'],
+                        lineStyle: { color: '#000000', width: 2 },
+                        data: donationVolatilityData
+                          .map((d, i) => [
+                            { xAxis: i, yAxis: d.mean + d.stdDev, label: { show: false } },
+                            { xAxis: i, yAxis: Math.max(0, d.mean - d.stdDev), label: { show: false } },
+                          ])
+                          .flat(),
+                      },
+                    },
+                  ],
+                }}
+                style={{ height: '100%', width: '100%' }}
+              />
             </div>
           </ChartCard>
 
@@ -1149,32 +1584,47 @@ export function SeminaryFinancialDashboard({ entityName, year }: { entityName: s
             subtitle="Fee income impact under baseline and enrollment growth scenarios."
           >
             <div className="h-80">
-              <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={enrollmentDigitalTwinData} margin={chartMargin}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#E5E7EB" />
-                  <XAxis
-                    dataKey="scenario"
-                    label={{ value: 'Enrollment Scenario', position: 'insideBottom', offset: -8 }}
-                  />
-                  <YAxis
-                    tickFormatter={(value) => `${Math.round(Number(value) / 1000)}k`}
-                    label={{ value: 'Projected Fee Income (PHP)', angle: -90, position: 'insideLeft' }}
-                  />
-                  <Tooltip
-                    formatter={(value, name) =>
-                      name === 'enrollment'
-                        ? numberFormatter(Number(value ?? 0))
-                        : currencyFormatter(Number(value ?? 0))
-                    }
-                  />
-                  <Legend />
-                  <Bar dataKey="income" name="Projected Income" radius={[10, 10, 0, 0]}>
-                    {enrollmentDigitalTwinData.map((entry) => (
-                      <Cell key={entry.scenario} fill={entry.fill} />
-                    ))}
-                  </Bar>
-                </BarChart>
-              </ResponsiveContainer>
+              <ReactECharts
+                option={{
+                  tooltip: {
+                    trigger: 'axis',
+                    formatter: (params: any) => {
+                      const d = enrollmentDigitalTwinData[params[0].dataIndex];
+                      return `${params[0].axisValue}<br/>${params[0].marker}Projected Income: ${currencyFormatter(params[0].value)}<br/>Enrollment: ${numberFormatter(d.enrollment)}`;
+                    },
+                  },
+                  legend: { bottom: 0 },
+                  grid: { top: 16, right: 24, left: 72, bottom: 48 },
+                  xAxis: {
+                    type: 'category',
+                    data: enrollmentDigitalTwinData.map((d) => d.scenario),
+                    name: 'Enrollment Scenario',
+                    nameLocation: 'middle',
+                    nameGap: 28,
+                    axisLine: { show: false },
+                    axisTick: { show: false },
+                  },
+                  yAxis: {
+                    type: 'value',
+                    name: 'Projected Fee Income (PHP)',
+                    nameLocation: 'middle',
+                    nameGap: 60,
+                    axisLabel: { formatter: (v: number) => `${Math.round(v / 1000)}k` },
+                    splitLine: { lineStyle: { color: '#E5E7EB' } },
+                  },
+                  series: [
+                    {
+                      name: 'Projected Income',
+                      type: 'bar',
+                      data: enrollmentDigitalTwinData.map((d) => ({
+                        value: d.income,
+                        itemStyle: { color: d.fill, borderRadius: [10, 10, 0, 0] },
+                      })),
+                    },
+                  ],
+                }}
+                style={{ height: '100%', width: '100%' }}
+              />
             </div>
           </ChartCard>
 
@@ -1183,26 +1633,55 @@ export function SeminaryFinancialDashboard({ entityName, year }: { entityName: s
             subtitle="Monthly facilities spend with a rolling three-month average overlay."
           >
             <div className="h-80">
-              <ResponsiveContainer width="100%" height="100%">
-                <LineChart data={infrastructureTrendData} margin={chartMargin}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#E5E7EB" />
-                  <XAxis dataKey="month" label={{ value: 'Month', position: 'insideBottom', offset: -8 }} />
-                  <YAxis
-                    tickFormatter={(value) => `${Math.round(Number(value) / 1000)}k`}
-                    label={{ value: 'Infrastructure PHP', angle: -90, position: 'insideLeft' }}
-                  />
-                  <Tooltip formatter={(value) => currencyFormatter(Number(value ?? 0))} />
-                  <Legend />
-                  <Line type="monotone" dataKey="Spend" stroke={palette[1]} strokeWidth={3} />
-                  <Line
-                    type="monotone"
-                    dataKey="Rolling Avg"
-                    stroke={palette[0]}
-                    strokeWidth={3}
-                    strokeDasharray="6 4"
-                  />
-                </LineChart>
-              </ResponsiveContainer>
+              <ReactECharts
+                option={{
+                  color: [palette[1], palette[0]],
+                  tooltip: {
+                    trigger: 'axis',
+                    formatter: (params: any) =>
+                      `${params[0].axisValue}<br/>` +
+                      params.map((p: any) => `${p.marker}${p.seriesName}: ${currencyFormatter(p.value)}`).join('<br/>'),
+                  },
+                  legend: { bottom: 0 },
+                  grid: { top: 16, right: 24, left: 64, bottom: 48 },
+                  xAxis: {
+                    type: 'category',
+                    data: infrastructureTrendData.map((d) => d.month),
+                    name: 'Month',
+                    nameLocation: 'middle',
+                    nameGap: 28,
+                    axisLine: { show: false },
+                    axisTick: { show: false },
+                  },
+                  yAxis: {
+                    type: 'value',
+                    name: 'Infrastructure PHP',
+                    nameLocation: 'middle',
+                    nameGap: 52,
+                    axisLabel: { formatter: (v: number) => `${Math.round(v / 1000)}k` },
+                    splitLine: { lineStyle: { color: '#E5E7EB' } },
+                  },
+                  series: [
+                    {
+                      name: 'Spend',
+                      type: 'line',
+                      data: infrastructureTrendData.map((d) => d.Spend),
+                      smooth: true,
+                      lineStyle: { width: 3 },
+                      showSymbol: false,
+                    },
+                    {
+                      name: 'Rolling Avg',
+                      type: 'line',
+                      data: infrastructureTrendData.map((d) => d['Rolling Avg']),
+                      smooth: true,
+                      lineStyle: { width: 3, type: 'dashed' },
+                      showSymbol: false,
+                    },
+                  ],
+                }}
+                style={{ height: '100%', width: '100%' }}
+              />
             </div>
           </ChartCard>
 
@@ -1211,23 +1690,55 @@ export function SeminaryFinancialDashboard({ entityName, year }: { entityName: s
             subtitle="Impact on annual income and surplus if RCBSP subsidy is reduced."
           >
             <div className="h-80">
-              <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={subsidyRiskDigitalTwinData} margin={chartMargin}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#E5E7EB" />
-                  <XAxis
-                    dataKey="scenario"
-                    label={{ value: 'RCBSP Cut Scenario', position: 'insideBottom', offset: -8 }}
-                  />
-                  <YAxis
-                    tickFormatter={(value) => `${Math.round(Number(value) / 1000000)}M`}
-                    label={{ value: 'Annual PHP', angle: -90, position: 'insideLeft' }}
-                  />
-                  <Tooltip formatter={(value) => currencyFormatter(Number(value ?? 0))} />
-                  <Legend />
-                  <Bar dataKey="Income" fill={palette[0]} radius={[10, 10, 0, 0]} />
-                  <Bar dataKey="Surplus" fill={palette[1]} radius={[10, 10, 0, 0]} />
-                </BarChart>
-              </ResponsiveContainer>
+              <ReactECharts
+                option={{
+                  color: [palette[0], palette[1]],
+                  tooltip: {
+                    trigger: 'axis',
+                    formatter: (params: any) =>
+                      `${params[0].axisValue}<br/>` +
+                      params.map((p: any) => `${p.marker}${p.seriesName}: ${currencyFormatter(p.value)}`).join('<br/>'),
+                  },
+                  legend: { bottom: 0 },
+                  grid: { top: 16, right: 24, left: 56, bottom: 48 },
+                  xAxis: {
+                    type: 'category',
+                    data: subsidyRiskDigitalTwinData.map((d) => d.scenario),
+                    name: 'RCBSP Cut Scenario',
+                    nameLocation: 'middle',
+                    nameGap: 28,
+                    axisLine: { show: false },
+                    axisTick: { show: false },
+                  },
+                  yAxis: {
+                    type: 'value',
+                    name: 'Annual PHP',
+                    nameLocation: 'middle',
+                    nameGap: 44,
+                    axisLabel: { formatter: (v: number) => `${Math.round(v / 1000000)}M` },
+                    splitLine: { lineStyle: { color: '#E5E7EB' } },
+                  },
+                  series: [
+                    {
+                      name: 'Income',
+                      type: 'bar',
+                      data: subsidyRiskDigitalTwinData.map((d) => ({
+                        value: d.Income,
+                        itemStyle: { color: palette[0], borderRadius: [10, 10, 0, 0] },
+                      })),
+                    },
+                    {
+                      name: 'Surplus',
+                      type: 'bar',
+                      data: subsidyRiskDigitalTwinData.map((d) => ({
+                        value: d.Surplus,
+                        itemStyle: { color: palette[1], borderRadius: [10, 10, 0, 0] },
+                      })),
+                    },
+                  ],
+                }}
+                style={{ height: '100%', width: '100%' }}
+              />
             </div>
           </ChartCard>
         </div>
@@ -1280,23 +1791,61 @@ export function SeminaryFinancialDashboard({ entityName, year }: { entityName: s
             subtitle="Current versus target diversification share by income source."
           >
             <div className="h-80">
-              <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={seminaryDiversificationTargets} margin={chartMargin}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#E5E7EB" />
-                  <XAxis
-                    dataKey="source"
-                    angle={-20}
-                    textAnchor="end"
-                    height={70}
-                    label={{ value: 'Income Source', position: 'insideBottom', offset: -4 }}
-                  />
-                  <YAxis label={{ value: 'Share of Total Income (%)', angle: -90, position: 'insideLeft' }} />
-                  <Tooltip formatter={(value) => `${Number(value ?? 0)}%`} />
-                  <Legend />
-                  <Bar dataKey="current" name="Current Share" fill={palette[1]} radius={[10, 10, 0, 0]} />
-                  <Bar dataKey="target" name="Target Share" fill={palette[0]} radius={[10, 10, 0, 0]} />
-                </BarChart>
-              </ResponsiveContainer>
+              <ReactECharts
+                option={{
+                  color: [palette[1], palette[0]],
+                  tooltip: {
+                    trigger: 'axis',
+                    formatter: (params: any) =>
+                      `${params[0].axisValue}<br/>` +
+                      params.map((p: any) => `${p.marker}${p.seriesName}: ${p.value}%`).join('<br/>'),
+                  },
+                  legend: { bottom: 0 },
+                  grid: { top: 16, right: 24, left: 64, bottom: 60 },
+                  xAxis: {
+                    type: 'category',
+                    data: (seminaryDiversificationTargets as { source: string; current: number; target: number }[]).map(
+                      (d) => d.source,
+                    ),
+                    name: 'Income Source',
+                    nameLocation: 'middle',
+                    nameGap: 42,
+                    axisLabel: { rotate: -20, interval: 0 },
+                    axisLine: { show: false },
+                    axisTick: { show: false },
+                  },
+                  yAxis: {
+                    type: 'value',
+                    name: 'Share of Total Income (%)',
+                    nameLocation: 'middle',
+                    nameGap: 52,
+                    splitLine: { lineStyle: { color: '#E5E7EB' } },
+                  },
+                  series: [
+                    {
+                      name: 'Current Share',
+                      type: 'bar',
+                      data: (
+                        seminaryDiversificationTargets as { source: string; current: number; target: number }[]
+                      ).map((d) => ({
+                        value: d.current,
+                        itemStyle: { color: palette[1], borderRadius: [10, 10, 0, 0] },
+                      })),
+                    },
+                    {
+                      name: 'Target Share',
+                      type: 'bar',
+                      data: (
+                        seminaryDiversificationTargets as { source: string; current: number; target: number }[]
+                      ).map((d) => ({
+                        value: d.target,
+                        itemStyle: { color: palette[0], borderRadius: [10, 10, 0, 0] },
+                      })),
+                    },
+                  ],
+                }}
+                style={{ height: '100%', width: '100%' }}
+              />
             </div>
           </ChartCard>
 
@@ -1361,28 +1910,45 @@ export function SeminaryFinancialDashboard({ entityName, year }: { entityName: s
             subtitle="Minimum income needed as salary and benefits rise over time."
           >
             <div className="h-80">
-              <ResponsiveContainer width="100%" height="100%">
-                <LineChart data={salaryThresholdData} margin={chartMargin}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#E5E7EB" />
-                  <XAxis
-                    dataKey="increase"
-                    label={{ value: 'Salary Increase Level', position: 'insideBottom', offset: -8 }}
-                  />
-                  <YAxis
-                    tickFormatter={(value) => `${Math.round(Number(value) / 1000000)}M`}
-                    label={{ value: 'Minimum Annual Income (PHP)', angle: -90, position: 'insideLeft' }}
-                  />
-                  <Tooltip formatter={(value) => currencyFormatter(Number(value ?? 0))} />
-                  <Legend />
-                  <Line
-                    type="monotone"
-                    dataKey="Minimum Income Needed"
-                    stroke={palette[0]}
-                    strokeWidth={3}
-                    dot={{ r: 4 }}
-                  />
-                </LineChart>
-              </ResponsiveContainer>
+              <ReactECharts
+                option={{
+                  color: [palette[0]],
+                  tooltip: {
+                    trigger: 'axis',
+                    formatter: (params: any) => `${params[0].axisValue}: ${currencyFormatter(params[0].value)}`,
+                  },
+                  legend: { bottom: 0 },
+                  grid: { top: 16, right: 24, left: 64, bottom: 48 },
+                  xAxis: {
+                    type: 'category',
+                    data: salaryThresholdData.map((d) => d.increase),
+                    name: 'Salary Increase Level',
+                    nameLocation: 'middle',
+                    nameGap: 28,
+                    axisLine: { show: false },
+                    axisTick: { show: false },
+                  },
+                  yAxis: {
+                    type: 'value',
+                    name: 'Minimum Annual Income (PHP)',
+                    nameLocation: 'middle',
+                    nameGap: 52,
+                    axisLabel: { formatter: (v: number) => `${Math.round(v / 1000000)}M` },
+                    splitLine: { lineStyle: { color: '#E5E7EB' } },
+                  },
+                  series: [
+                    {
+                      name: 'Minimum Income Needed',
+                      type: 'line',
+                      data: salaryThresholdData.map((d) => d['Minimum Income Needed']),
+                      smooth: true,
+                      lineStyle: { width: 3 },
+                      symbolSize: 8,
+                    },
+                  ],
+                }}
+                style={{ height: '100%', width: '100%' }}
+              />
             </div>
           </ChartCard>
 
@@ -1391,43 +1957,80 @@ export function SeminaryFinancialDashboard({ entityName, year }: { entityName: s
             subtitle="Horizontal Gantt-style timeline for next-year capital projects."
           >
             <div className="h-80">
-              <ResponsiveContainer width="100%" height="100%">
-                <BarChart
-                  data={seminaryCapexTimeline}
-                  layout="vertical"
-                  margin={{ top: 16, right: 24, left: 48, bottom: 16 }}
-                >
-                  <CartesianGrid strokeDasharray="3 3" stroke="#E5E7EB" />
-                  <XAxis
-                    type="number"
-                    domain={[0, 12]}
-                    tickFormatter={(value) => `M${Number(value) + 1}`}
-                    label={{ value: 'Project Timeline (Months)', position: 'insideBottom', offset: -8 }}
-                  />
-                  <YAxis
-                    type="category"
-                    dataKey="initiative"
-                    width={160}
-                    label={{ value: 'Capital Projects', angle: -90, position: 'insideLeft' }}
-                  />
-                  <Tooltip
-                    formatter={(value, name, item: { payload?: { budget: number } }) =>
-                      name === 'duration'
-                        ? `${Number(value ?? 0)} months`
-                        : currencyFormatter(item.payload?.budget ?? 0)
-                    }
-                  />
-                  <Legend />
-                  <Bar dataKey="start" stackId="timeline" fill="transparent" legendType="none" />
-                  <Bar
-                    dataKey="duration"
-                    stackId="timeline"
-                    name="Planned Duration"
-                    fill={palette[0]}
-                    radius={[10, 10, 10, 10]}
-                  />
-                </BarChart>
-              </ResponsiveContainer>
+              <ReactECharts
+                option={{
+                  tooltip: {
+                    trigger: 'axis',
+                    formatter: (params: any) => {
+                      const durationParam = params.find((p: any) => p.seriesName === 'Planned Duration');
+                      const d = (
+                        seminaryCapexTimeline as {
+                          initiative: string;
+                          start: number;
+                          duration: number;
+                          budget: number;
+                        }[]
+                      )[params[0].dataIndex];
+                      return `${params[0].axisValue}<br/>Duration: ${durationParam?.value ?? 0} months<br/>Budget: ${currencyFormatter(d?.budget ?? 0)}`;
+                    },
+                  },
+                  legend: { bottom: 0 },
+                  grid: { top: 16, right: 24, left: 168, bottom: 48 },
+                  xAxis: {
+                    type: 'value',
+                    min: 0,
+                    max: 12,
+                    name: 'Project Timeline (Months)',
+                    nameLocation: 'middle',
+                    nameGap: 28,
+                    axisLabel: { formatter: (v: number) => `M${v + 1}` },
+                    splitLine: { lineStyle: { color: '#E5E7EB' } },
+                  },
+                  yAxis: {
+                    type: 'category',
+                    data: (
+                      seminaryCapexTimeline as { initiative: string; start: number; duration: number; budget: number }[]
+                    ).map((d) => d.initiative),
+                    axisLine: { show: false },
+                    axisTick: { show: false },
+                  },
+                  series: [
+                    {
+                      name: 'Start Offset',
+                      type: 'bar',
+                      stack: 'timeline',
+                      itemStyle: { color: 'transparent' },
+                      data: (
+                        seminaryCapexTimeline as {
+                          initiative: string;
+                          start: number;
+                          duration: number;
+                          budget: number;
+                        }[]
+                      ).map((d) => d.start),
+                      legendType: 'none',
+                      silent: true,
+                    },
+                    {
+                      name: 'Planned Duration',
+                      type: 'bar',
+                      stack: 'timeline',
+                      data: (
+                        seminaryCapexTimeline as {
+                          initiative: string;
+                          start: number;
+                          duration: number;
+                          budget: number;
+                        }[]
+                      ).map((d) => ({
+                        value: d.duration,
+                        itemStyle: { color: palette[0], borderRadius: [0, 10, 10, 0] },
+                      })),
+                    },
+                  ],
+                }}
+                style={{ height: '100%', width: '100%' }}
+              />
             </div>
           </ChartCard>
 
@@ -1436,37 +2039,94 @@ export function SeminaryFinancialDashboard({ entityName, year }: { entityName: s
             subtitle="Three-year plan showing subsidy decline and own-source growth."
           >
             <div className="h-80">
-              <ResponsiveContainer width="100%" height="100%">
-                <AreaChart data={selfSufficiencyRoadmapData} margin={chartMargin}>
-                  <defs>
-                    <linearGradient id="roadmapSubsidy" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%" stopColor={palette[1]} stopOpacity={0.3} />
-                      <stop offset="95%" stopColor={palette[1]} stopOpacity={0.04} />
-                    </linearGradient>
-                    <linearGradient id="roadmapOwn" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%" stopColor={palette[0]} stopOpacity={0.32} />
-                      <stop offset="95%" stopColor={palette[0]} stopOpacity={0.05} />
-                    </linearGradient>
-                  </defs>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#E5E7EB" />
-                  <XAxis dataKey="year" label={{ value: 'Year', position: 'insideBottom', offset: -8 }} />
-                  <YAxis
-                    tickFormatter={(value) => `${Math.round(Number(value) / 1000000)}M`}
-                    label={{ value: 'PHP', angle: -90, position: 'insideLeft' }}
-                  />
-                  <Tooltip formatter={(value) => currencyFormatter(Number(value ?? 0))} />
-                  <Legend />
-                  <Area type="monotone" dataKey="Subsidy" stackId="1" stroke={palette[1]} fill="url(#roadmapSubsidy)" />
-                  <Area
-                    type="monotone"
-                    dataKey="Own-Source Income"
-                    stackId="1"
-                    stroke={palette[0]}
-                    fill="url(#roadmapOwn)"
-                  />
-                  <Line type="monotone" dataKey="Target Surplus" stroke={seminaryTheme.success} strokeWidth={3} />
-                </AreaChart>
-              </ResponsiveContainer>
+              <ReactECharts
+                option={{
+                  color: [palette[1], palette[0], seminaryTheme.success],
+                  tooltip: {
+                    trigger: 'axis',
+                    formatter: (params: any) =>
+                      `${params[0].axisValue}<br/>` +
+                      params.map((p: any) => `${p.marker}${p.seriesName}: ${currencyFormatter(p.value)}`).join('<br/>'),
+                  },
+                  legend: { bottom: 0 },
+                  grid: { top: 16, right: 24, left: 56, bottom: 48 },
+                  xAxis: {
+                    type: 'category',
+                    data: selfSufficiencyRoadmapData.map((d) => d.year),
+                    name: 'Year',
+                    nameLocation: 'middle',
+                    nameGap: 28,
+                    axisLine: { show: false },
+                    axisTick: { show: false },
+                  },
+                  yAxis: {
+                    type: 'value',
+                    name: 'PHP',
+                    nameLocation: 'middle',
+                    nameGap: 44,
+                    axisLabel: { formatter: (v: number) => `${Math.round(v / 1000000)}M` },
+                    splitLine: { lineStyle: { color: '#E5E7EB' } },
+                  },
+                  series: [
+                    {
+                      name: 'Subsidy',
+                      type: 'line',
+                      stack: 'roadmap',
+                      data: selfSufficiencyRoadmapData.map((d) => d.Subsidy),
+                      smooth: true,
+                      lineStyle: { color: palette[1], width: 2 },
+                      itemStyle: { color: palette[1] },
+                      showSymbol: false,
+                      areaStyle: {
+                        color: {
+                          type: 'linear',
+                          x: 0,
+                          y: 0,
+                          x2: 0,
+                          y2: 1,
+                          colorStops: [
+                            { offset: 0.05, color: palette[1] + '4D' },
+                            { offset: 0.95, color: palette[1] + '0A' },
+                          ],
+                        },
+                      },
+                    },
+                    {
+                      name: 'Own-Source Income',
+                      type: 'line',
+                      stack: 'roadmap',
+                      data: selfSufficiencyRoadmapData.map((d) => d['Own-Source Income']),
+                      smooth: true,
+                      lineStyle: { color: palette[0], width: 2 },
+                      itemStyle: { color: palette[0] },
+                      showSymbol: false,
+                      areaStyle: {
+                        color: {
+                          type: 'linear',
+                          x: 0,
+                          y: 0,
+                          x2: 0,
+                          y2: 1,
+                          colorStops: [
+                            { offset: 0.05, color: palette[0] + '52' },
+                            { offset: 0.95, color: palette[0] + '0D' },
+                          ],
+                        },
+                      },
+                    },
+                    {
+                      name: 'Target Surplus',
+                      type: 'line',
+                      data: selfSufficiencyRoadmapData.map((d) => d['Target Surplus']),
+                      smooth: true,
+                      lineStyle: { color: seminaryTheme.success, width: 3 },
+                      itemStyle: { color: seminaryTheme.success },
+                      showSymbol: false,
+                    },
+                  ],
+                }}
+                style={{ height: '100%', width: '100%' }}
+              />
             </div>
           </ChartCard>
         </div>

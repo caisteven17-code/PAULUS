@@ -10,6 +10,8 @@
     "dev:financial": "npm run build && dotenv -e ../../.env -- node dist/apps/financial-service/main.js",
     "dev:project": "npm run build && dotenv -e ../../.env -- node dist/apps/project-service/main.js",
     "dev:analytics": "npm run build && dotenv -e ../../.env -- node dist/apps/analytics-service/main.js",
+    "dev:announcement": "npm run build && dotenv -e ../../.env -- node dist/apps/announcement-service/main.js",
+    "dev:audit-log": "npm run build && dotenv -e ../../.env -- node dist/apps/audit-log-service/main.js",
     "dev:all": "npm run build && dotenv -e ../../.env -- concurrently -n gateway,auth,entity,financial,project,analytics -c cyan,green,yellow,blue,magenta,gray \"node dist/apps/api-gateway/main.js\" \"node dist/apps/auth-service/main.js\" \"node dist/apps/entity-service/main.js\" \"node dist/apps/financial-service/main.js\" \"node dist/apps/project-service/main.js\" \"node dist/apps/analytics-service/main.js\"",
     "build": "tsc -p tsconfig.json",
     "typecheck": "tsc --noEmit -p tsconfig.json",
@@ -22,6 +24,8 @@
     "start:financial": "dotenv -e ../../.env -- node dist/apps/financial-service/main.js",
     "start:project": "dotenv -e ../../.env -- node dist/apps/project-service/main.js",
     "start:analytics": "dotenv -e ../../.env -- node dist/apps/analytics-service/main.js",
+    "start:announcement": "dotenv -e ../../.env -- node dist/apps/announcement-service/main.js",
+    "start:audit-log": "dotenv -e ../../.env -- node dist/apps/audit-log-service/main.js",
     "start:all": "dotenv -e ../../.env -- concurrently -n gateway,auth,entity,financial,project,analytics -c cyan,green,yellow,blue,magenta,gray \"node dist/apps/api-gateway/main.js\" \"node dist/apps/auth-service/main.js\" \"node dist/apps/entity-service/main.js\" \"node dist/apps/financial-service/main.js\" \"node dist/apps/project-service/main.js\" \"node dist/apps/analytics-service/main.js\""
   },
   "dependencies": {

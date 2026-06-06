@@ -37,7 +37,9 @@ export const seminaryExpenseColumns = [
 const monthKeys = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 
 const tuitionFees = [332000, 318000, 321000, 312000, 309000, 368000, 358000, 351000, 341000, 336000, 329000, 333000];
-const boardAndLodgingFees = [224000, 223000, 224000, 223000, 224000, 226000, 227000, 228000, 229000, 230000, 231000, 232000];
+const boardAndLodgingFees = [
+  224000, 223000, 224000, 223000, 224000, 226000, 227000, 228000, 229000, 230000, 231000, 232000,
+];
 const drmFees = [42000, 40000, 43000, 41000, 42000, 45000, 46000, 46000, 47000, 47000, 48000, 49000];
 const sraFees = [26000, 25000, 26000, 26000, 27000, 28000, 29000, 29000, 30000, 30000, 31000, 32000];
 const retreatFees = [18000, 14000, 32000, 22000, 18000, 12000, 36000, 17000, 14000, 28000, 20000, 19000];
@@ -142,11 +144,41 @@ export const seminaryDiversificationTargets = [
 ];
 
 export const seminaryBudgetReallocation = [
-  { category: 'Construction Supplies/Materials', urgency: 'High', action: 'Phase noncritical masonry works into dry months', shiftTo: 'Utilities resilience reserve', suggestedMove: 65000 },
-  { category: 'Purchases (Other Equipment and Furnitures)', urgency: 'High', action: 'Bundle furniture replacement with annual procurement cycle', shiftTo: 'Scholarship contingency', suggestedMove: 48000 },
-  { category: 'Others Expenses', urgency: 'Medium', action: 'Tighten discretionary hospitality and event spend', shiftTo: 'Formation program buffer', suggestedMove: 26000 },
-  { category: 'Transportation/Parking Fee/Bank Charges', urgency: 'Medium', action: 'Route collections through fewer settlement windows', shiftTo: 'Minor repairs reserve', suggestedMove: 12000 },
-  { category: 'Cash Incentives', urgency: 'Low', action: 'Align incentives with surplus months only', shiftTo: 'Emergency cash buffer', suggestedMove: 9000 },
+  {
+    category: 'Construction Supplies/Materials',
+    urgency: 'High',
+    action: 'Phase noncritical masonry works into dry months',
+    shiftTo: 'Utilities resilience reserve',
+    suggestedMove: 65000,
+  },
+  {
+    category: 'Purchases (Other Equipment and Furnitures)',
+    urgency: 'High',
+    action: 'Bundle furniture replacement with annual procurement cycle',
+    shiftTo: 'Scholarship contingency',
+    suggestedMove: 48000,
+  },
+  {
+    category: 'Others Expenses',
+    urgency: 'Medium',
+    action: 'Tighten discretionary hospitality and event spend',
+    shiftTo: 'Formation program buffer',
+    suggestedMove: 26000,
+  },
+  {
+    category: 'Transportation/Parking Fee/Bank Charges',
+    urgency: 'Medium',
+    action: 'Route collections through fewer settlement windows',
+    shiftTo: 'Minor repairs reserve',
+    suggestedMove: 12000,
+  },
+  {
+    category: 'Cash Incentives',
+    urgency: 'Low',
+    action: 'Align incentives with surplus months only',
+    shiftTo: 'Emergency cash buffer',
+    suggestedMove: 9000,
+  },
 ];
 
 export const seminaryRoadmap = [

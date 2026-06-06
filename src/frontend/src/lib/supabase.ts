@@ -25,7 +25,7 @@ if (!process.env.NEXT_PUBLIC_SUPABASE_URL || !process.env.NEXT_PUBLIC_SUPABASE_A
 export const supabaseBrowser = createClient(url, anon);
 
 // ─── Server / service-role ─────────────────────────────────────────────────
-// Use ONLY inside src/microservices/ and app/api/ route handlers.
+// Use ONLY inside app/api/ route handlers (server-side Next.js).
 // The service-role key bypasses RLS — treat it like a root database password.
 export const supabaseServer = createClient(url, serviceRole ?? anon, {
   auth: { persistSession: false },
