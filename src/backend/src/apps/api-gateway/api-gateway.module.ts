@@ -10,6 +10,8 @@ import { AnalyticsGatewayController } from './controllers/analytics-gateway.cont
 import { AdminGatewayController } from './controllers/admin-gateway.controller';
 import { AdminEntitiesGatewayController } from './controllers/admin-entities-gateway.controller';
 import { AdminRolesGatewayController } from './controllers/admin-roles-gateway.controller';
+import { AnnouncementsGatewayController } from './controllers/announcements-gateway.controller';
+import { AuditLogGatewayController } from './controllers/audit-log-gateway.controller';
 
 @Module({
   imports: [
@@ -27,6 +29,8 @@ import { AdminRolesGatewayController } from './controllers/admin-roles-gateway.c
     AdminGatewayController,
     AdminEntitiesGatewayController,
     AdminRolesGatewayController,
+    AnnouncementsGatewayController,
+    AuditLogGatewayController,
   ],
 })
 export class ApiGatewayModule {}

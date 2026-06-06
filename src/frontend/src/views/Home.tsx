@@ -24,7 +24,7 @@ import {
 import { motion } from 'motion/react';
 import { SubmissionTracker } from '../components/projects/SubmissionTracker';
 import { ClassificationManagement, ClassificationRecord } from '../components/ui/ClassificationManagement';
-import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from 'recharts';
+import ReactECharts from 'echarts-for-react';
 import type { Role } from '../App';
 
 interface HomeProps {
@@ -567,39 +567,34 @@ export function Home({ onNavigate, role = 'bishop', permissions = {} }: HomeProp
               <div className="flex-1 w-full h-[500px] relative">
                 <div className="absolute inset-0 flex items-center justify-center">
                   <div className="w-full h-full">
-                    <ResponsiveContainer width="100%" height="100%">
-                      <PieChart>
-                        <Pie
-                          data={contributionData}
-                          cx="50%"
-                          cy="50%"
-                          innerRadius={130}
-                          outerRadius={190}
-                          paddingAngle={10}
-                          dataKey="value"
-                          stroke="none"
-                          onClick={(data: any) => onNavigate(data.page)}
-                          className="cursor-pointer outline-none"
-                        >
-                          {contributionData.map((entry, index) => (
-                            <Cell
-                              key={`cell-${index}`}
-                              fill={entry.color}
-                              className="hover:opacity-80 transition-opacity duration-500"
-                            />
-                          ))}
-                        </Pie>
-                        <Tooltip
-                          contentStyle={{
-                            borderRadius: '24px',
-                            border: 'none',
-                            boxShadow: '0 25px 50px rgba(0,0,0,0.12)',
-                            padding: '16px 24px',
-                            fontFamily: 'serif',
-                          }}
-                        />
-                      </PieChart>
-                    </ResponsiveContainer>
+                    <ReactECharts
+                      style={{ height: '500px', width: '100%' }}
+                      option={{
+                        color: contributionData.map((d) => d.color),
+                        tooltip: {
+                          trigger: 'item',
+                          formatter: '{b}: {c}%',
+                        },
+                        series: [
+                          {
+                            type: 'pie',
+                            radius: ['55%', '80%'],
+                            padAngle: 8,
+                            center: ['50%', '50%'],
+                            data: contributionData.map((d) => ({ name: d.name, value: d.value, page: d.page })),
+                            itemStyle: { borderRadius: 4 },
+                            label: { show: false },
+                            emphasis: { itemStyle: { opacity: 0.8 } },
+                          },
+                        ],
+                      }}
+                      onEvents={{
+                        click: (params: any) => {
+                          const item = contributionData.find((d) => d.name === params.name);
+                          if (item) onNavigate(item.page);
+                        },
+                      }}
+                    />
                   </div>
                   <div className="absolute flex flex-col items-center text-center pointer-events-none">
                     <div className="text-[10px] font-black text-gray-300 uppercase tracking-[0.4em] mb-2">

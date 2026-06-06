@@ -22,18 +22,7 @@ import {
   Users,
   Zap,
 } from 'lucide-react';
-import {
-  Area,
-  AreaChart,
-  CartesianGrid,
-  Legend,
-  Line,
-  LineChart,
-  ResponsiveContainer,
-  Tooltip,
-  XAxis,
-  YAxis,
-} from 'recharts';
+import ReactECharts from 'echarts-for-react';
 
 type AITwinMode = 'parish' | 'priest' | 'seminary' | 'school';
 type FinancialAITwinMode = Exclude<AITwinMode, 'priest'>;
@@ -961,39 +950,65 @@ function ParishAITwin({ mode = 'parish' }: { mode?: FinancialAITwinMode }) {
             </div>
 
             <div className="h-[420px] w-full">
-              <ResponsiveContainer width="100%" height="100%">
-                <AreaChart data={simulationResults.projectedData}>
-                  <defs>
-                    <linearGradient id="parishTwinGradient" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%" stopColor="#D4AF37" stopOpacity={0.3} />
-                      <stop offset="95%" stopColor="#D4AF37" stopOpacity={0} />
-                    </linearGradient>
-                  </defs>
-                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#E5E7EB" />
-                  <XAxis dataKey="month" tick={{ fontSize: 10, fontWeight: 600, fill: '#9CA3AF' }} dy={10} />
-                  <YAxis
-                    tick={{ fontSize: 10, fontWeight: 600, fill: '#9CA3AF' }}
-                    tickFormatter={(value) => `P${Math.round(value / 1000)}k`}
-                  />
-                  <Tooltip formatter={(value) => [formatCurrency(Number(value ?? 0)), '']} />
-                  <Area
-                    type="monotone"
-                    dataKey="baseline"
-                    stroke="#9CA3AF"
-                    strokeWidth={2}
-                    strokeDasharray="5 5"
-                    fill="transparent"
-                  />
-                  <Area
-                    type="monotone"
-                    dataKey="simulated"
-                    stroke="#D4AF37"
-                    strokeWidth={4}
-                    fillOpacity={1}
-                    fill="url(#parishTwinGradient)"
-                  />
-                </AreaChart>
-              </ResponsiveContainer>
+              <ReactECharts
+                style={{ height: '420px', width: '100%' }}
+                option={{
+                  color: ['#6366f1', '#8b5cf6', '#06b6d4', '#10b981', '#f59e0b', '#ef4444'],
+                  tooltip: {
+                    trigger: 'axis',
+                    formatter: (params: any) =>
+                      params.map((p: any) => `${p.seriesName}: ${formatCurrency(Number(p.value ?? 0))}`).join('<br/>'),
+                  },
+                  legend: { data: ['Baseline', 'Simulated'] },
+                  grid: { left: 60, right: 20, bottom: 30, top: 40 },
+                  xAxis: {
+                    type: 'category',
+                    data: simulationResults.projectedData.map((d) => d.month),
+                    axisLabel: { fontSize: 10, fontWeight: 'bold', color: '#9CA3AF' },
+                  },
+                  yAxis: {
+                    type: 'value',
+                    axisLabel: {
+                      formatter: (v: number) => `P${Math.round(v / 1000)}k`,
+                      fontSize: 10,
+                      fontWeight: 'bold',
+                      color: '#9CA3AF',
+                    },
+                  },
+                  series: [
+                    {
+                      name: 'Baseline',
+                      type: 'line',
+                      data: simulationResults.projectedData.map((d) => d.baseline),
+                      smooth: true,
+                      lineStyle: { color: '#9CA3AF', width: 2, type: 'dashed' },
+                      itemStyle: { color: '#9CA3AF' },
+                      areaStyle: { color: 'transparent' },
+                    },
+                    {
+                      name: 'Simulated',
+                      type: 'line',
+                      data: simulationResults.projectedData.map((d) => d.simulated),
+                      smooth: true,
+                      lineStyle: { color: '#D4AF37', width: 4 },
+                      itemStyle: { color: '#D4AF37' },
+                      areaStyle: {
+                        color: {
+                          type: 'linear',
+                          x: 0,
+                          y: 0,
+                          x2: 0,
+                          y2: 1,
+                          colorStops: [
+                            { offset: 0, color: 'rgba(212,175,55,0.3)' },
+                            { offset: 1, color: 'rgba(212,175,55,0)' },
+                          ],
+                        },
+                      },
+                    },
+                  ],
+                }}
+              />
             </div>
 
             <div className="p-6 rounded-[24px] bg-gold-500/5 border border-gold-500/10 space-y-3">
@@ -1421,40 +1436,53 @@ function PriestAITwin() {
             </div>
 
             <div className="h-[420px] w-full">
-              <ResponsiveContainer width="100%" height="100%">
-                <LineChart data={results.projectedData}>
-                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#E5E7EB" />
-                  <XAxis dataKey="month" tick={{ fontSize: 10, fontWeight: 600, fill: '#9CA3AF' }} />
-                  <YAxis tick={{ fontSize: 10, fontWeight: 600, fill: '#9CA3AF' }} />
-                  <Tooltip />
-                  <Legend wrapperStyle={{ fontSize: '11px', fontWeight: 700 }} />
-                  <Line
-                    type="monotone"
-                    dataKey="stayCase"
-                    name="If Priest Stays"
-                    stroke="#111111"
-                    strokeDasharray="6 4"
-                    strokeWidth={2}
-                    dot={false}
-                  />
-                  <Line
-                    type="monotone"
-                    dataKey="sourceParish"
-                    name="Old Parish After Transfer"
-                    stroke="#EF4444"
-                    strokeWidth={3}
-                    dot={{ r: 2 }}
-                  />
-                  <Line
-                    type="monotone"
-                    dataKey="targetParish"
-                    name="New Parish After Transfer"
-                    stroke="#D4AF37"
-                    strokeWidth={4}
-                    dot={{ r: 2 }}
-                  />
-                </LineChart>
-              </ResponsiveContainer>
+              <ReactECharts
+                style={{ height: '420px', width: '100%' }}
+                option={{
+                  color: ['#6366f1', '#8b5cf6', '#06b6d4', '#10b981', '#f59e0b', '#ef4444'],
+                  tooltip: { trigger: 'axis' },
+                  legend: {
+                    data: ['If Priest Stays', 'Old Parish After Transfer', 'New Parish After Transfer'],
+                    textStyle: { fontSize: 11, fontWeight: 'bold' },
+                  },
+                  grid: { left: 50, right: 20, bottom: 30, top: 50 },
+                  xAxis: {
+                    type: 'category',
+                    data: results.projectedData.map((d) => d.month),
+                    axisLabel: { fontSize: 10, fontWeight: 'bold', color: '#9CA3AF' },
+                  },
+                  yAxis: { type: 'value', axisLabel: { fontSize: 10, fontWeight: 'bold', color: '#9CA3AF' } },
+                  series: [
+                    {
+                      name: 'If Priest Stays',
+                      type: 'line',
+                      data: results.projectedData.map((d) => d.stayCase),
+                      smooth: true,
+                      lineStyle: { color: '#111111', width: 2, type: 'dashed' },
+                      itemStyle: { color: '#111111' },
+                      showSymbol: false,
+                    },
+                    {
+                      name: 'Old Parish After Transfer',
+                      type: 'line',
+                      data: results.projectedData.map((d) => d.sourceParish),
+                      smooth: true,
+                      lineStyle: { color: '#EF4444', width: 3 },
+                      itemStyle: { color: '#EF4444' },
+                      symbolSize: 4,
+                    },
+                    {
+                      name: 'New Parish After Transfer',
+                      type: 'line',
+                      data: results.projectedData.map((d) => d.targetParish),
+                      smooth: true,
+                      lineStyle: { color: '#D4AF37', width: 4 },
+                      itemStyle: { color: '#D4AF37' },
+                      symbolSize: 4,
+                    },
+                  ],
+                }}
+              />
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
