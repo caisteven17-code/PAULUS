@@ -4,7 +4,6 @@ import { FinancialHealthScore, DiagnosticResult, EntityClass } from '../types';
 
 const PYTHON_ANALYTICS_URL = (process.env.ANALYTICS_PYTHON_URL || 'http://127.0.0.1:8000').replace(/\/$/, '');
 
-
 @Injectable()
 export class AnalyticsService {
   private readonly logger = new Logger(AnalyticsService.name);

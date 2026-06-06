@@ -39,11 +39,7 @@ export class FinancialService {
 
   private async resolveInstitutionId(name: string): Promise<string | null> {
     try {
-      const { data } = await this.db('diocese')
-        .from('institutions')
-        .select('id')
-        .eq('name', name)
-        .single();
+      const { data } = await this.db('diocese').from('institutions').select('id').eq('name', name).single();
       return data?.id ?? null;
     } catch {
       return null;
@@ -61,16 +57,33 @@ export class FinancialService {
   private parishToRecord(row: any, name: string, entityClass?: EntityClass): FinancialRecord {
     const n = this.num.bind(this);
     const collections =
-      n(row.sacraments_total) + n(row.confirmation_total) + n(row.mass_intentions_total) +
-      n(row.mass_collection_weekday) + n(row.mass_collection_sunday) + n(row.mass_collection_saturday) +
-      n(row.other_collections_total) + n(row.donations) + n(row.interest_income) +
-      n(row.subsidy_inflow) + n(row.special_collections) + n(row.second_collections) +
-      n(row.charge_over_above) + n(row.other_receipts);
+      n(row.sacraments_total) +
+      n(row.confirmation_total) +
+      n(row.mass_intentions_total) +
+      n(row.mass_collection_weekday) +
+      n(row.mass_collection_sunday) +
+      n(row.mass_collection_saturday) +
+      n(row.other_collections_total) +
+      n(row.donations) +
+      n(row.interest_income) +
+      n(row.subsidy_inflow) +
+      n(row.special_collections) +
+      n(row.second_collections) +
+      n(row.charge_over_above) +
+      n(row.other_receipts);
     const disbursements =
-      n(row.priest_share) + n(row.mass_stipend) + n(row.other_pastoral_expenses) +
-      n(row.salaries_wages_benefits) + n(row.govt_contributions) + n(row.utilities) +
-      n(row.communications) + n(row.other_rectory_expenses) + n(row.construction_expenses) +
-      n(row.remittance_to_diocese) + n(row.bishops_fund_share) + n(row.special_collections_remittance);
+      n(row.priest_share) +
+      n(row.mass_stipend) +
+      n(row.other_pastoral_expenses) +
+      n(row.salaries_wages_benefits) +
+      n(row.govt_contributions) +
+      n(row.utilities) +
+      n(row.communications) +
+      n(row.other_rectory_expenses) +
+      n(row.construction_expenses) +
+      n(row.remittance_to_diocese) +
+      n(row.bishops_fund_share) +
+      n(row.special_collections_remittance);
     return {
       id: row.id,
       month: row.month,
@@ -83,8 +96,14 @@ export class FinancialService {
       disbursements,
       netReceipts: n(row.net_receipts),
       expenses_pastoral: n(row.priest_share) + n(row.mass_stipend) + n(row.other_pastoral_expenses),
-      expenses_parish: n(row.salaries_wages_benefits) + n(row.govt_contributions) + n(row.utilities) + n(row.communications) + n(row.other_rectory_expenses),
-      collections_mass: n(row.mass_collection_weekday) + n(row.mass_collection_sunday) + n(row.mass_collection_saturday),
+      expenses_parish:
+        n(row.salaries_wages_benefits) +
+        n(row.govt_contributions) +
+        n(row.utilities) +
+        n(row.communications) +
+        n(row.other_rectory_expenses),
+      collections_mass:
+        n(row.mass_collection_weekday) + n(row.mass_collection_sunday) + n(row.mass_collection_saturday),
       collections_other: n(row.other_collections_total),
       collections_otherReceipts: n(row.other_receipts),
       sacraments_rate: n(row.sacraments_total),
@@ -101,9 +120,15 @@ export class FinancialService {
 
   private schoolToRecord(row: any, name: string, entityClass?: EntityClass): FinancialRecord {
     const n = this.num.bind(this);
-    const collections = n(row.tuition_revenues) + n(row.miscellaneous_fees) + n(row.other_income) + n(row.subsidy_inflow);
-    const disbursements = n(row.faculty_payroll) + n(row.admin_staff_payroll) + n(row.utilities) +
-      n(row.facilities_maintenance) + n(row.supplies) + n(row.other_expenses);
+    const collections =
+      n(row.tuition_revenues) + n(row.miscellaneous_fees) + n(row.other_income) + n(row.subsidy_inflow);
+    const disbursements =
+      n(row.faculty_payroll) +
+      n(row.admin_staff_payroll) +
+      n(row.utilities) +
+      n(row.facilities_maintenance) +
+      n(row.supplies) +
+      n(row.other_expenses);
     return {
       id: row.id,
       month: row.month,
@@ -116,7 +141,12 @@ export class FinancialService {
       disbursements,
       netReceipts: n(row.net_receipts),
       expenses_pastoral: n(row.faculty_payroll),
-      expenses_parish: n(row.admin_staff_payroll) + n(row.utilities) + n(row.facilities_maintenance) + n(row.supplies) + n(row.other_expenses),
+      expenses_parish:
+        n(row.admin_staff_payroll) +
+        n(row.utilities) +
+        n(row.facilities_maintenance) +
+        n(row.supplies) +
+        n(row.other_expenses),
       timestamp: row.record_timestamp ?? undefined,
     };
   }
@@ -124,10 +154,18 @@ export class FinancialService {
   private seminaryToRecord(row: any, name: string, entityClass?: EntityClass): FinancialRecord {
     const n = this.num.bind(this);
     const collections =
-      n(row.donations) + n(row.seminary_fees) + n(row.mass_collections) + n(row.other_sources) +
-      n(row.subsidy_from_rbscp) + n(row.tuition_fees) + n(row.board_lodging_fees) +
-      n(row.drm_modules) + n(row.sra_reading_lab) + n(row.retreat) +
-      n(row.honorarium_fee) + n(row.miscellaneous_fees);
+      n(row.donations) +
+      n(row.seminary_fees) +
+      n(row.mass_collections) +
+      n(row.other_sources) +
+      n(row.subsidy_from_rbscp) +
+      n(row.tuition_fees) +
+      n(row.board_lodging_fees) +
+      n(row.drm_modules) +
+      n(row.sra_reading_lab) +
+      n(row.retreat) +
+      n(row.honorarium_fee) +
+      n(row.miscellaneous_fees);
     return {
       id: row.id,
       month: row.month,
@@ -136,11 +174,13 @@ export class FinancialService {
       entityType: 'seminary',
       entityClass: row.institution_class ?? entityClass,
       collections,
-      consumableCollections: n(row.seminary_fees) + n(row.mass_collections) + n(row.tuition_fees) + n(row.board_lodging_fees),
+      consumableCollections:
+        n(row.seminary_fees) + n(row.mass_collections) + n(row.tuition_fees) + n(row.board_lodging_fees),
       disbursements: n(row.total_expenses),
       netReceipts: n(row.net_surplus),
       expenses_pastoral: n(row.salaries_wages) + n(row.contribution_benefits) + n(row.cash_incentives),
-      expenses_parish: n(row.daily_food) + n(row.food_others) + n(row.utilities) + n(row.repairs_maintenance) + n(row.other_expenses),
+      expenses_parish:
+        n(row.daily_food) + n(row.food_others) + n(row.utilities) + n(row.repairs_maintenance) + n(row.other_expenses),
       timestamp: row.record_timestamp ?? undefined,
     };
   }
@@ -184,7 +224,9 @@ export class FinancialService {
     const entityGroups: { name: string; type: 'parish' | 'school' | 'seminary'; class: EntityClass }[] = [];
     ALL_PARISHES.forEach((p) => entityGroups.push({ name: p.name, type: 'parish', class: p.class as EntityClass }));
     INITIAL_SCHOOLS.forEach((s) => entityGroups.push({ name: s.name, type: 'school', class: s.class as EntityClass }));
-    INITIAL_SEMINARIES.forEach((s) => entityGroups.push({ name: s.name, type: 'seminary', class: s.class as EntityClass }));
+    INITIAL_SEMINARIES.forEach((s) =>
+      entityGroups.push({ name: s.name, type: 'seminary', class: s.class as EntityClass }),
+    );
 
     try {
       const schemas: Array<'parish' | 'school' | 'seminary'> = ['parish', 'school', 'seminary'];
@@ -196,9 +238,7 @@ export class FinancialService {
             .order('record_timestamp', { ascending: true });
 
           if (error || !data || data.length === 0) return [];
-          return data.map((row: any) =>
-            this.domainToRecord(row, row.institution?.name ?? row.institution_id, type),
-          );
+          return data.map((row: any) => this.domainToRecord(row, row.institution?.name ?? row.institution_id, type));
         }),
       );
 
@@ -250,10 +290,22 @@ export class FinancialService {
     let healthProfile = 0.2 + this.pseudoRandom(seed + 123) * 1.8;
 
     let classBonus = 0;
-    if (entityClass === 'Class A') { classBonus = 0.3; baseMultiplier *= 2.0; }
-    if (entityClass === 'Class B') { classBonus = 0.15; baseMultiplier *= 1.4; }
-    if (entityClass === 'Class D') { classBonus = -0.15; baseMultiplier *= 0.7; }
-    if (entityClass === 'Class E') { classBonus = -0.3; baseMultiplier *= 0.4; }
+    if (entityClass === 'Class A') {
+      classBonus = 0.3;
+      baseMultiplier *= 2.0;
+    }
+    if (entityClass === 'Class B') {
+      classBonus = 0.15;
+      baseMultiplier *= 1.4;
+    }
+    if (entityClass === 'Class D') {
+      classBonus = -0.15;
+      baseMultiplier *= 0.7;
+    }
+    if (entityClass === 'Class E') {
+      classBonus = -0.3;
+      baseMultiplier *= 0.4;
+    }
 
     const efficiencyFactor = 1.0 / healthProfile + this.pseudoRandom(seed + 456) * 0.5 - classBonus;
     const sustainabilityFactor = 0.7 * healthProfile + this.pseudoRandom(seed + 789) * 0.4 + classBonus;
@@ -271,7 +323,10 @@ export class FinancialService {
         let colVar = 0.7 + this.pseudoRandom(ms) * 0.6;
         let disVar = 0.8 + this.pseudoRandom(ms + 100) * 0.4;
 
-        if (r.month === fiestaMonth) { colVar *= 2.0; disVar *= 1.5; }
+        if (r.month === fiestaMonth) {
+          colVar *= 2.0;
+          disVar *= 1.5;
+        }
         if (entityType === 'school') {
           if (r.month === 'Jun' || r.month === 'Nov') colVar *= 3.0;
           if (r.month === 'Apr' || r.month === 'May') colVar *= 0.3;
@@ -284,7 +339,11 @@ export class FinancialService {
 
         const collections = Math.round(r.collections * baseMultiplier * colVar * yMult);
         const consumableCollections = Math.round(
-          r.consumableCollections * baseMultiplier * sustainabilityFactor * (0.8 + this.pseudoRandom(ms + 200) * 0.4) * yMult,
+          r.consumableCollections *
+            baseMultiplier *
+            sustainabilityFactor *
+            (0.8 + this.pseudoRandom(ms + 200) * 0.4) *
+            yMult,
         );
         const disbursements = Math.round(r.disbursements * baseMultiplier * efficiencyFactor * disVar * yMult);
         const netReceipts = collections - disbursements;

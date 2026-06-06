@@ -44,9 +44,7 @@ export class AnnouncementService {
     return (data ?? []).map((row) => this.toAnnouncement(row));
   }
 
-  async createAnnouncement(
-    announcement: Omit<Announcement, 'id' | 'createdAt'>,
-  ): Promise<Announcement | null> {
+  async createAnnouncement(announcement: Omit<Announcement, 'id' | 'createdAt'>): Promise<Announcement | null> {
     const { data, error } = await this.supabaseService.admin
       .schema('diocese')
       .from('announcements')
@@ -70,11 +68,7 @@ export class AnnouncementService {
   }
 
   async deleteAnnouncement(id: string): Promise<void> {
-    const { error } = await this.supabaseService.admin
-      .schema('diocese')
-      .from('announcements')
-      .delete()
-      .eq('id', id);
+    const { error } = await this.supabaseService.admin.schema('diocese').from('announcements').delete().eq('id', id);
 
     if (error) {
       console.error('[announcement.service] deleteAnnouncement:', error.message);

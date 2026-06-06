@@ -85,46 +85,31 @@ export class AnalyticsGatewayController {
   // ------------------------------------------------------------------
 
   @Get('descriptive/*')
-  async descriptiveGet(
-    @Req() req: Request,
-    @Res({ passthrough: true }) res: Response,
-  ) {
+  async descriptiveGet(@Req() req: Request, @Res({ passthrough: true }) res: Response) {
     const subPath = req.path.replace(/^\/api\/analytics/, '/analytics');
     return proxyToPython(req, res, subPath, 'GET');
   }
 
   @Get('diagnostic/*')
-  async diagnosticWildcardGet(
-    @Req() req: Request,
-    @Res({ passthrough: true }) res: Response,
-  ) {
+  async diagnosticWildcardGet(@Req() req: Request, @Res({ passthrough: true }) res: Response) {
     const subPath = req.path.replace(/^\/api\/analytics/, '/analytics');
     return proxyToPython(req, res, subPath, 'GET');
   }
 
   @Get('predictive/*')
-  async predictiveGet(
-    @Req() req: Request,
-    @Res({ passthrough: true }) res: Response,
-  ) {
+  async predictiveGet(@Req() req: Request, @Res({ passthrough: true }) res: Response) {
     const subPath = req.path.replace(/^\/api\/analytics/, '/analytics');
     return proxyToPython(req, res, subPath, 'GET');
   }
 
   @Get('prescriptive/*')
-  async prescriptiveGet(
-    @Req() req: Request,
-    @Res({ passthrough: true }) res: Response,
-  ) {
+  async prescriptiveGet(@Req() req: Request, @Res({ passthrough: true }) res: Response) {
     const subPath = req.path.replace(/^\/api\/analytics/, '/analytics');
     return proxyToPython(req, res, subPath, 'GET');
   }
 
   @Post('prescriptive/*')
-  async prescriptivePost(
-    @Req() req: Request,
-    @Res({ passthrough: true }) res: Response,
-  ) {
+  async prescriptivePost(@Req() req: Request, @Res({ passthrough: true }) res: Response) {
     const subPath = req.path.replace(/^\/api\/analytics/, '/analytics');
     return proxyToPython(req, res, subPath, 'POST');
   }

@@ -47,11 +47,7 @@ export class AuditLogService {
     };
   }
 
-  async getAuditLogs(filters?: {
-    category?: string;
-    severity?: string;
-    limit?: number;
-  }): Promise<AuditLogEntry[]> {
+  async getAuditLogs(filters?: { category?: string; severity?: string; limit?: number }): Promise<AuditLogEntry[]> {
     let query = this.supabaseService.admin
       .schema('diocese')
       .from('audit_logs')
