@@ -14,6 +14,8 @@ import {
   Cpu,
   ScrollText,
   BarChart2,
+  X,
+  ChevronRight,
 } from 'lucide-react';
 
 // ─────────────────────────────────────────────
@@ -21,6 +23,12 @@ import {
 // ─────────────────────────────────────────────
 type LogCategory = 'all' | 'auth' | 'finance' | 'analytics' | 'reports' | 'system' | 'access';
 type LogSeverity = 'info' | 'warning' | 'error' | 'success';
+
+interface FieldChange {
+  field: string;
+  from: string | null;
+  to: string | null;
+}
 
 interface AuditEntry {
   id: string;
@@ -35,6 +43,7 @@ interface AuditEntry {
   date: string;
   ip: string;
   entity?: string;
+  changes?: FieldChange[];
 }
 
 // ─────────────────────────────────────────────
@@ -450,6 +459,7 @@ export function AuditLog() {
   const [search, setSearch] = useState('');
   const [activeFilter, setActiveFilter] = useState<LogCategory>('all');
   const [showAnalytics, setShowAnalytics] = useState(false);
+  const [selectedLog, setSelectedLog] = useState<AuditEntry | null>(null);
 
   const filtered = useMemo(() => {
     return logs.filter((log) => {
@@ -471,7 +481,7 @@ export function AuditLog() {
       system: logs.filter((l) => l.isSystem).length,
       alerts: logs.filter((l) => l.severity === 'warning' || l.severity === 'error').length,
     }),
-    [],
+    [logs],
   );
 
   // ── Analytics data derived from logs ──────────
@@ -918,7 +928,10 @@ export function AuditLog() {
                           <div className={`w-1.5 h-1.5 rounded-full ${cat.dot}`} />
                         </div>
 
-                        <div className="ml-4 mb-3 bg-white rounded-2xl border border-gray-100 shadow-sm hover:shadow-md hover:border-gold-200/60 transition-all duration-300 px-5 py-4 flex flex-col sm:flex-row sm:items-start gap-3">
+                        <div
+                          className="ml-4 mb-3 bg-white rounded-2xl border border-gray-100 shadow-sm hover:shadow-md hover:border-gold-200/60 transition-all duration-300 px-5 py-4 flex flex-col sm:flex-row sm:items-start gap-3 cursor-pointer"
+                          onClick={() => setSelectedLog(log)}
+                        >
                           <div className={`mt-0.5 p-2 rounded-xl shrink-0 ring-1 ${sev.ring}`}>{sev.icon}</div>
 
                           <div className="flex-1 min-w-0">
@@ -943,12 +956,20 @@ export function AuditLog() {
 
                             <p className="text-sm text-gray-500 leading-relaxed">{log.detail}</p>
 
-                            {log.entity && (
-                              <div className="mt-2 inline-flex items-center gap-1.5 text-[10px] font-black text-church-green uppercase tracking-wider bg-church-green/5 border border-church-green/20 px-2.5 py-1 rounded-full">
-                                <div className="w-1 h-1 rounded-full bg-church-green" />
-                                {log.entity}
-                              </div>
-                            )}
+                            <div className="mt-2 flex flex-wrap gap-2">
+                              {log.entity && (
+                                <div className="inline-flex items-center gap-1.5 text-[10px] font-black text-church-green uppercase tracking-wider bg-church-green/5 border border-church-green/20 px-2.5 py-1 rounded-full">
+                                  <div className="w-1 h-1 rounded-full bg-church-green" />
+                                  {log.entity}
+                                </div>
+                              )}
+                              {log.changes && log.changes.length > 0 && (
+                                <div className="inline-flex items-center gap-1 text-[10px] font-black text-gold-700 uppercase tracking-wider bg-gold-500/10 border border-gold-200 px-2.5 py-1 rounded-full">
+                                  <ChevronRight className="w-2.5 h-2.5" />
+                                  {log.changes.length} field{log.changes.length !== 1 ? 's' : ''} changed
+                                </div>
+                              )}
+                            </div>
                           </div>
 
                           <div className="shrink-0 text-right sm:min-w-[130px]">
@@ -974,6 +995,134 @@ export function AuditLog() {
           <div className="flex-1 h-px bg-gray-100" />
         </div>
       </div>
+
+      {/* ── Detail Modal ──────────────────────────────── */}
+      <AnimatePresence>
+        {selectedLog && (
+          <motion.div
+            key="detail-modal"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50"
+            onClick={() => setSelectedLog(null)}
+          >
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95, y: 12 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 12 }}
+              transition={{ duration: 0.2 }}
+              className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[85vh] overflow-y-auto"
+              onClick={(e) => e.stopPropagation()}
+            >
+              {/* Modal Header */}
+              <div className="bg-church-black px-6 py-5 rounded-t-2xl flex items-start justify-between gap-4">
+                <div className="flex-1 min-w-0">
+                  <div className="flex flex-wrap items-center gap-2 mb-2">
+                    <span
+                      className={`text-[10px] font-black px-2.5 py-0.5 rounded-full uppercase tracking-wider ${CATEGORY_CONFIG[selectedLog.category].pill}`}
+                    >
+                      {CATEGORY_CONFIG[selectedLog.category].label}
+                    </span>
+                    <span
+                      className={`text-[10px] font-black px-2 py-0.5 rounded-full uppercase tracking-wider ring-1 ${SEVERITY_CONFIG[selectedLog.severity].ring}`}
+                    >
+                      {selectedLog.severity}
+                    </span>
+                  </div>
+                  <h2 className="text-lg font-bold text-white">{selectedLog.action}</h2>
+                  <p className="text-sm text-white/50 mt-1 leading-relaxed">{selectedLog.detail}</p>
+                </div>
+                <button
+                  onClick={() => setSelectedLog(null)}
+                  className="shrink-0 p-2 rounded-xl bg-white/10 hover:bg-white/20 text-white/60 hover:text-white transition-colors"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+
+              {/* Meta grid */}
+              <div className="px-6 py-5 border-b border-gray-100 grid grid-cols-2 gap-x-6 gap-y-4">
+                {[
+                  { label: 'User', value: selectedLog.user },
+                  { label: 'Role', value: selectedLog.role },
+                  { label: 'Date & Time', value: `${selectedLog.date} — ${selectedLog.timestamp}` },
+                  { label: 'IP Address', value: selectedLog.ip, mono: true },
+                  ...(selectedLog.entity ? [{ label: 'Entity', value: selectedLog.entity, green: true }] : []),
+                  { label: 'Log ID', value: selectedLog.id, mono: true },
+                ].map((item, i) => (
+                  <div key={i}>
+                    <p className="text-[10px] font-black text-gray-400 uppercase tracking-wider mb-0.5">{item.label}</p>
+                    <p
+                      className={`text-sm font-semibold ${(item as any).mono ? 'font-mono text-gray-500' : (item as any).green ? 'text-church-green' : 'text-gray-800'}`}
+                    >
+                      {item.value}
+                    </p>
+                  </div>
+                ))}
+              </div>
+
+              {/* Field diff */}
+              {selectedLog.changes && selectedLog.changes.length > 0 ? (
+                <div className="px-6 py-5">
+                  <p className="text-[11px] font-black text-gray-500 uppercase tracking-[0.2em] mb-4">
+                    Field Changes &nbsp;
+                    <span className="text-gold-600 bg-gold-500/10 border border-gold-200 px-2 py-0.5 rounded-full text-[10px]">
+                      {selectedLog.changes.length} changed
+                    </span>
+                  </p>
+                  <div className="border border-gray-100 rounded-xl overflow-hidden">
+                    <table className="w-full text-sm">
+                      <thead>
+                        <tr className="bg-gray-50 border-b border-gray-100">
+                          <th className="text-left px-4 py-2.5 text-[10px] font-black text-gray-500 uppercase tracking-wider w-1/3">
+                            Field
+                          </th>
+                          <th className="text-left px-4 py-2.5 text-[10px] font-black text-rose-400 uppercase tracking-wider w-1/3">
+                            Before
+                          </th>
+                          <th className="text-left px-4 py-2.5 text-[10px] font-black text-emerald-500 uppercase tracking-wider w-1/3">
+                            After
+                          </th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {selectedLog.changes.map((change, i) => (
+                          <tr
+                            key={i}
+                            className={`border-b border-gray-50 last:border-0 ${i % 2 === 0 ? 'bg-white' : 'bg-gray-50/40'}`}
+                          >
+                            <td className="px-4 py-2.5 text-xs font-bold text-gray-600 capitalize">{change.field}</td>
+                            <td className="px-4 py-2.5 text-xs font-mono text-rose-500 break-all">
+                              {change.from !== null ? (
+                                change.from
+                              ) : (
+                                <span className="text-gray-300 italic not-italic font-sans">—</span>
+                              )}
+                            </td>
+                            <td className="px-4 py-2.5 text-xs font-mono text-emerald-600 break-all">
+                              {change.to !== null ? (
+                                change.to
+                              ) : (
+                                <span className="text-gray-300 italic not-italic font-sans">—</span>
+                              )}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              ) : (
+                <div className="px-6 py-5">
+                  <p className="text-[11px] font-black text-gray-400 uppercase tracking-[0.2em] mb-2">Field Changes</p>
+                  <p className="text-sm text-gray-400">No field-level diff available for this event type.</p>
+                </div>
+              )}
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }

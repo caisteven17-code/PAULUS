@@ -22,10 +22,18 @@
     "format": "npm run format --workspace=src/frontend && npm run format --workspace=src/backend",
     "format:check": "npm run format:check --workspace=src/frontend && npm run format:check --workspace=src/backend",
     "typecheck": "npm run typecheck --workspace=src/frontend && npm run typecheck --workspace=src/backend",
+    "calendar:collect": "cd src/analytics && python -m app.services.liturgical_calendar_collector",
+    "calendar:update": "cd src/analytics && python -m app.services.liturgical_calendar_updater",
+    "calendar:load": "cd src/analytics && python -m app.services.liturgical_calendar_loader",
     "docker:up": "docker compose up --build",
     "docker:down": "docker compose down"
   },
   "devDependencies": {
     "concurrently": "^9.2.1"
+  },
+  "dependencies": {
+    "@romcal/calendar.general-roman": "^3.0.0-alpha.0",
+    "@romcal/calendar.philippines": "^3.0.0-alpha.0",
+    "romcal": "^3.0.0-alpha.0"
   }
 }

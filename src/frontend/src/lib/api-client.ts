@@ -268,6 +268,31 @@ export const apiClient = {
     return get('/api/entities', type ? { type } : undefined);
   },
 
+  async getGeoInstitutions(): Promise<
+    { id: string; name: string; vicariate: string; class: string; lat: number; lng: number; collections: number }[]
+  > {
+    return get('/api/entities/geo');
+  },
+
+  async getFinancialProfiles(type?: 'parish' | 'seminary' | 'school'): Promise<any[]> {
+    return get('/api/entities/financial-profiles', type ? { type } : undefined);
+  },
+
+  // ----------------------------------------------------------------
+  // Priest health records
+  // ----------------------------------------------------------------
+  async getHealthRecords(): Promise<any[]> {
+    return get('/api/health-records');
+  },
+
+  async saveHealthRecord(record: any): Promise<any> {
+    return post('/api/health-records', record);
+  },
+
+  async deleteHealthRecord(id: string): Promise<void> {
+    await del(`/api/health-records/${id}`);
+  },
+
   // ----------------------------------------------------------------
   // Subscriptions (polling-based, backward-compatible)
   // ----------------------------------------------------------------
