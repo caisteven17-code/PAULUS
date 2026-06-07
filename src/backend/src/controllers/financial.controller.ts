@@ -1,11 +1,21 @@
-import { Controller, Get, Post, Delete, Body, Query, Param, Res, HttpStatus } from '@nestjs/common';
-import { Response } from 'express';
+import { Controller, Get, Post, Delete, Body, Query, Param, Req, Res, HttpStatus } from '@nestjs/common';
+import { Request, Response } from 'express';
 import { FinancialService } from '../services/financial.service';
+import { AuditLogService } from '../services/audit-log.service';
 import { FinancialRecord, EntityClass } from '../types';
+
+function clientIp(req: Request): string {
+  const forwarded = req.headers['x-forwarded-for'];
+  if (typeof forwarded === 'string') return forwarded.split(',')[0].trim();
+  return req.socket?.remoteAddress ?? 'unknown';
+}
 
 @Controller('financial')
 export class FinancialController {
-  constructor(private readonly financialService: FinancialService) {}
+  constructor(
+    private readonly financialService: FinancialService,
+    private readonly auditLogService: AuditLogService,
+  ) {}
 
   @Get('records')
   async getRecords(
@@ -28,14 +38,36 @@ export class FinancialController {
   }
 
   @Post('records')
-  async saveRecord(@Body() record: FinancialRecord, @Res() res: Response) {
+  async saveRecord(@Body() record: FinancialRecord, @Req() req: Request, @Res() res: Response) {
     const saved = await this.financialService.saveRecord(record);
+    await this.auditLogService.logEvent({
+      category: 'finance',
+      severity: 'success',
+      action: 'Financial Record Saved',
+      detail: `${record.entityType ?? 'Entity'} financial record saved for entity ${record.entityId ?? 'unknown'} (${record.month ?? ''})`,
+      ipAddress: clientIp(req),
+      metadata: { entityId: record.entityId, entityType: record.entityType, month: record.month },
+      userName: 'System',
+      userRole: 'system',
+      isSystem: true,
+    });
     return res.status(HttpStatus.OK).json(saved);
   }
 
   @Delete('records/:id')
-  async deleteRecord(@Param('id') id: string, @Res() res: Response) {
+  async deleteRecord(@Param('id') id: string, @Req() req: Request, @Res() res: Response) {
     await this.financialService.deleteRecord(id);
+    await this.auditLogService.logEvent({
+      category: 'finance',
+      severity: 'warning',
+      action: 'Financial Record Deleted',
+      detail: `Financial record ${id} permanently deleted`,
+      ipAddress: clientIp(req),
+      metadata: { recordId: id },
+      userName: 'System',
+      userRole: 'system',
+      isSystem: true,
+    });
     return res.status(HttpStatus.OK).json({ ok: true });
   }
 

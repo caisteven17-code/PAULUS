@@ -465,7 +465,7 @@ Sandbox outputs are never written back to operational or analytics fact tables. 
 ## 8. `reference` Schema — Climate & Liturgical Time Context
 
 ### `reference.liturgical_calendar` 🆕 *(Standardized from the Ordo/Philippine Rite)*
-`id` (uuid PK) · `date` (date unique) · `year` (smallint) · `liturgical_season` (text: Advent/Christmas/Lent/Easter/Ordinary Time) · `feast_name` (text) · `rank` (text: Solemnity/Feast/Memorial/Optional) · `liturgical_color` (text) · `is_holy_day_of_obligation` (bool) · `has_special_collection` (bool) · `special_collection_name` (text, nullable) · `expected_collection_impact` (text: low/medium/high) · `notes` (text)[cite: 2]
+`id` (uuid PK) · `date` (date) · `year` (smallint) · `month` (smallint) · `day` (smallint) · `weekday` (text) · `celebration_name` (text) · `rank` (text, nullable) · `liturgical_season` (text, nullable) · `psalter_week` (text: I/II/III/IV, nullable) · `source_name` (text) · `source_url` (text) · `source_reference` (text, nullable) · `raw_payload` (jsonb) · `review_status` (text: pending/approved/approved_with_revisions/rejected) · `reviewed_by` (text, nullable) · `reviewed_at` (timestamptz, nullable) · `review_notes` (text, nullable) · `revision_payload` (jsonb, nullable) · unique per (`date`, `source_name`)[cite: 2]
 
 ### `reference.weather_observations` 🆕 *(Sourced from OpenWeather/PAGASA daily logs)*
 `id` (uuid PK) · `date` (date) · `institution_id` (uuid FK → `diocese.institutions.id`, nullable for regional province-wide overrides) · `location` (text) · `condition` (text: sunny/rainy/stormy/cloudy) · `temp_avg_c` (numeric) · `rainfall_mm` (numeric) · `typhoon_signal` (smallint references range 0–5) · `is_extreme_event` (bool) · `source` (text) · `recorded_at` (timestamptz)[cite: 2]

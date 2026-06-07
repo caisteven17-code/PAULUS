@@ -1,4 +1,4 @@
-'use client';
+﻿'use client';
 
 import React, { useState, useEffect } from 'react';
 import { ArrowLeft, CalendarClock, ChevronDown, ShieldAlert } from 'lucide-react';
@@ -12,7 +12,7 @@ import { Settings } from './views/Settings';
 import { Login } from './views/Login';
 import { Home } from './views/Home';
 import { Projects } from './views/Projects';
-import { AITwin } from './views/AITwin';
+import { WhatIfSimulator } from './views/WhatIfSimulator';
 import { DigitalTwin } from './views/DigitalTwin';
 import { Announcements } from './views/Announcements';
 import { HealthTracker } from './views/HealthTracker';
@@ -195,9 +195,9 @@ export default function App() {
         case 'priest-health':
           return <HealthTracker />;
         case 'parish-aitwin':
-          return <AITwin mode="parish" />;
+          return <WhatIfSimulator mode="parish" />;
         case 'priest-aitwin':
-          return <AITwin mode="priest" />;
+          return <WhatIfSimulator mode="priest" />;
         case 'announcements':
           return <Announcements />;
         default:
@@ -236,7 +236,7 @@ export default function App() {
             />
           );
         case 'seminary-aitwin':
-          return <AITwin mode="seminary" />;
+          return <WhatIfSimulator mode="seminary" />;
         case 'announcements':
           return <Announcements />;
         default:
@@ -274,7 +274,7 @@ export default function App() {
           />
         );
       case 'school-aitwin':
-        return <AITwin mode="school" />;
+        return <WhatIfSimulator mode="school" />;
       case 'announcements':
         return <Announcements />;
       default:
@@ -314,7 +314,7 @@ export default function App() {
               onLogout={handleLogout}
             />
 
-            {/* ── Digital Twin Period Bar ──────────────────────────────── */}
+            {/* â”€â”€ Digital Twin Period Bar â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
             <div className="flex shrink-0 items-center gap-2 border-b border-amber-200 bg-gradient-to-r from-amber-50 to-yellow-50 px-4 py-2">
               <CalendarClock className="h-3.5 w-3.5 text-amber-700 shrink-0" />
               <span className="text-[11px] font-black uppercase tracking-[0.2em] text-amber-800 shrink-0">
@@ -367,7 +367,7 @@ export default function App() {
 
               {/* Active period badge */}
               <span className="ml-auto shrink-0 rounded-full border border-amber-300 bg-white px-2.5 py-0.5 text-[11px] font-bold text-amber-800">
-                {dtMonth} {year} • Read-only view
+                {dtMonth} {year} â€¢ Read-only view
               </span>
             </div>
 
@@ -402,7 +402,7 @@ export default function App() {
 
   /**
    * Renders the appropriate page component based on activeTab and user role.
-   * Routes between Home, Dashboard, Projects, AITwin, and Settings pages.
+   * Routes between Home, Dashboard, Projects, WhatIfSimulator, and Settings pages.
    */
   const renderContent = () => {
     // Dynamically retrieve the logged-in user's assigned parish/institution name
@@ -421,7 +421,7 @@ export default function App() {
       </div>
     );
 
-    // Administration sub-routes — each deep-links to a specific Settings tab
+    // Administration sub-routes â€” each deep-links to a specific Settings tab
     const adminTabMap: Record<string, string> = {
       'admin-user-management': 'user-management',
       'admin-user-role': 'role-control',
@@ -499,7 +499,7 @@ export default function App() {
         case 'parish-aitwin':
           if (permissions.view_parish_dashboard !== true && permissions.digital_twin !== true)
             return renderAccessDenied();
-          return <AITwin mode="parish" />;
+          return <WhatIfSimulator mode="parish" />;
         case 'priest-dashboard':
           if (permissions.view_parish_dashboard !== true) return renderAccessDenied();
           return (
@@ -519,7 +519,7 @@ export default function App() {
         case 'priest-aitwin':
           if (permissions.view_parish_dashboard !== true && permissions.digital_twin !== true)
             return renderAccessDenied();
-          return <AITwin mode="priest" />;
+          return <WhatIfSimulator mode="priest" />;
         case 'seminaries':
           if (permissions.view_seminary_dashboard !== true) return renderAccessDenied();
           return (
@@ -528,7 +528,7 @@ export default function App() {
         case 'seminary-aitwin':
           if (permissions.view_seminary_dashboard !== true && permissions.digital_twin !== true)
             return renderAccessDenied();
-          return <AITwin mode="seminary" />;
+          return <WhatIfSimulator mode="seminary" />;
         case 'school':
           if (permissions.view_school_dashboard !== true) return renderAccessDenied();
           return (
@@ -542,7 +542,7 @@ export default function App() {
         case 'school-aitwin':
           if (permissions.view_school_dashboard !== true && permissions.digital_twin !== true)
             return renderAccessDenied();
-          return <AITwin mode="school" />;
+          return <WhatIfSimulator mode="school" />;
         case 'projects':
           return permissions.view_projects ? <Projects role={role} /> : renderAccessDenied();
         case 'digital-twin':
@@ -651,7 +651,7 @@ export default function App() {
           );
         case 'parish-aitwin':
           return permissions.view_parish_dashboard === true || permissions.digital_twin === true ? (
-            <AITwin mode="parish" />
+            <WhatIfSimulator mode="parish" />
           ) : (
             renderAccessDenied()
           );
@@ -674,7 +674,7 @@ export default function App() {
           return permissions.view_priests ? <HealthTracker /> : renderAccessDenied();
         case 'priest-aitwin':
           return permissions.view_parish_dashboard === true || permissions.digital_twin === true ? (
-            <AITwin mode="priest" />
+            <WhatIfSimulator mode="priest" />
           ) : (
             renderAccessDenied()
           );
@@ -707,7 +707,7 @@ export default function App() {
           );
         case 'seminary-aitwin':
           return permissions.view_seminary_dashboard === true || permissions.digital_twin === true ? (
-            <AITwin mode="seminary" />
+            <WhatIfSimulator mode="seminary" />
           ) : (
             renderAccessDenied()
           );
@@ -740,7 +740,7 @@ export default function App() {
           );
         case 'school-aitwin':
           return permissions.view_school_dashboard === true || permissions.digital_twin === true ? (
-            <AITwin mode="school" />
+            <WhatIfSimulator mode="school" />
           ) : (
             renderAccessDenied()
           );
@@ -799,3 +799,4 @@ export default function App() {
     </ErrorBoundary>
   );
 }
+
