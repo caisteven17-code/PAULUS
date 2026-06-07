@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Patch, Delete, Body, Query, Res, HttpStatus } from '@nestjs/common';
+import { Controller, Get, Post, Patch, Delete, Body, Query, Param, Res, HttpStatus } from '@nestjs/common';
 import { Response } from 'express';
 import { EntityService } from '../services/entity.service';
 
@@ -24,6 +24,56 @@ export class EntityController {
   @Get('all')
   getAll() {
     return this.entityService.getAll();
+  }
+
+  @Get('geo')
+  async getGeoInstitutions(@Res() res: Response) {
+    try {
+      const data = await this.entityService.getGeoInstitutions();
+      return res.status(HttpStatus.OK).json(data);
+    } catch (err: any) {
+      return res.status(HttpStatus.BAD_REQUEST).json({ error: err.message });
+    }
+  }
+
+  @Get('financial-profiles')
+  async getFinancialProfiles(@Query('type') type: 'parish' | 'seminary' | 'school' | undefined, @Res() res: Response) {
+    try {
+      const data = await this.entityService.getFinancialProfiles(type as any);
+      return res.status(HttpStatus.OK).json(data);
+    } catch (err: any) {
+      return res.status(HttpStatus.BAD_REQUEST).json({ error: err.message });
+    }
+  }
+
+  @Get('health-records')
+  async getPriestHealthRecords(@Res() res: Response) {
+    try {
+      const data = await this.entityService.getPriestHealthRecords();
+      return res.status(HttpStatus.OK).json(data);
+    } catch (err: any) {
+      return res.status(HttpStatus.BAD_REQUEST).json({ error: err.message });
+    }
+  }
+
+  @Post('health-records')
+  async savePriestHealthRecord(@Body() body: any, @Res() res: Response) {
+    try {
+      const data = await this.entityService.savePriestHealthRecord(body);
+      return res.status(HttpStatus.OK).json(data);
+    } catch (err: any) {
+      return res.status(HttpStatus.BAD_REQUEST).json({ error: err.message });
+    }
+  }
+
+  @Delete('health-records/:id')
+  async deletePriestHealthRecord(@Param('id') id: string, @Res() res: Response) {
+    try {
+      await this.entityService.deletePriestHealthRecord(id);
+      return res.status(HttpStatus.OK).json({ ok: true });
+    } catch (err: any) {
+      return res.status(HttpStatus.BAD_REQUEST).json({ error: err.message });
+    }
   }
 
   @Get('admin')

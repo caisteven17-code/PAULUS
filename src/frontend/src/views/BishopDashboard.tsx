@@ -40,6 +40,7 @@ const GeospatialHeatMap = dynamic(
   },
 );
 import { dataService } from '../services/dataService';
+import { apiClient } from '../lib/api-client';
 import { FinancialRecord, FinancialHealthScore, DiagnosticResult } from '../types';
 import { auth } from '../firebase';
 import { FinancialHealthGauge } from '../components/ui/FinancialHealthGauge';
@@ -50,64 +51,6 @@ import { motion, AnimatePresence } from 'motion/react';
 import { formatCurrency, formatNumber } from '../lib/format';
 import SeminaryAnalyticsDashboard from '../components/analytics/SeminaryAnalyticsDashboard';
 import { DataImportExport } from '../components/projects/DataImportExport';
-
-const weeklyDeclineDataRaw = [
-  {
-    parish: 'San Gabriel Arkanghel Parish',
-    vicariate: 'St. Paul the First Hermit',
-    class: 'Class B',
-    w1: 412000,
-    w2: 386000,
-    w3: 351000,
-    w4: 322000,
-    trend: -22,
-    type: 'down',
-  },
-  {
-    parish: 'Our Lady of the Pillar Parish',
-    vicariate: 'St. Paul the First Hermit',
-    class: 'Class C',
-    w1: 412000,
-    w2: 279000,
-    w3: 261000,
-    w4: 248000,
-    trend: -14,
-    type: 'down',
-  },
-  {
-    parish: 'Sto. Rosario Parish',
-    vicariate: 'San Pedro Apostol',
-    class: 'Class D',
-    w1: 301000,
-    w2: 318000,
-    w3: 296000,
-    w4: 281000,
-    trend: -6,
-    type: 'down',
-  },
-  {
-    parish: 'Mother of Good Counsel Parish',
-    vicariate: 'Holy Family',
-    class: 'Class D',
-    w1: 214000,
-    w2: 203000,
-    w3: 191000,
-    w4: 176000,
-    trend: -18,
-    type: 'down',
-  },
-  {
-    parish: 'Chair of St. Peter Parish',
-    vicariate: 'Sta. Rosa De Lima',
-    class: 'Class A',
-    w1: 612000,
-    w2: 598000,
-    w3: 583000,
-    w4: 576000,
-    trend: -6,
-    type: 'down',
-  },
-];
 
 const topTierParishesData = [
   { rank: 1, name: 'St. John Paul II Parish', location: 'SAN PABLO', class: 'Class A' },
@@ -863,37 +806,6 @@ const getEntitiesData = (type: string) => {
   }));
 };
 
-const getDeclineData = (type: string) => {
-  const entities = getEntitiesData(type);
-
-  return entities.map((entity: any, index: number) => {
-    // Generate some mock monthly data
-    // Use index to create some variety in trends
-    const isStruggling = index % 3 === 0;
-    const baseVal = 300000 + index * 50000;
-    const m1 = baseVal;
-
-    // If struggling, trend downwards. If not, trend upwards or stay stable.
-    const m2 = baseVal * (isStruggling ? 0.95 : 1.02);
-    const m3 = m2 * (isStruggling ? 0.92 : 1.03);
-    const m4 = m3 * (isStruggling ? 0.88 : 1.01);
-
-    const trend = Math.round(((m4 - m1) / m1) * 100);
-
-    return {
-      name: entity.name,
-      vicariate: entity.vicariate || 'Holy Family',
-      class: entity.class || ['Class A', 'Class B', 'Class C', 'Class D'][index % 4],
-      w1: m1,
-      w2: m2,
-      w3: m3,
-      w4: m4,
-      trend: trend,
-      type: trend < 0 ? 'down' : 'up',
-    };
-  });
-};
-
 const formationStageData = [
   { stage: 'Propaedeutic', count: 12, color: '#1a472a' },
   { stage: 'Philosophy I', count: 10, color: '#D4AF37' },
@@ -1124,6 +1036,7 @@ export function BishopDashboard({
     setEntityType(initialEntityType);
   }, [initialEntityType]);
   const [records, setRecords] = useState<FinancialRecord[]>([]);
+  const [geoInstitutions, setGeoInstitutions] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [selectedDiagnostic, setSelectedDiagnostic] = useState<DiagnosticResult | null>(null);
@@ -1180,6 +1093,47 @@ export function BishopDashboard({
       setIsLoading(false);
     }
   }, []);
+
+  useEffect(() => {
+    apiClient
+      .getGeoInstitutions()
+      .then((data) => {
+        if (data?.length) setGeoInstitutions(data);
+      })
+      .catch(() => {});
+  }, []);
+
+  const [liveDeclineData, setLiveDeclineData] = useState<any[]>([]);
+  useEffect(() => {
+    const apiType = entityType === 'Diocesan Schools' ? 'school' : entityType === 'Seminaries' ? 'seminary' : 'parish';
+    apiClient
+      .getFinancialProfiles(apiType as any)
+      .then((data) => {
+        if (!data?.length) return;
+        setLiveDeclineData(
+          data.map((p: any) => {
+            const hist: number[] = p.collectionsHistory ?? [];
+            const last4 = hist.slice(-4);
+            const [w1 = 0, w2 = 0, w3 = 0, w4 = 0] = last4;
+            const trend = w1 > 0 ? Math.round(((w4 - w1) / w1) * 100) : 0;
+            return {
+              name: p.name,
+              vicariate: p.location ?? '',
+              class: p.class ?? '',
+              w1,
+              w2,
+              w3,
+              w4,
+              trend,
+              type: trend < 0 ? 'down' : 'up',
+            };
+          }),
+        );
+      })
+      .catch(() => {});
+  }, [entityType]);
+
+  const [sortConfig, setSortConfig] = useState<{ key: string; direction: 'asc' | 'desc' } | null>(null);
   const [districtFilter, setDistrictFilter] = useState('All Districts');
   const [vicariateFilter, setVicariateFilter] = useState('All Vicariates');
   const [classFilter, setClassFilter] = useState('All Classes');
@@ -1188,7 +1142,6 @@ export function BishopDashboard({
   const [contributionView, setContributionView] = useState<'entity' | 'vicariate'>('vicariate');
   const [selectedVicariate, setSelectedVicariate] = useState<string | null>(null);
   const [selectedBarVicariate, setSelectedBarVicariate] = useState<string | null>(null);
-  const [sortConfig, setSortConfig] = useState<{ key: string; direction: 'asc' | 'desc' } | null>(null);
   const [contributionSortOrder, setContributionSortOrder] = useState<'desc' | 'asc'>('desc');
   const [showFilters, setShowFilters] = useState(false);
   const [forecastTab, setForecastTab] = useState<'collections' | 'disbursements'>('collections');
@@ -1388,40 +1341,6 @@ export function BishopDashboard({
     });
   }, [entityType, districtFilter, vicariateFilter, classFilter, entityFilter]);
 
-  const filteredDeclineData = useMemo(() => {
-    let data = getDeclineData(entityType)
-      .map((item) => ({
-        ...item,
-        district: VICARIATE_TO_DISTRICT[item.vicariate] || 'Other',
-      }))
-      .filter((p: any) => {
-        const dMatch =
-          entityType === 'Seminaries' || districtFilter === 'All Districts' || p.district === districtFilter;
-        const vMatch =
-          entityType === 'Seminaries' || vicariateFilter === 'All Vicariates' || p.vicariate === vicariateFilter;
-        const cMatch = classFilter === 'All Classes' || p.class === classFilter;
-        const pMatch = entityFilter === 'All Entities' || p.name === entityFilter;
-        return dMatch && vMatch && cMatch && pMatch;
-      });
-
-    if (sortConfig) {
-      data.sort((a: any, b: any) => {
-        if (a[sortConfig.key] < b[sortConfig.key]) return sortConfig.direction === 'asc' ? -1 : 1;
-        if (a[sortConfig.key] > b[sortConfig.key]) return sortConfig.direction === 'asc' ? 1 : -1;
-        return 0;
-      });
-    }
-    return data;
-  }, [districtFilter, vicariateFilter, classFilter, entityFilter, sortConfig, entityType]);
-
-  const handleSort = (key: string) => {
-    let direction: 'asc' | 'desc' = 'asc';
-    if (sortConfig && sortConfig.key === key && sortConfig.direction === 'asc') {
-      direction = 'desc';
-    }
-    setSortConfig({ key, direction });
-  };
-
   const dynamicTrendData = useMemo(() => {
     const scale = filteredEntities.length / (currentEntities.length || 1);
     return filteredTrendData.map((d) => ({
@@ -1539,6 +1458,37 @@ export function BishopDashboard({
       ],
     };
   }, [entityType, cmpMetric, cmpMonth1, cmpYear1, cmpMonth2, cmpYear2]);
+
+  const filteredDeclineData = useMemo(() => {
+    let data = liveDeclineData
+      .map((item) => ({
+        ...item,
+        district: VICARIATE_TO_DISTRICT[item.vicariate] || 'Other',
+      }))
+      .filter((p: any) => {
+        const dMatch =
+          entityType === 'Seminaries' || districtFilter === 'All Districts' || p.district === districtFilter;
+        const vMatch =
+          entityType === 'Seminaries' || vicariateFilter === 'All Vicariates' || p.vicariate === vicariateFilter;
+        const cMatch = classFilter === 'All Classes' || p.class === classFilter;
+        const pMatch = entityFilter === 'All Entities' || p.name === entityFilter;
+        return dMatch && vMatch && cMatch && pMatch;
+      });
+    if (sortConfig) {
+      data.sort((a: any, b: any) => {
+        if (a[sortConfig.key] < b[sortConfig.key]) return sortConfig.direction === 'asc' ? -1 : 1;
+        if (a[sortConfig.key] > b[sortConfig.key]) return sortConfig.direction === 'asc' ? 1 : -1;
+        return 0;
+      });
+    }
+    return data;
+  }, [liveDeclineData, districtFilter, vicariateFilter, classFilter, entityFilter, sortConfig, entityType]);
+
+  const handleSort = (key: string) => {
+    setSortConfig((prev) =>
+      prev?.key === key && prev.direction === 'asc' ? { key, direction: 'desc' } : { key, direction: 'asc' },
+    );
+  };
 
   if (isLoading) {
     return (
@@ -3389,7 +3339,7 @@ export function BishopDashboard({
                       <h3 className="text-2xl font-bold text-church-green">Monthly Collections Decline Monitor</h3>
                     </div>
                     <p className="text-sm text-gray-400 mt-1">
-                      Flags entities with continuously decreasing collections over the past 4 months(sample data).
+                      Flags entities with continuously decreasing collections over the past 4 months.
                     </p>
                   </CardHeader>
                   <CardContent className="mt-4">
@@ -3450,74 +3400,26 @@ export function BishopDashboard({
                                 )}
                               </div>
                             </th>
-                            <th
-                              className="px-4 py-4 cursor-pointer hover:bg-gray-50 transition-colors sticky top-0 bg-white"
-                              onClick={() => handleSort('w1')}
-                            >
-                              <div className="flex items-center gap-1">
-                                Month 1
-                                {sortConfig?.key === 'w1' ? (
-                                  sortConfig.direction === 'asc' ? (
-                                    <ArrowUp className="w-3 h-3 text-gold-600" />
+                            {(['w1', 'w2', 'w3', 'w4'] as const).map((col, i) => (
+                              <th
+                                key={col}
+                                className="px-4 py-4 cursor-pointer hover:bg-gray-50 transition-colors sticky top-0 bg-white"
+                                onClick={() => handleSort(col)}
+                              >
+                                <div className="flex items-center gap-1">
+                                  Month {i + 1}
+                                  {sortConfig?.key === col ? (
+                                    sortConfig.direction === 'asc' ? (
+                                      <ArrowUp className="w-3 h-3 text-gold-600" />
+                                    ) : (
+                                      <ArrowDown className="w-3 h-3 text-gold-600" />
+                                    )
                                   ) : (
-                                    <ArrowDown className="w-3 h-3 text-gold-600" />
-                                  )
-                                ) : (
-                                  <ArrowUpDown className="w-3 h-3 opacity-30" />
-                                )}
-                              </div>
-                            </th>
-                            <th
-                              className="px-4 py-4 cursor-pointer hover:bg-gray-50 transition-colors sticky top-0 bg-white"
-                              onClick={() => handleSort('w2')}
-                            >
-                              <div className="flex items-center gap-1">
-                                Month 2
-                                {sortConfig?.key === 'w2' ? (
-                                  sortConfig.direction === 'asc' ? (
-                                    <ArrowUp className="w-3 h-3 text-gold-600" />
-                                  ) : (
-                                    <ArrowDown className="w-3 h-3 text-gold-600" />
-                                  )
-                                ) : (
-                                  <ArrowUpDown className="w-3 h-3 opacity-30" />
-                                )}
-                              </div>
-                            </th>
-                            <th
-                              className="px-4 py-4 cursor-pointer hover:bg-gray-50 transition-colors sticky top-0 bg-white"
-                              onClick={() => handleSort('w3')}
-                            >
-                              <div className="flex items-center gap-1">
-                                Month 3
-                                {sortConfig?.key === 'w3' ? (
-                                  sortConfig.direction === 'asc' ? (
-                                    <ArrowUp className="w-3 h-3 text-gold-600" />
-                                  ) : (
-                                    <ArrowDown className="w-3 h-3 text-gold-600" />
-                                  )
-                                ) : (
-                                  <ArrowUpDown className="w-3 h-3 opacity-30" />
-                                )}
-                              </div>
-                            </th>
-                            <th
-                              className="px-4 py-4 cursor-pointer hover:bg-gray-50 transition-colors sticky top-0 bg-white"
-                              onClick={() => handleSort('w4')}
-                            >
-                              <div className="flex items-center gap-1">
-                                Month 4
-                                {sortConfig?.key === 'w4' ? (
-                                  sortConfig.direction === 'asc' ? (
-                                    <ArrowUp className="w-3 h-3 text-gold-600" />
-                                  ) : (
-                                    <ArrowDown className="w-3 h-3 text-gold-600" />
-                                  )
-                                ) : (
-                                  <ArrowUpDown className="w-3 h-3 opacity-30" />
-                                )}
-                              </div>
-                            </th>
+                                    <ArrowUpDown className="w-3 h-3 opacity-30" />
+                                  )}
+                                </div>
+                              </th>
+                            ))}
                             <th
                               className="px-4 py-4 text-right cursor-pointer hover:bg-gray-50 transition-colors sticky top-0 bg-white"
                               onClick={() => handleSort('trend')}
@@ -3538,35 +3440,39 @@ export function BishopDashboard({
                           </tr>
                         </thead>
                         <tbody>
-                          {filteredDeclineData.map((row, i) => (
-                            <tr key={i} className="border-b border-gray-100 hover:bg-gray-50 transition-colors">
-                              <td className="px-4 py-4 text-church-green/80">{row.name}</td>
-                              {entityType !== 'Seminaries' && (
-                                <td className="px-4 py-4 text-church-green/80">
-                                  {stripVicariatePrefix(row.vicariate)}
-                                </td>
-                              )}
-                              <td className="px-4 py-4 text-church-green/80">{row.class}</td>
-                              <td className="px-4 py-4 font-medium text-church-green">{formatCurrency(row.w1)}</td>
-                              <td className="px-4 py-4 font-medium text-church-green">{formatCurrency(row.w2)}</td>
-                              <td className="px-4 py-4 font-medium text-church-green">{formatCurrency(row.w3)}</td>
-                              <td className="px-4 py-4 font-medium text-church-green">{formatCurrency(row.w4)}</td>
-                              <td className="px-4 py-4 text-right">
-                                <span
-                                  className={`px-3 py-1 rounded-full font-bold text-[10px] flex items-center justify-end gap-1 w-fit ml-auto ${
-                                    row.type === 'down'
-                                      ? 'bg-orange-50 text-orange-700'
-                                      : 'bg-emerald-50 text-emerald-700'
-                                  }`}
-                                >
-                                  <div
-                                    className={`w-1.5 h-1.5 rounded-full ${row.type === 'down' ? 'bg-orange-500' : 'bg-emerald-500'}`}
-                                  ></div>
-                                  {row.trend}%
-                                </span>
+                          {filteredDeclineData.length === 0 ? (
+                            <tr>
+                              <td colSpan={7} className="px-4 py-8 text-center text-gray-400 text-sm">
+                                Awaiting monthly submission data.
                               </td>
                             </tr>
-                          ))}
+                          ) : (
+                            filteredDeclineData.map((row, i) => (
+                              <tr key={i} className="border-b border-gray-100 hover:bg-gray-50 transition-colors">
+                                <td className="px-4 py-4 text-church-green/80">{row.name}</td>
+                                {entityType !== 'Seminaries' && (
+                                  <td className="px-4 py-4 text-church-green/80">
+                                    {stripVicariatePrefix(row.vicariate)}
+                                  </td>
+                                )}
+                                <td className="px-4 py-4 text-church-green/80">{row.class}</td>
+                                <td className="px-4 py-4 font-medium text-church-green">{formatCurrency(row.w1)}</td>
+                                <td className="px-4 py-4 font-medium text-church-green">{formatCurrency(row.w2)}</td>
+                                <td className="px-4 py-4 font-medium text-church-green">{formatCurrency(row.w3)}</td>
+                                <td className="px-4 py-4 font-medium text-church-green">{formatCurrency(row.w4)}</td>
+                                <td className="px-4 py-4 text-right">
+                                  <span
+                                    className={`px-3 py-1 rounded-full font-bold text-[10px] flex items-center justify-end gap-1 w-fit ml-auto ${row.type === 'down' ? 'bg-orange-50 text-orange-700' : 'bg-emerald-50 text-emerald-700'}`}
+                                  >
+                                    <div
+                                      className={`w-1.5 h-1.5 rounded-full ${row.type === 'down' ? 'bg-orange-500' : 'bg-emerald-500'}`}
+                                    ></div>
+                                    {row.trend}%
+                                  </span>
+                                </td>
+                              </tr>
+                            ))
+                          )}
                         </tbody>
                       </table>
                     </div>
@@ -4006,7 +3912,7 @@ export function BishopDashboard({
                     </CardHeader>
                     <CardContent className="w-full mt-6">
                       <div className="h-[450px]">
-                        <GeospatialHeatMap data={records.length > 0 ? records : ALL_PARISHES} />
+                        <GeospatialHeatMap data={geoInstitutions.length > 0 ? geoInstitutions : undefined} />
                       </div>
                     </CardContent>
                   </Card>

@@ -1,19 +1,43 @@
 CREATE TABLE IF NOT EXISTS reference.liturgical_calendar (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  date date NOT NULL UNIQUE,
+  date date NOT NULL,
   year smallint NOT NULL,
-  liturgical_season text NOT NULL CHECK (liturgical_season IN ('Advent', 'Christmas', 'Lent', 'Easter', 'Ordinary Time')),
-  feast_name text,
-  rank text CHECK (rank IN ('Solemnity', 'Feast', 'Memorial', 'Optional') OR rank IS NULL),
-  liturgical_color text,
-  is_holy_day_of_obligation boolean NOT NULL DEFAULT false,
-  has_special_collection boolean NOT NULL DEFAULT false,
-  special_collection_name text,
-  expected_collection_impact text CHECK (expected_collection_impact IN ('low', 'medium', 'high') OR expected_collection_impact IS NULL),
-  notes text,
+  month smallint NOT NULL CHECK (month BETWEEN 1 AND 12),
+  day smallint NOT NULL CHECK (day BETWEEN 1 AND 31),
+  weekday text NOT NULL,
+  celebration_name text NOT NULL,
+  rank text,
+  liturgical_season text,
+  psalter_week text CHECK (psalter_week IN ('I', 'II', 'III', 'IV') OR psalter_week IS NULL),
+  source_name text NOT NULL,
+  source_url text NOT NULL,
+  source_reference text,
+  raw_payload jsonb NOT NULL,
+  review_status text NOT NULL DEFAULT 'pending'
+    CHECK (review_status IN ('pending', 'approved', 'approved_with_revisions', 'rejected')),
+  reviewed_by text,
+  reviewed_at timestamptz,
+  review_notes text,
+  revision_payload jsonb,
   created_at timestamptz NOT NULL DEFAULT now(),
-  updated_at timestamptz NOT NULL DEFAULT now()
+  updated_at timestamptz NOT NULL DEFAULT now(),
+  CONSTRAINT uq_liturgical_calendar_date_source UNIQUE (date, source_name)
 );
+
+CREATE INDEX IF NOT EXISTS idx_liturgical_calendar_date
+  ON reference.liturgical_calendar (date);
+
+CREATE INDEX IF NOT EXISTS idx_liturgical_calendar_year
+  ON reference.liturgical_calendar (year);
+
+CREATE INDEX IF NOT EXISTS idx_liturgical_calendar_source_name
+  ON reference.liturgical_calendar (source_name);
+
+CREATE INDEX IF NOT EXISTS idx_liturgical_calendar_review_status
+  ON reference.liturgical_calendar (review_status);
+
+GRANT USAGE ON SCHEMA reference TO service_role;
+GRANT SELECT, INSERT, UPDATE, DELETE ON reference.liturgical_calendar TO service_role;
 
 CREATE TABLE IF NOT EXISTS reference.weather_observations (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),

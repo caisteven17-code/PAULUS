@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { AuthController } from '../../controllers/auth.controller';
 import { AppAuthService } from '../../services/auth.service';
+import { AuditLogService } from '../../services/audit-log.service';
 import { SupabaseService } from '../../services/supabase.service';
 
 @Module({
@@ -11,6 +12,6 @@ import { SupabaseService } from '../../services/supabase.service';
     }),
   ],
   controllers: [AuthController],
-  providers: [SupabaseService, AppAuthService],
+  providers: [SupabaseService, AppAuthService, AuditLogService],
 })
 export class AuthServiceModule {}

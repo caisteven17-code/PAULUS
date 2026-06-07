@@ -1,0 +1,98 @@
+name: Liturgical Calendar Refresh
+
+on:
+  workflow_dispatch:
+    inputs:
+      force:
+        description: Run even outside the scheduled refresh window
+        required: false
+        default: "true"
+  schedule:
+    # 2nd week of November in Asia/Manila — preloads next year's PH calendar.
+    - cron: "0 18 8 11 *"
+    # Quarterly PH-context refresh, also in Asia/Manila.
+    - cron: "0 18 1 2,5,8,11 *"
+    # Daily fallback: retry-until-success if a scheduled run failed.
+    - cron: "0 18 * * *"
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    outputs:
+      needed: ${{ steps.check.outputs.needed }}
+    env:
+      SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+      NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
+      SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Check if refresh needed
+        id: check
+        run: python src/analytics/app/services/liturgical_calendar_check.py
+
+  refresh:
+    needs: check
+    if: always() && (needs.check.outputs.needed == 'true' || github.event_name == 'workflow_dispatch')
+    runs-on: ubuntu-latest
+    env:
+      NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
+      SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+      SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+
+      - name: Install Node dependencies
+        run: npm ci
+
+      - name: Install analytics dependencies
+        run: pip install -r src/analytics/requirements.txt
+
+      - name: Refresh liturgical calendar
+        working-directory: src/analytics
+        run: |
+          EXTRA_ARGS=""
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ] && [ "${{ inputs.force }}" = "true" ]; then
+            EXTRA_ARGS="--force"
+          fi
+          SUCCESS=false
+          for attempt in 1 2; do
+            echo "Attempt $attempt of 2"
+            if python -m app.services.liturgical_calendar_updater --load $EXTRA_ARGS; then
+              SUCCESS=true
+              break
+            fi
+            if [ $attempt -lt 2 ]; then
+              echo "Attempt $attempt failed — waiting 30 minutes before retry..."
+              sleep 1800
+            fi
+          done
+          if [ "$SUCCESS" = false ]; then
+            echo "Both attempts failed."
+            exit 1
+          fi
+
+      - name: Notify on failure
+        if: failure()
+        run: |
+          echo "::error::Liturgical calendar refresh failed. Check the logs above for details."
+          echo "::error::Triggered by: ${{ github.event_name }} on ${{ github.ref }}"

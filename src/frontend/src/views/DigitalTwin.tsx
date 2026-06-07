@@ -3,6 +3,7 @@
 import React, { useEffect, useState } from 'react';
 import { ArrowRight, Building2, Database, Landmark, Play, School, ShieldCheck, Sparkles } from 'lucide-react';
 import { ALL_PARISHES, INITIAL_SEMINARIES, INITIAL_SCHOOLS } from '../constants';
+import { apiClient } from '../lib/api-client';
 
 type InstitutionType = 'parish' | 'seminary' | 'school';
 
@@ -80,7 +81,7 @@ const institutionTypeMeta: Record<
   },
 };
 
-const institutionProfiles: InstitutionProfile[] = [
+const FALLBACK_PROFILES: InstitutionProfile[] = [
   {
     id: 'parish-san-isidro',
     name: 'San Isidro Labrador Parish',
@@ -195,11 +196,37 @@ export function DigitalTwin({ onLaunch }: DigitalTwinProps) {
   const [selectedInstitutionId, setSelectedInstitutionId] = useState('');
   const [savedSessions, setSavedSessions] = useState<SavedSession[]>([]);
   const [isLaunching, setIsLaunching] = useState(false);
+  const [liveProfiles, setLiveProfiles] = useState<InstitutionProfile[]>(FALLBACK_PROFILES);
 
-  const filteredInstitutions = institutionProfiles.filter((item) => item.type === institutionType);
+  const filteredInstitutions = liveProfiles.filter((item) => item.type === institutionType);
   const selectedInstitution =
     filteredInstitutions.find((item) => item.id === selectedInstitutionId) ?? filteredInstitutions[0];
   const activeMeta = institutionTypeMeta[institutionType];
+
+  // Fetch live institution profiles from DB on mount
+  useEffect(() => {
+    apiClient
+      .getFinancialProfiles()
+      .then((data) => {
+        if (data?.length) {
+          setLiveProfiles(
+            data.map((p: any) => ({
+              id: String(p.id),
+              name: p.name,
+              type: p.type as InstitutionType,
+              location: p.location ?? '',
+              healthScore: p.healthScore ?? 50,
+              risk: (p.risk as 'Low' | 'Moderate' | 'High') ?? 'Moderate',
+              currentBalance: p.currentBalance ?? 0,
+              monthlyCollections: p.monthlyCollections ?? 0,
+              trend: p.trend ?? '0.0%',
+              insight: p.insight ?? '',
+            })),
+          );
+        }
+      })
+      .catch(() => {}); // silently keep fallback data
+  }, []);
 
   useEffect(() => {
     if (!selectedInstitutionId && filteredInstitutions[0]) {
@@ -252,7 +279,7 @@ export function DigitalTwin({ onLaunch }: DigitalTwinProps) {
   };
 
   const handleQuickLaunch = (item: SavedSession) => {
-    const inst = institutionProfiles.find((p) => p.id === item.institutionId);
+    const inst = liveProfiles.find((p) => p.id === item.institutionId);
     if (!inst) return;
     const entityClass = getInstitutionClass(inst);
     const viewRole = inst.type === 'parish' ? 'priest' : inst.type;
@@ -353,7 +380,7 @@ export function DigitalTwin({ onLaunch }: DigitalTwinProps) {
                           <div>
                             <p className="text-sm font-black text-gray-900">{meta.label}</p>
                             <p className="text-xs text-gray-500">
-                              {institutionProfiles.filter((i) => i.type === type).length} listed
+                              {liveProfiles.filter((i) => i.type === type).length} listed
                             </p>
                           </div>
                         </button>
