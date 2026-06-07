@@ -23,6 +23,7 @@ import {
   Zap,
 } from 'lucide-react';
 import ReactECharts from 'echarts-for-react';
+import { apiClient } from '../lib/api-client';
 
 type AITwinMode = 'parish' | 'priest' | 'seminary' | 'school';
 type FinancialAITwinMode = Exclude<AITwinMode, 'priest'>;
@@ -597,8 +598,35 @@ function calculatePriestScenario(
 
 function ParishAITwin({ mode = 'parish' }: { mode?: FinancialAITwinMode }) {
   const config = financialTwinConfigs[mode];
-  const profiles = config.profiles;
-  const [selectedParishId, setSelectedParishId] = useState(profiles[0].id);
+  const [liveProfiles, setLiveProfiles] = useState<FinancialTwinProfile[]>(config.profiles);
+  const profiles = liveProfiles;
+  const [selectedParishId, setSelectedParishId] = useState<number>(profiles[0]?.id ?? 1);
+
+  // Fetch real institution financial profiles; fall back to hardcoded on failure
+  useEffect(() => {
+    const entityType = mode === 'seminary' ? 'seminary' : mode === 'school' ? 'school' : 'parish';
+    apiClient
+      .getFinancialProfiles(entityType as any)
+      .then((data) => {
+        if (data?.length) {
+          const mapped: FinancialTwinProfile[] = data.map((p: any, i: number) => ({
+            id: i + 1,
+            name: p.name,
+            cashBalance: p.currentBalance ?? 0,
+            monthlyIncome: p.monthlyCollections ?? 0,
+            monthlyExpenses: p.monthlyExpenses ?? 0,
+            healthScore: p.healthScore ?? 50,
+            collectionsHistory:
+              p.collectionsHistory?.length === 6 ? p.collectionsHistory : Array(6).fill(p.monthlyCollections ?? 0),
+            expensesHistory:
+              p.expensesHistory?.length === 6 ? p.expensesHistory : Array(6).fill(p.monthlyExpenses ?? 0),
+          }));
+          setLiveProfiles(mapped);
+          setSelectedParishId(1);
+        }
+      })
+      .catch(() => {});
+  }, [mode]);
   const [isSimulating, setIsSimulating] = useState(false);
   const [savedScenarios, setSavedScenarios] = useState<ParishSavedScenario[]>(() => {
     const saved = localStorage.getItem(config.storageKey);
@@ -1594,6 +1622,6 @@ function PriestAITwin() {
   );
 }
 
-export function AITwin({ mode = 'parish' }: AITwinProps) {
+export function WhatIfSimulator({ mode = 'parish' }: AITwinProps) {
   return mode === 'priest' ? <PriestAITwin /> : <ParishAITwin mode={mode} />;
 }
