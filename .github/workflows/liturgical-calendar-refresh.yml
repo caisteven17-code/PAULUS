@@ -1,0 +1,52 @@
+name: Liturgical Calendar Refresh
+
+on:
+  workflow_dispatch:
+    inputs:
+      force:
+        description: Run even outside the scheduled refresh window
+        required: false
+        default: "true"
+  schedule:
+    # 2nd week of November in Asia/Manila, used to preload next year's PH calendar.
+    - cron: "0 18 8 11 *"
+    # Quarterly PH-context refresh, also in Asia/Manila.
+    - cron: "0 18 1 2,5,8,11 *"
+
+jobs:
+  refresh-calendar:
+    runs-on: ubuntu-latest
+    env:
+      NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
+      SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+      SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+
+      - name: Install Node dependencies
+        run: npm ci
+
+      - name: Install analytics dependencies
+        run: pip install -r src/analytics/requirements.txt
+
+      - name: Refresh liturgical calendar
+        working-directory: src/analytics
+        run: |
+          EXTRA_ARGS=""
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ] && [ "${{ inputs.force }}" = "true" ]; then
+            EXTRA_ARGS="--force"
+          fi
+          python -m app.services.liturgical_calendar_updater --load $EXTRA_ARGS
