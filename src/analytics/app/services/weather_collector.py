@@ -55,13 +55,15 @@ def _create_run_record(period_start: date, period_end: date) -> Optional[str]:
 
         resp = (
             get_table("reference", "weather_runs")
-            .insert({
-                "mode": "full",
-                "status": "running",
-                "period_start": period_start.isoformat(),
-                "period_end": period_end.isoformat(),
-                "started_at": datetime.now(timezone.utc).isoformat(),
-            })
+            .insert(
+                {
+                    "mode": "full",
+                    "status": "running",
+                    "period_start": period_start.isoformat(),
+                    "period_end": period_end.isoformat(),
+                    "started_at": datetime.now(timezone.utc).isoformat(),
+                }
+            )
             .execute()
         )
         return resp.data[0]["id"] if resp.data else None
@@ -82,13 +84,15 @@ def _update_run_record(
     try:
         from app.services.supabase_client import get_table
 
-        get_table("reference", "weather_runs").update({
-            "status": status,
-            "finished_at": datetime.now(timezone.utc).isoformat(),
-            "municipalities_count": municipalities_count,
-            "records_loaded": records_loaded,
-            "error_detail": error_detail,
-        }).eq("id", run_id).execute()
+        get_table("reference", "weather_runs").update(
+            {
+                "status": status,
+                "finished_at": datetime.now(timezone.utc).isoformat(),
+                "municipalities_count": municipalities_count,
+                "records_loaded": records_loaded,
+                "error_detail": error_detail,
+            }
+        ).eq("id", run_id).execute()
     except Exception as exc:
         logger.warning("Could not update weather run record: %s", exc)
 
@@ -155,7 +159,9 @@ MUNICIPALITIES: list[dict] = [
 # ── HTTP helper with retry + exponential backoff ──────────────────────────────
 
 
-def _fetch_json(url: str, max_retries: int = 4, base_delay: float = 2.0) -> Optional[dict]:
+def _fetch_json(
+    url: str, max_retries: int = 4, base_delay: float = 2.0
+) -> Optional[dict]:
     for attempt in range(max_retries):
         try:
             with urllib.request.urlopen(url, timeout=30) as resp:
@@ -163,7 +169,12 @@ def _fetch_json(url: str, max_retries: int = 4, base_delay: float = 2.0) -> Opti
         except Exception as exc:
             wait = base_delay * (2**attempt)
             if attempt < max_retries - 1:
-                logger.warning("Fetch failed (%s) — retrying in %.0fs: %s", type(exc).__name__, wait, url[:80])
+                logger.warning(
+                    "Fetch failed (%s) — retrying in %.0fs: %s",
+                    type(exc).__name__,
+                    wait,
+                    url[:80],
+                )
                 time.sleep(wait)
             else:
                 logger.error("All retries exhausted for %s: %s", url[:80], exc)
@@ -216,7 +227,9 @@ def fetch_open_meteo(lat: float, lon: float, start: date, end: date) -> list[dic
     return records
 
 
-def _fetch_nasa_power(lat: float, lon: float, start: date, end: date, community: str, wind_param: str) -> list[dict]:
+def _fetch_nasa_power(
+    lat: float, lon: float, start: date, end: date, community: str, wind_param: str
+) -> list[dict]:
     params = urllib.parse.urlencode(
         {
             "parameters": f"T2M,T2M_MAX,T2M_MIN,PRECTOTCORR,{wind_param}",
@@ -300,7 +313,9 @@ def _score_source(records: list[dict], all_sources: dict[str, list[dict]]) -> di
     total = len(records)
 
     # Build date-indexed lookup for cross-source consistency
-    _by_date: dict[str, float | None] = {r["date"]: r.get("temp_avg_c") for r in records}  # noqa: F841
+    _by_date: dict[str, float | None] = {
+        r["date"]: r.get("temp_avg_c") for r in records
+    }  # noqa: F841
 
     # Cross-source medians for consistency check
     source_by_date: dict[str, list[float]] = {}
@@ -458,7 +473,12 @@ def collect(
     per_city_dir = out_dir / "laguna_weather_per_city"
     per_city_dir.mkdir(exist_ok=True)
 
-    logger.info("Collecting weather %s → %s for %d municipalities", start, end, len(MUNICIPALITIES))
+    logger.info(
+        "Collecting weather %s → %s for %d municipalities",
+        start,
+        end,
+        len(MUNICIPALITIES),
+    )
 
     # Load IBTrACS typhoon flags once for the full date range
     try:
@@ -494,7 +514,9 @@ def collect(
         champion = max(scores, key=lambda s: scores[s]["composite"])
         champion_map[name] = champion
 
-        logger.info("  Champion: %s (score %.1f)", champion, scores[champion]["composite"])
+        logger.info(
+            "  Champion: %s (score %.1f)", champion, scores[champion]["composite"]
+        )
 
         # Build monthly data from champion source
         champion_records = sources[champion]
@@ -562,7 +584,10 @@ def collect(
     for row in validity_rows:
         source_totals.setdefault(row["source"], []).append(row["composite"])
     global_ranking = sorted(
-        [{"source": s, "avg_composite": round(sum(v) / len(v), 2)} for s, v in source_totals.items()],
+        [
+            {"source": s, "avg_composite": round(sum(v) / len(v), 2)}
+            for s, v in source_totals.items()
+        ],
         key=lambda x: x["avg_composite"],
         reverse=True,
     )
@@ -597,14 +622,23 @@ def collect(
             from app.services.weather_loader import load_from_file
 
             records_loaded = load_from_file(out_dir / "laguna_weather_final.json")
-            logger.info("Loaded %d records into reference.weather_observations", records_loaded)
+            logger.info(
+                "Loaded %d records into reference.weather_observations", records_loaded
+            )
 
         _update_run_record(run_id, "success", len(master), records_loaded)
     except Exception as exc:
-        _update_run_record(run_id, "failed", len(master), records_loaded, error_detail=str(exc))
+        _update_run_record(
+            run_id, "failed", len(master), records_loaded, error_detail=str(exc)
+        )
         raise
 
-    return {"master": master, "validity": validity_rows, "champion_map": champion_map, "records_loaded": records_loaded}
+    return {
+        "master": master,
+        "validity": validity_rows,
+        "champion_map": champion_map,
+        "records_loaded": records_loaded,
+    }
 
 
 # ── CLI ───────────────────────────────────────────────────────────────────────
@@ -612,13 +646,31 @@ def collect(
 if __name__ == "__main__":
     import argparse
 
-    logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
+    logging.basicConfig(
+        level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s"
+    )
 
     parser = argparse.ArgumentParser(description="Laguna weather collector")
-    parser.add_argument("--start", type=str, default=None, help="Start date YYYY-MM-DD (default: 3 years ago)")
-    parser.add_argument("--end", type=str, default=None, help="End date YYYY-MM-DD (default: today minus 7 days)")
-    parser.add_argument("--out", type=str, default=str(DEFAULT_OUT_DIR), help="Output directory")
-    parser.add_argument("--load", action="store_true", help="Also load results into Supabase after collecting")
+    parser.add_argument(
+        "--start",
+        type=str,
+        default=None,
+        help="Start date YYYY-MM-DD (default: 3 years ago)",
+    )
+    parser.add_argument(
+        "--end",
+        type=str,
+        default=None,
+        help="End date YYYY-MM-DD (default: today minus 7 days)",
+    )
+    parser.add_argument(
+        "--out", type=str, default=str(DEFAULT_OUT_DIR), help="Output directory"
+    )
+    parser.add_argument(
+        "--load",
+        action="store_true",
+        help="Also load results into Supabase after collecting",
+    )
     args = parser.parse_args()
 
     start = date.fromisoformat(args.start) if args.start else None
@@ -627,4 +679,6 @@ if __name__ == "__main__":
     result = collect(start=start, end=end, out_dir=Path(args.out), load=args.load)
     print(f"Collected {len(result['master'])} municipalities.")
     if args.load:
-        print(f"Loaded {result['records_loaded']} records into reference.weather_observations")
+        print(
+            f"Loaded {result['records_loaded']} records into reference.weather_observations"
+        )

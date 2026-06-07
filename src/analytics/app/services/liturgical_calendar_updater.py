@@ -55,7 +55,9 @@ def _stale_years(today: date | None = None) -> list[int]:
 
         table = get_table("reference", "liturgical_calendar_runs")
         cutoff = (today - timedelta(days=RETRY_WINDOW_DAYS)).isoformat()
-        ttl_cutoff = (datetime.now(timezone.utc) - timedelta(hours=RUN_TTL_HOURS)).isoformat()
+        ttl_cutoff = (
+            datetime.now(timezone.utc) - timedelta(hours=RUN_TTL_HOURS)
+        ).isoformat()
 
         failed_resp = (
             table.select("years, completed_years, started_at")
@@ -110,11 +112,13 @@ def _create_run_record(years: list[int]) -> Optional[str]:
 
         resp = (
             get_table("reference", "liturgical_calendar_runs")
-            .insert({
-                "years": years,
-                "status": "running",
-                "started_at": datetime.now(timezone.utc).isoformat(),
-            })
+            .insert(
+                {
+                    "years": years,
+                    "status": "running",
+                    "started_at": datetime.now(timezone.utc).isoformat(),
+                }
+            )
             .execute()
         )
         return resp.data[0]["id"] if resp.data else None
@@ -136,19 +140,23 @@ def _update_run_record(
     try:
         from app.services.supabase_client import get_table
 
-        get_table("reference", "liturgical_calendar_runs").update({
-            "status": status,
-            "finished_at": datetime.now(timezone.utc).isoformat(),
-            "clean_count": clean_count,
-            "review_count": review_count,
-            "error_detail": error_detail,
-            "completed_years": completed_years or [],
-        }).eq("id", run_id).execute()
+        get_table("reference", "liturgical_calendar_runs").update(
+            {
+                "status": status,
+                "finished_at": datetime.now(timezone.utc).isoformat(),
+                "clean_count": clean_count,
+                "review_count": review_count,
+                "error_detail": error_detail,
+                "completed_years": completed_years or [],
+            }
+        ).eq("id", run_id).execute()
     except Exception as exc:
         logger.warning("Could not update run record: %s", exc)
 
 
-def update(out_dir: Path = DEFAULT_OUT_DIR, load: bool = False, force: bool = False) -> dict:
+def update(
+    out_dir: Path = DEFAULT_OUT_DIR, load: bool = False, force: bool = False
+) -> dict:
     from app.services.liturgical_calendar_collector import collect
 
     years = sorted(set(target_years(force=force)) | set(_stale_years()))
@@ -180,12 +188,22 @@ def update(out_dir: Path = DEFAULT_OUT_DIR, load: bool = False, force: bool = Fa
 
             completed_years.append(year)
 
-        _update_run_record(run_id, "success", clean_count, review_count, completed_years=completed_years)
+        _update_run_record(
+            run_id,
+            "success",
+            clean_count,
+            review_count,
+            completed_years=completed_years,
+        )
     except Exception as exc:
         status = "partial" if completed_years else "failed"
         _update_run_record(
-            run_id, status, clean_count, review_count,
-            error_detail=str(exc), completed_years=completed_years,
+            run_id,
+            status,
+            clean_count,
+            review_count,
+            error_detail=str(exc),
+            completed_years=completed_years,
         )
         raise
 
@@ -200,12 +218,22 @@ def update(out_dir: Path = DEFAULT_OUT_DIR, load: bool = False, force: bool = Fa
 if __name__ == "__main__":
     import argparse
 
-    logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
+    logging.basicConfig(
+        level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s"
+    )
 
-    parser = argparse.ArgumentParser(description="Refresh Philippine liturgical calendar data")
+    parser = argparse.ArgumentParser(
+        description="Refresh Philippine liturgical calendar data"
+    )
     parser.add_argument("--out", type=str, default=str(DEFAULT_OUT_DIR))
-    parser.add_argument("--load", action="store_true", help="Load generated rows into Supabase")
-    parser.add_argument("--force", action="store_true", help="Run even outside the scheduled refresh window")
+    parser.add_argument(
+        "--load", action="store_true", help="Load generated rows into Supabase"
+    )
+    parser.add_argument(
+        "--force",
+        action="store_true",
+        help="Run even outside the scheduled refresh window",
+    )
     args = parser.parse_args()
 
     result = update(out_dir=Path(args.out), load=args.load, force=args.force)

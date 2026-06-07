@@ -166,12 +166,16 @@ def _upsert_batch(rows: list[dict[str, Any]], run_id: Optional[str] = None) -> i
         now_iso = datetime.now(timezone.utc).isoformat()
         for staging_id, main_record_id in promotions:
             try:
-                staging_table.update({
-                    "promoted_record_id": main_record_id,
-                    "applied_at": now_iso,
-                }).eq("id", staging_id).execute()
+                staging_table.update(
+                    {
+                        "promoted_record_id": main_record_id,
+                        "applied_at": now_iso,
+                    }
+                ).eq("id", staging_id).execute()
             except Exception as exc:
-                logger.warning("Could not mark staging row %s as applied: %s", staging_id, exc)
+                logger.warning(
+                    "Could not mark staging row %s as applied: %s", staging_id, exc
+                )
 
     return len(rows)
 
@@ -185,7 +189,11 @@ def load_from_file(
     data = json.loads(path.read_text(encoding="utf-8"))
     rows = data.get("records", [])
     if not include_pending:
-        rows = [row for row in rows if row.get("review_status") in {"approved", "approved_with_revisions"}]
+        rows = [
+            row
+            for row in rows
+            if row.get("review_status") in {"approved", "approved_with_revisions"}
+        ]
     count = _upsert_batch(rows, run_id=run_id)
     logger.info("Liturgical calendar load complete — %d rows processed.", count)
     return count
@@ -194,11 +202,23 @@ def load_from_file(
 if __name__ == "__main__":
     import argparse
 
-    logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
+    logging.basicConfig(
+        level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s"
+    )
 
-    parser = argparse.ArgumentParser(description="Load liturgical calendar JSON into Supabase")
-    parser.add_argument("--file", type=str, default=str(DEFAULT_OUT_DIR / "liturgical_calendar_clean.json"))
-    parser.add_argument("--approved-only", action="store_true", help="Only load rows already approved by a human reviewer")
+    parser = argparse.ArgumentParser(
+        description="Load liturgical calendar JSON into Supabase"
+    )
+    parser.add_argument(
+        "--file",
+        type=str,
+        default=str(DEFAULT_OUT_DIR / "liturgical_calendar_clean.json"),
+    )
+    parser.add_argument(
+        "--approved-only",
+        action="store_true",
+        help="Only load rows already approved by a human reviewer",
+    )
     args = parser.parse_args()
 
     loaded = load_from_file(Path(args.file), include_pending=not args.approved_only)

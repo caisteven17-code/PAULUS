@@ -45,7 +45,9 @@ def _today() -> date:
     return date.today()
 
 
-def _fetch_text(url: str, accept: str = "*/*", timeout: int = 30, retries: int = 3) -> str:
+def _fetch_text(
+    url: str, accept: str = "*/*", timeout: int = 30, retries: int = 3
+) -> str:
     last_exc: Exception = RuntimeError("No attempts made")
     for attempt in range(retries):
         try:
@@ -61,7 +63,13 @@ def _fetch_text(url: str, accept: str = "*/*", timeout: int = 30, retries: int =
         except Exception as exc:
             last_exc = exc
             if attempt < retries - 1:
-                logger.debug("Fetch attempt %d/%d failed for %s: %s", attempt + 1, retries, url, exc)
+                logger.debug(
+                    "Fetch attempt %d/%d failed for %s: %s",
+                    attempt + 1,
+                    retries,
+                    url,
+                    exc,
+                )
                 time.sleep(2 ** (attempt + 1))
     raise last_exc
 
@@ -72,12 +80,16 @@ def _fetch_json(url: str) -> dict[str, Any]:
 
 def _preflight_check() -> None:
     try:
-        subprocess.run(["node", "--version"], check=True, capture_output=True, timeout=10)
+        subprocess.run(
+            ["node", "--version"], check=True, capture_output=True, timeout=10
+        )
     except Exception as exc:
         raise RuntimeError(f"Node.js is required but not found: {exc}")
     romcal_dir = PROJECT_ROOT / "node_modules" / "@romcal"
     if not romcal_dir.exists():
-        raise RuntimeError("@romcal packages not found — run npm install from the project root.")
+        raise RuntimeError(
+            "@romcal packages not found — run npm install from the project root."
+        )
 
 
 def _clean_spaces(value: Optional[str]) -> Optional[str]:
@@ -252,7 +264,9 @@ def fetch_gcatholic(year: int) -> list[dict[str, Any]]:
     return [best_by_date[key] for key in sorted(best_by_date)]
 
 
-def _normalize_litcal_event(event: dict[str, Any], year: int, source_url: str) -> Optional[dict[str, Any]]:
+def _normalize_litcal_event(
+    event: dict[str, Any], year: int, source_url: str
+) -> Optional[dict[str, Any]]:
     date_value = event.get("date") or event.get("event_date") or event.get("start")
     if isinstance(date_value, int):
         date_str = datetime.utcfromtimestamp(date_value).date().isoformat()
@@ -277,7 +291,9 @@ def _normalize_litcal_event(event: dict[str, Any], year: int, source_url: str) -
         psalter_week=None,
         source_name="litcal",
         source_url=source_url,
-        source_reference=str(event.get("event_key") or event.get("id") or event.get("key") or ""),
+        source_reference=str(
+            event.get("event_key") or event.get("id") or event.get("key") or ""
+        ),
         raw_payload=event,
     )
 
@@ -289,7 +305,9 @@ def fetch_litcal(year: int) -> tuple[list[dict[str, Any]], Optional[str]]:
     universal endpoint. This covers all universal feasts and liturgical seasons
     that the Philippines follows; PH-specific saints are covered by GCatholic/Universalis.
     """
-    params = urllib.parse.urlencode({"year": year, "locale": "en", "return_type": "JSON", "year_type": "CIVIL"})
+    params = urllib.parse.urlencode(
+        {"year": year, "locale": "en", "return_type": "JSON", "year_type": "CIVIL"}
+    )
     source_url = f"https://litcal.johnromanodorazio.com/api/v5/calendar?{params}"
     try:
         payload = _fetch_json(source_url)
@@ -321,13 +339,20 @@ def _apply_cross_validation_fallback(
     """Try LitCal then Universalis when GCatholic is absent or mismatched."""
     mismatches: dict[str, str] = {}
 
-    for validator_source, validator_by_date in [("litcal", litcal_by_date), ("universalis", universalis_by_date)]:
+    for validator_source, validator_by_date in [
+        ("litcal", litcal_by_date),
+        ("universalis", universalis_by_date),
+    ]:
         validator = validator_by_date.get(record["date"])
         if not validator:
             continue
         source_key = _review_key(record["celebration_name"])
         validator_key = _review_key(validator["celebration_name"])
-        if source_key and validator_key and (source_key in validator_key or validator_key in source_key):
+        if (
+            source_key
+            and validator_key
+            and (source_key in validator_key or validator_key in source_key)
+        ):
             record["review_status"] = "pending"
             record["review_notes"] = (
                 f"GCatholic {gcatholic_result}; matched {validator_source} cross-validator "
@@ -349,7 +374,9 @@ def _apply_cross_validation_fallback(
     # No cross-validator matched — route to review with all available context
     if gcatholic_result == "validator_missing" and not mismatches:
         record["review_status"] = "pending"
-        record["review_notes"] = "No GCatholic, LitCal, or Universalis validator found for this date; needs human review."
+        record["review_notes"] = (
+            "No GCatholic, LitCal, or Universalis validator found for this date; needs human review."
+        )
         record["revision_payload"] = {
             "primary_source": record["source_name"],
             "validator_source": None,
@@ -360,12 +387,18 @@ def _apply_cross_validation_fallback(
         }
     else:
         gcatholic_detail = (
-            f"GCatholic: {gcatholic_celebration_name}" if gcatholic_celebration_name else f"GCatholic: {gcatholic_result}"
+            f"GCatholic: {gcatholic_celebration_name}"
+            if gcatholic_celebration_name
+            else f"GCatholic: {gcatholic_result}"
         )
-        mismatch_detail = "; ".join(f"{src}: {name}" for src, name in mismatches.items())
+        mismatch_detail = "; ".join(
+            f"{src}: {name}" for src, name in mismatches.items()
+        )
         all_detail = "; ".join(filter(None, [gcatholic_detail, mismatch_detail]))
         record["review_status"] = "pending"
-        record["review_notes"] = f"No cross-validator matched ({all_detail}); needs human review."
+        record["review_notes"] = (
+            f"No cross-validator matched ({all_detail}); needs human review."
+        )
         record["revision_payload"] = {
             "primary_source": record["source_name"],
             "validator_source": None,
@@ -389,15 +422,24 @@ def _validate_against_gcatholic(
         validator = gcatholic_by_date.get(record["date"])
         if not validator:
             _apply_cross_validation_fallback(
-                record, litcal_by_date, universalis_by_date, gcatholic_result="validator_missing"
+                record,
+                litcal_by_date,
+                universalis_by_date,
+                gcatholic_result="validator_missing",
             )
             continue
 
         source_key = _review_key(record["celebration_name"])
         validator_key = _review_key(validator["celebration_name"])
-        if source_key and validator_key and (source_key in validator_key or validator_key in source_key):
+        if (
+            source_key
+            and validator_key
+            and (source_key in validator_key or validator_key in source_key)
+        ):
             record["review_status"] = "pending"
-            record["review_notes"] = "Matched GCatholic validator by normalized celebration name; awaiting human approval."
+            record["review_notes"] = (
+                "Matched GCatholic validator by normalized celebration name; awaiting human approval."
+            )
             record["revision_payload"] = {
                 "primary_source": record["source_name"],
                 "validator_source": "gcatholic",
@@ -463,14 +505,18 @@ def collect(
 
     lock_path = out_dir / ".collect.lock"
     if lock_path.exists():
-        raise RuntimeError(f"Another collect() run is already in progress. Delete {lock_path} to reset.")
+        raise RuntimeError(
+            f"Another collect() run is already in progress. Delete {lock_path} to reset."
+        )
     lock_path.write_text("locked")
     try:
         clean_rows: list[dict[str, Any]] = []
         review_rows: list[dict[str, Any]] = []
         report_rows: list[dict[str, Any]] = []
 
-        logger.info("Collecting Philippine liturgical calendar %s -> %s", start_year, end_year)
+        logger.info(
+            "Collecting Philippine liturgical calendar %s -> %s", start_year, end_year
+        )
 
         universalis_rows, universalis_error = fetch_universalis()
         universalis_by_date = {row["date"]: row for row in universalis_rows}
@@ -485,7 +531,9 @@ def collect(
             except Exception as exc:
                 gcatholic_rows = []
                 gcatholic_error = f"{type(exc).__name__}: {exc}"
-                logger.warning("GCatholic unavailable for %s: %s", year, gcatholic_error)
+                logger.warning(
+                    "GCatholic unavailable for %s: %s", year, gcatholic_error
+                )
 
             gcatholic_by_date = {row["date"]: row for row in gcatholic_rows}
 
@@ -504,11 +552,14 @@ def collect(
             litcal_by_date = {row["date"]: row for row in litcal_rows}
 
             for source_name, records in source_results.items():
-                _validate_against_gcatholic(records, gcatholic_by_date, litcal_by_date, universalis_by_date)
+                _validate_against_gcatholic(
+                    records, gcatholic_by_date, litcal_by_date, universalis_by_date
+                )
                 matched_rows = [
                     row
                     for row in records
-                    if (row.get("revision_payload") or {}).get("comparison_result") == "matched_wording"
+                    if (row.get("revision_payload") or {}).get("comparison_result")
+                    == "matched_wording"
                 ]
                 clean_rows.extend(matched_rows)
                 review_rows.extend([row for row in records if row not in matched_rows])
@@ -518,7 +569,9 @@ def collect(
                         "source": source_name,
                         "record_count": len(records),
                         "matched_count": len(matched_rows),
-                        "pending_count": sum(1 for row in records if row["review_status"] == "pending"),
+                        "pending_count": sum(
+                            1 for row in records if row["review_status"] == "pending"
+                        ),
                         "error": source_errors.get(source_name),
                     }
                 )
@@ -526,7 +579,11 @@ def collect(
             for validator_source, validator_rows, validator_error in [
                 ("gcatholic", gcatholic_rows, gcatholic_error),
                 ("litcal", litcal_rows, litcal_error),
-                ("universalis", [r for r in universalis_rows if r["date"].startswith(str(year))], universalis_error),
+                (
+                    "universalis",
+                    [r for r in universalis_rows if r["date"].startswith(str(year))],
+                    universalis_error,
+                ),
             ]:
                 report_rows.append(
                     {
@@ -559,14 +616,24 @@ def collect(
             "sources": report_rows,
         }
 
-        (out_dir / "liturgical_calendar_clean.json").write_text(json.dumps(clean_payload, indent=2), encoding="utf-8")
-        (out_dir / "liturgical_calendar_review.json").write_text(json.dumps(review_payload, indent=2), encoding="utf-8")
+        (out_dir / "liturgical_calendar_clean.json").write_text(
+            json.dumps(clean_payload, indent=2), encoding="utf-8"
+        )
+        (out_dir / "liturgical_calendar_review.json").write_text(
+            json.dumps(review_payload, indent=2), encoding="utf-8"
+        )
         (out_dir / "liturgical_calendar_source_report.json").write_text(
             json.dumps(report_payload, indent=2), encoding="utf-8"
         )
 
-        logger.info("Clean rows: %d; review rows: %d", len(clean_rows), len(review_rows))
-        return {"clean": clean_payload, "review": review_payload, "report": report_payload}
+        logger.info(
+            "Clean rows: %d; review rows: %d", len(clean_rows), len(review_rows)
+        )
+        return {
+            "clean": clean_payload,
+            "review": review_payload,
+            "report": report_payload,
+        }
     finally:
         lock_path.unlink(missing_ok=True)
 
@@ -574,17 +641,31 @@ def collect(
 if __name__ == "__main__":
     import argparse
 
-    logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
+    logging.basicConfig(
+        level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s"
+    )
 
-    parser = argparse.ArgumentParser(description="Collect Philippine liturgical calendar reference data")
+    parser = argparse.ArgumentParser(
+        description="Collect Philippine liturgical calendar reference data"
+    )
     parser.add_argument("--start-year", type=int, default=2023)
     parser.add_argument("--end-year", type=int, default=_today().year)
     parser.add_argument("--out", type=str, default=str(DEFAULT_OUT_DIR))
-    parser.add_argument("--load", action="store_true", help="Load clean output into Supabase after collecting")
-    parser.add_argument("--load-review", action="store_true", help="Also load pending review rows into Supabase")
+    parser.add_argument(
+        "--load",
+        action="store_true",
+        help="Load clean output into Supabase after collecting",
+    )
+    parser.add_argument(
+        "--load-review",
+        action="store_true",
+        help="Also load pending review rows into Supabase",
+    )
     args = parser.parse_args()
 
-    result = collect(start_year=args.start_year, end_year=args.end_year, out_dir=Path(args.out))
+    result = collect(
+        start_year=args.start_year, end_year=args.end_year, out_dir=Path(args.out)
+    )
     print(
         f"Collected {len(result['clean']['records'])} clean rows and "
         f"{len(result['review']['records'])} review rows."

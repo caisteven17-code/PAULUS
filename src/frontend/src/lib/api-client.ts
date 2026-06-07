@@ -268,7 +268,9 @@ export const apiClient = {
     return get('/api/entities', type ? { type } : undefined);
   },
 
-  async getGeoInstitutions(): Promise<{ id: string; name: string; vicariate: string; class: string; lat: number; lng: number; collections: number }[]> {
+  async getGeoInstitutions(): Promise<
+    { id: string; name: string; vicariate: string; class: string; lat: number; lng: number; collections: number }[]
+  > {
     return get('/api/entities/geo');
   },
 

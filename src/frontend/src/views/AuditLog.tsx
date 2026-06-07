@@ -1019,10 +1019,14 @@ export function AuditLog() {
               <div className="bg-church-black px-6 py-5 rounded-t-2xl flex items-start justify-between gap-4">
                 <div className="flex-1 min-w-0">
                   <div className="flex flex-wrap items-center gap-2 mb-2">
-                    <span className={`text-[10px] font-black px-2.5 py-0.5 rounded-full uppercase tracking-wider ${CATEGORY_CONFIG[selectedLog.category].pill}`}>
+                    <span
+                      className={`text-[10px] font-black px-2.5 py-0.5 rounded-full uppercase tracking-wider ${CATEGORY_CONFIG[selectedLog.category].pill}`}
+                    >
                       {CATEGORY_CONFIG[selectedLog.category].label}
                     </span>
-                    <span className={`text-[10px] font-black px-2 py-0.5 rounded-full uppercase tracking-wider ring-1 ${SEVERITY_CONFIG[selectedLog.severity].ring}`}>
+                    <span
+                      className={`text-[10px] font-black px-2 py-0.5 rounded-full uppercase tracking-wider ring-1 ${SEVERITY_CONFIG[selectedLog.severity].ring}`}
+                    >
                       {selectedLog.severity}
                     </span>
                   </div>
@@ -1049,7 +1053,9 @@ export function AuditLog() {
                 ].map((item, i) => (
                   <div key={i}>
                     <p className="text-[10px] font-black text-gray-400 uppercase tracking-wider mb-0.5">{item.label}</p>
-                    <p className={`text-sm font-semibold ${(item as any).mono ? 'font-mono text-gray-500' : (item as any).green ? 'text-church-green' : 'text-gray-800'}`}>
+                    <p
+                      className={`text-sm font-semibold ${(item as any).mono ? 'font-mono text-gray-500' : (item as any).green ? 'text-church-green' : 'text-gray-800'}`}
+                    >
                       {item.value}
                     </p>
                   </div>
@@ -1069,20 +1075,37 @@ export function AuditLog() {
                     <table className="w-full text-sm">
                       <thead>
                         <tr className="bg-gray-50 border-b border-gray-100">
-                          <th className="text-left px-4 py-2.5 text-[10px] font-black text-gray-500 uppercase tracking-wider w-1/3">Field</th>
-                          <th className="text-left px-4 py-2.5 text-[10px] font-black text-rose-400 uppercase tracking-wider w-1/3">Before</th>
-                          <th className="text-left px-4 py-2.5 text-[10px] font-black text-emerald-500 uppercase tracking-wider w-1/3">After</th>
+                          <th className="text-left px-4 py-2.5 text-[10px] font-black text-gray-500 uppercase tracking-wider w-1/3">
+                            Field
+                          </th>
+                          <th className="text-left px-4 py-2.5 text-[10px] font-black text-rose-400 uppercase tracking-wider w-1/3">
+                            Before
+                          </th>
+                          <th className="text-left px-4 py-2.5 text-[10px] font-black text-emerald-500 uppercase tracking-wider w-1/3">
+                            After
+                          </th>
                         </tr>
                       </thead>
                       <tbody>
                         {selectedLog.changes.map((change, i) => (
-                          <tr key={i} className={`border-b border-gray-50 last:border-0 ${i % 2 === 0 ? 'bg-white' : 'bg-gray-50/40'}`}>
+                          <tr
+                            key={i}
+                            className={`border-b border-gray-50 last:border-0 ${i % 2 === 0 ? 'bg-white' : 'bg-gray-50/40'}`}
+                          >
                             <td className="px-4 py-2.5 text-xs font-bold text-gray-600 capitalize">{change.field}</td>
                             <td className="px-4 py-2.5 text-xs font-mono text-rose-500 break-all">
-                              {change.from !== null ? change.from : <span className="text-gray-300 italic not-italic font-sans">—</span>}
+                              {change.from !== null ? (
+                                change.from
+                              ) : (
+                                <span className="text-gray-300 italic not-italic font-sans">—</span>
+                              )}
                             </td>
                             <td className="px-4 py-2.5 text-xs font-mono text-emerald-600 break-all">
-                              {change.to !== null ? change.to : <span className="text-gray-300 italic not-italic font-sans">—</span>}
+                              {change.to !== null ? (
+                                change.to
+                              ) : (
+                                <span className="text-gray-300 italic not-italic font-sans">—</span>
+                              )}
                             </td>
                           </tr>
                         ))}

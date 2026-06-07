@@ -60,7 +60,9 @@ def main() -> int:
         _set_output("needed", "true")
         return 0
 
-    supabase_url = os.environ.get("SUPABASE_URL") or os.environ.get("NEXT_PUBLIC_SUPABASE_URL", "")
+    supabase_url = os.environ.get("SUPABASE_URL") or os.environ.get(
+        "NEXT_PUBLIC_SUPABASE_URL", ""
+    )
     supabase_key = os.environ.get("SUPABASE_SERVICE_ROLE_KEY", "")
 
     if not supabase_url or not supabase_key:
@@ -69,18 +71,22 @@ def main() -> int:
         return 0
 
     cutoff = (today - timedelta(days=RETRY_WINDOW_DAYS)).isoformat()
-    ttl_cutoff = (datetime.now(timezone.utc) - timedelta(hours=RUN_TTL_HOURS)).isoformat()
+    ttl_cutoff = (
+        datetime.now(timezone.utc) - timedelta(hours=RUN_TTL_HOURS)
+    ).isoformat()
 
     # Failed runs within retry window
     failed = _supabase_get(
-        supabase_url, supabase_key,
+        supabase_url,
+        supabase_key,
         "liturgical_calendar_runs",
         f"select=id&status=eq.failed&started_at=gte.{cutoff}&limit=1",
     )
 
     # Orphaned running runs older than TTL (crash survivors)
     orphaned = _supabase_get(
-        supabase_url, supabase_key,
+        supabase_url,
+        supabase_key,
         "liturgical_calendar_runs",
         f"select=id&status=eq.running&started_at=lt.{ttl_cutoff}&started_at=gte.{cutoff}&limit=1",
     )
@@ -92,7 +98,8 @@ def main() -> int:
 
     # Critical staleness check — independent of retry window
     recent = _supabase_get(
-        supabase_url, supabase_key,
+        supabase_url,
+        supabase_key,
         "liturgical_calendar",
         "select=updated_at&order=updated_at.desc&limit=1",
     )
@@ -100,7 +107,9 @@ def main() -> int:
         last_updated = recent[0].get("updated_at", "")
         stale_cutoff = (today - timedelta(days=STALE_ALERT_DAYS)).isoformat()
         if last_updated and last_updated < stale_cutoff:
-            print(f"::error::Liturgical calendar data is critically stale — last updated {last_updated[:10]}.")
+            print(
+                f"::error::Liturgical calendar data is critically stale — last updated {last_updated[:10]}."
+            )
             _set_output("needed", "true")
             return 1  # fail the job to trigger failure notification
 

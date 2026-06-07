@@ -73,20 +73,26 @@ export function HealthTracker() {
   useEffect(() => {
     let cancelled = false;
     setRecordsLoading(true);
-    apiClient.getHealthRecords().then((data) => {
-      if (!cancelled) {
-        setPriests(data ?? []);
-        localStorage.setItem('priest_health_records', JSON.stringify(data ?? []));
-      }
-    }).catch(() => {
-      if (!cancelled) {
-        const cached = localStorage.getItem('priest_health_records');
-        if (cached) setPriests(JSON.parse(cached));
-      }
-    }).finally(() => {
-      if (!cancelled) setRecordsLoading(false);
-    });
-    return () => { cancelled = true; };
+    apiClient
+      .getHealthRecords()
+      .then((data) => {
+        if (!cancelled) {
+          setPriests(data ?? []);
+          localStorage.setItem('priest_health_records', JSON.stringify(data ?? []));
+        }
+      })
+      .catch(() => {
+        if (!cancelled) {
+          const cached = localStorage.getItem('priest_health_records');
+          if (cached) setPriests(JSON.parse(cached));
+        }
+      })
+      .finally(() => {
+        if (!cancelled) setRecordsLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   // Fetch health score from the backend on mount
@@ -175,16 +181,23 @@ export function HealthTracker() {
     try {
       const saved = await apiClient.saveHealthRecord(payload);
       if (editingId) {
-        setPriests((prev) => prev.map((p) => (p.id === editingId ? { ...saved, age: calculateAge(saved.birthDate) } : p)));
+        setPriests((prev) =>
+          prev.map((p) => (p.id === editingId ? { ...saved, age: calculateAge(saved.birthDate) } : p)),
+        );
       } else {
         setPriests((prev) => [...prev, { ...saved, age: calculateAge(saved.birthDate) }]);
       }
     } catch {
       // fallback: update local state only
       if (editingId) {
-        setPriests((prev) => prev.map((p) => p.id === editingId ? { ...p, ...formData, age: calculateAge(formData.birthDate) } : p));
+        setPriests((prev) =>
+          prev.map((p) => (p.id === editingId ? { ...p, ...formData, age: calculateAge(formData.birthDate) } : p)),
+        );
       } else {
-        setPriests((prev) => [...prev, { id: Math.random().toString(36).substr(2, 9), ...formData, age: calculateAge(formData.birthDate) }]);
+        setPriests((prev) => [
+          ...prev,
+          { id: Math.random().toString(36).substr(2, 9), ...formData, age: calculateAge(formData.birthDate) },
+        ]);
       }
     }
 
@@ -207,7 +220,9 @@ export function HealthTracker() {
     if (confirm('Delete this record?')) {
       try {
         await apiClient.deleteHealthRecord(id);
-      } catch { /* fallback: delete locally */ }
+      } catch {
+        /* fallback: delete locally */
+      }
       setPriests((prev) => prev.filter((p) => p.id !== id));
     }
   }, []);

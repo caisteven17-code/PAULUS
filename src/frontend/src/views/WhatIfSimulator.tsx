@@ -605,22 +605,27 @@ function ParishAITwin({ mode = 'parish' }: { mode?: FinancialAITwinMode }) {
   // Fetch real institution financial profiles; fall back to hardcoded on failure
   useEffect(() => {
     const entityType = mode === 'seminary' ? 'seminary' : mode === 'school' ? 'school' : 'parish';
-    apiClient.getFinancialProfiles(entityType as any).then((data) => {
-      if (data?.length) {
-        const mapped: FinancialTwinProfile[] = data.map((p: any, i: number) => ({
-          id: i + 1,
-          name: p.name,
-          cashBalance: p.currentBalance ?? 0,
-          monthlyIncome: p.monthlyCollections ?? 0,
-          monthlyExpenses: p.monthlyExpenses ?? 0,
-          healthScore: p.healthScore ?? 50,
-          collectionsHistory: p.collectionsHistory?.length === 6 ? p.collectionsHistory : Array(6).fill(p.monthlyCollections ?? 0),
-          expensesHistory: p.expensesHistory?.length === 6 ? p.expensesHistory : Array(6).fill(p.monthlyExpenses ?? 0),
-        }));
-        setLiveProfiles(mapped);
-        setSelectedParishId(1);
-      }
-    }).catch(() => {});
+    apiClient
+      .getFinancialProfiles(entityType as any)
+      .then((data) => {
+        if (data?.length) {
+          const mapped: FinancialTwinProfile[] = data.map((p: any, i: number) => ({
+            id: i + 1,
+            name: p.name,
+            cashBalance: p.currentBalance ?? 0,
+            monthlyIncome: p.monthlyCollections ?? 0,
+            monthlyExpenses: p.monthlyExpenses ?? 0,
+            healthScore: p.healthScore ?? 50,
+            collectionsHistory:
+              p.collectionsHistory?.length === 6 ? p.collectionsHistory : Array(6).fill(p.monthlyCollections ?? 0),
+            expensesHistory:
+              p.expensesHistory?.length === 6 ? p.expensesHistory : Array(6).fill(p.monthlyExpenses ?? 0),
+          }));
+          setLiveProfiles(mapped);
+          setSelectedParishId(1);
+        }
+      })
+      .catch(() => {});
   }, [mode]);
   const [isSimulating, setIsSimulating] = useState(false);
   const [savedScenarios, setSavedScenarios] = useState<ParishSavedScenario[]>(() => {

@@ -1095,33 +1095,42 @@ export function BishopDashboard({
   }, []);
 
   useEffect(() => {
-    apiClient.getGeoInstitutions().then((data) => {
-      if (data?.length) setGeoInstitutions(data);
-    }).catch(() => {});
+    apiClient
+      .getGeoInstitutions()
+      .then((data) => {
+        if (data?.length) setGeoInstitutions(data);
+      })
+      .catch(() => {});
   }, []);
 
   const [liveDeclineData, setLiveDeclineData] = useState<any[]>([]);
   useEffect(() => {
     const apiType = entityType === 'Diocesan Schools' ? 'school' : entityType === 'Seminaries' ? 'seminary' : 'parish';
-    apiClient.getFinancialProfiles(apiType as any).then((data) => {
-      if (!data?.length) return;
-      setLiveDeclineData(
-        data.map((p: any) => {
-          const hist: number[] = p.collectionsHistory ?? [];
-          const last4 = hist.slice(-4);
-          const [w1 = 0, w2 = 0, w3 = 0, w4 = 0] = last4;
-          const trend = w1 > 0 ? Math.round(((w4 - w1) / w1) * 100) : 0;
-          return {
-            name: p.name,
-            vicariate: p.location ?? '',
-            class: p.class ?? '',
-            w1, w2, w3, w4,
-            trend,
-            type: trend < 0 ? 'down' : 'up',
-          };
-        }),
-      );
-    }).catch(() => {});
+    apiClient
+      .getFinancialProfiles(apiType as any)
+      .then((data) => {
+        if (!data?.length) return;
+        setLiveDeclineData(
+          data.map((p: any) => {
+            const hist: number[] = p.collectionsHistory ?? [];
+            const last4 = hist.slice(-4);
+            const [w1 = 0, w2 = 0, w3 = 0, w4 = 0] = last4;
+            const trend = w1 > 0 ? Math.round(((w4 - w1) / w1) * 100) : 0;
+            return {
+              name: p.name,
+              vicariate: p.location ?? '',
+              class: p.class ?? '',
+              w1,
+              w2,
+              w3,
+              w4,
+              trend,
+              type: trend < 0 ? 'down' : 'up',
+            };
+          }),
+        );
+      })
+      .catch(() => {});
   }, [entityType]);
 
   const [sortConfig, setSortConfig] = useState<{ key: string; direction: 'asc' | 'desc' } | null>(null);
@@ -1451,16 +1460,20 @@ export function BishopDashboard({
   }, [entityType, cmpMetric, cmpMonth1, cmpYear1, cmpMonth2, cmpYear2]);
 
   const filteredDeclineData = useMemo(() => {
-    let data = liveDeclineData.map((item) => ({
-      ...item,
-      district: VICARIATE_TO_DISTRICT[item.vicariate] || 'Other',
-    })).filter((p: any) => {
-      const dMatch = entityType === 'Seminaries' || districtFilter === 'All Districts' || p.district === districtFilter;
-      const vMatch = entityType === 'Seminaries' || vicariateFilter === 'All Vicariates' || p.vicariate === vicariateFilter;
-      const cMatch = classFilter === 'All Classes' || p.class === classFilter;
-      const pMatch = entityFilter === 'All Entities' || p.name === entityFilter;
-      return dMatch && vMatch && cMatch && pMatch;
-    });
+    let data = liveDeclineData
+      .map((item) => ({
+        ...item,
+        district: VICARIATE_TO_DISTRICT[item.vicariate] || 'Other',
+      }))
+      .filter((p: any) => {
+        const dMatch =
+          entityType === 'Seminaries' || districtFilter === 'All Districts' || p.district === districtFilter;
+        const vMatch =
+          entityType === 'Seminaries' || vicariateFilter === 'All Vicariates' || p.vicariate === vicariateFilter;
+        const cMatch = classFilter === 'All Classes' || p.class === classFilter;
+        const pMatch = entityFilter === 'All Entities' || p.name === entityFilter;
+        return dMatch && vMatch && cMatch && pMatch;
+      });
     if (sortConfig) {
       data.sort((a: any, b: any) => {
         if (a[sortConfig.key] < b[sortConfig.key]) return sortConfig.direction === 'asc' ? -1 : 1;
@@ -1473,9 +1486,7 @@ export function BishopDashboard({
 
   const handleSort = (key: string) => {
     setSortConfig((prev) =>
-      prev?.key === key && prev.direction === 'asc'
-        ? { key, direction: 'desc' }
-        : { key, direction: 'asc' },
+      prev?.key === key && prev.direction === 'asc' ? { key, direction: 'desc' } : { key, direction: 'asc' },
     );
   };
 
@@ -3336,51 +3347,113 @@ export function BishopDashboard({
                       <table className="w-full text-sm text-left">
                         <thead className="text-xs font-bold text-church-green border-b border-gray-200 sticky top-0 bg-white z-20">
                           <tr>
-                            <th className="px-4 py-4 cursor-pointer hover:bg-gray-50 transition-colors sticky top-0 bg-white" onClick={() => handleSort('name')}>
+                            <th
+                              className="px-4 py-4 cursor-pointer hover:bg-gray-50 transition-colors sticky top-0 bg-white"
+                              onClick={() => handleSort('name')}
+                            >
                               <div className="flex items-center gap-1">
                                 Name
-                                {sortConfig?.key === 'name' ? (sortConfig.direction === 'asc' ? <ArrowUp className="w-3 h-3 text-gold-600" /> : <ArrowDown className="w-3 h-3 text-gold-600" />) : <ArrowUpDown className="w-3 h-3 opacity-30" />}
+                                {sortConfig?.key === 'name' ? (
+                                  sortConfig.direction === 'asc' ? (
+                                    <ArrowUp className="w-3 h-3 text-gold-600" />
+                                  ) : (
+                                    <ArrowDown className="w-3 h-3 text-gold-600" />
+                                  )
+                                ) : (
+                                  <ArrowUpDown className="w-3 h-3 opacity-30" />
+                                )}
                               </div>
                             </th>
                             {entityType !== 'Seminaries' && (
-                              <th className="px-4 py-4 cursor-pointer hover:bg-gray-50 transition-colors sticky top-0 bg-white" onClick={() => handleSort('vicariate')}>
+                              <th
+                                className="px-4 py-4 cursor-pointer hover:bg-gray-50 transition-colors sticky top-0 bg-white"
+                                onClick={() => handleSort('vicariate')}
+                              >
                                 <div className="flex items-center gap-1">
                                   Vicariate
-                                  {sortConfig?.key === 'vicariate' ? (sortConfig.direction === 'asc' ? <ArrowUp className="w-3 h-3 text-gold-600" /> : <ArrowDown className="w-3 h-3 text-gold-600" />) : <ArrowUpDown className="w-3 h-3 opacity-30" />}
+                                  {sortConfig?.key === 'vicariate' ? (
+                                    sortConfig.direction === 'asc' ? (
+                                      <ArrowUp className="w-3 h-3 text-gold-600" />
+                                    ) : (
+                                      <ArrowDown className="w-3 h-3 text-gold-600" />
+                                    )
+                                  ) : (
+                                    <ArrowUpDown className="w-3 h-3 opacity-30" />
+                                  )}
                                 </div>
                               </th>
                             )}
-                            <th className="px-4 py-4 cursor-pointer hover:bg-gray-50 transition-colors sticky top-0 bg-white" onClick={() => handleSort('class')}>
+                            <th
+                              className="px-4 py-4 cursor-pointer hover:bg-gray-50 transition-colors sticky top-0 bg-white"
+                              onClick={() => handleSort('class')}
+                            >
                               <div className="flex items-center gap-1">
                                 Class
-                                {sortConfig?.key === 'class' ? (sortConfig.direction === 'asc' ? <ArrowUp className="w-3 h-3 text-gold-600" /> : <ArrowDown className="w-3 h-3 text-gold-600" />) : <ArrowUpDown className="w-3 h-3 opacity-30" />}
+                                {sortConfig?.key === 'class' ? (
+                                  sortConfig.direction === 'asc' ? (
+                                    <ArrowUp className="w-3 h-3 text-gold-600" />
+                                  ) : (
+                                    <ArrowDown className="w-3 h-3 text-gold-600" />
+                                  )
+                                ) : (
+                                  <ArrowUpDown className="w-3 h-3 opacity-30" />
+                                )}
                               </div>
                             </th>
-                            {(['w1','w2','w3','w4'] as const).map((col, i) => (
-                              <th key={col} className="px-4 py-4 cursor-pointer hover:bg-gray-50 transition-colors sticky top-0 bg-white" onClick={() => handleSort(col)}>
+                            {(['w1', 'w2', 'w3', 'w4'] as const).map((col, i) => (
+                              <th
+                                key={col}
+                                className="px-4 py-4 cursor-pointer hover:bg-gray-50 transition-colors sticky top-0 bg-white"
+                                onClick={() => handleSort(col)}
+                              >
                                 <div className="flex items-center gap-1">
                                   Month {i + 1}
-                                  {sortConfig?.key === col ? (sortConfig.direction === 'asc' ? <ArrowUp className="w-3 h-3 text-gold-600" /> : <ArrowDown className="w-3 h-3 text-gold-600" />) : <ArrowUpDown className="w-3 h-3 opacity-30" />}
+                                  {sortConfig?.key === col ? (
+                                    sortConfig.direction === 'asc' ? (
+                                      <ArrowUp className="w-3 h-3 text-gold-600" />
+                                    ) : (
+                                      <ArrowDown className="w-3 h-3 text-gold-600" />
+                                    )
+                                  ) : (
+                                    <ArrowUpDown className="w-3 h-3 opacity-30" />
+                                  )}
                                 </div>
                               </th>
                             ))}
-                            <th className="px-4 py-4 text-right cursor-pointer hover:bg-gray-50 transition-colors sticky top-0 bg-white" onClick={() => handleSort('trend')}>
+                            <th
+                              className="px-4 py-4 text-right cursor-pointer hover:bg-gray-50 transition-colors sticky top-0 bg-white"
+                              onClick={() => handleSort('trend')}
+                            >
                               <div className="flex items-center justify-end gap-1">
                                 Trend
-                                {sortConfig?.key === 'trend' ? (sortConfig.direction === 'asc' ? <ArrowUp className="w-3 h-3 text-gold-600" /> : <ArrowDown className="w-3 h-3 text-gold-600" />) : <ArrowUpDown className="w-3 h-3 opacity-30" />}
+                                {sortConfig?.key === 'trend' ? (
+                                  sortConfig.direction === 'asc' ? (
+                                    <ArrowUp className="w-3 h-3 text-gold-600" />
+                                  ) : (
+                                    <ArrowDown className="w-3 h-3 text-gold-600" />
+                                  )
+                                ) : (
+                                  <ArrowUpDown className="w-3 h-3 opacity-30" />
+                                )}
                               </div>
                             </th>
                           </tr>
                         </thead>
                         <tbody>
                           {filteredDeclineData.length === 0 ? (
-                            <tr><td colSpan={7} className="px-4 py-8 text-center text-gray-400 text-sm">Awaiting monthly submission data.</td></tr>
+                            <tr>
+                              <td colSpan={7} className="px-4 py-8 text-center text-gray-400 text-sm">
+                                Awaiting monthly submission data.
+                              </td>
+                            </tr>
                           ) : (
                             filteredDeclineData.map((row, i) => (
                               <tr key={i} className="border-b border-gray-100 hover:bg-gray-50 transition-colors">
                                 <td className="px-4 py-4 text-church-green/80">{row.name}</td>
                                 {entityType !== 'Seminaries' && (
-                                  <td className="px-4 py-4 text-church-green/80">{stripVicariatePrefix(row.vicariate)}</td>
+                                  <td className="px-4 py-4 text-church-green/80">
+                                    {stripVicariatePrefix(row.vicariate)}
+                                  </td>
                                 )}
                                 <td className="px-4 py-4 text-church-green/80">{row.class}</td>
                                 <td className="px-4 py-4 font-medium text-church-green">{formatCurrency(row.w1)}</td>
@@ -3388,8 +3461,12 @@ export function BishopDashboard({
                                 <td className="px-4 py-4 font-medium text-church-green">{formatCurrency(row.w3)}</td>
                                 <td className="px-4 py-4 font-medium text-church-green">{formatCurrency(row.w4)}</td>
                                 <td className="px-4 py-4 text-right">
-                                  <span className={`px-3 py-1 rounded-full font-bold text-[10px] flex items-center justify-end gap-1 w-fit ml-auto ${row.type === 'down' ? 'bg-orange-50 text-orange-700' : 'bg-emerald-50 text-emerald-700'}`}>
-                                    <div className={`w-1.5 h-1.5 rounded-full ${row.type === 'down' ? 'bg-orange-500' : 'bg-emerald-500'}`}></div>
+                                  <span
+                                    className={`px-3 py-1 rounded-full font-bold text-[10px] flex items-center justify-end gap-1 w-fit ml-auto ${row.type === 'down' ? 'bg-orange-50 text-orange-700' : 'bg-emerald-50 text-emerald-700'}`}
+                                  >
+                                    <div
+                                      className={`w-1.5 h-1.5 rounded-full ${row.type === 'down' ? 'bg-orange-500' : 'bg-emerald-500'}`}
+                                    ></div>
                                     {row.trend}%
                                   </span>
                                 </td>
@@ -3402,7 +3479,8 @@ export function BishopDashboard({
                     <div className="mt-6 p-4 border border-gray-200 rounded-xl bg-gray-50/50">
                       <p className="text-sm font-bold text-church-black/80">Interpretation:</p>
                       <p className="text-sm text-gray-400 mt-1">
-                        Entities with a sustained decline may require pastoral outreach, targeted fundraising or expense controls to prevent deficit months.
+                        Entities with a sustained decline may require pastoral outreach, targeted fundraising or expense
+                        controls to prevent deficit months.
                       </p>
                     </div>
                   </CardContent>

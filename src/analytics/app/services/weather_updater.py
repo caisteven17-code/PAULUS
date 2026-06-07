@@ -45,13 +45,15 @@ def _create_run_record(period_start: date, period_end: date) -> Optional[str]:
 
         resp = (
             get_table("reference", "weather_runs")
-            .insert({
-                "mode": "incremental",
-                "status": "running",
-                "period_start": period_start.isoformat(),
-                "period_end": period_end.isoformat(),
-                "started_at": datetime.now(timezone.utc).isoformat(),
-            })
+            .insert(
+                {
+                    "mode": "incremental",
+                    "status": "running",
+                    "period_start": period_start.isoformat(),
+                    "period_end": period_end.isoformat(),
+                    "started_at": datetime.now(timezone.utc).isoformat(),
+                }
+            )
             .execute()
         )
         return resp.data[0]["id"] if resp.data else None
@@ -72,13 +74,15 @@ def _update_run_record(
     try:
         from app.services.supabase_client import get_table
 
-        get_table("reference", "weather_runs").update({
-            "status": status,
-            "finished_at": datetime.now(timezone.utc).isoformat(),
-            "municipalities_count": municipalities_count,
-            "records_loaded": records_loaded,
-            "error_detail": error_detail,
-        }).eq("id", run_id).execute()
+        get_table("reference", "weather_runs").update(
+            {
+                "status": status,
+                "finished_at": datetime.now(timezone.utc).isoformat(),
+                "municipalities_count": municipalities_count,
+                "records_loaded": records_loaded,
+                "error_detail": error_detail,
+            }
+        ).eq("id", run_id).execute()
     except Exception as exc:
         logger.warning("Could not update weather run record: %s", exc)
 
@@ -173,7 +177,11 @@ def update(
     # Pre-load IBTrACS flags for the incremental window (re-uses the 7-day cache)
     try:
         typhoon_flags = get_typhoon_flags(start_date.year, end_date.year)
-        window_flags = {d: v for d, v in typhoon_flags.items() if start_date.isoformat() <= d <= end_date.isoformat()}
+        window_flags = {
+            d: v
+            for d, v in typhoon_flags.items()
+            if start_date.isoformat() <= d <= end_date.isoformat()
+        }
         logger.info("IBTrACS: %d typhoon-day flags in update window", len(window_flags))
     except Exception as exc:
         logger.warning("IBTrACS unavailable (%s) — typhoon fields will be empty", exc)
@@ -188,7 +196,9 @@ def update(
     for name, champion in champion_map.items():
         muni = muni_coords.get(name)
         if not muni:
-            logger.warning("Municipality %r not found in MUNICIPALITIES — skipping", name)
+            logger.warning(
+                "Municipality %r not found in MUNICIPALITIES — skipping", name
+            )
             continue
 
         lat = muni["lat"]
@@ -202,7 +212,9 @@ def update(
             try:
                 fetched = _fetch_for_source(source, lat, lon, start_date, end_date)
             except Exception as exc:
-                logger.warning("[%s] source %s raised %s — trying next", name, source, exc)
+                logger.warning(
+                    "[%s] source %s raised %s — trying next", name, source, exc
+                )
                 fetched = []
 
             if fetched:
@@ -215,10 +227,17 @@ def update(
                 logger.warning("[%s] source %s returned no data", name, source)
 
         if not records:
-            logger.error("[%s] all sources returned no data for %s → %s", name, start_date, end_date)
+            logger.error(
+                "[%s] all sources returned no data for %s → %s",
+                name,
+                start_date,
+                end_date,
+            )
         else:
             _merge_ibtracs(records, typhoon_flags)
-            logger.info("[%s] %d daily records from %s", name, len(records), source_used)
+            logger.info(
+                "[%s] %d daily records from %s", name, len(records), source_used
+            )
 
         results.append(
             {
@@ -258,11 +277,15 @@ def update(
             from app.services.weather_loader import load_incremental
 
             records_loaded = load_incremental(out_path)
-            logger.info("Loaded %d records into reference.weather_observations", records_loaded)
+            logger.info(
+                "Loaded %d records into reference.weather_observations", records_loaded
+            )
 
         _update_run_record(run_id, "success", len(results), records_loaded)
     except Exception as exc:
-        _update_run_record(run_id, "failed", len(results), records_loaded, error_detail=str(exc))
+        _update_run_record(
+            run_id, "failed", len(results), records_loaded, error_detail=str(exc)
+        )
         raise
 
     return {
@@ -279,9 +302,13 @@ def update(
 if __name__ == "__main__":
     import argparse
 
-    logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
+    logging.basicConfig(
+        level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s"
+    )
 
-    parser = argparse.ArgumentParser(description="Incremental weather updater for Laguna Province")
+    parser = argparse.ArgumentParser(
+        description="Incremental weather updater for Laguna Province"
+    )
     parser.add_argument(
         "--days",
         type=int,
@@ -289,9 +316,16 @@ if __name__ == "__main__":
         help=f"Lookback window in days (default: {DEFAULT_LOOKBACK_DAYS})",
     )
     parser.add_argument(
-        "--out", type=str, default=str(DEFAULT_OUT_DIR), help="Output directory (must contain champion_map.json)"
+        "--out",
+        type=str,
+        default=str(DEFAULT_OUT_DIR),
+        help="Output directory (must contain champion_map.json)",
     )
-    parser.add_argument("--load", action="store_true", help="Also load results into Supabase after fetching")
+    parser.add_argument(
+        "--load",
+        action="store_true",
+        help="Also load results into Supabase after fetching",
+    )
     args = parser.parse_args()
 
     result = update(lookback_days=args.days, out_dir=Path(args.out), load=args.load)
@@ -301,4 +335,6 @@ if __name__ == "__main__":
         f"{result['period_start']} → {result['period_end']}"
     )
     if args.load:
-        print(f"Loaded {result['records_loaded']} records into reference.weather_observations")
+        print(
+            f"Loaded {result['records_loaded']} records into reference.weather_observations"
+        )

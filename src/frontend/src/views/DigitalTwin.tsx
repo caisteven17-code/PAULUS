@@ -205,24 +205,27 @@ export function DigitalTwin({ onLaunch }: DigitalTwinProps) {
 
   // Fetch live institution profiles from DB on mount
   useEffect(() => {
-    apiClient.getFinancialProfiles().then((data) => {
-      if (data?.length) {
-        setLiveProfiles(
-          data.map((p: any) => ({
-            id: String(p.id),
-            name: p.name,
-            type: p.type as InstitutionType,
-            location: p.location ?? '',
-            healthScore: p.healthScore ?? 50,
-            risk: (p.risk as 'Low' | 'Moderate' | 'High') ?? 'Moderate',
-            currentBalance: p.currentBalance ?? 0,
-            monthlyCollections: p.monthlyCollections ?? 0,
-            trend: p.trend ?? '0.0%',
-            insight: p.insight ?? '',
-          })),
-        );
-      }
-    }).catch(() => {}); // silently keep fallback data
+    apiClient
+      .getFinancialProfiles()
+      .then((data) => {
+        if (data?.length) {
+          setLiveProfiles(
+            data.map((p: any) => ({
+              id: String(p.id),
+              name: p.name,
+              type: p.type as InstitutionType,
+              location: p.location ?? '',
+              healthScore: p.healthScore ?? 50,
+              risk: (p.risk as 'Low' | 'Moderate' | 'High') ?? 'Moderate',
+              currentBalance: p.currentBalance ?? 0,
+              monthlyCollections: p.monthlyCollections ?? 0,
+              trend: p.trend ?? '0.0%',
+              insight: p.insight ?? '',
+            })),
+          );
+        }
+      })
+      .catch(() => {}); // silently keep fallback data
   }, []);
 
   useEffect(() => {
