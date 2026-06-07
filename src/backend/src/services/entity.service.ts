@@ -6,8 +6,18 @@ import { SupabaseService } from './supabase.service';
 type EntityType = 'parish' | 'seminary' | 'school';
 
 const MONTH_ORDER: Record<string, number> = {
-  Jan: 1, Feb: 2, Mar: 3, Apr: 4, May: 5, Jun: 6,
-  Jul: 7, Aug: 8, Sep: 9, Oct: 10, Nov: 11, Dec: 12,
+  Jan: 1,
+  Feb: 2,
+  Mar: 3,
+  Apr: 4,
+  May: 5,
+  Jun: 6,
+  Jul: 7,
+  Aug: 8,
+  Sep: 9,
+  Oct: 10,
+  Nov: 11,
+  Dec: 12,
 };
 
 @Injectable()
@@ -166,7 +176,8 @@ export class EntityService {
         collectionsMap[r.institution_id] = r.net_receipts ?? 0;
       } else {
         const existingRecord = (records ?? []).find(
-          (x: any) => x.institution_id === r.institution_id && collectionsMap[r.institution_id] === (x.net_receipts ?? 0),
+          (x: any) =>
+            x.institution_id === r.institution_id && collectionsMap[r.institution_id] === (x.net_receipts ?? 0),
         );
         const existingYear = existingRecord?.year ?? 0;
         const existingMonth = MONTH_ORDER[existingRecord?.month ?? ''] ?? 0;
@@ -228,9 +239,16 @@ export class EntityService {
         for (const inst of institutions) {
           const recs = (byInst[inst.id] ?? []).slice(0, 6);
           const collectionsHistory = recs.map((r: any) => Number(r.net_receipts ?? 0)).reverse();
-          const expensesHistory = recs.map((r: any) =>
-            Math.max(0, Number(r.net_receipts ?? 0) + Number(r.beginning_balance ?? 0) - Number(r.ending_balance_after_remit ?? 0)),
-          ).reverse();
+          const expensesHistory = recs
+            .map((r: any) =>
+              Math.max(
+                0,
+                Number(r.net_receipts ?? 0) +
+                  Number(r.beginning_balance ?? 0) -
+                  Number(r.ending_balance_after_remit ?? 0),
+              ),
+            )
+            .reverse();
           const currentBalance = Number(recs[0]?.ending_balance_after_remit ?? 0);
           const monthlyCollections = collectionsHistory.length
             ? collectionsHistory.slice(-3).reduce((a, b) => a + b, 0) / Math.min(3, collectionsHistory.length)
@@ -239,7 +257,10 @@ export class EntityService {
             ? expensesHistory.slice(-3).reduce((a, b) => a + b, 0) / Math.min(3, expensesHistory.length)
             : 0;
           const { healthScore, risk } = this.computeFinancialHealthScore(
-            monthlyCollections, monthlyExpenses, currentBalance, collectionsHistory,
+            monthlyCollections,
+            monthlyExpenses,
+            currentBalance,
+            collectionsHistory,
           );
           const trend = this.computeCollectionTrend(collectionsHistory);
 
@@ -324,16 +345,31 @@ export class EntityService {
 
   private generateFinancialInsight(score: number, trend: string): string {
     const up = trend.startsWith('+');
-    if (score >= 80) return up ? 'Consistent collection growth with disciplined operating expenses.' : 'Strong reserves despite mixed collection trend.';
+    if (score >= 80)
+      return up
+        ? 'Consistent collection growth with disciplined operating expenses.'
+        : 'Strong reserves despite mixed collection trend.';
     if (score >= 65) return 'Stable financial position with moderate growth potential.';
     if (score >= 50) return 'Adequate reserves; monitor expense trajectory closely.';
     return 'Tight margins — financial review is recommended.';
   }
 
-  private buildFallbackProfile(id: string, name: string, type: EntityType, location: string, cls: string, monthlyCollections: number): any {
+  private buildFallbackProfile(
+    id: string,
+    name: string,
+    type: EntityType,
+    location: string,
+    cls: string,
+    monthlyCollections: number,
+  ): any {
     const monthlyExpenses = Math.round(monthlyCollections * 0.85);
     const currentBalance = monthlyCollections * 2;
-    const { healthScore, risk } = this.computeFinancialHealthScore(monthlyCollections, monthlyExpenses, currentBalance, []);
+    const { healthScore, risk } = this.computeFinancialHealthScore(
+      monthlyCollections,
+      monthlyExpenses,
+      currentBalance,
+      [],
+    );
     return {
       id,
       name,

@@ -177,11 +177,7 @@ def update(
     # Pre-load IBTrACS flags for the incremental window (re-uses the 7-day cache)
     try:
         typhoon_flags = get_typhoon_flags(start_date.year, end_date.year)
-        window_flags = {
-            d: v
-            for d, v in typhoon_flags.items()
-            if start_date.isoformat() <= d <= end_date.isoformat()
-        }
+        window_flags = {d: v for d, v in typhoon_flags.items() if start_date.isoformat() <= d <= end_date.isoformat()}
         logger.info("IBTrACS: %d typhoon-day flags in update window", len(window_flags))
     except Exception as exc:
         logger.warning("IBTrACS unavailable (%s) — typhoon fields will be empty", exc)
@@ -196,9 +192,7 @@ def update(
     for name, champion in champion_map.items():
         muni = muni_coords.get(name)
         if not muni:
-            logger.warning(
-                "Municipality %r not found in MUNICIPALITIES — skipping", name
-            )
+            logger.warning("Municipality %r not found in MUNICIPALITIES — skipping", name)
             continue
 
         lat = muni["lat"]
@@ -212,9 +206,7 @@ def update(
             try:
                 fetched = _fetch_for_source(source, lat, lon, start_date, end_date)
             except Exception as exc:
-                logger.warning(
-                    "[%s] source %s raised %s — trying next", name, source, exc
-                )
+                logger.warning("[%s] source %s raised %s — trying next", name, source, exc)
                 fetched = []
 
             if fetched:
@@ -235,9 +227,7 @@ def update(
             )
         else:
             _merge_ibtracs(records, typhoon_flags)
-            logger.info(
-                "[%s] %d daily records from %s", name, len(records), source_used
-            )
+            logger.info("[%s] %d daily records from %s", name, len(records), source_used)
 
         results.append(
             {
@@ -277,15 +267,11 @@ def update(
             from app.services.weather_loader import load_incremental
 
             records_loaded = load_incremental(out_path)
-            logger.info(
-                "Loaded %d records into reference.weather_observations", records_loaded
-            )
+            logger.info("Loaded %d records into reference.weather_observations", records_loaded)
 
         _update_run_record(run_id, "success", len(results), records_loaded)
     except Exception as exc:
-        _update_run_record(
-            run_id, "failed", len(results), records_loaded, error_detail=str(exc)
-        )
+        _update_run_record(run_id, "failed", len(results), records_loaded, error_detail=str(exc))
         raise
 
     return {
@@ -302,13 +288,9 @@ def update(
 if __name__ == "__main__":
     import argparse
 
-    logging.basicConfig(
-        level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s"
-    )
+    logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
 
-    parser = argparse.ArgumentParser(
-        description="Incremental weather updater for Laguna Province"
-    )
+    parser = argparse.ArgumentParser(description="Incremental weather updater for Laguna Province")
     parser.add_argument(
         "--days",
         type=int,
@@ -335,6 +317,4 @@ if __name__ == "__main__":
         f"{result['period_start']} → {result['period_end']}"
     )
     if args.load:
-        print(
-            f"Loaded {result['records_loaded']} records into reference.weather_observations"
-        )
+        print(f"Loaded {result['records_loaded']} records into reference.weather_observations")

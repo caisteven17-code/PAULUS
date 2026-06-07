@@ -37,10 +37,7 @@ export class EntityController {
   }
 
   @Get('financial-profiles')
-  async getFinancialProfiles(
-    @Query('type') type: 'parish' | 'seminary' | 'school' | undefined,
-    @Res() res: Response,
-  ) {
+  async getFinancialProfiles(@Query('type') type: 'parish' | 'seminary' | 'school' | undefined, @Res() res: Response) {
     try {
       const data = await this.entityService.getFinancialProfiles(type as any);
       return res.status(HttpStatus.OK).json(data);

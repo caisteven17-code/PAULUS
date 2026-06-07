@@ -60,9 +60,7 @@ def main() -> int:
         _set_output("needed", "true")
         return 0
 
-    supabase_url = os.environ.get("SUPABASE_URL") or os.environ.get(
-        "NEXT_PUBLIC_SUPABASE_URL", ""
-    )
+    supabase_url = os.environ.get("SUPABASE_URL") or os.environ.get("NEXT_PUBLIC_SUPABASE_URL", "")
     supabase_key = os.environ.get("SUPABASE_SERVICE_ROLE_KEY", "")
 
     if not supabase_url or not supabase_key:
@@ -71,9 +69,7 @@ def main() -> int:
         return 0
 
     cutoff = (today - timedelta(days=RETRY_WINDOW_DAYS)).isoformat()
-    ttl_cutoff = (
-        datetime.now(timezone.utc) - timedelta(hours=RUN_TTL_HOURS)
-    ).isoformat()
+    ttl_cutoff = (datetime.now(timezone.utc) - timedelta(hours=RUN_TTL_HOURS)).isoformat()
 
     # Failed runs within retry window
     failed = _supabase_get(
@@ -107,9 +103,7 @@ def main() -> int:
         last_updated = recent[0].get("updated_at", "")
         stale_cutoff = (today - timedelta(days=STALE_ALERT_DAYS)).isoformat()
         if last_updated and last_updated < stale_cutoff:
-            print(
-                f"::error::Liturgical calendar data is critically stale — last updated {last_updated[:10]}."
-            )
+            print(f"::error::Liturgical calendar data is critically stale — last updated {last_updated[:10]}.")
             _set_output("needed", "true")
             return 1  # fail the job to trigger failure notification
 

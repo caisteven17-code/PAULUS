@@ -55,9 +55,7 @@ def _stale_years(today: date | None = None) -> list[int]:
 
         table = get_table("reference", "liturgical_calendar_runs")
         cutoff = (today - timedelta(days=RETRY_WINDOW_DAYS)).isoformat()
-        ttl_cutoff = (
-            datetime.now(timezone.utc) - timedelta(hours=RUN_TTL_HOURS)
-        ).isoformat()
+        ttl_cutoff = (datetime.now(timezone.utc) - timedelta(hours=RUN_TTL_HOURS)).isoformat()
 
         failed_resp = (
             table.select("years, completed_years, started_at")
@@ -154,9 +152,7 @@ def _update_run_record(
         logger.warning("Could not update run record: %s", exc)
 
 
-def update(
-    out_dir: Path = DEFAULT_OUT_DIR, load: bool = False, force: bool = False
-) -> dict:
+def update(out_dir: Path = DEFAULT_OUT_DIR, load: bool = False, force: bool = False) -> dict:
     from app.services.liturgical_calendar_collector import collect
 
     years = sorted(set(target_years(force=force)) | set(_stale_years()))
@@ -179,12 +175,8 @@ def update(
             if load:
                 from app.services.liturgical_calendar_loader import load_from_file
 
-                loaded_count += load_from_file(
-                    year_out_dir / "liturgical_calendar_clean.json", run_id=run_id
-                )
-                loaded_count += load_from_file(
-                    year_out_dir / "liturgical_calendar_review.json", run_id=run_id
-                )
+                loaded_count += load_from_file(year_out_dir / "liturgical_calendar_clean.json", run_id=run_id)
+                loaded_count += load_from_file(year_out_dir / "liturgical_calendar_review.json", run_id=run_id)
 
             completed_years.append(year)
 
@@ -218,17 +210,11 @@ def update(
 if __name__ == "__main__":
     import argparse
 
-    logging.basicConfig(
-        level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s"
-    )
+    logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
 
-    parser = argparse.ArgumentParser(
-        description="Refresh Philippine liturgical calendar data"
-    )
+    parser = argparse.ArgumentParser(description="Refresh Philippine liturgical calendar data")
     parser.add_argument("--out", type=str, default=str(DEFAULT_OUT_DIR))
-    parser.add_argument(
-        "--load", action="store_true", help="Load generated rows into Supabase"
-    )
+    parser.add_argument("--load", action="store_true", help="Load generated rows into Supabase")
     parser.add_argument(
         "--force",
         action="store_true",

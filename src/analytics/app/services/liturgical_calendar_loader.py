@@ -93,8 +93,7 @@ def _upsert_batch(rows: list[dict[str, Any]], run_id: Optional[str] = None) -> i
         .execute()
     )
     existing_map: dict[tuple[str, str], tuple[str, str]] = {
-        (r["date"], r["source_name"]): (r["id"], r["review_status"])
-        for r in (existing_resp.data or [])
+        (r["date"], r["source_name"]): (r["id"], r["review_status"]) for r in (existing_resp.data or [])
     }
 
     # Pass 1: categorize
@@ -130,10 +129,7 @@ def _upsert_batch(rows: list[dict[str, Any]], run_id: Optional[str] = None) -> i
         try:
             staging_table = get_table("staging", "liturgical_calendar")
             staging_resp = staging_table.insert(staging_rows).execute()
-            staging_id_map = {
-                (s["date"], s["source_name"]): s["id"]
-                for s in (staging_resp.data or [])
-            }
+            staging_id_map = {(s["date"], s["source_name"]): s["id"] for s in (staging_resp.data or [])}
         except Exception as exc:
             logger.warning("Could not write to staging: %s", exc)
             staging_table = None
@@ -173,9 +169,7 @@ def _upsert_batch(rows: list[dict[str, Any]], run_id: Optional[str] = None) -> i
                     }
                 ).eq("id", staging_id).execute()
             except Exception as exc:
-                logger.warning(
-                    "Could not mark staging row %s as applied: %s", staging_id, exc
-                )
+                logger.warning("Could not mark staging row %s as applied: %s", staging_id, exc)
 
     return len(rows)
 
@@ -189,11 +183,7 @@ def load_from_file(
     data = json.loads(path.read_text(encoding="utf-8"))
     rows = data.get("records", [])
     if not include_pending:
-        rows = [
-            row
-            for row in rows
-            if row.get("review_status") in {"approved", "approved_with_revisions"}
-        ]
+        rows = [row for row in rows if row.get("review_status") in {"approved", "approved_with_revisions"}]
     count = _upsert_batch(rows, run_id=run_id)
     logger.info("Liturgical calendar load complete — %d rows processed.", count)
     return count
@@ -202,13 +192,9 @@ def load_from_file(
 if __name__ == "__main__":
     import argparse
 
-    logging.basicConfig(
-        level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s"
-    )
+    logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
 
-    parser = argparse.ArgumentParser(
-        description="Load liturgical calendar JSON into Supabase"
-    )
+    parser = argparse.ArgumentParser(description="Load liturgical calendar JSON into Supabase")
     parser.add_argument(
         "--file",
         type=str,

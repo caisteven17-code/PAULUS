@@ -46,10 +46,7 @@ export class EntityGatewayController {
   }
 
   @Get('financial-profiles')
-  async getFinancialProfiles(
-    @Query('type') type: string,
-    @Res({ passthrough: true }) response: Response,
-  ) {
+  async getFinancialProfiles(@Query('type') type: string, @Res({ passthrough: true }) response: Response) {
     const suffix = type ? `?type=${encodeURIComponent(type)}` : '';
     const result = await requestDownstream<unknown>({
       baseUrl: SERVICE_URLS.entity,
