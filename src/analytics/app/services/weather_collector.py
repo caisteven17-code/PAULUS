@@ -36,7 +36,7 @@ import logging
 import time
 import urllib.parse
 import urllib.request
-from datetime import date, datetime, timedelta
+from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
 from typing import Optional
 
@@ -45,6 +45,53 @@ logger = logging.getLogger(__name__)
 # ── Output directory ──────────────────────────────────────────────────────────
 
 DEFAULT_OUT_DIR = Path(__file__).resolve().parents[4] / "weather_output"
+
+# ── Run record helpers ────────────────────────────────────────────────────────
+
+
+def _create_run_record(period_start: date, period_end: date) -> Optional[str]:
+    try:
+        from app.services.supabase_client import get_table
+
+        resp = (
+            get_table("reference", "weather_runs")
+            .insert({
+                "mode": "full",
+                "status": "running",
+                "period_start": period_start.isoformat(),
+                "period_end": period_end.isoformat(),
+                "started_at": datetime.now(timezone.utc).isoformat(),
+            })
+            .execute()
+        )
+        return resp.data[0]["id"] if resp.data else None
+    except Exception as exc:
+        logger.warning("Could not create weather run record: %s", exc)
+        return None
+
+
+def _update_run_record(
+    run_id: Optional[str],
+    status: str,
+    municipalities_count: int = 0,
+    records_loaded: int = 0,
+    error_detail: Optional[str] = None,
+) -> None:
+    if not run_id:
+        return
+    try:
+        from app.services.supabase_client import get_table
+
+        get_table("reference", "weather_runs").update({
+            "status": status,
+            "finished_at": datetime.now(timezone.utc).isoformat(),
+            "municipalities_count": municipalities_count,
+            "records_loaded": records_loaded,
+            "error_detail": error_detail,
+        }).eq("id", run_id).execute()
+    except Exception as exc:
+        logger.warning("Could not update weather run record: %s", exc)
+
 
 # ── Date range ────────────────────────────────────────────────────────────────
 
@@ -396,6 +443,7 @@ def collect(
     start: Optional[date] = None,
     end: Optional[date] = None,
     out_dir: Path = DEFAULT_OUT_DIR,
+    load: bool = False,
 ) -> dict:
     """
     Run full collection for all 30 municipalities.
@@ -403,6 +451,8 @@ def collect(
     """
     start = start or _default_start()
     end = end or _default_end()
+
+    run_id = _create_run_record(start, end)
 
     out_dir.mkdir(parents=True, exist_ok=True)
     per_city_dir = out_dir / "laguna_weather_per_city"
@@ -540,7 +590,21 @@ def collect(
     )
 
     logger.info("Done. Output saved to %s", out_dir)
-    return {"master": master, "validity": validity_rows, "champion_map": champion_map}
+
+    records_loaded = 0
+    try:
+        if load:
+            from app.services.weather_loader import load_from_file
+
+            records_loaded = load_from_file(out_dir / "laguna_weather_final.json")
+            logger.info("Loaded %d records into reference.weather_observations", records_loaded)
+
+        _update_run_record(run_id, "success", len(master), records_loaded)
+    except Exception as exc:
+        _update_run_record(run_id, "failed", len(master), records_loaded, error_detail=str(exc))
+        raise
+
+    return {"master": master, "validity": validity_rows, "champion_map": champion_map, "records_loaded": records_loaded}
 
 
 # ── CLI ───────────────────────────────────────────────────────────────────────
@@ -560,9 +624,7 @@ if __name__ == "__main__":
     start = date.fromisoformat(args.start) if args.start else None
     end = date.fromisoformat(args.end) if args.end else None
 
-    result = collect(start=start, end=end, out_dir=Path(args.out))
-
+    result = collect(start=start, end=end, out_dir=Path(args.out), load=args.load)
+    print(f"Collected {len(result['master'])} municipalities.")
     if args.load:
-        from app.services.weather_loader import load_from_file
-
-        load_from_file(Path(args.out) / "laguna_weather_final.json")
+        print(f"Loaded {result['records_loaded']} records into reference.weather_observations")
