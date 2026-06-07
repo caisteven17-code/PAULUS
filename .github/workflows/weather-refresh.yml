@@ -1,0 +1,89 @@
+name: Weather Data Refresh
+
+on:
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: "Run mode: incremental (last 10 days) or full (3-year historical collection)"
+        required: false
+        default: "incremental"
+        type: choice
+        options:
+          - incremental
+          - full
+  schedule:
+    # Incremental update every 10 days at 10 AM Manila (02:00 UTC).
+    - cron: "0 2 1,11,21 * *"
+    # Annual full historical collection — January 15 at 10 AM Manila (02:00 UTC).
+    - cron: "0 2 15 1 *"
+
+jobs:
+  refresh:
+    runs-on: ubuntu-latest
+    env:
+      SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+      NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
+      SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+
+      - name: Install analytics dependencies
+        run: pip install -r src/analytics/requirements.txt
+
+      - name: Determine run mode
+        id: mode
+        run: |
+          if [ "${{ github.event_name }}" = "schedule" ]; then
+            # January 15 cron → full historical collection; all other schedule triggers → incremental.
+            MONTH=$(date -u +%m)
+            DAY=$(date -u +%d)
+            if [ "$MONTH" = "01" ] && [ "$DAY" = "15" ]; then
+              echo "mode=full" >> "$GITHUB_OUTPUT"
+            else
+              echo "mode=incremental" >> "$GITHUB_OUTPUT"
+            fi
+          else
+            echo "mode=${{ inputs.mode }}" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Refresh weather data
+        working-directory: src/analytics
+        run: |
+          MODE="${{ steps.mode.outputs.mode }}"
+          echo "Running $MODE weather refresh"
+
+          if [ "$MODE" = "full" ]; then
+            COMMAND="python -m app.services.weather_collector --load"
+          else
+            COMMAND="python -m app.services.weather_updater --load"
+          fi
+
+          SUCCESS=false
+          for attempt in 1 2; do
+            echo "Attempt $attempt of 2"
+            if $COMMAND; then
+              SUCCESS=true
+              break
+            fi
+            if [ $attempt -lt 2 ]; then
+              echo "Attempt $attempt failed — waiting 30 minutes before retry..."
+              sleep 1800
+            fi
+          done
+          if [ "$SUCCESS" = false ]; then
+            echo "Both attempts failed."
+            exit 1
+          fi
+
+      - name: Notify on failure
+        if: failure()
+        run: |
+          echo "::error::Weather data refresh failed (${{ steps.mode.outputs.mode }} mode). Check the logs above for details."
+          echo "::error::Triggered by: ${{ github.event_name }} on ${{ github.ref }}"
