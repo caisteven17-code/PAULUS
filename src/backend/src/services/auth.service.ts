@@ -2,6 +2,153 @@ import { Injectable } from '@nestjs/common';
 import { SupabaseService } from './supabase.service';
 import { AuthUser, AppRole } from '../types';
 
+const ROLE_PERMISSION_DEFINITIONS = [
+  {
+    id: 'view_diocese',
+    name: 'Diocesan Level',
+    category: 'Viewing Permissions',
+    description: 'Allows the user to view all records across the entire diocese.',
+  },
+  {
+    id: 'view_parish',
+    name: 'Parish Level',
+    category: 'Viewing Permissions',
+    description: 'Allows the user to view records specific to their assigned parish.',
+  },
+  {
+    id: 'view_seminary',
+    name: 'Seminary Level',
+    category: 'Viewing Permissions',
+    description: 'Allows the user to view records specific to their assigned seminary.',
+  },
+  {
+    id: 'view_school',
+    name: 'School Level',
+    category: 'Viewing Permissions',
+    description: 'Allows the user to view records specific to their assigned school.',
+  },
+  {
+    id: 'view_school_cluster',
+    name: 'Cluster School Level',
+    category: 'Viewing Permissions',
+    description: 'Allows the user to view assigned cluster schools.',
+  },
+  {
+    id: 'view_school_all',
+    name: 'All Schools Level',
+    category: 'Viewing Permissions',
+    description: 'Allows the user to view all schools in the diocese.',
+  },
+  {
+    id: 'download_csv',
+    name: 'Download CSV Templates',
+    category: 'Data Management',
+    description: 'Allows the user to download blank CSV templates for data entry.',
+  },
+  {
+    id: 'upload_csv_admin',
+    name: 'Upload Master CSV',
+    category: 'Data Management',
+    description: 'Allows the user to upload and process master CSV templates for the diocese.',
+  },
+  {
+    id: 'upload_csv_entity',
+    name: 'Upload Entity CSV',
+    category: 'Data Management',
+    description: 'Allows the user to upload updated CSVs for their specific entity.',
+  },
+  {
+    id: 'create_users',
+    name: 'Create User Accounts',
+    category: 'User Management',
+    description: 'Allows the user to create new accounts for other personnel.',
+  },
+  {
+    id: 'manage_roles',
+    name: 'Manage User Roles',
+    category: 'User Management',
+    description: 'Allows the user to modify role permissions and assign roles to users.',
+  },
+  {
+    id: 'digital_twin',
+    name: 'Digital Twin',
+    category: 'Digital Twin',
+    description: 'Allows the user to launch scenario simulations and mirror other institution dashboards.',
+  },
+  {
+    id: 'manage_entities',
+    name: 'Manage Entity Management',
+    category: 'Entity Management',
+    description: 'Allows the user to manage and configure diocesan institutions, parishes, schools, and seminaries.',
+  },
+  {
+    id: 'manage_projects',
+    name: 'Manage Projects',
+    category: 'Projects',
+    description: 'Allows the user to create, edit, and manage projects.',
+  },
+  {
+    id: 'view_projects',
+    name: 'View Projects Only',
+    category: 'Projects',
+    description: 'Allows the user to view project lists and details without administrative modifications.',
+  },
+  {
+    id: 'manage_announcements',
+    name: 'Manage Announcements',
+    category: 'Announcements',
+    description: 'Allows the user to create, edit, and publish announcements across the diocese.',
+  },
+  {
+    id: 'view_announcements',
+    name: 'View Announcements Only',
+    category: 'Announcements',
+    description: 'Allows the user to view announcements and news bulletins without publishing rights.',
+  },
+  {
+    id: 'view_priests',
+    name: 'Priest Profiles & Dashboard',
+    category: 'Priest Management',
+    description: 'Allows the user to view priest health trackers, assignments, and personnel dashboards.',
+  },
+  {
+    id: 'manage_assignments',
+    name: 'Priest Assignment Simulator',
+    category: 'Priest Management',
+    description: 'Allows the user to launch scenario planning and simulate clergy assignments.',
+  },
+  {
+    id: 'view_audit_logs',
+    name: 'View Audit Logs',
+    category: 'User Management',
+    description: 'Allows the user to view administrative action audit logs.',
+  },
+  {
+    id: 'view_parish_dashboard',
+    name: 'Parish Dashboard',
+    category: 'Dashboard Access',
+    description: 'Allows the user to access parish dashboards.',
+  },
+  {
+    id: 'view_seminary_dashboard',
+    name: 'Seminary Dashboard',
+    category: 'Dashboard Access',
+    description: 'Allows the user to access seminary dashboards.',
+  },
+  {
+    id: 'view_school_dashboard',
+    name: 'School Dashboard',
+    category: 'Dashboard Access',
+    description: 'Allows the user to access school dashboards.',
+  },
+  {
+    id: 'manage_own_institution',
+    name: 'Manage Own Institution',
+    category: 'Entity Management',
+    description: 'Allows the user to update their assigned institution profile.',
+  },
+] as const;
+
 @Injectable()
 export class AppAuthService {
   constructor(private readonly supabaseService: SupabaseService) {}
@@ -285,7 +432,8 @@ export class AppAuthService {
   }
 
   async listRoles() {
-    const { data: rolesData, error: rolesError } = await this.supabaseService.supabaseServer
+    const { data: rolesData, error: rolesError } = await this.supabaseService.admin
+      .schema('diocese')
       .from('roles')
       .select('*')
       .order('is_predefined', { ascending: false })
@@ -293,7 +441,8 @@ export class AppAuthService {
 
     if (rolesError) throw rolesError;
 
-    const { data: permsData, error: permsError } = await this.supabaseService.supabaseServer
+    const { data: permsData, error: permsError } = await this.supabaseService.admin
+      .schema('diocese')
       .from('role_permissions')
       .select('*');
 
@@ -301,32 +450,7 @@ export class AppAuthService {
 
     return (rolesData ?? []).map((role) => {
       const permissions: Record<string, boolean> = {};
-      const permissionKeys = [
-        'view_diocese',
-        'view_parish',
-        'view_seminary',
-        'view_school',
-        'view_school_cluster',
-        'view_school_all',
-        'download_csv',
-        'upload_csv_admin',
-        'upload_csv_entity',
-        'create_users',
-        'manage_roles',
-        'digital_twin',
-        'manage_entities',
-        'manage_projects',
-        'view_projects',
-        'manage_announcements',
-        'view_announcements',
-        'view_priests',
-        'manage_assignments',
-        'view_audit_logs',
-        'view_parish_dashboard',
-        'view_seminary_dashboard',
-        'view_school_dashboard',
-        'manage_own_institution',
-      ];
+      const permissionKeys = ROLE_PERMISSION_DEFINITIONS.map((permission) => permission.id);
 
       permissionKeys.forEach((k) => {
         permissions[k] = false;
@@ -348,39 +472,71 @@ export class AppAuthService {
   }
 
   async saveRoles(rolesList: any[]) {
-    const { data: dbRoles, error: rolesError } = await this.supabaseService.supabaseServer.from('roles').select('*');
+    const { error: permissionsUpsertError } = await this.supabaseService.admin
+      .schema('diocese')
+      .from('permissions')
+      .upsert(ROLE_PERMISSION_DEFINITIONS, { onConflict: 'id' });
+    if (permissionsUpsertError) throw permissionsUpsertError;
+
+    const { data: dbPermissions, error: permissionsError } = await this.supabaseService.admin
+      .schema('diocese')
+      .from('permissions')
+      .select('id');
+    if (permissionsError) throw permissionsError;
+
+    const validPermissionIds = new Set((dbPermissions ?? []).map((permission) => permission.id));
+
+    const { data: dbRoles, error: rolesError } = await this.supabaseService.admin
+      .schema('diocese')
+      .from('roles')
+      .select('*');
     if (rolesError) throw rolesError;
 
     const payloadIds = new Set(rolesList.map((r) => r.id));
 
     const rolesToDelete = (dbRoles ?? []).filter((r) => !r.is_predefined && !payloadIds.has(r.id));
     for (const role of rolesToDelete) {
-      await this.supabaseService.supabaseServer.from('roles').delete().eq('id', role.id);
+      const { error: deleteRoleError } = await this.supabaseService.admin
+        .schema('diocese')
+        .from('roles')
+        .delete()
+        .eq('id', role.id);
+      if (deleteRoleError) throw deleteRoleError;
     }
 
     for (const role of rolesList) {
       if (!role.is_predefined) {
-        const { error: upsertErr } = await this.supabaseService.supabaseServer.from('roles').upsert({
-          id: role.id,
-          name: role.name,
-          color: role.color,
-          is_predefined: false,
-          updated_at: new Date().toISOString(),
-        });
+        const { error: upsertErr } = await this.supabaseService.admin
+          .schema('diocese')
+          .from('roles')
+          .upsert({
+            id: role.id,
+            name: role.name,
+            color: role.color,
+            is_predefined: false,
+            updated_at: new Date().toISOString(),
+          });
         if (upsertErr) throw upsertErr;
       }
 
-      await this.supabaseService.supabaseServer.from('role_permissions').delete().eq('role_id', role.id);
+      const { error: deletePermissionsError } = await this.supabaseService.admin
+        .schema('diocese')
+        .from('role_permissions')
+        .delete()
+        .eq('role_id', role.id);
+      if (deletePermissionsError) throw deletePermissionsError;
 
       const activeKeys = Object.entries(role.permissions ?? {})
-        .filter(([_, val]) => val === true)
+        .filter(([key, val]) => val === true && validPermissionIds.has(key))
         .map(([key]) => ({
           role_id: role.id,
           permission_id: key,
+          granted: true,
         }));
 
       if (activeKeys.length > 0) {
-        const { error: insertPermErr } = await this.supabaseService.supabaseServer
+        const { error: insertPermErr } = await this.supabaseService.admin
+          .schema('diocese')
           .from('role_permissions')
           .insert(activeKeys);
         if (insertPermErr) throw insertPermErr;

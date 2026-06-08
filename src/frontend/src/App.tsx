@@ -46,6 +46,68 @@ const toPriestTimeframe = (tf: Timeframe): '3m' | '6m' | '12m' | undefined => {
   return undefined;
 };
 
+const hasAdminPermissions = (permissions: Record<string, boolean>) =>
+  permissions.create_users === true ||
+  permissions.manage_roles === true ||
+  permissions.manage_entities === true ||
+  permissions.upload_csv_admin === true ||
+  permissions.view_audit_logs === true;
+
+const hasProjectAccess = (permissions: Record<string, boolean>) =>
+  permissions.view_projects === true || permissions.manage_projects === true;
+
+const hasAnnouncementAccess = (permissions: Record<string, boolean>) =>
+  permissions.view_announcements === true || permissions.manage_announcements === true;
+
+const getFirstAllowedTab = (role: Role, permissions: Record<string, boolean>) => {
+  if (permissions.view_diocese === true) return 'home';
+  if (role === 'priest' && permissions.view_parish_dashboard === true) return 'parish-dashboard';
+  if (role === 'school' && permissions.view_school_dashboard === true) return 'school';
+  if (role === 'seminary' && permissions.view_seminary_dashboard === true) return 'seminaries';
+  if (hasAnnouncementAccess(permissions)) return 'announcements';
+  if (hasProjectAccess(permissions)) return 'projects';
+  if (permissions.view_priests === true) return 'priest-dashboard';
+  if (permissions.view_parish_dashboard === true) return 'parish-dashboard';
+  if (permissions.view_seminary_dashboard === true) return 'seminaries';
+  if (permissions.view_school_dashboard === true) return 'school';
+  if (permissions.digital_twin === true) return 'digital-twin';
+  if (hasAdminPermissions(permissions)) {
+    if (permissions.create_users === true) return 'admin-user-management';
+    if (permissions.manage_roles === true) return 'admin-user-role';
+    if (permissions.manage_entities === true) return 'admin-entity';
+    if (permissions.upload_csv_admin === true) return 'admin-data';
+    if (permissions.view_audit_logs === true) return 'audit-log';
+  }
+  return 'profile';
+};
+
+const canAccessTab = (tab: string, role: Role, permissions: Record<string, boolean>) => {
+  if (tab === 'profile') return true;
+  if (tab.startsWith('admin-') || tab === 'settings' || tab === 'audit-log') {
+    return tab === 'audit-log' ? permissions.view_audit_logs === true : hasAdminPermissions(permissions);
+  }
+  if (tab === 'home') return permissions.view_diocese === true;
+  if (tab === 'dashboard' || tab === 'parish-dashboard' || tab === 'parish-health') {
+    return role === 'priest' ? permissions.view_parish_dashboard === true : permissions.view_parish_dashboard === true;
+  }
+  if (tab === 'parish-data-submission' || tab === 'seminary-data-submission' || tab === 'school-data-submission') {
+    return permissions.download_csv === true || permissions.upload_csv_entity === true;
+  }
+  if (tab === 'parish-aitwin' || tab === 'priest-aitwin') {
+    return permissions.view_parish_dashboard === true || permissions.digital_twin === true;
+  }
+  if (tab === 'priest-dashboard' || tab === 'priest-health') return permissions.view_priests === true;
+  if (tab === 'seminaries') return permissions.view_seminary_dashboard === true;
+  if (tab === 'seminary-aitwin') return permissions.view_seminary_dashboard === true || permissions.digital_twin === true;
+  if (tab === 'school') return permissions.view_school_dashboard === true;
+  if (tab === 'school-aitwin') return permissions.view_school_dashboard === true || permissions.digital_twin === true;
+  if (tab === 'projects') return hasProjectAccess(permissions);
+  if (tab === 'digital-twin') return permissions.digital_twin === true;
+  if (tab === 'announcements') return hasAnnouncementAccess(permissions);
+  if (tab === 'consolidated') return permissions.view_diocese === true;
+  return false;
+};
+
 const appRoleToRole = (appRole: string): Role => {
   const mapped = getAppRole(appRole);
   if (mapped === 'parish_priest' || mapped === 'parish_secretary') return 'priest';
@@ -57,7 +119,7 @@ export default function App() {
   const [isAuthReady, setIsAuthReady] = useState(false);
   const [role, setRole] = useState<Role>('bishop');
   const [activeTab, setActiveTab] = useState('home');
-  const { permissions } = usePermissions();
+  const { permissions, loading: permissionsLoading } = usePermissions();
   const [timeframe, setTimeframe] = useState<Timeframe>('6m');
   const [year, setYear] = useState<number>(2026);
   const [digitalTwinSession, setDigitalTwinSession] = useState<DigitalTwinSession | null>(null);
@@ -112,6 +174,13 @@ export default function App() {
       setActiveTab('home');
     }
   };
+
+  useEffect(() => {
+    if (!isAuthReady || !isAuthenticated || permissionsLoading) return;
+    if (!canAccessTab(activeTab, role, permissions)) {
+      setActiveTab(getFirstAllowedTab(role, permissions));
+    }
+  }, [activeTab, isAuthReady, isAuthenticated, permissions, permissionsLoading, role]);
 
   /**
    * Handles user logout and state reset
@@ -508,7 +577,7 @@ export default function App() {
             return renderAccessDenied();
           return <WhatIfSimulator mode="parish" />;
         case 'priest-dashboard':
-          if (permissions.view_parish_dashboard !== true) return renderAccessDenied();
+          if (permissions.view_priests !== true) return renderAccessDenied();
           return (
             <PriestDashboard
               role="priest"
@@ -551,7 +620,7 @@ export default function App() {
             return renderAccessDenied();
           return <WhatIfSimulator mode="school" />;
         case 'projects':
-          return permissions.view_projects ? <Projects role={role} /> : renderAccessDenied();
+          return permissions.view_projects || permissions.manage_projects ? <Projects role={role} /> : renderAccessDenied();
         case 'digital-twin':
           return permissions.digital_twin ? (
             <DigitalTwin
@@ -663,7 +732,7 @@ export default function App() {
             renderAccessDenied()
           );
         case 'priest-dashboard':
-          if (permissions.view_parish_dashboard !== true) {
+          if (permissions.view_priests !== true) {
             return renderAccessDenied();
           }
           return (
@@ -752,7 +821,7 @@ export default function App() {
             renderAccessDenied()
           );
         case 'projects':
-          return permissions.view_projects ? <Projects role={role} /> : renderAccessDenied();
+          return permissions.view_projects || permissions.manage_projects ? <Projects role={role} /> : renderAccessDenied();
         case 'announcements':
           return permissions.view_announcements || permissions.manage_announcements ? (
             <Announcements />

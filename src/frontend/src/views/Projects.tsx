@@ -22,7 +22,7 @@ import { ProjectDetailPage } from '../components/projects/ProjectDetailPage';
 import { ProjectCreationForm } from '../components/projects/ProjectCreationForm';
 import { dataService } from '../services/dataService';
 import { auth } from '../firebase';
-import { INITIAL_ROLES } from '../constants';
+import { usePermissions } from '../hooks/usePermissions';
 
 interface ProjectsProps {
   role?: string;
@@ -40,49 +40,8 @@ export function Projects({ role }: ProjectsProps) {
   const [showFilterDropdown, setShowFilterDropdown] = useState(false);
   const [showEntityFilterDropdown, setShowEntityFilterDropdown] = useState(false);
   const [userContext, setUserContext] = useState<{ id: string; type: EntityType } | null>(null);
-
-  const [customRoles, setCustomRoles] = useState<any[]>([]);
-
-  useEffect(() => {
-    const loadRoles = async () => {
-      try {
-        const res = await fetch('/api/admin/roles');
-        if (!res.ok) throw new Error();
-        const data = await res.json();
-        if (Array.isArray(data)) setCustomRoles(data);
-      } catch {
-        const stored = localStorage.getItem('diocese_roles');
-        if (stored) setCustomRoles(JSON.parse(stored));
-      }
-    };
-    loadRoles();
-  }, []);
-
-  // Load the current user's role permissions dynamically
-  const permissions = useMemo(() => {
-    const userRole = auth.currentUser?.role || 'bishop';
-
-    // First, look in dynamically loaded custom roles
-    let matchingRole = customRoles.find((r) => r.id === userRole);
-
-    // Fall back to INITIAL_ROLES
-    if (!matchingRole) {
-      matchingRole = INITIAL_ROLES.find((r) => r.id === userRole);
-    }
-
-    if (matchingRole) {
-      return {
-        manage_projects: matchingRole.permissions.manage_projects !== false,
-        view_projects: matchingRole.permissions.view_projects !== false,
-        view_diocese: matchingRole.permissions.view_diocese === true,
-      };
-    }
-    return {
-      manage_projects: userRole === 'bishop' || userRole === 'admin',
-      view_projects: userRole === 'bishop' || userRole === 'admin',
-      view_diocese: userRole === 'bishop' || userRole === 'admin',
-    };
-  }, [customRoles, auth.currentUser]);
+  const { permissions } = usePermissions();
+  const canAccessProjects = permissions.view_projects === true || permissions.manage_projects === true;
 
   useEffect(() => {
     const unsubscribe = auth.onAuthStateChanged((user: any) => {
@@ -99,25 +58,8 @@ export function Projects({ role }: ProjectsProps) {
     return () => unsubscribe();
   }, []);
 
-  if (!permissions.view_projects) {
-    return (
-      <div className="min-h-screen bg-church-light p-4 md:p-8 flex items-center justify-center">
-        <div className="bg-white p-12 rounded-[40px] border border-gray-100 shadow-xl max-w-md text-center space-y-6">
-          <div className="w-20 h-20 bg-rose-50 rounded-full flex items-center justify-center text-rose-500 mx-auto">
-            <Building2 className="w-10 h-10" />
-          </div>
-          <h2 className="text-2xl font-serif font-bold text-church-black">Access Denied</h2>
-          <p className="text-gray-500 text-sm leading-relaxed">
-            Your account role does not have viewing permissions for Diocesan and Parish Projects. Please contact your
-            diocesan administrator to request access.
-          </p>
-        </div>
-      </div>
-    );
-  }
-
   useEffect(() => {
-    if (!userContext) return;
+    if (!userContext || !canAccessProjects) return;
 
     // If bishop, we can see all projects or filter by type
     // If others, we only see our own projects
@@ -146,7 +88,7 @@ export function Projects({ role }: ProjectsProps) {
       unsubscribeDonations();
       unsubscribeExpenses();
     };
-  }, [userContext, filterEntityType]);
+  }, [userContext, filterEntityType, canAccessProjects]);
 
   const isDiocese = permissions.view_diocese === true;
 
@@ -257,6 +199,23 @@ export function Projects({ role }: ProjectsProps) {
         return <Building2 className="w-4 h-4" />;
     }
   };
+
+  if (!canAccessProjects) {
+    return (
+      <div className="min-h-screen bg-church-light p-4 md:p-8 flex items-center justify-center">
+        <div className="bg-white p-12 rounded-[40px] border border-gray-100 shadow-xl max-w-md text-center space-y-6">
+          <div className="w-20 h-20 bg-rose-50 rounded-full flex items-center justify-center text-rose-500 mx-auto">
+            <Building2 className="w-10 h-10" />
+          </div>
+          <h2 className="text-2xl font-serif font-bold text-church-black">Access Denied</h2>
+          <p className="text-gray-500 text-sm leading-relaxed">
+            Your account role does not have viewing permissions for Diocesan and Parish Projects. Please contact your
+            diocesan administrator to request access.
+          </p>
+        </div>
+      </div>
+    );
+  }
 
   if (selectedProject) {
     return (

@@ -102,10 +102,15 @@ export class EntityController {
   }
 
   @Patch('admin')
-  async updateAdminEntity(@Body() body: any, @Res() res: Response) {
+  async updateAdminEntity(
+    @Body() body: any,
+    @Query('type') typeParam: 'parish' | 'seminary' | 'school' | undefined,
+    @Query('id') idParam: string | undefined,
+    @Res() res: Response,
+  ) {
     try {
-      const { type, id, ...updates } = body;
-      const data = await this.entityService.updateAdminEntity(type, id, updates);
+      const { type, id, ...updates } = body ?? {};
+      const data = await this.entityService.updateAdminEntity(type ?? typeParam, id ?? idParam, updates);
       return res.status(HttpStatus.OK).json(data);
     } catch (err: any) {
       return res.status(HttpStatus.BAD_REQUEST).json({ error: err.message });

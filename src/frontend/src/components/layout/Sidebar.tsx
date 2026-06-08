@@ -83,7 +83,7 @@ export function Sidebar({ activeTab = '', onNavigate, role, timeframe = '6m', on
   const canViewPriests = permissions.view_priests === true;
   const canViewSeminaries = permissions.view_seminary_dashboard === true;
   const canViewSchools = permissions.view_school_dashboard === true;
-  const canViewProjects = permissions.view_projects === true;
+  const canViewProjects = permissions.view_projects === true || permissions.manage_projects === true;
 
   const parishSubtabs = [
     { id: 'parish-dashboard', label: 'Dashboard', icon: BarChart3, section: 'PARISH' },
@@ -136,10 +136,8 @@ export function Sidebar({ activeTab = '', onNavigate, role, timeframe = '6m', on
       <nav className="flex-1 px-3 space-y-1 overflow-y-auto scrollbar-none">
         {/* Home (bishop/admin) or Announcements (priest) — always first */}
         {(() => {
-          const item =
-            role === 'priest'
-              ? { id: 'announcements', label: 'Announcements', icon: Bell }
-              : { id: 'home', label: 'Home', icon: Home };
+          if (permissions.view_diocese !== true) return null;
+          const item = { id: 'home', label: 'Home', icon: Home };
           const Icon = item.icon;
           const isActive = activeTab === item.id;
           return (

@@ -384,6 +384,7 @@ export function Settings({ onBack, onLogout, onNavigate, role = 'bishop', initia
 
   const handleUpdateRoles = async (newRoles: UserRole[]) => {
     setRoles(newRoles);
+    localStorage.setItem('diocese_roles', JSON.stringify(newRoles));
     try {
       const res = await fetch('/api/admin/roles', {
         method: 'POST',
@@ -393,7 +394,6 @@ export function Settings({ onBack, onLogout, onNavigate, role = 'bishop', initia
       if (!res.ok) throw new Error('Failed to save roles');
     } catch (err) {
       console.error('Error saving roles, falling back to local storage:', err);
-      localStorage.setItem('diocese_roles', JSON.stringify(newRoles));
     }
   };
 
@@ -447,10 +447,26 @@ export function Settings({ onBack, onLogout, onNavigate, role = 'bishop', initia
       seminary: ['seminary_rector', 'seminary_oeconomus'],
       school: ['school_superintendent', 'finance_supervisor', 'finance_officer', 'school_principal'],
     };
+    const predefinedRoleIds = new Set(Object.values(staticRoles).flat());
+    const inferCustomRoleType = (customRole: UserRole): InstitutionType => {
+      const roleText = `${customRole.id} ${customRole.name}`.toLowerCase();
+      if (roleText.includes('parish')) return 'parish';
+      if (roleText.includes('seminary') || roleText.includes('rector')) return 'seminary';
+      if (
+        roleText.includes('school') ||
+        roleText.includes('principal') ||
+        roleText.includes('supervisor') ||
+        roleText.includes('officer')
+      ) {
+        return 'school';
+      }
+      return 'diocese';
+    };
 
     return roles.filter((r) => {
       const allowedIds = staticRoles[instType];
       if (allowedIds && allowedIds.includes(r.id)) return true;
+      if (predefinedRoleIds.has(r.id)) return false;
 
       // Dynamic custom role type detection based on permissions
       if (r.permissions.view_diocese && formState.institutionType === 'diocese') return true;
@@ -461,7 +477,14 @@ export function Settings({ onBack, onLogout, onNavigate, role = 'bishop', initia
         r.permissions.view_school || r.permissions.view_school_cluster || r.permissions.view_school_all;
       if (isSchoolPerm && formState.institutionType === 'school') return true;
 
-      return false;
+      const hasAccessLevel =
+        r.permissions.view_diocese ||
+        r.permissions.view_parish ||
+        r.permissions.view_seminary ||
+        r.permissions.view_school ||
+        r.permissions.view_school_cluster ||
+        r.permissions.view_school_all;
+      return !hasAccessLevel && inferCustomRoleType(r) === instType;
     });
   }, [formState.institutionType, roles]);
 

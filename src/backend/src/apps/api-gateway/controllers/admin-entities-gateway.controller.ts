@@ -37,12 +37,23 @@ export class AdminEntitiesGatewayController {
   }
 
   @Patch()
-  async updateAdminEntity(@Body() body: unknown, @Res({ passthrough: true }) response: Response) {
+  async updateAdminEntity(
+    @Body() body: unknown,
+    @Query('type') type: string | undefined,
+    @Query('id') id: string | undefined,
+    @Res({ passthrough: true }) response: Response,
+  ) {
+    const bodyObject = body && typeof body === 'object' ? body : {};
+    const bodyWithIdentity = {
+      ...bodyObject,
+      ...(type ? { type } : {}),
+      ...(id ? { id } : {}),
+    };
     const result = await requestDownstream<unknown>({
       baseUrl: SERVICE_URLS.entity,
       path: '/entities/admin',
       method: 'PATCH',
-      body,
+      body: bodyWithIdentity,
     });
     response.status(result.status);
     return result.data;

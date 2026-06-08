@@ -18,7 +18,6 @@ import {
 import { motion, AnimatePresence } from 'motion/react';
 import { useAuth } from '../firebase';
 import { formatDate } from '../lib/format';
-import { INITIAL_ROLES } from '../constants';
 import { usePermissions } from '../hooks/usePermissions';
 
 interface Announcement {
@@ -80,23 +79,6 @@ export function Announcements() {
       .then((data: Announcement[]) => setAnnouncements(data))
       .catch(() => setAnnouncements([]));
   }, []);
-
-  if (!permissions.view_announcements && !permissions.manage_announcements) {
-    return (
-      <div className="min-h-screen bg-slate-50 flex items-center justify-center p-4">
-        <div className="bg-white p-12 rounded-[40px] border border-slate-100 shadow-xl max-w-md text-center space-y-6">
-          <div className="w-20 h-20 bg-rose-50 rounded-full flex items-center justify-center text-rose-500 mx-auto">
-            <Bell className="w-10 h-10" />
-          </div>
-          <h2 className="text-2xl font-serif font-bold text-slate-950">Access Denied</h2>
-          <p className="text-slate-500 text-sm leading-relaxed">
-            Your account role does not have viewing permissions for Diocesan Announcements. Please contact your diocesan
-            administrator to request access.
-          </p>
-        </div>
-      </div>
-    );
-  }
 
   const canCreateAnnouncements = permissions.manage_announcements;
 
@@ -223,6 +205,23 @@ export function Announcements() {
 
   const filteredAnnouncements =
     filter === 'all' ? announcements : announcements.filter((announcement) => announcement.category === filter);
+
+  if (!permissions.view_announcements && !permissions.manage_announcements) {
+    return (
+      <div className="min-h-screen bg-slate-50 flex items-center justify-center p-4">
+        <div className="bg-white p-12 rounded-[40px] border border-slate-100 shadow-xl max-w-md text-center space-y-6">
+          <div className="w-20 h-20 bg-rose-50 rounded-full flex items-center justify-center text-rose-500 mx-auto">
+            <Bell className="w-10 h-10" />
+          </div>
+          <h2 className="text-2xl font-serif font-bold text-slate-950">Access Denied</h2>
+          <p className="text-slate-500 text-sm leading-relaxed">
+            Your account role does not have viewing permissions for Diocesan Announcements. Please contact your diocesan
+            administrator to request access.
+          </p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-[radial-gradient(circle_at_top,_rgba(212,175,55,0.08),_transparent_32%),linear-gradient(180deg,#f8fafc_0%,#eef2f7_100%)] pt-6 pb-20 px-4 md:px-6">

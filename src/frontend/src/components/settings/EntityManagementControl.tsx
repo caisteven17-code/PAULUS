@@ -400,8 +400,10 @@ export function EntityManagementControl({
   const [formState, setFormState] = useState<{
     name: string;
     vicariate: string;
+    cluster: 1 | 2 | 3;
     class: string;
     address: string;
+    subsidyType: 'subsidized' | 'independent';
     city?: string;
     lat?: number;
     lng?: number;
@@ -409,8 +411,10 @@ export function EntityManagementControl({
   }>({
     name: '',
     vicariate: VICARIATES[0],
+    cluster: 1,
     class: CLASSES[0],
     address: '',
+    subsidyType: 'subsidized',
     city: '',
     lat: undefined,
     lng: undefined,
@@ -884,8 +888,10 @@ export function EntityManagementControl({
       setFormState({
         name: entity.name || '',
         vicariate: entity.vicariate || VICARIATES[0],
+        cluster: entity.cluster || 1,
         class: entity.class || CLASSES[0],
         address: rawAddress,
+        subsidyType: entity.subsidyType || 'subsidized',
         city: extractedCity,
         lat: entity.lat !== undefined ? Number(entity.lat) : undefined,
         lng: entity.lng !== undefined ? Number(entity.lng) : undefined,
@@ -899,8 +905,10 @@ export function EntityManagementControl({
       setFormState({
         name: '',
         vicariate: '',
+        cluster: 1,
         class: CLASSES[0],
         address: '',
+        subsidyType: 'subsidized',
         city: '',
         lat: undefined,
         lng: undefined,
@@ -914,6 +922,48 @@ export function EntityManagementControl({
     setIsFetchingSuggestions(false);
     setGeocodingStatus(null);
     setIsModalOpen(true);
+  };
+
+  const entityIdentity = (entity: any) => ({
+    id: entity?.id?.toString(),
+    name: entity?.name?.trim().toLowerCase(),
+  });
+
+  const upsertEntityList = <T extends { id: string; name: string }>(
+    list: T[],
+    entity: T,
+    previousEntity?: Partial<T> | null,
+  ) => {
+    const nextIdentity = entityIdentity(entity);
+    const previousIdentity = entityIdentity(previousEntity);
+    let replaced = false;
+
+    const merged = list.map((item) => {
+      const itemIdentity = entityIdentity(item);
+      const matches =
+        (previousIdentity.id && itemIdentity.id === previousIdentity.id) ||
+        (previousIdentity.name && itemIdentity.name === previousIdentity.name) ||
+        (nextIdentity.id && itemIdentity.id === nextIdentity.id) ||
+        (nextIdentity.name && itemIdentity.name === nextIdentity.name);
+
+      if (!matches) return item;
+      replaced = true;
+      return { ...item, ...entity };
+    });
+
+    return dedupeEntities(replaced ? merged : [...merged, entity]);
+  };
+
+  const dedupeEntities = <T extends { id: string; name: string }>(list: T[]) => {
+    const seen = new Set<string>();
+    return list.filter((item) => {
+      const identity = entityIdentity(item);
+      const key = identity.id || identity.name;
+      if (!key) return true;
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
   };
 
   const handleSave = async (e: React.FormEvent) => {
@@ -944,6 +994,7 @@ export function EntityManagementControl({
         lat: formState.lat,
         lng: formState.lng,
         district: formState.district,
+        subsidy_type: formState.subsidyType,
         status: 'active',
       };
     } else if (activeSubTab === 'seminaries') {
@@ -955,30 +1006,40 @@ export function EntityManagementControl({
         enrollment: editingEntity?.enrollment || 0,
         capacity: editingEntity?.capacity || 0,
         staff: editingEntity?.staff || 0,
+        subsidy_type: formState.subsidyType,
         status: 'active',
       };
     } else {
       payload = {
         ...payload,
-        ...baseData,
+        name: formState.name,
+        cluster: formState.cluster,
         class: formState.class,
+        address: formState.address,
         principal: editingEntity?.principal || '',
         level: editingEntity?.level || 'K-12',
         enrollment: editingEntity?.enrollment || 0,
         capacity: editingEntity?.capacity || 0,
         staff: editingEntity?.staff || 0,
+        subsidy_type: formState.subsidyType,
         status: 'active',
       };
     }
 
     try {
       const method = editingEntity ? 'PATCH' : 'POST';
-      const res = await fetch('/api/admin/entities', {
+      const endpoint = editingEntity
+        ? `/api/admin/entities?type=${encodeURIComponent(type)}&id=${encodeURIComponent(id)}`
+        : '/api/admin/entities';
+      const res = await fetch(endpoint, {
         method,
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
       });
-      if (!res.ok) throw new Error('API save failed');
+      if (!res.ok) {
+        const errorText = await res.text().catch(() => '');
+        throw new Error(errorText || `API save failed with status ${res.status}`);
+      }
       const savedEntity = await res.json();
 
       const mappedEntity: any = {
@@ -990,6 +1051,7 @@ export function EntityManagementControl({
         status: savedEntity.status || 'active',
         district: savedEntity.district,
         collections: savedEntity.collections,
+        subsidyType: savedEntity.subsidy_type || savedEntity.subsidyType || formState.subsidyType,
       };
 
       if (activeSubTab === 'parishes') {
@@ -1025,6 +1087,7 @@ export function EntityManagementControl({
         mappedEntity.enrollment = savedEntity.enrollment;
         mappedEntity.capacity = savedEntity.capacity;
         mappedEntity.staff = savedEntity.staff;
+        mappedEntity.cluster = savedEntity.cluster || formState.cluster;
 
         if (editingEntity) {
           onUpdateSchools(schools.map((s) => (s.id === editingEntity.id ? mappedEntity : s)));
@@ -1035,7 +1098,7 @@ export function EntityManagementControl({
         }
       }
     } catch (err) {
-      console.error('Error saving entity, falling back to local memory:', err);
+      console.warn('Error saving entity, falling back to local memory:', err instanceof Error ? err.message : err);
       const baseDataLocal = {
         id,
         name: formState.name,
@@ -1055,12 +1118,13 @@ export function EntityManagementControl({
           lat: formState.lat,
           lng: formState.lng,
           district: formState.district,
+          subsidyType: formState.subsidyType,
         };
         if (editingEntity) {
-          onUpdateParishes(parishes.map((p) => (p.id === id ? newParish : p)));
+          onUpdateParishes(upsertEntityList(parishes, newParish, editingEntity));
           setShowSuccess({ show: true, message: 'Parish updated successfully (Offline Mode)!' });
         } else {
-          onUpdateParishes([...parishes, newParish]);
+          onUpdateParishes(upsertEntityList(parishes, newParish));
           setShowSuccess({ show: true, message: 'Parish created successfully (Offline Mode)!' });
         }
       } else if (activeSubTab === 'seminaries') {
@@ -1071,29 +1135,32 @@ export function EntityManagementControl({
           enrollment: editingEntity?.enrollment || 0,
           capacity: editingEntity?.capacity || 0,
           staff: editingEntity?.staff || 0,
+          subsidyType: formState.subsidyType,
         };
         if (editingEntity) {
-          onUpdateSeminaries(seminaries.map((s) => (s.id === id ? newSeminary : s)));
+          onUpdateSeminaries(upsertEntityList(seminaries, newSeminary, editingEntity));
           setShowSuccess({ show: true, message: 'Seminary updated successfully (Offline Mode)!' });
         } else {
-          onUpdateSeminaries([...seminaries, newSeminary]);
+          onUpdateSeminaries(upsertEntityList(seminaries, newSeminary));
           setShowSuccess({ show: true, message: 'Seminary created successfully (Offline Mode)!' });
         }
       } else {
         const newSchool: DiocesanSchool = {
           ...baseDataLocal,
+          cluster: formState.cluster,
           class: formState.class as EntityClass,
           principal: editingEntity?.principal || '',
           level: editingEntity?.level || 'K-12',
           enrollment: editingEntity?.enrollment || 0,
           capacity: editingEntity?.capacity || 0,
           staff: editingEntity?.staff || 0,
+          subsidyType: formState.subsidyType,
         };
         if (editingEntity) {
-          onUpdateSchools(schools.map((s) => (s.id === id ? newSchool : s)));
+          onUpdateSchools(upsertEntityList(schools, newSchool, editingEntity));
           setShowSuccess({ show: true, message: 'School updated successfully (Offline Mode)!' });
         } else {
-          onUpdateSchools([...schools, newSchool]);
+          onUpdateSchools(upsertEntityList(schools, newSchool));
           setShowSuccess({ show: true, message: 'School created successfully (Offline Mode)!' });
         }
       }
@@ -1184,17 +1251,17 @@ export function EntityManagementControl({
   const filteredData = () => {
     const query = searchQuery.toLowerCase();
     if (activeSubTab === 'parishes') {
-      return parishes
+      return dedupeEntities(parishes)
         .filter((p) => p.status !== 'inactive')
         .filter((p) => p.name.toLowerCase().includes(query) || p.vicariate.toLowerCase().includes(query));
     } else if (activeSubTab === 'seminaries') {
-      return seminaries
+      return dedupeEntities(seminaries)
         .filter((s) => s.status !== 'inactive')
         .filter((s) => s.name.toLowerCase().includes(query) || s.vicariate.toLowerCase().includes(query));
     } else {
-      return schools
+      return dedupeEntities(schools)
         .filter((s) => s.status !== 'inactive')
-        .filter((s) => s.name.toLowerCase().includes(query) || s.vicariate.toLowerCase().includes(query));
+        .filter((s) => s.name.toLowerCase().includes(query) || s.cluster.toString().includes(query));
     }
   };
 
@@ -1338,7 +1405,7 @@ export function EntityManagementControl({
       {isModalOpen && (
         <div className="fixed inset-0 bg-black/40 z-[110] flex items-center justify-center p-4 backdrop-blur-sm animate-in fade-in duration-200">
           <div
-            className={`bg-white rounded-3xl shadow-2xl w-full ${activeSubTab === 'parishes' ? 'max-w-4xl' : 'max-w-md'} max-h-[90vh] overflow-hidden flex flex-col animate-in zoom-in-95 duration-200 border border-gray-100`}
+            className="bg-white rounded-3xl shadow-2xl w-full max-w-4xl max-h-[90vh] overflow-hidden flex flex-col animate-in zoom-in-95 duration-200 border border-gray-100"
           >
             <div className="bg-[#1A1A1A] p-8 text-white relative overflow-hidden shrink-0">
               <div className="absolute top-0 right-0 w-32 h-32 bg-[#D4AF37]/10 rounded-full -mr-16 -mt-16 blur-2xl"></div>
@@ -1535,13 +1602,33 @@ export function EntityManagementControl({
                         </div>
                       </div>
                     </div>
+
+                    <div>
+                      <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-2 ml-1">
+                        Subsidy Type <span className="text-rose-500 font-bold ml-0.5">*</span>
+                      </label>
+                      <div className="relative">
+                        <select
+                          required
+                          value={formState.subsidyType}
+                          onChange={(e) => setFormState({ ...formState, subsidyType: e.target.value as 'subsidized' | 'independent' })}
+                          className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-gray-900 focus:outline-none focus:border-[#D4AF37] focus:ring-1 focus:ring-[#D4AF37] transition-all appearance-none"
+                        >
+                          <option value="subsidized">Subsidized</option>
+                          <option value="independent">Independent</option>
+                        </select>
+                        <div className="absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none">
+                          <ArrowRight className="w-4 h-4 text-gray-400 rotate-90" />
+                        </div>
+                      </div>
+                    </div>
                   </div>
 
                   {/* Middle Column: Divider Line */}
                   <div className="hidden md:block w-px bg-gray-200 self-stretch my-2"></div>
 
                   {/* Right Column: Coordinates & Map */}
-                  <div className="space-y-5 flex flex-col justify-between overflow-hidden">
+                  <div className="space-y-5 flex flex-col justify-between">
                     <div className="space-y-4">
                       <div className="flex gap-4">
                         <div className="flex-1">
@@ -1683,68 +1770,212 @@ export function EntityManagementControl({
                   </div>
                 </div>
               ) : (
-                /* Non-parish: Single column (Seminaries / Schools) */
-                <div className="space-y-5 flex-1 overflow-y-auto pr-2 scrollbar-thin">
-                  <div>
-                    <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-2 ml-1">
-                      Name <span className="text-rose-500 font-bold ml-0.5">*</span>
-                    </label>
-                    <input
-                      type="text"
-                      required
-                      value={formState.name}
-                      onChange={(e) => setFormState({ ...formState, name: e.target.value })}
-                      placeholder={`e.g. ${activeSubTab === 'seminaries' ? 'Holy Cross Seminary' : 'San Pablo School'}`}
-                      className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-gray-900 focus:outline-none focus:border-[#D4AF37] focus:ring-1 focus:ring-[#D4AF37] transition-all placeholder:text-gray-400"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-2 ml-1">
-                      Vicariate <span className="text-rose-500 font-bold ml-0.5">*</span>
-                    </label>
-                    <div className="relative">
-                      <select
+                /* Non-parish: 3-column layout with map (Seminaries / Schools) */
+                <div className="grid grid-cols-1 md:grid-cols-[1fr_auto_1fr] gap-8 flex-1 overflow-y-auto pr-2 scrollbar-thin items-stretch">
+                  {/* Left Column: Main Fields */}
+                  <div className="space-y-5">
+                    <div>
+                      <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-2 ml-1">
+                        Name <span className="text-rose-500 font-bold ml-0.5">*</span>
+                      </label>
+                      <input
+                        type="text"
                         required
-                        value={formState.vicariate}
-                        onChange={(e) => {
-                          const vicVal = e.target.value;
-                          const autoDist = vicVal ? VICARIATE_TO_DISTRICT[vicVal] || DISTRICTS[0] : '';
-                          setFormState((prev) => ({
-                            ...prev,
-                            vicariate: vicVal,
-                            district: autoDist,
-                          }));
-                        }}
-                        className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-gray-900 focus:outline-none focus:border-[#D4AF37] focus:ring-1 focus:ring-[#D4AF37] transition-all appearance-none"
-                      >
-                        <option value="" disabled hidden>
-                          Select Vicariate...
-                        </option>
-                        {VICARIATES.map((v) => (
-                          <option key={v} value={v}>
-                            {stripVicariatePrefix(v)}
-                          </option>
-                        ))}
-                      </select>
-                      <div className="absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none">
-                        <ArrowRight className="w-4 h-4 text-gray-400 rotate-90" />
+                        value={formState.name}
+                        onChange={(e) => setFormState({ ...formState, name: e.target.value })}
+                        placeholder={`e.g. ${activeSubTab === 'seminaries' ? 'Holy Cross Seminary' : 'San Pablo School'}`}
+                        className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-gray-900 focus:outline-none focus:border-[#D4AF37] focus:ring-1 focus:ring-[#D4AF37] transition-all placeholder:text-gray-400"
+                      />
+                    </div>
+
+                    {activeSubTab === 'schools' && (
+                      <div>
+                        <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-2 ml-1">
+                          Cluster <span className="text-rose-500 font-bold ml-0.5">*</span>
+                        </label>
+                        <div className="relative">
+                          <select
+                            required
+                            value={formState.cluster}
+                            onChange={(e) => setFormState((prev) => ({ ...prev, cluster: Number(e.target.value) as 1 | 2 | 3 }))}
+                            className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-gray-900 focus:outline-none focus:border-[#D4AF37] focus:ring-1 focus:ring-[#D4AF37] transition-all appearance-none"
+                          >
+                            <option value="" disabled hidden>
+                              Select Cluster...
+                            </option>
+                            <option value="1">1</option>
+                            <option value="2">2</option>
+                            <option value="3">3</option>
+                          </select>
+                          <div className="absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none">
+                            <ArrowRight className="w-4 h-4 text-gray-400 rotate-90" />
+                          </div>
+                        </div>
+                      </div>
+                    )}
+
+                    <div>
+                      <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-2 ml-1">
+                        Address <span className="text-rose-500 font-bold ml-0.5">*</span>
+                      </label>
+                      <input
+                        type="text"
+                        required
+                        value={formState.address}
+                        onChange={(e) => setFormState({ ...formState, address: e.target.value })}
+                        placeholder="Full address"
+                        className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-gray-900 focus:outline-none focus:border-[#D4AF37] focus:ring-1 focus:ring-[#D4AF37] transition-all placeholder:text-gray-400"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-2 ml-1">
+                        Subsidy Type <span className="text-rose-500 font-bold ml-0.5">*</span>
+                      </label>
+                      <div className="relative">
+                        <select
+                          required
+                          value={formState.subsidyType}
+                          onChange={(e) => setFormState({ ...formState, subsidyType: e.target.value as 'subsidized' | 'independent' })}
+                          className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-gray-900 focus:outline-none focus:border-[#D4AF37] focus:ring-1 focus:ring-[#D4AF37] transition-all appearance-none"
+                        >
+                          <option value="subsidized">Subsidized</option>
+                          <option value="independent">Independent</option>
+                        </select>
+                        <div className="absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none">
+                          <ArrowRight className="w-4 h-4 text-gray-400 rotate-90" />
+                        </div>
                       </div>
                     </div>
                   </div>
 
-                  <div>
-                    <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-2 ml-1">
-                      Address <span className="text-rose-500 font-bold ml-0.5">*</span>
-                    </label>
-                    <input
-                      type="text"
-                      required
-                      value={formState.address}
-                      onChange={(e) => setFormState({ ...formState, address: e.target.value })}
-                      placeholder="Full address"
-                      className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-gray-900 focus:outline-none focus:border-[#D4AF37] focus:ring-1 focus:ring-[#D4AF37] transition-all placeholder:text-gray-400"
-                    />
+                  {/* Middle Column: Divider Line */}
+                  <div className="hidden md:block w-px bg-gray-200 self-stretch my-2"></div>
+
+                  {/* Right Column: Coordinates & Map */}
+                  <div className="space-y-5 flex flex-col justify-between">
+                    <div className="space-y-4">
+                      <div className="flex gap-4">
+                        <div className="flex-1">
+                          <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-2 ml-1">
+                            Latitude <span className="text-rose-500 font-bold ml-0.5">*</span>
+                          </label>
+                          <input
+                            type="number"
+                            step="any"
+                            required
+                            disabled={isMapLocked}
+                            value={formState.lat !== undefined ? formState.lat : ''}
+                            onChange={(e) =>
+                              setFormState({
+                                ...formState,
+                                lat: e.target.value === '' ? undefined : Number(e.target.value),
+                              })
+                            }
+                            placeholder="e.g. 14.1686"
+                            className={`w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-gray-900 focus:outline-none focus:border-[#D4AF37] focus:ring-1 focus:ring-[#D4AF37] transition-all placeholder:text-gray-400 text-xs ${
+                              isMapLocked ? 'opacity-60 cursor-not-allowed bg-gray-100/50' : ''
+                            }`}
+                          />
+                        </div>
+                        <div className="flex-1">
+                          <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-2 ml-1">
+                            Longitude <span className="text-rose-500 font-bold ml-0.5">*</span>
+                          </label>
+                          <input
+                            type="number"
+                            step="any"
+                            required
+                            disabled={isMapLocked}
+                            value={formState.lng !== undefined ? formState.lng : ''}
+                            onChange={(e) =>
+                              setFormState({
+                                ...formState,
+                                lng: e.target.value === '' ? undefined : Number(e.target.value),
+                              })
+                            }
+                            placeholder="e.g. 121.3253"
+                            className={`w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-gray-900 focus:outline-none focus:border-[#D4AF37] focus:ring-1 focus:ring-[#D4AF37] transition-all placeholder:text-gray-400 text-xs ${
+                              isMapLocked ? 'opacity-60 cursor-not-allowed bg-gray-100/50' : ''
+                            }`}
+                          />
+                        </div>
+                      </div>
+
+                      <div className="flex flex-col gap-2">
+                        <div className="flex items-center justify-between mt-1 px-1">
+                          <span
+                            className={`text-[10px] font-bold uppercase tracking-wider flex items-center gap-1 ${
+                              isMapLocked ? 'text-gray-400' : 'text-amber-600 animate-pulse'
+                            }`}
+                          >
+                            {isMapLocked ? '🔒 Coordinates Locked' : '🔓 Coordinates Editable'}
+                          </span>
+                          {isMapLocked && (
+                            <button
+                              type="button"
+                              onClick={() => setIsMapLocked(false)}
+                              className="text-[10px] font-bold text-[#D4AF37] hover:underline hover:text-[#B5952F] transition-all"
+                            >
+                              Unlock manual pinning
+                            </button>
+                          )}
+                        </div>
+
+                        <div className="flex gap-2">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setIsMapLocked(false);
+                              setIsLargeMapOpen(true);
+                            }}
+                            className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-xl text-xs font-bold transition-all border border-gray-200"
+                          >
+                            <Maximize2 className="w-3.5 h-3.5 text-gray-500" />
+                            <span>Fullscreen Map</span>
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="w-full h-[220px] rounded-xl overflow-hidden border border-gray-200 relative z-20 shrink-0">
+                      <MapContainer
+                        center={[
+                          formState.lat !== undefined ? formState.lat : 14.1686,
+                          formState.lng !== undefined ? formState.lng : 121.3253,
+                        ]}
+                        zoom={13}
+                        style={{ height: '100%', width: '100%' }}
+                        zoomControl={true}
+                        maxBounds={[
+                          [13.9, 120.9],
+                          [14.45, 121.75],
+                        ]}
+                      >
+                        <UpdateMapCenter
+                          center={[
+                            formState.lat !== undefined ? formState.lat : 14.1686,
+                            formState.lng !== undefined ? formState.lng : 121.3253,
+                          ]}
+                        />
+                        <TileLayer
+                          url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+                          attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
+                        />
+                        <DraggableMarker
+                          position={[
+                            formState.lat !== undefined ? formState.lat : 14.1686,
+                            formState.lng !== undefined ? formState.lng : 121.3253,
+                          ]}
+                          onDragEnd={(lat, lng) => {
+                            const clampedLat = Math.max(13.9, Math.min(14.45, lat));
+                            const clampedLng = Math.max(120.9, Math.min(121.75, lng));
+                            setFormState((prev) => ({ ...prev, lat: clampedLat, lng: clampedLng }));
+                          }}
+                          draggable={!isMapLocked}
+                        />
+                      </MapContainer>
+                    </div>
                   </div>
                 </div>
               )}
@@ -1927,15 +2158,17 @@ export function EntityManagementControl({
               <th className="pb-4 text-[10px] font-bold text-gray-400 uppercase tracking-widest pl-4">
                 Name & Address
               </th>
-              <th className="pb-4 text-[10px] font-bold text-gray-400 uppercase tracking-widest">Vicariate</th>
+              <th className="pb-4 text-[10px] font-bold text-gray-400 uppercase tracking-widest">
+                {activeSubTab === 'schools' ? 'Cluster' : 'Vicariate'}
+              </th>
               <th className="pb-4 text-[10px] font-bold text-gray-400 uppercase tracking-widest text-right pr-4">
                 Actions
               </th>
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-50">
-            {filteredData().map((item: any) => (
-              <tr key={item.id} className="group hover:bg-gray-50/50 transition-colors">
+            {filteredData().map((item: any, index: number) => (
+              <tr key={item.id || `item-${index}`} className="group hover:bg-gray-50/50 transition-colors">
                 <td className="py-5 pl-4">
                   <div className="flex flex-col">
                     <span className="text-gray-900 font-bold text-sm flex items-center gap-1.5">
@@ -1954,7 +2187,7 @@ export function EntityManagementControl({
                 </td>
                 <td className="py-5">
                   <span className="px-3 py-1 bg-gray-100 text-gray-600 rounded-full text-[10px] font-bold uppercase tracking-wider">
-                    {stripVicariatePrefix(item.vicariate)}
+                    {activeSubTab === 'schools' ? `Cluster ${item.cluster}` : stripVicariatePrefix(item.vicariate)}
                   </span>
                 </td>
                 <td className="py-5 text-right pr-4">
@@ -1981,7 +2214,7 @@ export function EntityManagementControl({
               </tr>
             ))}
             {filteredData().length === 0 && (
-              <tr>
+              <tr key="no-entities">
                 <td colSpan={3} className="py-20 text-center">
                   <div className="flex flex-col items-center gap-3">
                     <div className="w-16 h-16 bg-gray-50 rounded-full flex items-center justify-center">

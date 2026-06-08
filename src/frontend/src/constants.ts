@@ -688,7 +688,7 @@ export const INITIAL_SCHOOLS: DiocesanSchool[] = [
   {
     id: '1',
     name: 'Liceo de San Pablo',
-    vicariate: 'San Pablo',
+    cluster: 1,
     class: 'Class A',
     principal: 'Sr. Maria Clara',
     address: 'San Pablo City, Laguna',
@@ -700,7 +700,7 @@ export const INITIAL_SCHOOLS: DiocesanSchool[] = [
   {
     id: '2',
     name: 'Canossa College San Pablo',
-    vicariate: 'San Pablo',
+    cluster: 2,
     class: 'Class B',
     principal: 'Sr. Josefina',
     address: 'San Pablo City, Laguna',

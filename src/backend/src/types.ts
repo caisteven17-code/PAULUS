@@ -94,6 +94,7 @@ export interface Parish {
   primaryPatron?: string;
   secondaryPatron?: string;
   fiestaDate?: string;
+  subsidyType?: 'subsidized' | 'independent';
 }
 
 export interface Seminary {
@@ -108,13 +109,14 @@ export interface Seminary {
   capacity: number;
   staff: number;
   collections?: number;
+  subsidyType?: 'subsidized' | 'independent';
 }
 
 export interface DiocesanSchool {
   id: string;
   name: string;
   district?: string;
-  vicariate: string;
+  cluster: 1 | 2 | 3;
   class: EntityClass;
   principal: string;
   address: string;
@@ -123,6 +125,7 @@ export interface DiocesanSchool {
   capacity: number;
   staff: number;
   collections?: number;
+  subsidyType?: 'subsidized' | 'independent';
 }
 
 export interface FinancialHealthScore {

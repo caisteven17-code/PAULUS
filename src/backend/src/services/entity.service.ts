@@ -62,6 +62,16 @@ export class EntityService {
       if (error || !data?.length) {
         return type === 'parish' ? this.getParishes() : type === 'seminary' ? this.getSeminaries() : this.getSchools();
       }
+      // Normalize data based on type
+      if (type === 'school' && data) {
+        return data.map((school: any) => this.normalizeSchoolData(school));
+      }
+      if (type === 'parish' && data) {
+        return data.map((parish: any) => this.normalizeEntityResponse(parish));
+      }
+      if (type === 'seminary' && data) {
+        return data.map((seminary: any) => this.normalizeEntityResponse(seminary));
+      }
       return data;
     }
 
@@ -76,34 +86,196 @@ export class EntityService {
     }
 
     return {
-      parishes: par.data ?? [],
-      seminaries: sem.data ?? [],
-      schools: sch.data ?? [],
+      parishes: (par.data ?? []).map((p: any) => this.normalizeEntityResponse(p)),
+      seminaries: (sem.data ?? []).map((s: any) => this.normalizeEntityResponse(s)),
+      schools: (sch.data ?? []).map((s: any) => this.normalizeSchoolData(s)),
     };
+  }
+
+  private normalizeSchoolData(school: any): any {
+    let normalized = school;
+
+    // If school has vicariate instead of cluster (pre-migration data), convert it
+    if (school.vicariate && !school.cluster) {
+      // Map vicariate names to clusters
+      const vicariateToCluster: Record<string, number> = {
+        'San Pablo': 1,
+        'Holy Family': 2,
+        'San Isidro Labrador': 3,
+      };
+      normalized = {
+        ...school,
+        cluster: vicariateToCluster[school.vicariate] || 1,
+      };
+    }
+
+    // Use full entity response normalization (handles id, subsidy_type, etc.)
+    return this.normalizeEntityResponse(normalized);
+  }
+
+  private normalizeEntityResponse(entity: any): any {
+    if (!entity) return entity;
+    const normalized: any = { ...entity };
+
+    // Normalize institution_id to id if present
+    if (entity.institution_id && !entity.id) {
+      normalized.id = entity.institution_id;
+    }
+
+    // Normalize snake_case to camelCase for subsidy_type
+    if (entity.subsidy_type) {
+      normalized.subsidyType = entity.subsidy_type;
+    }
+
+    return normalized;
+  }
+
+  private domainInstitutionType(type: EntityType): 'parish' | 'school' | 'seminary' {
+    return type;
+  }
+
+  private async syncInstitutionFields(type: EntityType, entity: any): Promise<any | null> {
+    const subsidyType = entity?.subsidy_type ?? entity?.subsidyType;
+    const payload: Record<string, any> = {
+      updated_at: new Date().toISOString(),
+    };
+
+    if (entity?.name !== undefined) payload.name = entity.name;
+    if (entity?.address !== undefined) payload.address = entity.address;
+    if (entity?.vicariate !== undefined) payload.vicariate = entity.vicariate;
+    if (entity?.district !== undefined) payload.district = entity.district;
+    if (entity?.class !== undefined) payload.class = entity.class;
+    if (entity?.lat !== undefined) payload.latitude = entity.lat;
+    if (entity?.lng !== undefined) payload.longitude = entity.lng;
+    if (subsidyType === 'subsidized' || subsidyType === 'independent') payload.subsidy_type = subsidyType;
+
+    if (Object.keys(payload).length <= 1) return null;
+
+    try {
+      const byId = entity?.id
+        ? await this.supabaseService.admin
+            .schema('diocese')
+            .from('institutions')
+            .update(payload)
+            .eq('id', entity.id)
+            .select('*')
+            .maybeSingle()
+        : null;
+
+      if (byId?.error) throw byId.error;
+      if (byId?.data) return byId.data;
+
+      if (!entity?.name) return null;
+
+      const byName = await this.supabaseService.admin
+        .schema('diocese')
+        .from('institutions')
+        .update(payload)
+        .eq('name', entity.name)
+        .eq('institution_type', this.domainInstitutionType(type))
+        .select('*')
+        .limit(1);
+
+      if (byName.error) throw byName.error;
+      return byName.data?.[0] ?? null;
+    } catch (error) {
+      console.warn('Unable to sync entity fields to diocese.institutions:', error);
+      return null;
+    }
+  }
+
+  private legacyPayloadFor(type: EntityType, payload: any): any {
+    const legacyPayload = { ...payload };
+
+    // These fields are owned by diocese.institutions in the portable schema. Some legacy/detail tables do not
+    // have them, so writing them directly can make the admin save fail before the central-table sync runs.
+    // NOTE: subsidy_type is now part of the detail tables, so we keep it
+    delete legacyPayload.subsidyType; // Remove camelCase version, keep snake_case subsidy_type
+    delete legacyPayload.district;
+    delete legacyPayload.lat;
+    delete legacyPayload.lng;
+
+    if (type === 'school') {
+      delete legacyPayload.cluster;
+    }
+
+    return legacyPayload;
   }
 
   async createAdminEntity(type: EntityType, entity: any): Promise<any> {
     const table = this.tableFor(type);
     if (!table) throw new Error('Invalid type');
 
-    const { data, error } = await this.supabaseService.supabaseServer.from(table).insert(entity).select().single();
+    // For schools, convert cluster to vicariate if database still uses vicariate column
+    let payload = entity;
+    if (type === 'school' && entity.cluster && !entity.vicariate) {
+      const clusterToVicariate: Record<number, string> = {
+        1: 'San Pablo',
+        2: 'Holy Family',
+        3: 'San Isidro Labrador',
+      };
+      payload = {
+        ...entity,
+        vicariate: clusterToVicariate[entity.cluster] || 'San Pablo',
+      };
+      // Remove cluster if database doesn't have it yet
+      const { cluster, ...payloadWithoutCluster } = payload;
+      payload = payloadWithoutCluster;
+    }
+
+    const legacyPayload = this.legacyPayloadFor(type, payload);
+    const { data, error } = await this.supabaseService.supabaseServer.from(table).insert(legacyPayload).select().single();
     if (error) throw error;
-    return data;
+    const syncedInstitution = await this.syncInstitutionFields(type, { ...payload, ...data });
+    const { id: _createdInstitutionId, ...createdInstitutionFields } = syncedInstitution ?? {};
+    const normalizedData = syncedInstitution ? { ...data, ...createdInstitutionFields } : data;
+    // Normalize the response
+    if (type === 'school') return this.normalizeSchoolData(normalizedData);
+    return this.normalizeEntityResponse(normalizedData);
   }
 
   async updateAdminEntity(type: EntityType, id: string, updates: any): Promise<any> {
     const table = this.tableFor(type);
     if (!table || !id) throw new Error('type and id are required');
 
+    // For schools, convert cluster to vicariate if database still uses vicariate column
+    let payload = { ...updates, updated_at: new Date().toISOString() };
+    if (type === 'school' && updates.cluster && !updates.vicariate) {
+      const clusterToVicariate: Record<number, string> = {
+        1: 'San Pablo',
+        2: 'Holy Family',
+        3: 'San Isidro Labrador',
+      };
+      payload = {
+        ...payload,
+        vicariate: clusterToVicariate[updates.cluster] || 'San Pablo',
+      };
+      // Remove cluster if database doesn't have it yet
+      const { cluster, ...payloadWithoutCluster } = payload;
+      payload = payloadWithoutCluster;
+    }
+
+    const legacyPayload = this.legacyPayloadFor(type, payload);
+    console.log('[updateAdminEntity] type:', type, 'id:', id);
+    console.log('[updateAdminEntity] legacyPayload:', JSON.stringify(legacyPayload, null, 2));
+
     const { data, error } = await this.supabaseService.supabaseServer
       .from(table)
-      .update({ ...updates, updated_at: new Date().toISOString() })
+      .update(legacyPayload)
       .eq('id', id)
       .select()
       .single();
 
-    if (error) throw error;
-    return data;
+    if (error) {
+      console.error('[updateAdminEntity] Update error:', error);
+      throw error;
+    }
+    const syncedInstitution = await this.syncInstitutionFields(type, { ...updates, ...data });
+    const { id: _updatedInstitutionId, ...updatedInstitutionFields } = syncedInstitution ?? {};
+    const normalizedData = syncedInstitution ? { ...data, ...updatedInstitutionFields } : data;
+    // Normalize the response
+    if (type === 'school') return this.normalizeSchoolData(normalizedData);
+    return this.normalizeEntityResponse(normalizedData);
   }
 
   async updateOwnInstitution(type: EntityType, id: string, contactNumber?: string, email?: string): Promise<any> {
@@ -293,7 +465,7 @@ export class EntityService {
     // Schools and seminaries: use constants until their institutions are seeded in diocese.institutions
     if (!type || type === 'school') {
       INITIAL_SCHOOLS.forEach((s: any) =>
-        result.push(this.buildFallbackProfile(s.id, s.name, 'school', s.vicariate ?? '', s.class ?? '', 0)),
+        result.push(this.buildFallbackProfile(s.id, s.name, 'school', `Cluster ${s.cluster}`, s.class ?? '', 0)),
       );
     }
 

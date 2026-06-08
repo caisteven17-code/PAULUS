@@ -3,7 +3,6 @@
 import React, { useState, useRef, useMemo } from 'react';
 import { Database, UploadCloud, CheckCircle2, Loader2, Church, BookOpen, GraduationCap } from 'lucide-react';
 import { SubmissionTracker } from '../projects/SubmissionTracker';
-import { ClassificationManagement, ClassificationRecord } from '../ui/ClassificationManagement';
 import { motion } from 'motion/react';
 import { usePermissions } from '../../hooks/usePermissions';
 
@@ -129,7 +128,7 @@ function CSVUploadSection({ title, description, type }: CSVUploadSectionProps) {
 
 export function DataManagementControl() {
   const { permissions } = usePermissions();
-  const [activeTab, setActiveTab] = useState<'templates' | 'submissions' | 'classifications'>('templates');
+  const [activeTab, setActiveTab] = useState<'templates' | 'submissions'>('templates');
 
   const isDiocese = permissions.view_diocese === true;
   const isParish = permissions.view_parish === true;
@@ -204,63 +203,6 @@ export function DataManagementControl() {
     [],
   );
 
-  // Mock classification data
-  const mockClassifications = useMemo<ClassificationRecord[]>(
-    () => [
-      {
-        id: '1',
-        entityName: "St. Matthew's Parish",
-        currentClass: 'Class B',
-        annualIncome: 1800000,
-        isSubsidized: false,
-        subsidyLocked: false,
-        lastReviewed: '2024-03-15',
-        recommendedAction: 'none',
-      },
-      {
-        id: '2',
-        entityName: 'San Roque Parish',
-        currentClass: 'Class D',
-        annualIncome: 450000,
-        isSubsidized: true,
-        subsidyLocked: true,
-        lastReviewed: '2024-02-20',
-        recommendedAction: 'none',
-      },
-      {
-        id: '3',
-        entityName: 'Our Lady of Peace',
-        currentClass: 'Class D',
-        annualIncome: 680000,
-        isSubsidized: true,
-        subsidyLocked: false,
-        lastReviewed: '2024-01-10',
-        recommendedAction: 'reclassify',
-      },
-      {
-        id: '4',
-        entityName: 'St. John Seminary',
-        currentClass: 'Class A',
-        annualIncome: 2800000,
-        isSubsidized: false,
-        subsidyLocked: false,
-        lastReviewed: '2024-03-20',
-        recommendedAction: 'none',
-      },
-      {
-        id: '5',
-        entityName: 'Sacred Heart School',
-        currentClass: 'Class C',
-        annualIncome: 920000,
-        isSubsidized: false,
-        subsidyLocked: false,
-        lastReviewed: '2024-02-15',
-        recommendedAction: 'none',
-      },
-    ],
-    [],
-  );
-
   const templatesToRender = useMemo(() => {
     const list = [];
     if (isDiocese || isParish) {
@@ -305,14 +247,6 @@ export function DataManagementControl() {
     return [];
   }, [isDiocese, isParish, isSeminary, isSchool, mockSubmissions]);
 
-  const filteredClassifications = useMemo(() => {
-    if (isDiocese) return mockClassifications;
-    if (isParish) return mockClassifications.filter((c) => c.entityName.toLowerCase().includes('parish'));
-    if (isSeminary) return mockClassifications.filter((c) => c.entityName.toLowerCase().includes('seminary'));
-    if (isSchool) return mockClassifications.filter((c) => c.entityName.toLowerCase().includes('school'));
-    return [];
-  }, [isDiocese, isParish, isSeminary, isSchool, mockClassifications]);
-
   return (
     <div className="bg-white rounded-3xl shadow-sm border border-gray-100 p-8">
       <div className="flex items-center justify-between mb-6">
@@ -349,18 +283,6 @@ export function DataManagementControl() {
         >
           Submission Tracking
         </button>
-        {isDiocese && (
-          <button
-            onClick={() => setActiveTab('classifications')}
-            className={`px-6 py-3 font-bold text-sm transition-all border-b-2 ${
-              activeTab === 'classifications'
-                ? 'border-[#D4AF37] text-[#D4AF37]'
-                : 'border-transparent text-gray-600 hover:text-gray-900'
-            }`}
-          >
-            Classification Management
-          </button>
-        )}
       </div>
 
       {/* Tab Content */}
@@ -391,13 +313,6 @@ export function DataManagementControl() {
           />
         )}
 
-        {activeTab === 'classifications' && isDiocese && (
-          <ClassificationManagement
-            classifications={filteredClassifications}
-            onUpdateClassification={(id, updates) => {}}
-            onToggleLock={(id, locked) => {}}
-          />
-        )}
       </motion.div>
     </div>
   );
