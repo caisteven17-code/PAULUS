@@ -89,6 +89,7 @@ def _preflight_check() -> None:
 def _clean_spaces(value: Optional[str]) -> Optional[str]:
     if value is None:
         return None
+    value = str(value)
     cleaned = re.sub(r"\s+", " ", value).strip()
     return cleaned or None
 
