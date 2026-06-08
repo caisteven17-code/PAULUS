@@ -3,7 +3,7 @@
 import React, { useState } from 'react';
 import { Shield, Eye, EyeOff, LogIn, KeyRound, Mail, Lock, CheckCircle2 } from 'lucide-react';
 import { Footer } from '../components/layout/Footer';
-import { AppRole, getAccessRoleLabel, getAppRole, normalizeAccessRole } from '../lib/access';
+import { AccessRole, AppRole, getAccessRoleLabel, getAppRole, normalizeAccessRole } from '../lib/access';
 import { supabaseBrowser } from '../lib/supabase';
 
 interface LoginProps {
@@ -99,10 +99,19 @@ export function Login({ onLogin }: LoginProps) {
         string,
         {
           password: string;
-          accessRole: 'parish_priest' | 'parish_secretary';
+          accessRole: AccessRole;
           displayName: string;
+          entityName?: string;
+          entityType?: string;
         }
       > = {
+        'bishop@gmail.com': {
+          password: 'password123',
+          accessRole: 'bishop',
+          displayName: 'Bishop Office',
+          entityName: 'Diocese of San Pablo',
+          entityType: 'diocese',
+        },
         'priest@gmail.com': {
           password: 'password123',
           accessRole: 'parish_priest',
@@ -134,7 +143,8 @@ export function Login({ onLogin }: LoginProps) {
         displayName = sampleCredential.displayName;
         accessRole = sampleCredential.accessRole;
         role = getAppRole(accessRole);
-        entityName = 'San Isidro Labrador Parish';
+        entityName = sampleCredential.entityName || 'San Isidro Labrador Parish';
+        entityType = sampleCredential.entityType || entityType;
       } else if (storedUser) {
         if (!storedUser.password || password !== storedUser.password) {
           throw new Error('Invalid email or password');
@@ -428,6 +438,16 @@ export function Login({ onLogin }: LoginProps) {
                 </p>
               </div>
               <div className="grid grid-cols-1 gap-2.5 text-xs text-slate-300">
+                <button
+                  type="button"
+                  onClick={() => fillDemoCredentials('bishop@gmail.com')}
+                  className="flex flex-col items-start bg-slate-900/40 hover:bg-[#D4AF37]/10 border border-slate-800 hover:border-[#D4AF37]/30 rounded-xl p-3 text-left transition-all duration-200 group"
+                >
+                  <span className="font-bold text-[#E6C27A] group-hover:text-white transition-colors font-sans">
+                    Bishop Access
+                  </span>
+                  <span className="text-[10px] text-slate-400 mt-0.5">bishop@gmail.com Â· password123</span>
+                </button>
                 <button
                   type="button"
                   onClick={() => fillDemoCredentials('priest@gmail.com')}

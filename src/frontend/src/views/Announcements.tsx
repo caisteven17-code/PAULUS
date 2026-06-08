@@ -441,15 +441,17 @@ export function Announcements() {
                 const Icon = CATEGORY_META[announcement.category].icon;
 
                 return (
-                  <motion.button
+                  <motion.div
                     key={announcement.id}
-                    type="button"
+                    role="button"
+                    tabIndex={0}
                     initial={{ opacity: 0, y: 20 }}
                     animate={{ opacity: 1, y: 0 }}
                     exit={{ opacity: 0, y: -20 }}
                     transition={{ delay: index * 0.04 }}
                     onClick={() => setSelectedAnnouncement(announcement)}
-                    className={`w-full text-left bg-white rounded-[30px] border-l-4 ${priority.rail} p-6 border-t border-r border-b border-slate-100 shadow-sm hover:shadow-xl hover:shadow-slate-900/5 transition-all`}
+                    onKeyDown={(e) => e.key === 'Enter' && setSelectedAnnouncement(announcement)}
+                    className={`w-full cursor-pointer text-left bg-white rounded-[30px] border-l-4 ${priority.rail} p-6 border-t border-r border-b border-slate-100 shadow-sm hover:shadow-xl hover:shadow-slate-900/5 transition-all`}
                   >
                     <div className="flex items-start justify-between gap-4">
                       <div className="flex items-start gap-4 flex-1 min-w-0">
@@ -505,7 +507,7 @@ export function Announcements() {
                         </div>
                       )}
                     </div>
-                  </motion.button>
+                  </motion.div>
                 );
               })
             )}

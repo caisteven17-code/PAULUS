@@ -433,6 +433,13 @@ export default function App() {
       profile: 'profile',
     };
     if (adminTabMap[activeTab] !== undefined) {
+      const hasAdminAccess =
+        permissions.create_users === true ||
+        permissions.manage_roles === true ||
+        permissions.manage_entities === true ||
+        permissions.upload_csv_admin === true ||
+        permissions.view_audit_logs === true;
+      if (activeTab !== 'profile' && !hasAdminAccess) return renderAccessDenied();
       return (
         <Settings
           onBack={() => setActiveTab('home')}

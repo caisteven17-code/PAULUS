@@ -406,35 +406,46 @@ export class EntityService {
       name: record.name,
       position: record.position ?? '',
       parish: record.parish ?? '',
-      birth_date: record.birthDate ?? null,
-      last_checkup: record.lastCheckup ?? null,
+      birth_date: record.birthDate || null,
+      last_checkup: record.lastCheckup || null,
       health_status: record.healthStatus ?? 'good',
       notes: record.notes ?? '',
       email: record.email ?? '',
       phone: record.phone ?? '',
       updated_at: new Date().toISOString(),
+      ...(record.createdByUserId ? { created_by_user_id: record.createdByUserId } : {}),
     };
 
-    if (record.id && !String(record.id).startsWith('__new')) {
+    // Try first with document columns; if columns don't exist yet, retry without them
+    const tryInsert = async (p: any, isUpdate: boolean, id?: string) => {
+      if (isUpdate) {
+        const { data, error } = await this.supabaseService.admin
+          .schema('diocese').from('priest_health_records').update(p).eq('id', id).select().single();
+        return { data, error };
+      }
       const { data, error } = await this.supabaseService.admin
-        .schema('diocese')
-        .from('priest_health_records')
-        .update(payload)
-        .eq('id', record.id)
-        .select()
-        .single();
-      if (error) throw error;
-      return this.mapHealthRecord(data);
+        .schema('diocese').from('priest_health_records').insert(p).select().single();
+      return { data, error };
+    };
+
+    const withDocs = {
+      ...payload,
+      ...(record.documentName ? { document_name: record.documentName } : {}),
+      ...(record.documentUrl  ? { document_url:  record.documentUrl  } : {}),
+    };
+
+    const isUpdate = !!(record.id && !String(record.id).startsWith('__new'));
+
+    let result = await tryInsert(withDocs, isUpdate, record.id);
+
+    // If it failed because the document columns don't exist yet, retry without them
+    if (result.error && result.error.message?.includes('document_')) {
+      console.warn('[entity.service] document columns missing, retrying without them');
+      result = await tryInsert(payload, isUpdate, record.id);
     }
 
-    const { data, error } = await this.supabaseService.admin
-      .schema('diocese')
-      .from('priest_health_records')
-      .insert(payload)
-      .select()
-      .single();
-    if (error) throw error;
-    return this.mapHealthRecord(data);
+    if (result.error) throw result.error;
+    return this.mapHealthRecord(result.data);
   }
 
   async deletePriestHealthRecord(id: string): Promise<void> {
@@ -459,6 +470,9 @@ export class EntityService {
       notes: r.notes,
       email: r.email,
       phone: r.phone,
+      documentUrl: r.document_url ?? '',
+      documentName: r.document_name ?? '',
+      createdByUserId: r.created_by_user_id ?? null,
     };
   }
 

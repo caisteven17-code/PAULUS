@@ -6,6 +6,101 @@ import { AuthUser, AppRole } from '../types';
 export class AppAuthService {
   constructor(private readonly supabaseService: SupabaseService) {}
 
+  private isUuid(value?: string): boolean {
+    return typeof value === 'string' && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(value);
+  }
+
+  private domainInstitutionType(entityType?: string): string | null {
+    if (entityType === 'parish' || entityType === 'school' || entityType === 'seminary') return entityType;
+    if (entityType === 'diocese') return 'chancery';
+    return null;
+  }
+
+  private async resolveInstitutionId(
+    entityId?: string,
+    entityName?: string,
+    entityType?: string,
+  ): Promise<string | null> {
+    const institutions = this.supabaseService.admin.schema('diocese').from('institutions');
+
+    if (this.isUuid(entityId)) {
+      const { data } = await institutions.select('id').eq('id', entityId).maybeSingle();
+      if (data?.id) return data.id;
+    }
+
+    if (!entityName) return null;
+
+    const institutionType = this.domainInstitutionType(entityType);
+    let query = this.supabaseService.admin
+      .schema('diocese')
+      .from('institutions')
+      .select('id')
+      .eq('name', entityName)
+      .eq('is_active', true)
+      .is('deleted_at', null);
+
+    if (institutionType) query = query.eq('institution_type', institutionType);
+
+    const { data } = await query.maybeSingle();
+    if (data?.id) return data.id;
+
+    const fallback = await this.supabaseService.admin
+      .schema('diocese')
+      .from('institutions')
+      .select('id')
+      .eq('name', entityName)
+      .eq('is_active', true)
+      .is('deleted_at', null)
+      .maybeSingle();
+
+    return fallback.data?.id ?? null;
+  }
+
+  private async upsertDioceseProfile(userId: string, body: any, fallbackEmail?: string): Promise<void> {
+    const email = body.email ?? fallbackEmail ?? '';
+    const roleId = body.role ?? 'parish_priest';
+    const fullName = body.displayName ?? email.split('@')[0] ?? '';
+    const institutionId = await this.resolveInstitutionId(body.entityId, body.entityName, body.entityType);
+
+    const { error } = await this.supabaseService.admin.schema('diocese').from('profiles').upsert(
+      {
+        external_auth_id: userId,
+        full_name: fullName,
+        email,
+        role_id: roleId,
+        institution_id: institutionId,
+        is_active: true,
+        deleted_at: null,
+        updated_at: new Date().toISOString(),
+      },
+      { onConflict: 'external_auth_id' },
+    );
+
+    if (!error) return;
+
+    // '23503' = foreign_key_violation — role_id not found in diocese.roles (roles not seeded yet).
+    // Retry with no role so the profile row still lands in the DB; role can be fixed once roles are seeded.
+    if (error.code === '23503') {
+      const { error: retryError } = await this.supabaseService.admin.schema('diocese').from('profiles').upsert(
+        {
+          external_auth_id: userId,
+          full_name: fullName,
+          email,
+          role_id: null,
+          institution_id: institutionId,
+          is_active: false, // CHECK constraint requires is_active=false when role_id is null
+          deleted_at: null,
+          updated_at: new Date().toISOString(),
+        },
+        { onConflict: 'external_auth_id' },
+      );
+      if (retryError) throw retryError;
+      return;
+    }
+
+    throw error;
+  }
+
   private mapSupabaseUser(supabaseUser: any): AuthUser {
     const meta = supabaseUser.user_metadata ?? supabaseUser.raw_user_meta_data ?? {};
     return {
@@ -83,6 +178,15 @@ export class AppAuthService {
       email_confirm: true,
     });
     if (error) throw error;
+
+    try {
+      await this.upsertDioceseProfile(data.user.id, { email, displayName, role, entityName, entityType, entityId });
+    } catch (profileError) {
+      // Log but do not roll back the auth user — the account exists and the user can log in.
+      // The profile row can be repaired once the diocese schema/roles are seeded.
+      console.error('[auth.service] Profile upsert failed for user', data.user.id, ':', (profileError as any)?.message ?? profileError);
+    }
+
     return {
       id: data.user.id,
       email: data.user.email ?? '',
@@ -105,6 +209,14 @@ export class AppAuthService {
 
     const { data, error } = await this.supabaseService.supabaseServer.auth.admin.updateUserById(id, updates);
     if (error) throw error;
+    await this.upsertDioceseProfile(id, {
+      email: data.user.email ?? email,
+      displayName,
+      role,
+      entityName,
+      entityType,
+      entityId,
+    });
     const meta = data.user.user_metadata ?? {};
     return {
       id: data.user.id,
@@ -126,6 +238,11 @@ export class AppAuthService {
         ban_duration: '876600h', // ~100 years
       });
       if (error) throw error;
+      await this.supabaseService.admin
+        .schema('diocese')
+        .from('profiles')
+        .update({ is_active: false, deleted_at: new Date().toISOString(), updated_at: new Date().toISOString() })
+        .eq('external_auth_id', id);
       const meta = data.user.user_metadata ?? {};
       return {
         id: data.user.id,
@@ -146,6 +263,11 @@ export class AppAuthService {
         ban_duration: 'none',
       });
       if (error) throw error;
+      await this.supabaseService.admin
+        .schema('diocese')
+        .from('profiles')
+        .update({ is_active: true, deleted_at: null, updated_at: new Date().toISOString() })
+        .eq('external_auth_id', id);
       const meta = data.user.user_metadata ?? {};
       return {
         id: data.user.id,

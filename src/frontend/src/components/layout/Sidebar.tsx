@@ -77,6 +77,14 @@ export function Sidebar({ activeTab = '', onNavigate, role, timeframe = '6m', on
     [onTimeframeChange],
   );
 
+  const hasDioceseAccess = role === 'bishop' || role === 'admin';
+
+  const canViewParishes = permissions.view_parish_dashboard === true;
+  const canViewPriests = permissions.view_priests === true;
+  const canViewSeminaries = permissions.view_seminary_dashboard === true;
+  const canViewSchools = permissions.view_school_dashboard === true;
+  const canViewProjects = permissions.view_projects === true;
+
   const parishSubtabs = [
     { id: 'parish-dashboard', label: 'Dashboard', icon: BarChart3, section: 'PARISH' },
     { id: 'parish-whatif', label: 'Simulator', icon: Zap, section: 'PARISH' },
@@ -84,7 +92,7 @@ export function Sidebar({ activeTab = '', onNavigate, role, timeframe = '6m', on
 
   const priestSubtabs = [
     { id: 'priest-dashboard', label: 'Dashboard', icon: BarChart3 },
-    ...(role === 'priest' ? [] : [{ id: 'priest-health', label: 'Health Tracker', icon: Heart, section: 'PRIEST' }]),
+    ...(canViewPriests ? [{ id: 'priest-health', label: 'Health Tracker', icon: Heart, section: 'PRIEST' }] : []),
     { id: 'priest-aitwin', label: 'Simulator', icon: Zap, section: 'PRIEST' },
   ];
 
@@ -97,14 +105,6 @@ export function Sidebar({ activeTab = '', onNavigate, role, timeframe = '6m', on
     { id: 'school', label: 'Dashboard', icon: BarChart3 },
     { id: 'school-aitwin', label: 'Simulator', icon: Zap },
   ];
-
-  const hasDioceseAccess = role === 'bishop' || role === 'admin';
-
-  const canViewParishes = permissions.view_parish_dashboard === true;
-  const canViewPriests = permissions.view_priests === true;
-  const canViewSeminaries = permissions.view_seminary_dashboard === true;
-  const canViewSchools = permissions.view_school_dashboard === true;
-  const canViewProjects = permissions.view_projects === true;
 
   return (
     <aside className="hidden md:flex flex-col w-64 bg-black text-white h-screen sticky top-0 left-0 z-40 shadow-2xl border-r border-white/5">
@@ -488,9 +488,7 @@ export function Sidebar({ activeTab = '', onNavigate, role, timeframe = '6m', on
         {(permissions.create_users === true ||
           permissions.manage_roles === true ||
           permissions.manage_entities === true ||
-          permissions.download_csv === true ||
           permissions.upload_csv_admin === true ||
-          permissions.upload_csv_entity === true ||
           permissions.view_audit_logs === true) && (
           <div>
             <div
@@ -558,8 +556,7 @@ export function Sidebar({ activeTab = '', onNavigate, role, timeframe = '6m', on
                       icon: FileText,
                       show:
                         permissions.download_csv === true ||
-                        permissions.upload_csv_admin === true ||
-                        permissions.upload_csv_entity === true,
+                        permissions.upload_csv_admin === true,
                     },
                     {
                       id: 'admin-archives',

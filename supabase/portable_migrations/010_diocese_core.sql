@@ -217,3 +217,12 @@ DROP TRIGGER IF EXISTS set_updated_at_audit_logs ON diocese.audit_logs;
 CREATE TRIGGER set_updated_at_audit_logs
 BEFORE UPDATE ON diocese.audit_logs
 FOR EACH ROW EXECUTE FUNCTION public.set_row_updated_at();
+
+-- Grant schema and table access to Supabase built-in roles.
+-- Custom schemas require explicit grants; the public schema gets these automatically.
+GRANT USAGE ON SCHEMA diocese TO anon, authenticated, service_role;
+GRANT ALL PRIVILEGES ON ALL TABLES    IN SCHEMA diocese TO service_role;
+GRANT ALL PRIVILEGES ON ALL SEQUENCES IN SCHEMA diocese TO service_role;
+GRANT SELECT, INSERT, UPDATE, DELETE  ON ALL TABLES    IN SCHEMA diocese TO authenticated;
+GRANT USAGE                           ON ALL SEQUENCES IN SCHEMA diocese TO authenticated;
+GRANT SELECT                          ON ALL TABLES    IN SCHEMA diocese TO anon;
