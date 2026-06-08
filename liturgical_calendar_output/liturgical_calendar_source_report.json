@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-06-07T04:28:02.945453+00:00",
+  "generated_at": "2026-06-07T15:36:06.448958+00:00",
   "start_year": 2023,
   "end_year": 2026,
   "sources": [
@@ -7,17 +7,9 @@
       "year": 2023,
       "source": "romcal",
       "record_count": 365,
-      "matched_count": 0,
+      "matched_count": 85,
       "pending_count": 365,
       "error": null
-    },
-    {
-      "year": 2023,
-      "source": "litcal",
-      "record_count": 0,
-      "matched_count": 0,
-      "pending_count": 0,
-      "error": "LitCal unavailable for PH 2023: HTTP 400 {\n    \"type\": \"https://datatracker.ietf.org/doc/html/rfc9110#name-400-bad-request\",\n    \"title\": \"Bad Request\",\n    \"status\": 400,\n    \"detail\": \"Invalid value `PH` for parameter `national_calendar`, valid values are: VA, CA, IT, NL, US\"\n}"
     },
     {
       "year": 2023,
@@ -25,22 +17,28 @@
       "record_count": 0,
       "validator_only": true,
       "error": "HTTPError: HTTP Error 404: Not Found"
+    },
+    {
+      "year": 2023,
+      "source": "litcal",
+      "record_count": 544,
+      "validator_only": true,
+      "error": null
+    },
+    {
+      "year": 2023,
+      "source": "universalis",
+      "record_count": 0,
+      "validator_only": true,
+      "error": null
     },
     {
       "year": 2024,
       "source": "romcal",
       "record_count": 366,
-      "matched_count": 0,
+      "matched_count": 88,
       "pending_count": 366,
       "error": null
-    },
-    {
-      "year": 2024,
-      "source": "litcal",
-      "record_count": 0,
-      "matched_count": 0,
-      "pending_count": 0,
-      "error": "LitCal unavailable for PH 2024: HTTP 400 {\n    \"type\": \"https://datatracker.ietf.org/doc/html/rfc9110#name-400-bad-request\",\n    \"title\": \"Bad Request\",\n    \"status\": 400,\n    \"detail\": \"Invalid value `PH` for parameter `national_calendar`, valid values are: VA, CA, IT, NL, US\"\n}"
     },
     {
       "year": 2024,
@@ -50,20 +48,26 @@
       "error": "HTTPError: HTTP Error 404: Not Found"
     },
     {
-      "year": 2025,
-      "source": "romcal",
-      "record_count": 365,
-      "matched_count": 115,
-      "pending_count": 365,
+      "year": 2024,
+      "source": "litcal",
+      "record_count": 549,
+      "validator_only": true,
+      "error": null
+    },
+    {
+      "year": 2024,
+      "source": "universalis",
+      "record_count": 0,
+      "validator_only": true,
       "error": null
     },
     {
       "year": 2025,
-      "source": "litcal",
-      "record_count": 0,
-      "matched_count": 0,
-      "pending_count": 0,
-      "error": "LitCal unavailable for PH 2025: HTTP 400 {\n    \"type\": \"https://datatracker.ietf.org/doc/html/rfc9110#name-400-bad-request\",\n    \"title\": \"Bad Request\",\n    \"status\": 400,\n    \"detail\": \"Invalid value `PH` for parameter `national_calendar`, valid values are: VA, CA, IT, NL, US\"\n}"
+      "source": "romcal",
+      "record_count": 365,
+      "matched_count": 126,
+      "pending_count": 365,
+      "error": null
     },
     {
       "year": 2025,
@@ -73,25 +77,45 @@
       "error": null
     },
     {
+      "year": 2025,
+      "source": "litcal",
+      "record_count": 539,
+      "validator_only": true,
+      "error": null
+    },
+    {
+      "year": 2025,
+      "source": "universalis",
+      "record_count": 0,
+      "validator_only": true,
+      "error": null
+    },
+    {
       "year": 2026,
       "source": "romcal",
       "record_count": 365,
-      "matched_count": 113,
+      "matched_count": 128,
       "pending_count": 365,
       "error": null
     },
     {
       "year": 2026,
-      "source": "litcal",
-      "record_count": 0,
-      "matched_count": 0,
-      "pending_count": 0,
-      "error": "LitCal unavailable for PH 2026: HTTP 400 {\n    \"type\": \"https://datatracker.ietf.org/doc/html/rfc9110#name-400-bad-request\",\n    \"title\": \"Bad Request\",\n    \"status\": 400,\n    \"detail\": \"Invalid value `PH` for parameter `national_calendar`, valid values are: VA, CA, IT, NL, US\"\n}"
+      "source": "gcatholic",
+      "record_count": 365,
+      "validator_only": true,
+      "error": null
     },
     {
       "year": 2026,
-      "source": "gcatholic",
-      "record_count": 365,
+      "source": "litcal",
+      "record_count": 547,
+      "validator_only": true,
+      "error": null
+    },
+    {
+      "year": 2026,
+      "source": "universalis",
+      "record_count": 208,
       "validator_only": true,
       "error": null
     }
