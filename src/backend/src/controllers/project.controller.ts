@@ -19,8 +19,14 @@ export class ProjectController {
 
   @Post()
   async saveProject(@Body() project: Project, @Res() res: Response) {
-    const saved = await this.projectService.saveProject(project);
-    return res.status(HttpStatus.OK).json(saved);
+    try {
+      const saved = await this.projectService.saveProject(project);
+      return res.status(HttpStatus.OK).json(saved);
+    } catch (error: any) {
+      return res.status(HttpStatus.BAD_REQUEST).json({
+        error: error?.message ?? 'Project save failed.',
+      });
+    }
   }
 
   @Delete(':id')

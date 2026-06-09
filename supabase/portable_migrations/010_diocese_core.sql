@@ -3,7 +3,7 @@
 CREATE TABLE IF NOT EXISTS diocese.institutions (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   name text NOT NULL,
-  institution_type text NOT NULL CHECK (institution_type IN ('parish', 'school', 'seminary', 'chancery')),
+  institution_type text NOT NULL CHECK (institution_type IN ('diocese', 'parish', 'school', 'seminary')),
   vicariate text,
   district text,
   cluster text,

@@ -3,7 +3,6 @@
 import React, { useEffect, useState } from 'react';
 import {
   X,
-  Upload,
   Calendar,
   Target,
   FileText,
@@ -13,7 +12,6 @@ import {
   Check,
   ChevronDown,
   Plus,
-  Building2,
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { EntityType, Project, ProjectCategory } from '../../types';
@@ -27,9 +25,7 @@ export interface ProjectInstitutionOption {
 interface ProjectCreationFormProps {
   isOpen: boolean;
   onClose: () => void;
-  institutions: ProjectInstitutionOption[];
-  defaultInstitutionId?: string;
-  lockInstitutionSelect?: boolean;
+  currentInstitution: ProjectInstitutionOption | null;
   onSubmit: (
     project: Omit<Project, 'id' | 'currentAmount' | 'healthScore' | 'successProbability' | 'recommendation'>,
   ) => Promise<void> | void;
@@ -38,9 +34,7 @@ interface ProjectCreationFormProps {
 export function ProjectCreationForm({
   isOpen,
   onClose,
-  institutions,
-  defaultInstitutionId,
-  lockInstitutionSelect,
+  currentInstitution,
   onSubmit,
 }: ProjectCreationFormProps) {
   const [formData, setFormData] = useState({
@@ -59,46 +53,30 @@ export function ProjectCreationForm({
     entityType: 'parish' as EntityType,
   });
 
-  const [imagePreview, setImagePreview] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file) {
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        setImagePreview(reader.result as string);
-      };
-      reader.readAsDataURL(file);
-    }
-  };
-
   useEffect(() => {
-    if (!isOpen) return;
-    const selected =
-      institutions.find((institution) => institution.id === defaultInstitutionId) ?? institutions[0] ?? null;
-    if (!selected) return;
+    if (!isOpen || !currentInstitution) return;
     setFormData((prev) => ({
       ...prev,
-      entityId: selected.id,
-      entityName: selected.name,
-      entityType: selected.type,
+      entityId: currentInstitution.id,
+      entityName: currentInstitution.name,
+      entityType: currentInstitution.type,
     }));
-  }, [defaultInstitutionId, institutions, isOpen]);
+  }, [currentInstitution, isOpen]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!currentInstitution) return;
     setIsSubmitting(true);
 
     try {
-      const selectedInstitution = institutions.find((institution) => institution.id === formData.entityId);
       await onSubmit({
         ...formData,
-        entityId: selectedInstitution?.id ?? formData.entityId,
-        entityName: selectedInstitution?.name ?? formData.entityName,
-        entityType: selectedInstitution?.type ?? formData.entityType,
+        entityId: currentInstitution.id,
+        entityName: currentInstitution.name,
+        entityType: currentInstitution.type,
         targetAmount: Number(formData.targetAmount),
-        coverImage: imagePreview || undefined,
       });
       setIsSubmitting(false);
       onClose();
@@ -152,87 +130,7 @@ export function ProjectCreationForm({
             </div>
 
             <form onSubmit={handleSubmit} className="p-8 space-y-8 max-h-[75vh] overflow-y-auto scrollbar-thin">
-              {/* Image Upload */}
-              <div className="space-y-3">
-                <label className="text-[11px] font-bold text-gold-700 uppercase tracking-[0.2em] flex items-center gap-2">
-                  <Upload className="w-3.5 h-3.5" />
-                  Visual Identity
-                </label>
-                <div className="relative group">
-                  <input
-                    type="file"
-                    accept="image/*"
-                    onChange={handleImageChange}
-                    className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"
-                  />
-                  <div
-                    className={`w-full h-52 rounded-3xl border-2 border-dashed transition-all duration-500 flex flex-col items-center justify-center gap-3 overflow-hidden ${imagePreview ? 'border-gold-500 bg-gold-50/5' : 'border-gray-200 bg-gray-50 group-hover:border-gold-400 group-hover:bg-gold-50/10'}`}
-                  >
-                    {imagePreview ? (
-                      <div className="relative w-full h-full group/preview">
-                        <img
-                          src={imagePreview}
-                          alt="Preview"
-                          className="w-full h-full object-cover transition-transform duration-700 group-hover/preview:scale-105"
-                        />
-                        <div className="absolute inset-0 bg-black/40 opacity-0 group-hover/preview:opacity-100 transition-opacity flex items-center justify-center">
-                          <p className="text-white text-xs font-bold tracking-widest uppercase">Change Image</p>
-                        </div>
-                      </div>
-                    ) : (
-                      <>
-                        <div className="w-14 h-14 rounded-2xl bg-white shadow-sm flex items-center justify-center text-gray-400 group-hover:text-gold-600 group-hover:scale-110 transition-all duration-500">
-                          <Upload className="w-6 h-6" />
-                        </div>
-                        <div className="text-center">
-                          <p className="text-sm font-bold text-gray-500 group-hover:text-gold-700 transition-colors">
-                            Upload Cover Image
-                          </p>
-                          <p className="text-[10px] text-gray-400 mt-1 uppercase tracking-wider">JPG, PNG up to 5MB</p>
-                        </div>
-                      </>
-                    )}
-                  </div>
-                </div>
-              </div>
-
               <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                <div className="space-y-2 md:col-span-2">
-                  <label className="text-[11px] font-bold text-gold-700 uppercase tracking-[0.2em] flex items-center gap-2">
-                    <Building2 className="w-3.5 h-3.5" />
-                    Institution
-                  </label>
-                  <div className="relative">
-                    <select
-                      required
-                      disabled={lockInstitutionSelect}
-                      value={formData.entityId}
-                      onChange={(e) => {
-                        const selectedInstitution = institutions.find(
-                          (institution) => institution.id === e.target.value,
-                        );
-                        setFormData({
-                          ...formData,
-                          entityId: selectedInstitution?.id ?? '',
-                          entityName: selectedInstitution?.name ?? '',
-                          entityType: selectedInstitution?.type ?? 'parish',
-                        });
-                      }}
-                      className="w-full px-5 py-4 bg-gray-50/50 border border-gray-200 rounded-2xl text-sm font-medium focus:outline-none focus:ring-4 focus:ring-gold-500/10 focus:border-gold-500 focus:bg-white transition-all appearance-none cursor-pointer disabled:cursor-not-allowed disabled:text-gray-500"
-                    >
-                      {institutions.length === 0 && <option value="">No institutions available</option>}
-                      {institutions.map((institution) => (
-                        <option key={institution.id} value={institution.id}>
-                          {institution.name} ({institution.type})
-                        </option>
-                      ))}
-                    </select>
-                    <div className="absolute right-5 top-1/2 -translate-y-1/2 pointer-events-none text-gray-400">
-                      <ChevronDown className="w-4 h-4" />
-                    </div>
-                  </div>
-                </div>
-
                 <div className="space-y-2">
                   <label className="text-[11px] font-bold text-gold-700 uppercase tracking-[0.2em] flex items-center gap-2">
                     <Tag className="w-3.5 h-3.5" />
@@ -388,7 +286,7 @@ export function ProjectCreationForm({
                 </button>
                 <button
                   type="submit"
-                  disabled={isSubmitting}
+                  disabled={isSubmitting || !currentInstitution}
                   className="flex-[2] py-4 px-6 bg-gold-500 text-church-green-dark rounded-2xl text-sm font-bold hover:bg-gold-600 transition-all shadow-xl shadow-gold-500/20 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-3 active:scale-[0.98]"
                 >
                   {isSubmitting ? (

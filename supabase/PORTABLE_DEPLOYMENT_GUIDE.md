@@ -50,6 +50,7 @@ portable_migrations/130_sync_analytics_dimensions.sql
 portable_migrations/140_refresh_parish_analytics.sql
 portable_migrations/150_refresh_school_analytics.sql
 portable_migrations/160_refresh_seminary_analytics.sql
+portable_migrations/182_allow_diocese_institution_type.sql
 ```
 
 4. If you want Supabase Auth to auto-create `diocese.profiles`, run:
@@ -61,6 +62,7 @@ portable_optional/140_supabase_auth_sync.sql
 5. Run the seed files:
 
 ```text
+portable_seeds/000_diocese_institution.sql
 portable_seeds/001_roles_permissions.sql
 portable_seeds/002_entities_template.sql
 ```

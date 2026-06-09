@@ -14,13 +14,18 @@ const nextConfig = {
     ignoreBuildErrors: true,
   },
   logging: false,
-  turbopack: {},
   webpack: (config: any) => {
-    config.resolve.alias = {
-      ...config.resolve.alias,
-      react: path.resolve(__dirname, 'node_modules/react'),
-      'react-dom': path.resolve(__dirname, 'node_modules/react-dom'),
-    };
+    const alias = Object.fromEntries(
+      Object.entries(config.resolve.alias ?? {}).filter(([, value]) => {
+        return (
+          typeof value === 'string' ||
+          value === false ||
+          (Array.isArray(value) && value.every((item) => typeof item === 'string' && item.length > 0))
+        );
+      }),
+    );
+
+    config.resolve.alias = alias;
     return config;
   },
 };

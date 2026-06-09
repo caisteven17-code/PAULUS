@@ -14,19 +14,32 @@ export class ProjectService {
     return !!value && /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value);
   }
 
-  private async resolveInstitutionIds(entityId?: string, entityType?: string): Promise<string[]> {
+  private async resolveInstitutionIds(entityId?: string, entityType?: string, entityName?: string): Promise<string[]> {
     if (entityId && this.isUuid(entityId)) return [entityId];
 
+    const candidates = [entityId, entityName]
+      .filter((value): value is string => typeof value === 'string' && value.trim().length > 0)
+      .map((value) => value.trim());
+
+    if (entityType === 'diocese' && !candidates.some((value) => value.toLowerCase() === 'diocese of san pablo')) {
+      candidates.push('Diocese of San Pablo');
+    }
+
     let query: any = this.db().from('institutions').select('id, name').is('deleted_at', null);
-    if (entityType && entityType !== 'diocese') query = query.eq('institution_type', entityType);
-    if (entityId) query = query.ilike('name', entityId);
+    if (entityType) query = query.eq('institution_type', entityType);
 
     const { data, error } = await query;
     if (error) {
       console.error('[project.service] resolveInstitutionIds error:', error.message);
       return [];
     }
-    return (data ?? []).map((row: any) => row.id);
+
+    if (!candidates.length) return (data ?? []).map((row: any) => row.id);
+
+    const candidateSet = new Set(candidates.map((value) => value.toLowerCase()));
+    return (data ?? [])
+      .filter((row: any) => candidateSet.has(String(row.name ?? '').toLowerCase()))
+      .map((row: any) => row.id);
   }
 
   private toProject(row: any): Project {
@@ -167,13 +180,14 @@ export class ProjectService {
   async saveProject(project: Project): Promise<Project> {
     let institutionId = project.entityId;
     if (!this.isUuid(institutionId)) {
-      const ids = await this.resolveInstitutionIds(project.entityId, project.entityType);
+      const ids = await this.resolveInstitutionIds(project.entityId, project.entityType, project.entityName);
       institutionId = ids[0];
     }
 
     if (!institutionId) {
-      console.error('[project.service] saveProject error: institution_id is required');
-      return project;
+      throw new Error(
+        `Could not resolve institution for project save. entityId="${project.entityId}", entityName="${project.entityName}", entityType="${project.entityType}"`,
+      );
     }
 
     const row = this.fromProject({ ...project, entityId: institutionId });
@@ -183,8 +197,7 @@ export class ProjectService {
       .select('*, institution:institutions(id, name, institution_type)')
       .single();
     if (error || !data) {
-      console.error('[project.service] saveProject error:', error?.message);
-      return project;
+      throw new Error(error?.message ?? 'Project save failed.');
     }
     return this.toProject(data);
   }

@@ -28,6 +28,9 @@ interface ProjectsProps {
   role?: string;
 }
 
+const isUuid = (value?: string) =>
+  typeof value === 'string' && /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value);
+
 export function Projects({ role }: ProjectsProps) {
   const [projects, setProjects] = useState<Project[]>([]);
   const [donations, setDonations] = useState<Donation[]>([]);
@@ -40,7 +43,6 @@ export function Projects({ role }: ProjectsProps) {
   const [showFilterDropdown, setShowFilterDropdown] = useState(false);
   const [showEntityFilterDropdown, setShowEntityFilterDropdown] = useState(false);
   const [userContext, setUserContext] = useState<{ id: string; name: string; type: EntityType } | null>(null);
-  const [institutionOptions, setInstitutionOptions] = useState<ProjectInstitutionOption[]>([]);
   const { permissions } = usePermissions();
   const canAccessProjects = permissions.view_projects === true || permissions.manage_projects === true;
 
@@ -51,52 +53,17 @@ export function Projects({ role }: ProjectsProps) {
           user.role,
         );
         const entityType = user.entityType ?? (user.role === 'priest' ? 'parish' : user.role);
+        const entityName = user.entityName || user.displayName || 'Unknown Entity';
+        const entityId = isUuid(user.entityId) ? user.entityId : entityName;
         setUserContext({
-          id: user.entityId || user.entityName || user.displayName || 'Unknown Entity',
-          name: user.entityName || user.displayName || 'Unknown Entity',
+          id: entityId,
+          name: entityName,
           type: isDioceseRole ? 'diocese' : (entityType as EntityType),
         });
       }
     });
     return () => unsubscribe();
   }, []);
-
-  useEffect(() => {
-    if (!canAccessProjects) return;
-
-    let active = true;
-    const loadInstitutions = async () => {
-      try {
-        const [parishes, seminaries, schools] = await Promise.all([
-          dataService.getAdminEntities('parish'),
-          dataService.getAdminEntities('seminary'),
-          dataService.getAdminEntities('school'),
-        ]);
-        const options: ProjectInstitutionOption[] = [
-          ...(parishes ?? []).map((entity: any) => ({
-            id: entity.id,
-            name: entity.name,
-            type: 'parish' as EntityType,
-          })),
-          ...(seminaries ?? []).map((entity: any) => ({
-            id: entity.id,
-            name: entity.name,
-            type: 'seminary' as EntityType,
-          })),
-          ...(schools ?? []).map((entity: any) => ({ id: entity.id, name: entity.name, type: 'school' as EntityType })),
-        ];
-        if (active) setInstitutionOptions(options);
-      } catch (error) {
-        console.error('Failed to load project institutions:', error);
-        if (active) setInstitutionOptions([]);
-      }
-    };
-
-    void loadInstitutions();
-    return () => {
-      active = false;
-    };
-  }, [canAccessProjects]);
 
   useEffect(() => {
     if (!userContext || !canAccessProjects) return;
@@ -131,6 +98,13 @@ export function Projects({ role }: ProjectsProps) {
   }, [userContext, filterEntityType, canAccessProjects]);
 
   const isDiocese = permissions.view_diocese === true;
+  const currentProjectInstitution: ProjectInstitutionOption | null = userContext
+    ? {
+        id: userContext.id,
+        name: userContext.name,
+        type: userContext.type,
+      }
+    : null;
 
   const filteredProjects = projects.filter((p) => {
     const query = searchQuery.toLowerCase();
@@ -147,8 +121,9 @@ export function Projects({ role }: ProjectsProps) {
     const seminaryProjects = projects.filter((project) => project.entityType === 'seminary').length;
     const parishProjects = projects.filter((project) => project.entityType === 'parish').length;
     const schoolProjects = projects.filter((project) => project.entityType === 'school').length;
+    const dioceseProjects = projects.filter((project) => project.entityType === 'diocese').length;
 
-    return { seminaryProjects, parishProjects, schoolProjects };
+    return { seminaryProjects, parishProjects, schoolProjects, dioceseProjects };
   }, [projects]);
 
   const handleAddProject = (
@@ -317,8 +292,14 @@ export function Projects({ role }: ProjectsProps) {
         </div>
 
         {isDiocese && (
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-10">
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-10">
             {[
+              {
+                label: 'Diocese Projects',
+                value: projectSummary.dioceseProjects,
+                icon: Building2,
+                tone: 'bg-purple-50 text-purple-700 border-purple-100',
+              },
               {
                 label: 'Parish Projects',
                 value: projectSummary.parishProjects,
@@ -590,15 +571,7 @@ export function Projects({ role }: ProjectsProps) {
       <ProjectCreationForm
         isOpen={isCreateModalOpen}
         onClose={() => setIsCreateModalOpen(false)}
-        institutions={
-          userContext?.type === 'diocese'
-            ? institutionOptions
-            : institutionOptions.filter(
-                (institution) => institution.id === userContext?.id || institution.name === userContext?.name,
-              )
-        }
-        defaultInstitutionId={userContext?.type === 'diocese' ? undefined : userContext?.id}
-        lockInstitutionSelect={userContext?.type !== 'diocese'}
+        currentInstitution={currentProjectInstitution}
         onSubmit={handleAddProject}
       />
     </div>

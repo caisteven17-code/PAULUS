@@ -159,7 +159,7 @@ export class AppAuthService {
 
   private domainInstitutionType(entityType?: string): string | null {
     if (entityType === 'parish' || entityType === 'school' || entityType === 'seminary') return entityType;
-    if (entityType === 'diocese') return 'chancery';
+    if (entityType === 'diocese') return 'diocese';
     return null;
   }
 

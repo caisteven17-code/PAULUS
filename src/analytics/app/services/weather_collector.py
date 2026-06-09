@@ -104,8 +104,7 @@ REANALYSIS_LAG_DAYS = 7
 
 
 def _default_start() -> date:
-    today = date.today()
-    return date(today.year - 3, today.month, today.day)
+    return date(date.today().year - 3, 1, 1)
 
 
 def _default_end() -> date:

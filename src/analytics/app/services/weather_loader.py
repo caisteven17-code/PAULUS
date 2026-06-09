@@ -8,8 +8,15 @@ first so the (date, location) partial unique index exists.
 Two entry points:
   load_from_file(path)      — monthly aggregated data from weather_collector.py
                               → one record per (municipality, month, day=1)
+                              → includes validation against NOAA GSOD and CHIRPS
   load_incremental(path)    — daily records from weather_updater.py
                               → one record per (municipality, date)
+
+Validation (integrated):
+  For monthly loads, each municipality-month is validated:
+  - NASA POWER AG (source truth) vs NOAA GSOD (temperature)
+  - NASA POWER AG (source truth) vs CHIRPS (rainfall)
+  - Stores comparison_result ("matched"/"mismatched"), mismatch_reason, validation_payload
 
 Condition thresholds (daily equivalent rainfall):
   sunny  < 1 mm/day
@@ -161,6 +168,7 @@ def _upsert_batch(rows: list[dict]) -> int:
 def load_from_file(path: Path) -> int:
     """
     Load monthly-aggregated champion data from laguna_weather_final.json.
+    Validates each municipality-month against NOAA GSOD and CHIRPS.
     Stores one record per (municipality, month) with date = first day of month.
     Returns the total number of rows upserted.
     """
@@ -168,10 +176,38 @@ def load_from_file(path: Path) -> int:
     data = json.loads(path.read_text())
     now_iso = datetime.now(timezone.utc).isoformat()
 
+    validate_month = None
+    try:
+        from app.services.weather_validation import validate_month, build_meteostat_cache, build_chirps_cache
+    except ImportError:
+        logger.warning("weather_validation module not available — skipping validation")
+
+    # ── Pre-fetch Meteostat once for the full date range ─────────────────────
+    meteostat_cache: dict = {}
+    if validate_month:
+        try:
+            from datetime import date as date_class
+            period_start = date_class.fromisoformat(data.get("period_start", "2023-01-01"))
+            period_end = date_class.fromisoformat(data.get("period_end", "2023-12-31"))
+            meteostat_cache = build_meteostat_cache(period_start, period_end)
+        except Exception as exc:
+            logger.warning("Meteostat cache build failed: %s", exc)
+
     rows: list[dict] = []
     for muni in data.get("municipalities", []):
         name = muni["municipality"]
         source = muni["champion_source"]
+        lat = muni.get("latitude")
+        lon = muni.get("longitude")
+
+        # ── Pre-fetch CHIRPS once per municipality for the full date range ────
+        chirps_cache: dict = {}
+        if validate_month and source == "nasa_power_ag" and lat is not None and lon is not None:
+            try:
+                chirps_cache = build_chirps_cache(lat, lon, period_start, period_end)
+                logger.info("  CHIRPS cache for %-20s → %d months", name, len(chirps_cache))
+            except Exception as exc:
+                logger.warning("CHIRPS cache build failed for %s: %s", name, exc)
 
         for m in muni.get("monthly_data", []):
             year = int(m["year"])
@@ -187,6 +223,32 @@ def load_from_file(path: Path) -> int:
                 m.get("typhoon_days_count", 0),
             )
 
+            # Validate NASA POWER AG (champion) against pre-fetched validator caches
+            source_truth = None
+            validator_sources = None
+            comparison_result = None
+            mismatch_reason = None
+            validation_payload = None
+
+            if source == "nasa_power_ag" and validate_month:
+                try:
+                    validation = validate_month(
+                        name,
+                        year,
+                        month,
+                        m.get("temp_avg_c"),
+                        rainfall_mm,
+                        meteostat_cache,
+                        chirps_cache,
+                    )
+                    source_truth = validation["source_truth"]
+                    validator_sources = validation["validator_sources"]
+                    comparison_result = validation["comparison_result"]
+                    mismatch_reason = validation["mismatch_reason"]
+                    validation_payload = validation["validation_payload"]
+                except Exception as exc:
+                    logger.warning("Validation failed for %s %d-%02d: %s", name, year, month, exc)
+
             rows.append(
                 {
                     "date": date_str,
@@ -198,6 +260,11 @@ def load_from_file(path: Path) -> int:
                     "typhoon_signal": signal,
                     "is_extreme_event": bool(m.get("has_event", False)),
                     "source": source,
+                    "source_truth": source_truth,
+                    "validator_sources": validator_sources,
+                    "comparison_result": comparison_result,
+                    "mismatch_reason": mismatch_reason,
+                    "validation_payload": validation_payload,
                     "recorded_at": now_iso,
                 }
             )
@@ -215,6 +282,7 @@ def load_incremental(path: Path) -> int:
     """
     Load daily records from laguna_weather_incremental.json (weather_updater output).
     Stores one record per (municipality, date).
+    Note: Daily records do not include validation metadata (validation is for monthly aggregates).
     Returns the total number of rows upserted.
     """
     logger.info("Loading incremental weather data from %s", path)
@@ -244,6 +312,11 @@ def load_incremental(path: Path) -> int:
                     "typhoon_signal": signal,
                     "is_extreme_event": bool(r.get("typhoon_day", False)),
                     "source": source,
+                    "source_truth": None,
+                    "validator_sources": None,
+                    "comparison_result": None,
+                    "mismatch_reason": None,
+                    "validation_payload": None,
                     "recorded_at": now_iso,
                 }
             )

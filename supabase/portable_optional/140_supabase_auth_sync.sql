@@ -16,8 +16,10 @@ LANGUAGE plpgsql
 SECURITY DEFINER
 AS $$
 DECLARE
-  v_role_id  text;
-  v_raw_role text;
+  v_role_id        text;
+  v_raw_role       text;
+  v_entity_type    text;
+  v_institution_id uuid;
 BEGIN
   -- Resolve the role from user metadata; verify it actually exists in diocese.roles
   -- before using it, so we don't violate the FK constraint.
@@ -30,12 +32,33 @@ BEGIN
   SELECT id INTO v_role_id FROM diocese.roles WHERE id = v_raw_role LIMIT 1;
   -- If the role is not found (roles not yet seeded), v_role_id stays NULL.
 
+  v_entity_type := NEW.raw_user_meta_data->>'entityType';
+
+  SELECT id INTO v_institution_id
+  FROM diocese.institutions
+  WHERE is_active = true
+    AND deleted_at IS NULL
+    AND (
+      id::text = NEW.raw_user_meta_data->>'entityId'
+      OR lower(name) = lower(NEW.raw_user_meta_data->>'entityName')
+      OR (
+        v_entity_type = 'diocese'
+        AND lower(name) = lower('Diocese of San Pablo')
+      )
+    )
+    AND (
+      v_entity_type IS NULL
+      OR institution_type = v_entity_type
+    )
+  LIMIT 1;
+
   BEGIN
     INSERT INTO diocese.profiles (
       external_auth_id,
       full_name,
       email,
       role_id,
+      institution_id,
       contact_number,
       -- CHECK constraint: is_active=true requires role_id IS NOT NULL
       is_active,
@@ -47,6 +70,7 @@ BEGIN
       COALESCE(NEW.raw_user_meta_data->>'full_name', NEW.raw_user_meta_data->>'displayName', split_part(NEW.email, '@', 1)),
       NEW.email,
       v_role_id,
+      v_institution_id,
       NEW.raw_user_meta_data->>'contact_number',
       (v_role_id IS NOT NULL),
       now(),
@@ -56,6 +80,7 @@ BEGIN
       full_name      = COALESCE(EXCLUDED.full_name,      diocese.profiles.full_name),
       email          = COALESCE(EXCLUDED.email,          diocese.profiles.email),
       role_id        = COALESCE(EXCLUDED.role_id,        diocese.profiles.role_id),
+      institution_id = COALESCE(EXCLUDED.institution_id, diocese.profiles.institution_id),
       contact_number = COALESCE(EXCLUDED.contact_number, diocese.profiles.contact_number),
       is_active      = CASE
                          WHEN COALESCE(EXCLUDED.role_id, diocese.profiles.role_id) IS NOT NULL THEN true
