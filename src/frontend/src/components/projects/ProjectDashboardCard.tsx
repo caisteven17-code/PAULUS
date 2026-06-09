@@ -14,6 +14,7 @@ interface ProjectDashboardCardProps {
 export function ProjectDashboardCard({ project, onClick }: ProjectDashboardCardProps) {
   const progress = project.targetAmount > 0 ? (project.currentAmount / project.targetAmount) * 100 : 0;
   const progressWidth = Math.min(progress, 100);
+  const entityLabel = project.entityName ?? project.entityId;
   const daysRemaining = Math.max(
     0,
     Math.ceil((new Date(project.endDate).getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24)),
@@ -49,7 +50,7 @@ export function ProjectDashboardCard({ project, onClick }: ProjectDashboardCardP
             <div className="flex items-center gap-1.5 px-2 py-0.5 bg-gray-100 rounded-md">
               {getEntityIcon(project.entityType)}
               <span className="text-[9px] font-bold text-gray-500 uppercase tracking-wider truncate max-w-[120px]">
-                {project.entityId}
+                {entityLabel}
               </span>
             </div>
             <span className="text-[10px] font-bold text-gold-600 uppercase tracking-[0.3em] truncate">
@@ -140,7 +141,7 @@ export function ProjectDashboardCard({ project, onClick }: ProjectDashboardCardP
             <div>
               <span className="text-[10px] font-bold uppercase tracking-[0.2em] block leading-none">Managed By</span>
               <span className="text-[8px] font-bold text-gray-300 uppercase tracking-widest mt-1 block">
-                {project.entityId}
+                {entityLabel}
               </span>
             </div>
           </div>

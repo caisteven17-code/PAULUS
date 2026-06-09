@@ -1,13 +1,39 @@
 import { Injectable } from '@nestjs/common';
 import { SupabaseService } from './supabase.service';
 import { Project, Donation, ProjectExpense } from '../types';
-import { newId } from '../utils/store';
 
 @Injectable()
 export class ProjectService {
   constructor(private readonly supabaseService: SupabaseService) {}
 
+  private db() {
+    return this.supabaseService.supabaseServer.schema('diocese');
+  }
+
+  private isUuid(value?: string): boolean {
+    return !!value && /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value);
+  }
+
+  private async resolveInstitutionIds(entityId?: string, entityType?: string): Promise<string[]> {
+    if (entityId && this.isUuid(entityId)) return [entityId];
+
+    let query: any = this.db().from('institutions').select('id, name').is('deleted_at', null);
+    if (entityType && entityType !== 'diocese') query = query.eq('institution_type', entityType);
+    if (entityId) query = query.ilike('name', entityId);
+
+    const { data, error } = await query;
+    if (error) {
+      console.error('[project.service] resolveInstitutionIds error:', error.message);
+      return [];
+    }
+    return (data ?? []).map((row: any) => row.id);
+  }
+
   private toProject(row: any): Project {
+    const institution = Array.isArray(row.institution) ? row.institution[0] : row.institution;
+    const entityType = (row.entity_type ?? institution?.institution_type ?? 'parish') as Project['entityType'];
+    const entityId = row.entity_id ?? row.institution_id ?? '';
+
     return {
       id: row.id,
       name: row.name,
@@ -26,8 +52,9 @@ export class ProjectService {
       successProbability: Number(row.success_probability ?? 0),
       recommendation: row.recommendation ?? '',
       totalExpenses: row.total_expenses != null ? Number(row.total_expenses) : undefined,
-      entityId: row.entity_id,
-      entityType: row.entity_type,
+      entityId,
+      entityName: institution?.name ?? row.entity_name ?? row.entity_id ?? entityId,
+      entityType,
     };
   }
 
@@ -49,10 +76,9 @@ export class ProjectService {
       success_probability: p.successProbability,
       recommendation: p.recommendation,
       total_expenses: p.totalExpenses ?? null,
-      entity_id: p.entityId,
-      entity_type: p.entityType,
+      institution_id: p.entityId,
     };
-    if (p.id && p.id.startsWith('PRJ-')) row.id = p.id;
+    if (p.id && (this.isUuid(p.id) || p.id.startsWith('PRJ-'))) row.id = p.id;
     return row;
   }
 
@@ -81,7 +107,7 @@ export class ProjectService {
       receipt_proof_name: d.receiptProofName ?? null,
       notes: d.notes ?? null,
     };
-    if (d.id && d.id.startsWith('DON-')) row.id = d.id;
+    if (d.id && (this.isUuid(d.id) || d.id.startsWith('DON-'))) row.id = d.id;
     return row;
   }
 
@@ -110,21 +136,24 @@ export class ProjectService {
       receipt_reference: e.receiptReference ?? null,
       proof_file_name: e.proofFileName ?? null,
     };
-    if (e.id && e.id.startsWith('EXP-')) row.id = e.id;
+    if (e.id && (this.isUuid(e.id) || e.id.startsWith('EXP-'))) row.id = e.id;
     return row;
   }
 
   async getProjects(entityId?: string, entityType?: string): Promise<Project[]> {
-    let query = this.supabaseService.supabaseServer
+    let query: any = this.db()
       .from('projects')
-      .select('*')
+      .select('*, institution:institutions(id, name, institution_type)')
+      .is('deleted_at', null)
       .order('created_at', { ascending: false });
 
     if (entityType === 'diocese') {
       // bishop sees all
     } else {
-      if (entityId) query = query.eq('entity_id', entityId);
-      if (entityType) query = query.eq('entity_type', entityType);
+      const ids = await this.resolveInstitutionIds(entityId, entityType);
+      if ((entityId || entityType) && ids.length === 0) return [];
+      if (ids.length === 1) query = query.eq('institution_id', ids[0]);
+      if (ids.length > 1) query = query.in('institution_id', ids);
     }
 
     const { data, error } = await query;
@@ -132,12 +161,27 @@ export class ProjectService {
       console.error('[project.service] getProjects error:', error.message);
       return [];
     }
-    return (data ?? []).map((d) => this.toProject(d));
+    return (data ?? []).map((d: any) => this.toProject(d));
   }
 
   async saveProject(project: Project): Promise<Project> {
-    const row = this.fromProject(project);
-    const { data, error } = await this.supabaseService.supabaseServer.from('projects').upsert(row).select().single();
+    let institutionId = project.entityId;
+    if (!this.isUuid(institutionId)) {
+      const ids = await this.resolveInstitutionIds(project.entityId, project.entityType);
+      institutionId = ids[0];
+    }
+
+    if (!institutionId) {
+      console.error('[project.service] saveProject error: institution_id is required');
+      return project;
+    }
+
+    const row = this.fromProject({ ...project, entityId: institutionId });
+    const { data, error } = await this.db()
+      .from('projects')
+      .upsert(row)
+      .select('*, institution:institutions(id, name, institution_type)')
+      .single();
     if (error || !data) {
       console.error('[project.service] saveProject error:', error?.message);
       return project;
@@ -146,14 +190,15 @@ export class ProjectService {
   }
 
   async deleteProject(id: string): Promise<void> {
-    const { error } = await this.supabaseService.supabaseServer.from('projects').delete().eq('id', id);
+    const { error } = await this.db().from('projects').delete().eq('id', id);
     if (error) console.error('[project.service] deleteProject error:', error.message);
   }
 
   async getDonations(projectId?: string): Promise<Donation[]> {
-    let query = this.supabaseService.supabaseServer
+    let query: any = this.db()
       .from('donations')
       .select('*')
+      .is('deleted_at', null)
       .order('created_at', { ascending: false });
     if (projectId) query = query.eq('project_id', projectId);
     const { data, error } = await query;
@@ -161,12 +206,12 @@ export class ProjectService {
       console.error('[project.service] getDonations error:', error.message);
       return [];
     }
-    return (data ?? []).map((d) => this.toDonation(d));
+    return (data ?? []).map((d: any) => this.toDonation(d));
   }
 
   async saveDonation(donation: Donation): Promise<Donation> {
     const row = this.fromDonation(donation);
-    const { data, error } = await this.supabaseService.supabaseServer.from('donations').upsert(row).select().single();
+    const { data, error } = await this.db().from('donations').upsert(row).select().single();
     if (error || !data) {
       console.error('[project.service] saveDonation error:', error?.message);
       return donation;
@@ -175,9 +220,10 @@ export class ProjectService {
   }
 
   async getExpenses(projectId?: string): Promise<ProjectExpense[]> {
-    let query = this.supabaseService.supabaseServer
+    let query: any = this.db()
       .from('project_expenses')
       .select('*')
+      .is('deleted_at', null)
       .order('created_at', { ascending: false });
     if (projectId) query = query.eq('project_id', projectId);
     const { data, error } = await query;
@@ -185,16 +231,12 @@ export class ProjectService {
       console.error('[project.service] getExpenses error:', error.message);
       return [];
     }
-    return (data ?? []).map((d) => this.toExpense(d));
+    return (data ?? []).map((d: any) => this.toExpense(d));
   }
 
   async saveExpense(expense: ProjectExpense): Promise<ProjectExpense> {
     const row = this.fromExpense(expense);
-    const { data, error } = await this.supabaseService.supabaseServer
-      .from('project_expenses')
-      .upsert(row)
-      .select()
-      .single();
+    const { data, error } = await this.db().from('project_expenses').upsert(row).select().single();
     if (error || !data) {
       console.error('[project.service] saveExpense error:', error?.message);
       return expense;

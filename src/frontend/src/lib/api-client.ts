@@ -15,6 +15,38 @@ import type {
   Donation,
   ProjectExpense,
 } from '../types';
+import { auth } from '../firebase';
+
+// Get JWT token from session or localStorage demo session
+async function getAuthToken(): Promise<string | null> {
+  try {
+    const sessionUser = auth.currentUser;
+    if (sessionUser?.id || sessionUser?.uid) {
+      // Try to get the actual JWT token from Supabase
+      const { data } = (await (window as any).supabase?.auth?.getSession()) || {};
+      if (data?.session?.access_token) {
+        return `Bearer ${data.session.access_token}`;
+      }
+      // Fallback: create a mock token for demo purposes
+      return `Bearer demo-${sessionUser.id || sessionUser.uid}`;
+    }
+  } catch (error) {
+    // Fall through to localStorage fallback
+  }
+
+  // Demo fallback: check localStorage for currentUser
+  try {
+    const userStr = localStorage.getItem('currentUser');
+    if (userStr) {
+      const user = JSON.parse(userStr);
+      return `Bearer demo-${user.id || 'demo-user'}`;
+    }
+  } catch (error) {
+    // Ignore
+  }
+
+  return null;
+}
 
 // ------------------------------------------------------------------
 // Helpers
@@ -26,21 +58,38 @@ async function get<T>(path: string, params?: Record<string, string | undefined>)
       if (v !== undefined && v !== null) url.searchParams.set(k, v);
     });
   }
-  const res = await fetch(url.toString(), { credentials: 'include' });
+  const headers: Record<string, string> = {};
+  const token = await getAuthToken();
+  if (token) {
+    headers['Authorization'] = token;
+  }
+
+  const res = await fetch(url.toString(), { credentials: 'include', headers });
   if (!res.ok) throw new Error(`GET ${path} → ${res.status}`);
   return res.json();
 }
 
 async function post<T>(path: string, body: unknown): Promise<T> {
+  const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+  const token = await getAuthToken();
+  if (token) {
+    headers['Authorization'] = token;
+  }
+
   const res = await fetch(path, {
     method: 'POST',
     credentials: 'include',
-    headers: { 'Content-Type': 'application/json' },
+    headers,
     body: JSON.stringify(body),
   });
   if (!res.ok) {
     let detail = '';
-    try { const j = await res.json(); detail = j?.error ?? j?.message ?? ''; } catch { /* ignore */ }
+    try {
+      const j = await res.json();
+      detail = j?.error ?? j?.message ?? '';
+    } catch {
+      /* ignore */
+    }
     throw new Error(`POST ${path} → ${res.status}${detail ? `: ${detail}` : ''}`);
   }
   return res.json();
@@ -49,7 +98,14 @@ async function post<T>(path: string, body: unknown): Promise<T> {
 async function del(path: string, params?: Record<string, string>): Promise<void> {
   const url = new URL(path, window.location.origin);
   if (params) Object.entries(params).forEach(([k, v]) => url.searchParams.set(k, v));
-  const res = await fetch(url.toString(), { method: 'DELETE', credentials: 'include' });
+
+  const headers: Record<string, string> = {};
+  const token = await getAuthToken();
+  if (token) {
+    headers['Authorization'] = token;
+  }
+
+  const res = await fetch(url.toString(), { method: 'DELETE', credentials: 'include', headers });
   if (!res.ok) throw new Error(`DELETE ${path} → ${res.status}`);
 }
 
@@ -231,7 +287,9 @@ export const apiClient = {
   },
 
   async saveProject(project: Project): Promise<Project> {
-    return post('/api/projects', project);
+    const saved = await post<Project>('/api/projects', project);
+    window.dispatchEvent(new Event('projects_update'));
+    return saved;
   },
 
   async deleteProject(id: string): Promise<void> {
@@ -270,6 +328,10 @@ export const apiClient = {
   // ----------------------------------------------------------------
   async getEntities(type?: 'parish' | 'school' | 'seminary') {
     return get('/api/entities', type ? { type } : undefined);
+  },
+
+  async getAdminEntities(type?: 'parish' | 'school' | 'seminary', includeAll = false) {
+    return get('/api/admin/entities', { type, all: includeAll ? 'true' : undefined });
   },
 
   async getGeoInstitutions(): Promise<
@@ -336,6 +398,112 @@ export const apiClient = {
       body: formData, // do NOT set Content-Type — browser sets multipart boundary automatically
     });
     if (!res.ok) throw new Error(`POST /api/submissions → ${res.status}`);
+    return res.json();
+  },
+
+  // ----------------------------------------------------------------
+  // Simulator Scenarios
+  // ----------------------------------------------------------------
+  async createInstitutionScenario(dto: {
+    institutionType: 'parish' | 'seminary' | 'school';
+    institutionId: string;
+    institutionName: string;
+    name: string;
+    description?: string;
+    incomeChange: number;
+    expensesChange: number;
+    oneTimeIncome: number;
+    oneTimeExpense: number;
+    externalSupport: number;
+    timelineMonths: number;
+    monthlyNet: number;
+    runwayMonths: number;
+    riskLevel: 'Low' | 'Medium' | 'High' | 'Critical';
+    finalBalance: number;
+    projectedData: any[];
+    recommendation: string;
+  }): Promise<any> {
+    return post('/api/scenarios/institution', dto);
+  },
+
+  async listInstitutionScenarios(): Promise<any[]> {
+    return get('/api/scenarios/institution');
+  },
+
+  async getInstitutionScenario(id: string): Promise<any> {
+    return get(`/api/scenarios/institution/${id}`);
+  },
+
+  async deleteInstitutionScenario(id: string): Promise<void> {
+    await del(`/api/scenarios/institution/${id}`);
+  },
+
+  async archiveInstitutionScenario(id: string, isArchived: boolean): Promise<any> {
+    const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+    const token = await getAuthToken();
+    if (token) {
+      headers['Authorization'] = token;
+    }
+
+    const res = await fetch(`/api/scenarios/institution/${id}?action=archive`, {
+      method: 'PATCH',
+      credentials: 'include',
+      headers,
+      body: JSON.stringify({ isArchived }),
+    });
+    if (!res.ok) throw new Error(`PATCH /api/scenarios/institution/${id}?action=archive → ${res.status}`);
+    return res.json();
+  },
+
+  async createPriestScenario(dto: {
+    priestId: string;
+    priestName: string;
+    targetParishId: string;
+    targetParishName: string;
+    name: string;
+    description?: string;
+    transitionSupport: 'standard' | 'assisted' | 'intensive';
+    handoffWeeks: number;
+    timelineMonths: number;
+    fitScore: number;
+    targetLift: number;
+    vacatedParishDip: number;
+    dioceseLift: number;
+    transitionRisk: number;
+    riskBand: 'Low' | 'Medium' | 'High';
+    confidence: number;
+    projectedData: any[];
+    recommendation: string;
+  }): Promise<any> {
+    return post('/api/scenarios/priest', dto);
+  },
+
+  async listPriestScenarios(): Promise<any[]> {
+    return get('/api/scenarios/priest');
+  },
+
+  async getPriestScenario(id: string): Promise<any> {
+    return get(`/api/scenarios/priest/${id}`);
+  },
+
+  async deletePriestScenario(id: string): Promise<void> {
+    await del(`/api/scenarios/priest/${id}`);
+  },
+
+  async archivePriestScenario(id: string, isArchived: boolean): Promise<any> {
+    const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+    const token = await getAuthToken();
+    if (token) {
+      headers['Authorization'] = token;
+    }
+
+    const res = await fetch(`/api/scenarios/priest/${id}?action=archive`, {
+      method: 'PATCH',
+      credentials: 'include',
+      headers,
+      body: JSON.stringify({ isArchived }),
+    });
+    if (!res.ok) throw new Error(`PATCH /api/scenarios/priest/${id}?action=archive → ${res.status}`);
     return res.json();
   },
 };

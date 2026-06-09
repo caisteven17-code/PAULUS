@@ -20,6 +20,8 @@ const MONTH_ORDER: Record<string, number> = {
   Dec: 12,
 };
 
+const MISSING_TABLE_CODES = new Set(['42P01', 'PGRST205']);
+
 @Injectable()
 export class EntityService {
   constructor(private readonly supabaseService: SupabaseService) {}
@@ -55,21 +57,25 @@ export class EntityService {
   async getAdminEntities(type?: EntityType, includeAll = false): Promise<any> {
     const table = this.tableFor(type ?? null);
     if (table) {
+      const entityType = type as EntityType;
       let q: any = this.supabaseService.supabaseServer.from(table).select('*').order('name');
       if (!includeAll) q = q.eq('status', 'active');
 
       const { data, error } = await q;
+      if (this.isMissingTableError(error)) {
+        return this.getPortableAdminEntities(entityType, includeAll);
+      }
       if (error || !data?.length) {
-        return type === 'parish' ? this.getParishes() : type === 'seminary' ? this.getSeminaries() : this.getSchools();
+        return entityType === 'parish' ? this.getParishes() : entityType === 'seminary' ? this.getSeminaries() : this.getSchools();
       }
       // Normalize data based on type
-      if (type === 'school' && data) {
+      if (entityType === 'school' && data) {
         return data.map((school: any) => this.normalizeSchoolData(school));
       }
-      if (type === 'parish' && data) {
+      if (entityType === 'parish' && data) {
         return data.map((parish: any) => this.normalizeEntityResponse(parish));
       }
-      if (type === 'seminary' && data) {
+      if (entityType === 'seminary' && data) {
         return data.map((seminary: any) => this.normalizeEntityResponse(seminary));
       }
       return data;
@@ -81,6 +87,14 @@ export class EntityService {
       this.supabaseService.supabaseServer.from('diocesan_schools').select('*').eq('status', 'active').order('name'),
     ]);
 
+    if (this.isMissingTableError(par.error)) {
+      return {
+        parishes: await this.getPortableAdminEntities('parish', includeAll),
+        seminaries: await this.getPortableAdminEntities('seminary', includeAll),
+        schools: await this.getPortableAdminEntities('school', includeAll),
+      };
+    }
+
     if (par.error) {
       return this.getAll();
     }
@@ -90,6 +104,73 @@ export class EntityService {
       seminaries: (sem.data ?? []).map((s: any) => this.normalizeEntityResponse(s)),
       schools: (sch.data ?? []).map((s: any) => this.normalizeSchoolData(s)),
     };
+  }
+
+  private async getPortableAdminEntities(type: EntityType, includeAll = false): Promise<any[]> {
+    let q: any = this.supabaseService.admin
+      .schema('diocese')
+      .from('institutions')
+      .select(
+        'id, name, institution_type, vicariate, district, cluster, class, address, contact_number, email, latitude, longitude, is_active, subsidy_type',
+      )
+      .eq('institution_type', this.domainInstitutionType(type))
+      .order('name');
+
+    if (!includeAll) q = q.eq('is_active', true).is('deleted_at', null);
+
+    const { data, error } = await q;
+    if (error || !data?.length) {
+      return type === 'parish' ? this.getParishes() : type === 'seminary' ? this.getSeminaries() : this.getSchools();
+    }
+
+    return data.map((institution: any) => this.normalizePortableEntity(type, institution));
+  }
+
+  private normalizePortableEntity(type: EntityType, institution: any): any {
+    const normalized: any = {
+      id: institution.id,
+      name: institution.name,
+      vicariate: institution.vicariate ?? '',
+      district: institution.district ?? '',
+      class: this.fromInstitutionClass(institution.class) ?? institution.class ?? 'Class C',
+      address: institution.address ?? '',
+      contact_number: institution.contact_number ?? '',
+      contactNumber: institution.contact_number ?? '',
+      email: institution.email ?? '',
+      lat: institution.latitude !== null && institution.latitude !== undefined ? Number(institution.latitude) : undefined,
+      lng: institution.longitude !== null && institution.longitude !== undefined ? Number(institution.longitude) : undefined,
+      status: institution.is_active === false ? 'inactive' : 'active',
+      subsidy_type: institution.subsidy_type ?? 'subsidized',
+      subsidyType: institution.subsidy_type ?? 'subsidized',
+    };
+
+    if (type === 'parish') {
+      normalized.pastor = '';
+      return normalized;
+    }
+
+    if (type === 'seminary') {
+      normalized.rector = '';
+      normalized.enrollment = 0;
+      normalized.capacity = 0;
+      normalized.staff = 0;
+      return normalized;
+    }
+
+    normalized.cluster = Number(institution.cluster) || this.clusterFromVicariate(institution.vicariate);
+    normalized.principal = '';
+    normalized.level = 'K-12';
+    normalized.enrollment = 0;
+    normalized.capacity = 0;
+    normalized.staff = 0;
+    return normalized;
+  }
+
+  private clusterFromVicariate(vicariate: any): 1 | 2 | 3 {
+    const value = String(vicariate ?? '').toLowerCase();
+    if (value.includes('holy family') || value.includes('san isidro')) return 2;
+    if (value.includes('san pedro') || value.includes('sta. rosa')) return 3;
+    return 1;
   }
 
   private normalizeSchoolData(school: any): any {
@@ -134,6 +215,110 @@ export class EntityService {
     return type;
   }
 
+  private detailSchemaFor(type: EntityType): 'parishes' | 'schools' | 'seminaries' {
+    if (type === 'parish') return 'parishes';
+    if (type === 'school') return 'schools';
+    return 'seminaries';
+  }
+
+  private isUuid(value: any): boolean {
+    return typeof value === 'string' && /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value);
+  }
+
+  private normalizeInstitutionClass(value: any): string | undefined {
+    if (typeof value !== 'string') return undefined;
+    const match = value.trim().match(/^(?:Class\s*)?([A-E])$/i);
+    return match ? match[1].toUpperCase() : undefined;
+  }
+
+  private fromInstitutionClass(value: any): string | undefined {
+    const normalized = this.normalizeInstitutionClass(value);
+    return normalized ? `Class ${normalized}` : undefined;
+  }
+
+  private institutionFieldsForResponse(institution: any): any {
+    if (!institution) return {};
+    const response: any = { ...institution };
+
+    if (institution.latitude !== undefined) response.lat = institution.latitude;
+    if (institution.longitude !== undefined) response.lng = institution.longitude;
+
+    const className = this.fromInstitutionClass(institution.class);
+    if (className) response.class = className;
+
+    delete response.id;
+    delete response.latitude;
+    delete response.longitude;
+    return response;
+  }
+
+  private async findInstitution(type: EntityType, entity: any): Promise<any | null> {
+    const institutionType = this.domainInstitutionType(type);
+    const candidates = [
+      entity?.institution_id,
+      this.isUuid(entity?.id) ? entity.id : null,
+    ].filter(Boolean);
+
+    for (const id of candidates) {
+      const { data, error } = await this.supabaseService.admin
+        .schema('diocese')
+        .from('institutions')
+        .select('*')
+        .eq('id', id)
+        .maybeSingle();
+
+      if (error) throw error;
+      if (data) return data;
+    }
+
+    const names = [entity?.previousName, entity?.name].filter(
+      (name, index, all) => typeof name === 'string' && name.trim() && all.indexOf(name) === index,
+    );
+
+    for (const name of names) {
+      const { data, error } = await this.supabaseService.admin
+        .schema('diocese')
+        .from('institutions')
+        .select('*')
+        .eq('name', name)
+        .eq('institution_type', institutionType)
+        .is('deleted_at', null)
+        .limit(1);
+
+      if (error) throw error;
+      if (data?.[0]) return data[0];
+    }
+
+    return null;
+  }
+
+  private isMissingTableError(error: any): boolean {
+    return !!error && (MISSING_TABLE_CODES.has(error.code) || String(error.message ?? '').includes('schema cache'));
+  }
+
+  private async syncEntityDetails(type: EntityType, institutionId: string, entity: any): Promise<void> {
+    const subsidyType = entity?.subsidy_type ?? entity?.subsidyType;
+    if (subsidyType !== 'subsidized' && subsidyType !== 'independent') return;
+
+    try {
+      const { error } = await this.supabaseService.admin
+        .schema(this.detailSchemaFor(type))
+        .from('details')
+        .upsert(
+          {
+            institution_id: institutionId,
+            subsidy_type: subsidyType,
+            updated_at: new Date().toISOString(),
+          },
+          { onConflict: 'institution_id' },
+        );
+
+      if (error) throw error;
+    } catch (error) {
+      console.warn(`Unable to sync subsidy_type to ${this.detailSchemaFor(type)}.details:`, error);
+    }
+  }
+
   private async syncInstitutionFields(type: EntityType, entity: any): Promise<any | null> {
     const subsidyType = entity?.subsidy_type ?? entity?.subsidyType;
     const payload: Record<string, any> = {
@@ -144,7 +329,10 @@ export class EntityService {
     if (entity?.address !== undefined) payload.address = entity.address;
     if (entity?.vicariate !== undefined) payload.vicariate = entity.vicariate;
     if (entity?.district !== undefined) payload.district = entity.district;
-    if (entity?.class !== undefined) payload.class = entity.class;
+    if (entity?.class !== undefined) {
+      const normalizedClass = this.normalizeInstitutionClass(entity.class);
+      if (normalizedClass) payload.class = normalizedClass;
+    }
     if (entity?.lat !== undefined) payload.latitude = entity.lat;
     if (entity?.lng !== undefined) payload.longitude = entity.lng;
     if (subsidyType === 'subsidized' || subsidyType === 'independent') payload.subsidy_type = subsidyType;
@@ -152,32 +340,39 @@ export class EntityService {
     if (Object.keys(payload).length <= 1) return null;
 
     try {
-      const byId = entity?.id
-        ? await this.supabaseService.admin
-            .schema('diocese')
-            .from('institutions')
-            .update(payload)
-            .eq('id', entity.id)
-            .select('*')
-            .maybeSingle()
-        : null;
+      const existing = await this.findInstitution(type, entity);
 
-      if (byId?.error) throw byId.error;
-      if (byId?.data) return byId.data;
+      if (existing?.id) {
+        const { data, error } = await this.supabaseService.admin
+          .schema('diocese')
+          .from('institutions')
+          .update(payload)
+          .eq('id', existing.id)
+          .select('*')
+          .single();
+
+        if (error) throw error;
+        await this.syncEntityDetails(type, existing.id, entity);
+        return data;
+      }
 
       if (!entity?.name) return null;
 
-      const byName = await this.supabaseService.admin
+      const { data, error } = await this.supabaseService.admin
         .schema('diocese')
         .from('institutions')
-        .update(payload)
-        .eq('name', entity.name)
-        .eq('institution_type', this.domainInstitutionType(type))
+        .insert({
+          ...payload,
+          name: entity.name,
+          institution_type: this.domainInstitutionType(type),
+          is_active: entity?.status === 'inactive' ? false : true,
+        })
         .select('*')
-        .limit(1);
+        .single();
 
-      if (byName.error) throw byName.error;
-      return byName.data?.[0] ?? null;
+      if (error) throw error;
+      await this.syncEntityDetails(type, data.id, entity);
+      return data;
     } catch (error) {
       console.warn('Unable to sync entity fields to diocese.institutions:', error);
       return null;
@@ -189,8 +384,9 @@ export class EntityService {
 
     // These fields are owned by diocese.institutions in the portable schema. Some legacy/detail tables do not
     // have them, so writing them directly can make the admin save fail before the central-table sync runs.
-    // NOTE: subsidy_type is now part of the detail tables, so we keep it
-    delete legacyPayload.subsidyType; // Remove camelCase version, keep snake_case subsidy_type
+    delete legacyPayload.subsidyType;
+    delete legacyPayload.subsidy_type;
+    delete legacyPayload.previousName;
     delete legacyPayload.district;
     delete legacyPayload.lat;
     delete legacyPayload.lng;
@@ -225,9 +421,14 @@ export class EntityService {
 
     const legacyPayload = this.legacyPayloadFor(type, payload);
     const { data, error } = await this.supabaseService.supabaseServer.from(table).insert(legacyPayload).select().single();
+    if (this.isMissingTableError(error)) {
+      const syncedInstitution = await this.syncInstitutionFields(type, payload);
+      if (!syncedInstitution) throw error;
+      return this.normalizePortableEntity(type, syncedInstitution);
+    }
     if (error) throw error;
     const syncedInstitution = await this.syncInstitutionFields(type, { ...payload, ...data });
-    const { id: _createdInstitutionId, ...createdInstitutionFields } = syncedInstitution ?? {};
+    const createdInstitutionFields = this.institutionFieldsForResponse(syncedInstitution);
     const normalizedData = syncedInstitution ? { ...data, ...createdInstitutionFields } : data;
     // Normalize the response
     if (type === 'school') return this.normalizeSchoolData(normalizedData);
@@ -255,6 +456,12 @@ export class EntityService {
       payload = payloadWithoutCluster;
     }
 
+    const { data: existingEntity } = await this.supabaseService.supabaseServer
+      .from(table)
+      .select('name')
+      .eq('id', id)
+      .maybeSingle();
+
     const legacyPayload = this.legacyPayloadFor(type, payload);
     console.log('[updateAdminEntity] type:', type, 'id:', id);
     console.log('[updateAdminEntity] legacyPayload:', JSON.stringify(legacyPayload, null, 2));
@@ -267,11 +474,25 @@ export class EntityService {
       .single();
 
     if (error) {
+      if (this.isMissingTableError(error)) {
+        const syncedInstitution = await this.syncInstitutionFields(type, {
+          ...updates,
+          ...payload,
+          id,
+          previousName: updates.previousName ?? existingEntity?.name,
+        });
+        if (!syncedInstitution) throw error;
+        return this.normalizePortableEntity(type, syncedInstitution);
+      }
       console.error('[updateAdminEntity] Update error:', error);
       throw error;
     }
-    const syncedInstitution = await this.syncInstitutionFields(type, { ...updates, ...data });
-    const { id: _updatedInstitutionId, ...updatedInstitutionFields } = syncedInstitution ?? {};
+    const syncedInstitution = await this.syncInstitutionFields(type, {
+      ...updates,
+      ...data,
+      previousName: updates.previousName ?? existingEntity?.name,
+    });
+    const updatedInstitutionFields = this.institutionFieldsForResponse(syncedInstitution);
     const normalizedData = syncedInstitution ? { ...data, ...updatedInstitutionFields } : data;
     // Normalize the response
     if (type === 'school') return this.normalizeSchoolData(normalizedData);
@@ -570,7 +791,8 @@ export class EntityService {
       .is('deleted_at', null)
       .order('name');
     if (error) return [];
-    return (data ?? []).map((r: any) => this.mapHealthRecord(r));
+    const hydrated = await Promise.all((data ?? []).map((r: any) => this.hydrateHealthRecordDocument(r)));
+    return hydrated.map((r: any) => this.mapHealthRecord(r));
   }
 
   async savePriestHealthRecord(record: any): Promise<any> {
@@ -646,6 +868,59 @@ export class EntityService {
       documentName: r.document_name ?? '',
       createdByUserId: r.created_by_user_id ?? null,
     };
+  }
+
+  private async hydrateHealthRecordDocument(record: any): Promise<any> {
+    if (!record || record.document_name || record.document_url || !record.name) return record;
+
+    const safeName = String(record.name).replace(/[^a-zA-Z0-9._-]/g, '_');
+
+    try {
+      const { data: files, error } = await this.supabaseService.admin.storage
+        .from('health-documents')
+        .list(safeName, { limit: 100, sortBy: { column: 'created_at', order: 'desc' } });
+
+      if (error || !files?.length) return record;
+
+      const latest = files
+        .filter((file: any) => file?.name && file.name !== '.emptyFolderPlaceholder')
+        .sort((a: any, b: any) => {
+          const aTime = new Date(a.created_at ?? a.updated_at ?? 0).getTime();
+          const bTime = new Date(b.created_at ?? b.updated_at ?? 0).getTime();
+          return bTime - aTime;
+        })[0];
+
+      if (!latest?.name) return record;
+
+      const storagePath = `${safeName}/${latest.name}`;
+      const { data: signedData } = await this.supabaseService.admin.storage
+        .from('health-documents')
+        .createSignedUrl(storagePath, 60 * 60 * 24 * 365);
+
+      const documentName = latest.name.replace(/^\d+_/, '');
+      const documentUrl = signedData?.signedUrl ?? '';
+
+      if (documentName || documentUrl) {
+        await this.supabaseService.admin
+          .schema('diocese')
+          .from('priest_health_records')
+          .update({
+            document_name: documentName,
+            document_url: documentUrl,
+            updated_at: new Date().toISOString(),
+          })
+          .eq('id', record.id);
+      }
+
+      return {
+        ...record,
+        document_name: documentName,
+        document_url: documentUrl,
+      };
+    } catch (error) {
+      console.warn('[entity.service] Unable to hydrate health document:', error);
+      return record;
+    }
   }
 
   private calculateAge(birthDate: string | null): number {

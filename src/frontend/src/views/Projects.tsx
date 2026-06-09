@@ -19,7 +19,7 @@ import { motion, AnimatePresence } from 'motion/react';
 import { Project, Donation, ProjectCategory, EntityType, ProjectExpense } from '../types';
 import { ProjectDashboardCard } from '../components/projects/ProjectDashboardCard';
 import { ProjectDetailPage } from '../components/projects/ProjectDetailPage';
-import { ProjectCreationForm } from '../components/projects/ProjectCreationForm';
+import { ProjectCreationForm, ProjectInstitutionOption } from '../components/projects/ProjectCreationForm';
 import { dataService } from '../services/dataService';
 import { auth } from '../firebase';
 import { usePermissions } from '../hooks/usePermissions';
@@ -39,7 +39,8 @@ export function Projects({ role }: ProjectsProps) {
   const [filterEntityType, setFilterEntityType] = useState<EntityType | 'All'>('All');
   const [showFilterDropdown, setShowFilterDropdown] = useState(false);
   const [showEntityFilterDropdown, setShowEntityFilterDropdown] = useState(false);
-  const [userContext, setUserContext] = useState<{ id: string; type: EntityType } | null>(null);
+  const [userContext, setUserContext] = useState<{ id: string; name: string; type: EntityType } | null>(null);
+  const [institutionOptions, setInstitutionOptions] = useState<ProjectInstitutionOption[]>([]);
   const { permissions } = usePermissions();
   const canAccessProjects = permissions.view_projects === true || permissions.manage_projects === true;
 
@@ -49,14 +50,53 @@ export function Projects({ role }: ProjectsProps) {
         const isDioceseRole = ['bishop', 'admin', 'chancellor', 'diocesan_oeconomus', 'finance_staff'].includes(
           user.role,
         );
+        const entityType = user.entityType ?? (user.role === 'priest' ? 'parish' : user.role);
         setUserContext({
-          id: user.displayName || 'Unknown Entity',
-          type: isDioceseRole ? 'diocese' : (user.role as EntityType),
+          id: user.entityId || user.entityName || user.displayName || 'Unknown Entity',
+          name: user.entityName || user.displayName || 'Unknown Entity',
+          type: isDioceseRole ? 'diocese' : (entityType as EntityType),
         });
       }
     });
     return () => unsubscribe();
   }, []);
+
+  useEffect(() => {
+    if (!canAccessProjects) return;
+
+    let active = true;
+    const loadInstitutions = async () => {
+      try {
+        const [parishes, seminaries, schools] = await Promise.all([
+          dataService.getAdminEntities('parish'),
+          dataService.getAdminEntities('seminary'),
+          dataService.getAdminEntities('school'),
+        ]);
+        const options: ProjectInstitutionOption[] = [
+          ...(parishes ?? []).map((entity: any) => ({
+            id: entity.id,
+            name: entity.name,
+            type: 'parish' as EntityType,
+          })),
+          ...(seminaries ?? []).map((entity: any) => ({
+            id: entity.id,
+            name: entity.name,
+            type: 'seminary' as EntityType,
+          })),
+          ...(schools ?? []).map((entity: any) => ({ id: entity.id, name: entity.name, type: 'school' as EntityType })),
+        ];
+        if (active) setInstitutionOptions(options);
+      } catch (error) {
+        console.error('Failed to load project institutions:', error);
+        if (active) setInstitutionOptions([]);
+      }
+    };
+
+    void loadInstitutions();
+    return () => {
+      active = false;
+    };
+  }, [canAccessProjects]);
 
   useEffect(() => {
     if (!userContext || !canAccessProjects) return;
@@ -94,9 +134,10 @@ export function Projects({ role }: ProjectsProps) {
 
   const filteredProjects = projects.filter((p) => {
     const query = searchQuery.toLowerCase();
+    const entityLabel = p.entityName ?? p.entityId;
     const matchesSearch =
       p.name.toLowerCase().includes(query) ||
-      p.entityId.toLowerCase().includes(query) ||
+      entityLabel.toLowerCase().includes(query) ||
       p.category.toLowerCase().includes(query);
     const matchesCategory = filterCategory === 'All' || p.category === filterCategory;
     return matchesSearch && matchesCategory;
@@ -111,36 +152,39 @@ export function Projects({ role }: ProjectsProps) {
   }, [projects]);
 
   const handleAddProject = (
-    newProject: Omit<
-      Project,
-      'id' | 'currentAmount' | 'healthScore' | 'successProbability' | 'recommendation' | 'entityId' | 'entityType'
-    >,
+    newProject: Omit<Project, 'id' | 'currentAmount' | 'healthScore' | 'successProbability' | 'recommendation'>,
   ) => {
     if (!userContext) return;
 
     const project: Project = {
       ...newProject,
-      id: Math.random().toString(36).substr(2, 9),
+      id: '',
       currentAmount: 0,
       totalExpenses: 0,
       healthScore: 75,
       successProbability: 65,
       recommendation: 'Begin with a formal announcement during parish services.',
-      entityId: userContext.id,
-      entityType: userContext.type,
     };
-    dataService.saveProject(project);
+    return dataService.saveProject(project).then((saved) => {
+      setProjects((prev) => [saved, ...prev.filter((existing) => existing.id !== saved.id)]);
+    });
   };
 
   const handleAddDonation = (newDonation: Omit<Donation, 'id'>) => {
-    dataService.saveDonation(newDonation as Donation);
+    void dataService.saveDonation(newDonation as Donation).then((saved) => {
+      setDonations((prev) => [saved, ...prev.filter((donation) => donation.id !== saved.id)]);
+    });
 
     // Update project current amount in dataService
     const projectToUpdate = projects.find((p) => p.id === newDonation.projectId);
     if (projectToUpdate) {
-      dataService.saveProject({
+      const updatedProject = {
         ...projectToUpdate,
         currentAmount: projectToUpdate.currentAmount + newDonation.amount,
+      };
+      setProjects((prev) => prev.map((project) => (project.id === updatedProject.id ? updatedProject : project)));
+      void dataService.saveProject(updatedProject).then((saved) => {
+        setProjects((prev) => prev.map((project) => (project.id === saved.id ? saved : project)));
       });
     }
 
@@ -151,14 +195,20 @@ export function Projects({ role }: ProjectsProps) {
   };
 
   const handleAddExpense = (newExpense: Omit<ProjectExpense, 'id'>) => {
-    dataService.saveExpense(newExpense as ProjectExpense);
+    void dataService.saveExpense(newExpense as ProjectExpense).then((saved) => {
+      setExpenses((prev) => [saved, ...prev.filter((expense) => expense.id !== saved.id)]);
+    });
 
     const projectToUpdate = projects.find((p) => p.id === newExpense.projectId);
     if (projectToUpdate) {
       const updatedTotalExpenses = (projectToUpdate.totalExpenses || 0) + newExpense.amount;
-      dataService.saveProject({
+      const updatedProject = {
         ...projectToUpdate,
         totalExpenses: updatedTotalExpenses,
+      };
+      setProjects((prev) => prev.map((project) => (project.id === updatedProject.id ? updatedProject : project)));
+      void dataService.saveProject(updatedProject).then((saved) => {
+        setProjects((prev) => prev.map((project) => (project.id === saved.id ? saved : project)));
       });
     }
 
@@ -181,8 +231,10 @@ export function Projects({ role }: ProjectsProps) {
       // Keep other details like description, targetAmount, category, etc.
     };
 
-    dataService.saveProject(clonedProject);
-    setSelectedProject(clonedProject); // Navigate to the new cloned project
+    void dataService.saveProject(clonedProject).then((saved) => {
+      setProjects((prev) => [saved, ...prev.filter((existing) => existing.id !== saved.id)]);
+      setSelectedProject(saved);
+    });
   };
 
   const getEntityIcon = (type: string) => {
@@ -244,7 +296,7 @@ export function Projects({ role }: ProjectsProps) {
               <span className="text-xs font-bold text-gold-600 uppercase tracking-widest bg-gold-50 px-2 py-1 rounded-md">
                 {userContext?.type}
               </span>
-              <span className="text-sm text-gray-500 font-medium">{userContext?.id}</span>
+              <span className="text-sm text-gray-500 font-medium">{userContext?.name}</span>
             </div>
             <p className="text-base text-gray-500 font-medium mt-2 max-w-2xl">
               Track fundraising progress, monitor delivery status, and compare project performance across diocesan
@@ -538,6 +590,15 @@ export function Projects({ role }: ProjectsProps) {
       <ProjectCreationForm
         isOpen={isCreateModalOpen}
         onClose={() => setIsCreateModalOpen(false)}
+        institutions={
+          userContext?.type === 'diocese'
+            ? institutionOptions
+            : institutionOptions.filter(
+                (institution) => institution.id === userContext?.id || institution.name === userContext?.name,
+              )
+        }
+        defaultInstitutionId={userContext?.type === 'diocese' ? undefined : userContext?.id}
+        lockInstitutionSelect={userContext?.type !== 'diocese'}
         onSubmit={handleAddProject}
       />
     </div>

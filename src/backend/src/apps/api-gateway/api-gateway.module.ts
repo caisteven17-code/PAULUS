@@ -12,6 +12,9 @@ import { AdminEntitiesGatewayController } from './controllers/admin-entities-gat
 import { AdminRolesGatewayController } from './controllers/admin-roles-gateway.controller';
 import { AnnouncementsGatewayController } from './controllers/announcements-gateway.controller';
 import { AuditLogGatewayController } from './controllers/audit-log-gateway.controller';
+import { ScenarioGatewayController } from './controllers/scenario-gateway.controller';
+import { ScenarioService } from '../../services/scenario.service';
+import { SupabaseService } from '../../services/supabase.service';
 
 @Module({
   imports: [
@@ -31,6 +34,8 @@ import { AuditLogGatewayController } from './controllers/audit-log-gateway.contr
     AdminRolesGatewayController,
     AnnouncementsGatewayController,
     AuditLogGatewayController,
+    ScenarioGatewayController,
   ],
+  providers: [ScenarioService, SupabaseService],
 })
 export class ApiGatewayModule {}

@@ -1,6 +1,6 @@
 type ProxyOptions = {
   path: string;
-  method?: 'GET' | 'POST' | 'PUT' | 'DELETE';
+  method?: 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE';
   preserveQuery?: boolean;
 };
 

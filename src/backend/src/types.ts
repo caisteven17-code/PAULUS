@@ -198,6 +198,7 @@ export interface Project {
   recommendation: string;
   totalExpenses?: number;
   entityId: string;
+  entityName?: string;
   entityType: 'parish' | 'school' | 'seminary' | 'diocese';
 }
 

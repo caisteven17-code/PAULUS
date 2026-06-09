@@ -1,22 +1,48 @@
 ﻿'use client';
 
-import React, { useState } from 'react';
-import { X, Upload, Calendar, Target, FileText, User, Tag, Info, Check, ChevronDown, Plus } from 'lucide-react';
+import React, { useEffect, useState } from 'react';
+import {
+  X,
+  Upload,
+  Calendar,
+  Target,
+  FileText,
+  User,
+  Tag,
+  Info,
+  Check,
+  ChevronDown,
+  Plus,
+  Building2,
+} from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
-import { Project, ProjectCategory } from '../../types';
+import { EntityType, Project, ProjectCategory } from '../../types';
+
+export interface ProjectInstitutionOption {
+  id: string;
+  name: string;
+  type: EntityType;
+}
 
 interface ProjectCreationFormProps {
   isOpen: boolean;
   onClose: () => void;
+  institutions: ProjectInstitutionOption[];
+  defaultInstitutionId?: string;
+  lockInstitutionSelect?: boolean;
   onSubmit: (
-    project: Omit<
-      Project,
-      'id' | 'currentAmount' | 'healthScore' | 'successProbability' | 'recommendation' | 'entityId' | 'entityType'
-    >,
-  ) => void;
+    project: Omit<Project, 'id' | 'currentAmount' | 'healthScore' | 'successProbability' | 'recommendation'>,
+  ) => Promise<void> | void;
 }
 
-export function ProjectCreationForm({ isOpen, onClose, onSubmit }: ProjectCreationFormProps) {
+export function ProjectCreationForm({
+  isOpen,
+  onClose,
+  institutions,
+  defaultInstitutionId,
+  lockInstitutionSelect,
+  onSubmit,
+}: ProjectCreationFormProps) {
   const [formData, setFormData] = useState({
     name: '',
     description: '',
@@ -28,6 +54,9 @@ export function ProjectCreationForm({ isOpen, onClose, onSubmit }: ProjectCreati
     beneficiaries: '',
     contactPerson: '',
     status: 'active' as const,
+    entityId: '',
+    entityName: '',
+    entityType: 'parish' as EntityType,
   });
 
   const [imagePreview, setImagePreview] = useState<string | null>(null);
@@ -44,20 +73,39 @@ export function ProjectCreationForm({ isOpen, onClose, onSubmit }: ProjectCreati
     }
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  useEffect(() => {
+    if (!isOpen) return;
+    const selected =
+      institutions.find((institution) => institution.id === defaultInstitutionId) ?? institutions[0] ?? null;
+    if (!selected) return;
+    setFormData((prev) => ({
+      ...prev,
+      entityId: selected.id,
+      entityName: selected.name,
+      entityType: selected.type,
+    }));
+  }, [defaultInstitutionId, institutions, isOpen]);
+
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsSubmitting(true);
 
-    // Mock API call
-    setTimeout(() => {
-      onSubmit({
+    try {
+      const selectedInstitution = institutions.find((institution) => institution.id === formData.entityId);
+      await onSubmit({
         ...formData,
+        entityId: selectedInstitution?.id ?? formData.entityId,
+        entityName: selectedInstitution?.name ?? formData.entityName,
+        entityType: selectedInstitution?.type ?? formData.entityType,
         targetAmount: Number(formData.targetAmount),
         coverImage: imagePreview || undefined,
       });
       setIsSubmitting(false);
       onClose();
-    }, 1500);
+    } catch (error) {
+      console.error('Failed to create project:', error);
+      setIsSubmitting(false);
+    }
   };
 
   const categories: ProjectCategory[] = [
@@ -149,6 +197,42 @@ export function ProjectCreationForm({ isOpen, onClose, onSubmit }: ProjectCreati
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                <div className="space-y-2 md:col-span-2">
+                  <label className="text-[11px] font-bold text-gold-700 uppercase tracking-[0.2em] flex items-center gap-2">
+                    <Building2 className="w-3.5 h-3.5" />
+                    Institution
+                  </label>
+                  <div className="relative">
+                    <select
+                      required
+                      disabled={lockInstitutionSelect}
+                      value={formData.entityId}
+                      onChange={(e) => {
+                        const selectedInstitution = institutions.find(
+                          (institution) => institution.id === e.target.value,
+                        );
+                        setFormData({
+                          ...formData,
+                          entityId: selectedInstitution?.id ?? '',
+                          entityName: selectedInstitution?.name ?? '',
+                          entityType: selectedInstitution?.type ?? 'parish',
+                        });
+                      }}
+                      className="w-full px-5 py-4 bg-gray-50/50 border border-gray-200 rounded-2xl text-sm font-medium focus:outline-none focus:ring-4 focus:ring-gold-500/10 focus:border-gold-500 focus:bg-white transition-all appearance-none cursor-pointer disabled:cursor-not-allowed disabled:text-gray-500"
+                    >
+                      {institutions.length === 0 && <option value="">No institutions available</option>}
+                      {institutions.map((institution) => (
+                        <option key={institution.id} value={institution.id}>
+                          {institution.name} ({institution.type})
+                        </option>
+                      ))}
+                    </select>
+                    <div className="absolute right-5 top-1/2 -translate-y-1/2 pointer-events-none text-gray-400">
+                      <ChevronDown className="w-4 h-4" />
+                    </div>
+                  </div>
+                </div>
+
                 <div className="space-y-2">
                   <label className="text-[11px] font-bold text-gold-700 uppercase tracking-[0.2em] flex items-center gap-2">
                     <Tag className="w-3.5 h-3.5" />

@@ -21,6 +21,8 @@ interface PriestRecord {
   notes: string;
   email: string;
   phone: string;
+  documentName?: string;
+  documentUrl?: string;
 }
 
 const HEALTH_STATUS_COLORS = {
@@ -1054,6 +1056,9 @@ export function HealthTracker() {
                   <th className="text-left px-4 py-3 text-xs font-bold text-slate-500 uppercase tracking-wider hidden lg:table-cell">
                     Last Check-up
                   </th>
+                  <th className="text-left px-4 py-3 text-xs font-bold text-slate-500 uppercase tracking-wider hidden lg:table-cell">
+                    Document
+                  </th>
                   <th className="text-left px-4 py-3 text-xs font-bold text-slate-500 uppercase tracking-wider">
                     Status
                   </th>
@@ -1067,7 +1072,7 @@ export function HealthTracker() {
               <tbody className="divide-y divide-slate-100">
                 {filteredPriests.length === 0 ? (
                   <tr>
-                    <td colSpan={canManageRecords ? 7 : 6} className="text-center py-12">
+                    <td colSpan={canManageRecords ? 8 : 7} className="text-center py-12">
                       <Heart className="w-10 h-10 text-slate-200 mx-auto mb-3" />
                       <p className="text-slate-400 text-sm">
                         {search ? 'No results found for your search.' : 'No records to display.'}
@@ -1108,6 +1113,33 @@ export function HealthTracker() {
                           '—'
                         )}
                       </td>
+                      <td className="px-4 py-3 hidden lg:table-cell">
+                        {priest.documentName ? (
+                          priest.documentUrl ? (
+                            <a
+                              href={priest.documentUrl}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              onClick={(e) => e.stopPropagation()}
+                              className="inline-flex max-w-[180px] items-center gap-1.5 rounded-lg border border-slate-200 px-2 py-1 text-xs font-semibold text-blue-600 hover:border-blue-200 hover:bg-blue-50"
+                              title={priest.documentName}
+                            >
+                              <FileText className="h-3.5 w-3.5 shrink-0" />
+                              <span className="truncate">{priest.documentName}</span>
+                            </a>
+                          ) : (
+                            <span
+                              className="inline-flex max-w-[180px] items-center gap-1.5 text-xs font-medium text-slate-500"
+                              title={priest.documentName}
+                            >
+                              <FileText className="h-3.5 w-3.5 shrink-0" />
+                              <span className="truncate">{priest.documentName}</span>
+                            </span>
+                          )
+                        ) : (
+                          <span className="text-slate-300">—</span>
+                        )}
+                      </td>
                       <td className="px-4 py-3">
                         <span
                           className={`inline-flex items-center gap-1 px-2 py-1 rounded-md text-[11px] font-bold border ${HEALTH_STATUS_COLORS[priest.healthStatus]}`}
@@ -1119,6 +1151,18 @@ export function HealthTracker() {
                       {canManageRecords && (
                         <td className="px-4 py-3 text-right">
                           <div className="flex items-center justify-end gap-1">
+                            {priest.documentUrl && (
+                              <a
+                                href={priest.documentUrl}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                onClick={(e) => e.stopPropagation()}
+                                className="p-1.5 hover:bg-slate-100 rounded-lg transition-colors"
+                                title={priest.documentName || 'Open document'}
+                              >
+                                <FileText className="w-4 h-4 text-slate-500" />
+                              </a>
+                            )}
                             <button
                               onClick={(e) => {
                                 e.stopPropagation();
@@ -1240,6 +1284,31 @@ export function HealthTracker() {
                       <p className="text-slate-700 mt-2 bg-slate-50 p-3 rounded whitespace-pre-line">
                         {selectedPriest.notes}
                       </p>
+                    </div>
+                  )}
+                  {selectedPriest.documentName && (
+                    <div className="col-span-2">
+                      <p className="text-sm text-slate-600 font-medium">Document</p>
+                      {selectedPriest.documentUrl ? (
+                        <a
+                          href={selectedPriest.documentUrl}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="mt-2 inline-flex max-w-full items-center gap-2 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm font-semibold text-blue-600 hover:border-blue-200 hover:bg-blue-50"
+                          title={selectedPriest.documentName}
+                        >
+                          <FileText className="h-4 w-4 shrink-0" />
+                          <span className="truncate">{selectedPriest.documentName}</span>
+                        </a>
+                      ) : (
+                        <div
+                          className="mt-2 inline-flex max-w-full items-center gap-2 rounded-lg bg-slate-50 px-3 py-2 text-sm font-medium text-slate-600"
+                          title={selectedPriest.documentName}
+                        >
+                          <FileText className="h-4 w-4 shrink-0" />
+                          <span className="truncate">{selectedPriest.documentName}</span>
+                        </div>
+                      )}
                     </div>
                   )}
                 </div>

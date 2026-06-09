@@ -1006,6 +1006,8 @@ export function EntityManagementControl({
         enrollment: editingEntity?.enrollment || 0,
         capacity: editingEntity?.capacity || 0,
         staff: editingEntity?.staff || 0,
+        lat: formState.lat,
+        lng: formState.lng,
         subsidy_type: formState.subsidyType,
         status: 'active',
       };
@@ -1021,6 +1023,8 @@ export function EntityManagementControl({
         enrollment: editingEntity?.enrollment || 0,
         capacity: editingEntity?.capacity || 0,
         staff: editingEntity?.staff || 0,
+        lat: formState.lat,
+        lng: formState.lng,
         subsidy_type: formState.subsidyType,
         status: 'active',
       };
@@ -1052,6 +1056,8 @@ export function EntityManagementControl({
         district: savedEntity.district,
         collections: savedEntity.collections,
         subsidyType: savedEntity.subsidy_type || savedEntity.subsidyType || formState.subsidyType,
+        lat: savedEntity.lat !== undefined ? Number(savedEntity.lat) : formState.lat,
+        lng: savedEntity.lng !== undefined ? Number(savedEntity.lng) : formState.lng,
       };
 
       if (activeSubTab === 'parishes') {
@@ -1135,6 +1141,8 @@ export function EntityManagementControl({
           enrollment: editingEntity?.enrollment || 0,
           capacity: editingEntity?.capacity || 0,
           staff: editingEntity?.staff || 0,
+          lat: formState.lat,
+          lng: formState.lng,
           subsidyType: formState.subsidyType,
         };
         if (editingEntity) {
@@ -1154,6 +1162,8 @@ export function EntityManagementControl({
           enrollment: editingEntity?.enrollment || 0,
           capacity: editingEntity?.capacity || 0,
           staff: editingEntity?.staff || 0,
+          lat: formState.lat,
+          lng: formState.lng,
           subsidyType: formState.subsidyType,
         };
         if (editingEntity) {

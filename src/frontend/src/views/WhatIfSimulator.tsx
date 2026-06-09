@@ -199,7 +199,10 @@ interface ParishSavedScenario {
   parishId: number;
   params: ParishSimulationParams;
   timestamp: number;
+  fullScenario?: any;
 }
+
+const formatRunwayMonths = (months: number) => (months === 1 ? '1 month' : `${months} months`);
 
 const priests = [
   {
@@ -341,6 +344,7 @@ interface PriestSavedScenario {
   priestId: string;
   params: PriestSimulationParams;
   timestamp: number;
+  fullScenario?: any;
 }
 
 const transitionSupportFactor = {
@@ -628,10 +632,50 @@ function ParishAITwin({ mode = 'parish' }: { mode?: FinancialAITwinMode }) {
       .catch(() => {});
   }, [mode]);
   const [isSimulating, setIsSimulating] = useState(false);
-  const [savedScenarios, setSavedScenarios] = useState<ParishSavedScenario[]>(() => {
-    const saved = localStorage.getItem(config.storageKey);
-    return saved ? JSON.parse(saved) : [];
-  });
+  const [savedScenarios, setSavedScenarios] = useState<ParishSavedScenario[]>([]);
+  const [loadingScenarios, setLoadingScenarios] = useState(true);
+  const [selectedScenarioDetail, setSelectedScenarioDetail] = useState<any>(null);
+  const [scenarioNameModal, setScenarioNameModal] = useState<{ open: boolean; name: string; onConfirm: (name: string) => void }>({ open: false, name: '', onConfirm: () => {} });
+
+  // Load scenarios from Supabase on mount
+  useEffect(() => {
+    const loadScenarios = async () => {
+      try {
+        setLoadingScenarios(true);
+        const scenarios = await apiClient.listInstitutionScenarios();
+        // Filter by current mode and not archived
+        const filtered = (scenarios || [])
+          .filter(
+            (s: any) =>
+              s.institutionType === (mode === 'seminary' ? 'seminary' : mode === 'school' ? 'school' : 'parish') &&
+              !s.isArchived,
+          )
+          .map((s: any) => ({
+            id: s.id,
+            name: s.name,
+            parishId: 1, // Map to profile
+            params: {
+              collectionsChange: s.incomeChange,
+              expensesChange: s.expensesChange,
+              oneTimeIncome: s.oneTimeIncome,
+              oneTimeExpense: s.oneTimeExpense,
+              externalSupport: s.externalSupport,
+              timeline: s.timelineMonths,
+            },
+            timestamp: new Date(s.createdAt).getTime(),
+            // Store the full scenario data for detail view
+            fullScenario: s,
+          }))
+          .sort((a: any, b: any) => b.timestamp - a.timestamp);
+        setSavedScenarios(filtered);
+      } catch (error) {
+        console.error('Failed to load scenarios:', error);
+      } finally {
+        setLoadingScenarios(false);
+      }
+    };
+    loadScenarios();
+  }, [mode]);
   const [params, setParams] = useState<ParishSimulationParams>({
     collectionsChange: 0,
     expensesChange: 0,
@@ -663,27 +707,62 @@ function ParishAITwin({ mode = 'parish' }: { mode?: FinancialAITwinMode }) {
     }, 800);
   };
 
-  const handleSaveScenario = () => {
-    const name = prompt('Enter a name for this scenario:');
-    if (!name) return;
+  const handleSaveScenario = async () => {
+    setScenarioNameModal({
+      open: true,
+      name: '',
+      onConfirm: async (name: string) => {
+        if (!name) return;
+        try {
+      const entityType = mode === 'seminary' ? 'seminary' : mode === 'school' ? 'school' : 'parish';
+      const scenario = await apiClient.createInstitutionScenario({
+        institutionType: entityType,
+        institutionId: selectedParish.id.toString(),
+        institutionName: selectedParish.name,
+        name,
+        incomeChange: params.collectionsChange,
+        expensesChange: params.expensesChange,
+        oneTimeIncome: params.oneTimeIncome,
+        oneTimeExpense: params.oneTimeExpense,
+        externalSupport: params.externalSupport,
+        timelineMonths: params.timeline,
+        // Include results
+        monthlyNet: simulationResults.monthlyNet,
+        runwayMonths: simulationResults.runwayMonths,
+        riskLevel: simulationResults.riskLevel as 'Low' | 'Medium' | 'High' | 'Critical',
+        finalBalance:
+          simulationResults.projectedData[simulationResults.projectedData.length - 1]?.simulated || 0,
+        projectedData: simulationResults.projectedData,
+        recommendation: simulationResults.recommendation,
+      });
 
-    const nextScenario: ParishSavedScenario = {
-      id: Math.random().toString(36).slice(2, 9),
-      name,
-      parishId: selectedParishId,
-      params: { ...params },
-      timestamp: Date.now(),
-    };
-
-    const updated = [nextScenario, ...savedScenarios];
-    setSavedScenarios(updated);
-    localStorage.setItem(config.storageKey, JSON.stringify(updated));
+      // Add to local state
+      const nextScenario: ParishSavedScenario = {
+        id: scenario.id,
+        name: scenario.name,
+        parishId: selectedParishId,
+        params: { ...params },
+        timestamp: Date.now(),
+        fullScenario: scenario,
+      };
+      setSavedScenarios([nextScenario, ...savedScenarios]);
+      setScenarioNameModal({ open: false, name: '', onConfirm: () => {} });
+        } catch (error) {
+          console.error('Failed to save scenario:', error);
+        }
+      },
+    });
   };
 
-  const handleDeleteScenario = (id: string) => {
-    const updated = savedScenarios.filter((scenario) => scenario.id !== id);
-    setSavedScenarios(updated);
-    localStorage.setItem(config.storageKey, JSON.stringify(updated));
+  const handleDeleteScenario = async (id: string) => {
+    if (!confirm('Delete this scenario?')) return;
+    try {
+      await apiClient.deleteInstitutionScenario(id);
+      const updated = savedScenarios.filter((scenario) => scenario.id !== id);
+      setSavedScenarios(updated);
+    } catch (error) {
+      console.error('Failed to delete scenario:', error);
+    }
   };
 
   const handleLoadScenario = (scenario: ParishSavedScenario) => {
@@ -775,8 +854,13 @@ function ParishAITwin({ mode = 'parish' }: { mode?: FinancialAITwinMode }) {
                 <span className="text-[10px] font-bold text-church-grey uppercase tracking-wider">Current Runway</span>
                 <span className="text-2xl font-bold text-church-black">
                   {selectedParish.monthlyIncome >= selectedParish.monthlyExpenses
-                    ? 'âˆž'
-                    : `${Math.floor(selectedParish.cashBalance / (selectedParish.monthlyExpenses - selectedParish.monthlyIncome))}m`}
+                    ? 'No depletion'
+                    : formatRunwayMonths(
+                        Math.floor(
+                          selectedParish.cashBalance /
+                            (selectedParish.monthlyExpenses - selectedParish.monthlyIncome),
+                        ),
+                      )}
                 </span>
               </div>
             </div>
@@ -952,7 +1036,9 @@ function ParishAITwin({ mode = 'parish' }: { mode?: FinancialAITwinMode }) {
                   New Cash Runway
                 </span>
                 <span className="block max-w-full whitespace-nowrap text-[clamp(1.35rem,2.1vw,1.9rem)] leading-none font-bold text-church-black">
-                  {simulationResults.runwayMonths === -1 ? 'âˆž' : `${simulationResults.runwayMonths}m`}
+                  {simulationResults.runwayMonths === -1
+                    ? 'No depletion'
+                    : formatRunwayMonths(simulationResults.runwayMonths)}
                 </span>
               </div>
               <div className="min-w-0 p-5 rounded-[24px] bg-church-light border border-church-grey/5 flex flex-col gap-2.5">
@@ -1058,42 +1144,169 @@ function ParishAITwin({ mode = 'parish' }: { mode?: FinancialAITwinMode }) {
                 </div>
                 <h3 className="text-lg font-bold text-church-black">Saved Scenarios</h3>
               </div>
-              <span className="text-xs font-bold text-church-grey">{savedScenarios.length} Saved</span>
+              <span className="text-xs font-bold text-church-grey">
+                {loadingScenarios ? 'Loading...' : `${savedScenarios.length} Saved`}
+              </span>
             </div>
 
-            {savedScenarios.length > 0 ? (
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {savedScenarios.map((scenario) => (
-                  <div
-                    key={scenario.id}
-                    className="p-5 rounded-2xl bg-church-light border border-church-grey/5 hover:border-gold-500/30 transition-all group"
-                  >
-                    <div className="flex justify-between items-start mb-3">
-                      <div className="space-y-1">
-                        <h4 className="text-sm font-bold text-church-black group-hover:text-gold-600 transition-colors">
-                          {scenario.name}
-                        </h4>
-                        <p className="text-[10px] text-church-grey font-medium">
-                          {profiles.find((parish) => parish.id === scenario.parishId)?.name} -{' '}
-                          {new Date(scenario.timestamp).toLocaleDateString()}
+            {loadingScenarios ? (
+              <div className="py-12 flex items-center justify-center">
+                <div className="w-5 h-5 border-2 border-church-grey/30 border-t-church-grey rounded-full animate-spin" />
+              </div>
+            ) : savedScenarios.length > 0 ? (
+              <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+                {/* Scenario List */}
+                <div className="lg:col-span-1 space-y-2">
+                  {savedScenarios.map((scenario) => (
+                    <button
+                      key={scenario.id}
+                      onClick={() => setSelectedScenarioDetail(scenario.fullScenario)}
+                      className={`w-full text-left p-4 rounded-xl border transition-all ${
+                        selectedScenarioDetail?.id === scenario.id
+                          ? 'bg-gold-50 border-gold-500'
+                          : 'bg-church-light border-church-grey/5 hover:border-gold-500/30'
+                      }`}
+                    >
+                      <h4 className="text-sm font-bold text-church-black">{scenario.name}</h4>
+                      <p className="text-[10px] text-church-grey font-medium mt-1">
+                        {new Date(scenario.timestamp).toLocaleDateString()}
+                      </p>
+                    </button>
+                  ))}
+                </div>
+
+                {/* Scenario Detail Panel */}
+                <div className="lg:col-span-2">
+                  {selectedScenarioDetail ? (
+                    <div className="space-y-5 p-5 rounded-2xl bg-church-light border border-church-grey/5">
+                      {/* Header */}
+                      <div className="border-b border-church-grey/10 pb-4">
+                        <h4 className="text-lg font-bold text-church-black">{selectedScenarioDetail.name}</h4>
+                        <p className="text-xs text-church-grey font-medium mt-2">
+                          Saved: {new Date(selectedScenarioDetail.createdAt).toLocaleString()}
+                        </p>
+                        <p className="text-xs text-church-grey font-medium">
+                          Institution: {selectedScenarioDetail.institutionName}
                         </p>
                       </div>
+
+                      {/* Parameters Section */}
+                      <div>
+                        <h5 className="text-xs font-bold uppercase tracking-widest text-church-grey mb-3">
+                          Parameters Used
+                        </h5>
+                        <div className="grid grid-cols-2 gap-3">
+                          <div className="bg-white rounded-lg p-3">
+                            <p className="text-[10px] font-bold uppercase tracking-widest text-church-grey">
+                              Income Change
+                            </p>
+                            <p
+                              className={`text-base font-bold ${selectedScenarioDetail.incomeChange >= 0 ? 'text-emerald-500' : 'text-rose-500'}`}
+                            >
+                              {selectedScenarioDetail.incomeChange > 0 ? '+' : ''}
+                              {selectedScenarioDetail.incomeChange}%
+                            </p>
+                          </div>
+                          <div className="bg-white rounded-lg p-3">
+                            <p className="text-[10px] font-bold uppercase tracking-widest text-church-grey">
+                              Expenses Change
+                            </p>
+                            <p
+                              className={`text-base font-bold ${selectedScenarioDetail.expensesChange <= 0 ? 'text-emerald-500' : 'text-rose-500'}`}
+                            >
+                              {selectedScenarioDetail.expensesChange > 0 ? '+' : ''}
+                              {selectedScenarioDetail.expensesChange}%
+                            </p>
+                          </div>
+                          <div className="bg-white rounded-lg p-3">
+                            <p className="text-[10px] font-bold uppercase tracking-widest text-church-grey">
+                              One-time Income
+                            </p>
+                            <p className="text-base font-bold text-church-black">
+                              {formatCurrency(selectedScenarioDetail.oneTimeIncome)}
+                            </p>
+                          </div>
+                          <div className="bg-white rounded-lg p-3">
+                            <p className="text-[10px] font-bold uppercase tracking-widest text-church-grey">
+                              Timeline
+                            </p>
+                            <p className="text-base font-bold text-church-black">
+                              {selectedScenarioDetail.timelineMonths} months
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Apply Button */}
                       <button
-                        onClick={() => handleDeleteScenario(scenario.id)}
-                        className="p-2 text-church-grey hover:text-rose-500 transition-colors opacity-0 group-hover:opacity-100"
+                        onClick={() => {
+                          setParams({
+                            collectionsChange: selectedScenarioDetail.incomeChange,
+                            expensesChange: selectedScenarioDetail.expensesChange,
+                            oneTimeIncome: selectedScenarioDetail.oneTimeIncome,
+                            oneTimeExpense: selectedScenarioDetail.oneTimeExpense,
+                            externalSupport: selectedScenarioDetail.externalSupport,
+                            timeline: selectedScenarioDetail.timelineMonths,
+                          });
+                          setSelectedScenarioDetail(null);
+                        }}
+                        className="w-full py-3 bg-gold-500 text-church-black rounded-xl font-bold hover:bg-gold-600 transition-all text-sm"
                       >
-                        <Trash2 className="w-4 h-4" />
+                        Apply Parameters Again
+                      </button>
+
+                      {/* Results Section */}
+                      <div className="border-t border-church-grey/10 pt-4">
+                        <h5 className="text-xs font-bold uppercase tracking-widest text-church-grey mb-3">
+                          Saved Results
+                        </h5>
+                        <div className="grid grid-cols-3 gap-3">
+                          <div className="bg-white rounded-lg p-3">
+                            <p className="text-[10px] font-bold uppercase tracking-widest text-church-grey">
+                              Monthly Net
+                            </p>
+                            <p
+                              className={`text-sm font-bold ${selectedScenarioDetail.monthlyNet >= 0 ? 'text-emerald-500' : 'text-rose-500'}`}
+                            >
+                              {formatCurrency(selectedScenarioDetail.monthlyNet)}
+                            </p>
+                          </div>
+                          <div className="bg-white rounded-lg p-3">
+                            <p className="text-[10px] font-bold uppercase tracking-widest text-church-grey">
+                              Runway
+                            </p>
+                            <p className="text-sm font-bold text-church-black">
+                              {selectedScenarioDetail.runwayMonths === -1
+                                ? 'No depletion'
+                                : formatRunwayMonths(selectedScenarioDetail.runwayMonths)}
+                            </p>
+                          </div>
+                          <div className="bg-white rounded-lg p-3">
+                            <p className="text-[10px] font-bold uppercase tracking-widest text-church-grey">
+                              Risk Level
+                            </p>
+                            <p className="text-sm font-bold text-church-black">{selectedScenarioDetail.riskLevel}</p>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Delete Button */}
+                      <button
+                        onClick={() => {
+                          handleDeleteScenario(selectedScenarioDetail.id);
+                          setSelectedScenarioDetail(null);
+                        }}
+                        className="w-full py-2 bg-rose-50 text-rose-600 rounded-lg font-bold hover:bg-rose-100 transition-all text-xs"
+                      >
+                        Delete Scenario
                       </button>
                     </div>
-                    <button
-                      onClick={() => handleLoadScenario(scenario)}
-                      className="w-full py-2.5 bg-white border border-church-grey/10 rounded-xl text-xs font-bold text-church-black hover:bg-gold-500 hover:text-white hover:border-gold-500 transition-all flex items-center justify-center gap-2"
-                    >
-                      Load Scenario
-                      <ArrowRight className="w-3 h-3" />
-                    </button>
-                  </div>
-                ))}
+                  ) : (
+                    <div className="py-12 flex items-center justify-center h-full rounded-2xl bg-church-light border border-dashed border-church-grey/20">
+                      <p className="text-sm text-church-grey font-medium">Select a scenario to view details</p>
+                    </div>
+                  )}
+                </div>
               </div>
             ) : (
               <div className="py-12 flex flex-col items-center justify-center text-center space-y-4">
@@ -1111,6 +1324,51 @@ function ParishAITwin({ mode = 'parish' }: { mode?: FinancialAITwinMode }) {
           </div>
         </div>
       </div>
+
+      {/* Scenario Name Modal */}
+      {scenarioNameModal.open && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl p-8 shadow-lg max-w-md w-full space-y-6">
+            <h3 className="text-xl font-bold text-church-black">Save Scenario</h3>
+            <div>
+              <label className="block text-sm font-bold text-church-black mb-2">Scenario Name</label>
+              <input
+                type="text"
+                value={scenarioNameModal.name}
+                onChange={(e) =>
+                  setScenarioNameModal({ ...scenarioNameModal, name: e.target.value })
+                }
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    scenarioNameModal.onConfirm(scenarioNameModal.name);
+                  }
+                  if (e.key === 'Escape') {
+                    setScenarioNameModal({ open: false, name: '', onConfirm: () => {} });
+                  }
+                }}
+                autoFocus
+                placeholder="Enter scenario name"
+                className="w-full px-4 py-2 border border-church-grey/20 rounded-xl focus:outline-none focus:ring-2 focus:ring-gold-500"
+              />
+            </div>
+            <div className="flex gap-3 justify-end">
+              <button
+                onClick={() => setScenarioNameModal({ open: false, name: '', onConfirm: () => {} })}
+                className="px-4 py-2 rounded-xl border border-church-grey/20 text-church-grey font-bold hover:bg-church-light transition-all"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={() => scenarioNameModal.onConfirm(scenarioNameModal.name)}
+                disabled={!scenarioNameModal.name.trim()}
+                className="px-6 py-2 rounded-xl bg-gold-500 text-church-black font-bold hover:bg-gold-600 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                Save
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -1124,10 +1382,42 @@ function PriestAITwin() {
     handoffWeeks: 6,
   });
   const [isSimulating, setIsSimulating] = useState(false);
-  const [savedScenarios, setSavedScenarios] = useState<PriestSavedScenario[]>(() => {
-    const saved = localStorage.getItem('priest_reassignment_scenarios');
-    return saved ? JSON.parse(saved) : [];
-  });
+  const [savedScenarios, setSavedScenarios] = useState<PriestSavedScenario[]>([]);
+  const [loadingScenarios, setLoadingScenarios] = useState(true);
+  const [selectedScenarioDetail, setSelectedScenarioDetail] = useState<any>(null);
+  const [scenarioNameModal, setScenarioNameModal] = useState<{ open: boolean; name: string; onConfirm: (name: string) => void }>({ open: false, name: '', onConfirm: () => {} });
+
+  // Load scenarios from Supabase on mount
+  useEffect(() => {
+    const loadScenarios = async () => {
+      try {
+        setLoadingScenarios(true);
+        const scenarios = await apiClient.listPriestScenarios();
+        const mapped = (scenarios || [])
+          .filter((s: any) => !s.isArchived)
+          .map((s: any) => ({
+            id: s.id,
+            name: s.name,
+            priestId: s.priestId,
+            params: {
+              targetParishId: s.targetParishId,
+              timeline: s.timelineMonths,
+              transitionSupport: s.transitionSupport,
+              handoffWeeks: s.handoffWeeks,
+            },
+            timestamp: new Date(s.createdAt).getTime(),
+            fullScenario: s,
+          }))
+          .sort((a: any, b: any) => b.timestamp - a.timestamp);
+        setSavedScenarios(mapped);
+      } catch (error) {
+        console.error('Failed to load priest scenarios:', error);
+      } finally {
+        setLoadingScenarios(false);
+      }
+    };
+    loadScenarios();
+  }, []);
 
   const selectedPriest = useMemo(
     () => priests.find((priest) => priest.id === selectedPriestId) || priests[0],
@@ -1169,27 +1459,61 @@ function PriestAITwin() {
     }, 700);
   };
 
-  const saveScenario = () => {
-    const name = prompt('Enter a name for this reassignment scenario:');
-    if (!name) return;
+  const saveScenario = async () => {
+    setScenarioNameModal({
+      open: true,
+      name: '',
+      onConfirm: async (name: string) => {
+        if (!name) return;
+        try {
+      const scenario = await apiClient.createPriestScenario({
+        priestId: selectedPriestId,
+        priestName: selectedPriest.name,
+        targetParishId: params.targetParishId,
+        targetParishName: selectedParish.name,
+        name,
+        transitionSupport: params.transitionSupport,
+        handoffWeeks: params.handoffWeeks,
+        timelineMonths: params.timeline,
+        // Include results
+        fitScore: results.fitScore,
+        targetLift: results.targetLift,
+        vacatedParishDip: results.vacatedParishDip,
+        dioceseLift: results.dioceseLift,
+        transitionRisk: results.transitionRisk,
+        riskBand: results.riskBand as 'Low' | 'Medium' | 'High',
+        confidence: results.confidence,
+        projectedData: results.projectedData,
+        recommendation: results.recommendation,
+      });
 
-    const nextScenario: PriestSavedScenario = {
-      id: Math.random().toString(36).slice(2, 9),
-      name,
-      priestId: selectedPriestId,
-      params: { ...params },
-      timestamp: Date.now(),
-    };
+      const nextScenario: PriestSavedScenario = {
+        id: scenario.id,
+        name: scenario.name,
+        priestId: selectedPriestId,
+        params: { ...params },
+        timestamp: Date.now(),
+        fullScenario: scenario,
+      };
 
-    const updated = [nextScenario, ...savedScenarios];
-    setSavedScenarios(updated);
-    localStorage.setItem('priest_reassignment_scenarios', JSON.stringify(updated));
+      setSavedScenarios([nextScenario, ...savedScenarios]);
+      setScenarioNameModal({ open: false, name: '', onConfirm: () => {} });
+        } catch (error) {
+          console.error('Failed to save scenario:', error);
+        }
+      },
+    });
   };
 
-  const deleteScenario = (id: string) => {
-    const updated = savedScenarios.filter((scenario) => scenario.id !== id);
-    setSavedScenarios(updated);
-    localStorage.setItem('priest_reassignment_scenarios', JSON.stringify(updated));
+  const deleteScenario = async (id: string) => {
+    if (!confirm('Delete this scenario?')) return;
+    try {
+      await apiClient.deletePriestScenario(id);
+      const updated = savedScenarios.filter((scenario) => scenario.id !== id);
+      setSavedScenarios(updated);
+    } catch (error) {
+      console.error('Failed to delete scenario:', error);
+    }
   };
 
   const loadScenario = (scenario: PriestSavedScenario) => {
@@ -1565,42 +1889,137 @@ function PriestAITwin() {
                 </div>
                 <h3 className="text-lg font-bold text-church-black">Saved Reassignment Scenarios</h3>
               </div>
-              <span className="text-xs font-bold text-church-grey">{savedScenarios.length} Saved</span>
+              <span className="text-xs font-bold text-church-grey">
+                {loadingScenarios ? 'Loading...' : `${savedScenarios.length} Saved`}
+              </span>
             </div>
 
-            {savedScenarios.length > 0 ? (
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {savedScenarios.map((scenario) => (
-                  <div
-                    key={scenario.id}
-                    className="p-5 rounded-2xl bg-church-light border border-church-grey/5 hover:border-gold-500/30 transition-all group"
-                  >
-                    <div className="flex justify-between items-start mb-3">
-                      <div className="space-y-1">
-                        <h4 className="text-sm font-bold text-church-black group-hover:text-gold-600 transition-colors">
-                          {scenario.name}
-                        </h4>
-                        <p className="text-[10px] text-church-grey font-medium">
-                          {(priests.find((priest) => priest.id === scenario.priestId) || priests[0]).name} •{' '}
-                          {new Date(scenario.timestamp).toLocaleDateString()}
+            {loadingScenarios ? (
+              <div className="py-12 flex items-center justify-center">
+                <div className="w-5 h-5 border-2 border-church-grey/30 border-t-church-grey rounded-full animate-spin" />
+              </div>
+            ) : savedScenarios.length > 0 ? (
+              <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+                {/* Scenario List */}
+                <div className="lg:col-span-1 space-y-2">
+                  {savedScenarios.map((scenario) => (
+                    <button
+                      key={scenario.id}
+                      onClick={() => setSelectedScenarioDetail(scenario.fullScenario)}
+                      className={`w-full text-left p-4 rounded-xl border transition-all ${
+                        selectedScenarioDetail?.id === scenario.id
+                          ? 'bg-gold-50 border-gold-500'
+                          : 'bg-church-light border-church-grey/5 hover:border-gold-500/30'
+                      }`}
+                    >
+                      <h4 className="text-sm font-bold text-church-black">{scenario.name}</h4>
+                      <p className="text-[10px] text-church-grey font-medium mt-1">
+                        {new Date(scenario.timestamp).toLocaleDateString()}
+                      </p>
+                    </button>
+                  ))}
+                </div>
+
+                {/* Scenario Detail Panel */}
+                <div className="lg:col-span-2">
+                  {selectedScenarioDetail ? (
+                    <div className="space-y-5 p-5 rounded-2xl bg-church-light border border-church-grey/5">
+                      {/* Header */}
+                      <div className="border-b border-church-grey/10 pb-4">
+                        <h4 className="text-lg font-bold text-church-black">{selectedScenarioDetail.name}</h4>
+                        <p className="text-xs text-church-grey font-medium mt-2">
+                          Saved: {new Date(selectedScenarioDetail.createdAt).toLocaleString()}
+                        </p>
+                        <p className="text-xs text-church-grey font-medium">
+                          Priest: {selectedScenarioDetail.priestName}
+                        </p>
+                        <p className="text-xs text-church-grey font-medium">
+                          Target: {selectedScenarioDetail.targetParishName}
                         </p>
                       </div>
+
+                      {/* Parameters Section */}
+                      <div>
+                        <h5 className="text-xs font-bold uppercase tracking-widest text-church-grey mb-3">
+                          Parameters Used
+                        </h5>
+                        <div className="grid grid-cols-2 gap-3">
+                          <div className="bg-white rounded-lg p-3">
+                            <p className="text-[10px] font-bold uppercase tracking-widest text-church-grey">
+                              Transition Support
+                            </p>
+                            <p className="text-base font-bold text-church-black capitalize">
+                              {selectedScenarioDetail.transitionSupport}
+                            </p>
+                          </div>
+                          <div className="bg-white rounded-lg p-3">
+                            <p className="text-[10px] font-bold uppercase tracking-widest text-church-grey">
+                              Handoff Weeks
+                            </p>
+                            <p className="text-base font-bold text-church-black">{selectedScenarioDetail.handoffWeeks}</p>
+                          </div>
+                          <div className="bg-white rounded-lg p-3 col-span-2">
+                            <p className="text-[10px] font-bold uppercase tracking-widest text-church-grey">Timeline</p>
+                            <p className="text-base font-bold text-church-black">
+                              {selectedScenarioDetail.timelineMonths} months
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Apply Button */}
                       <button
-                        onClick={() => deleteScenario(scenario.id)}
-                        className="p-2 text-church-grey hover:text-rose-500 transition-colors opacity-0 group-hover:opacity-100"
+                        onClick={() => {
+                          loadScenario(selectedScenarioDetail);
+                          setSelectedScenarioDetail(null);
+                        }}
+                        className="w-full py-3 bg-gold-500 text-church-black rounded-xl font-bold hover:bg-gold-600 transition-all text-sm"
                       >
-                        <Trash2 className="w-4 h-4" />
+                        Apply Parameters Again
+                      </button>
+
+                      {/* Results Section */}
+                      <div className="border-t border-church-grey/10 pt-4">
+                        <h5 className="text-xs font-bold uppercase tracking-widest text-church-grey mb-3">
+                          Saved Results
+                        </h5>
+                        <div className="grid grid-cols-3 gap-3">
+                          <div className="bg-white rounded-lg p-3">
+                            <p className="text-[10px] font-bold uppercase tracking-widest text-church-grey">
+                              Fit Score
+                            </p>
+                            <p className="text-sm font-bold text-church-black">{selectedScenarioDetail.fitScore}</p>
+                          </div>
+                          <div className="bg-white rounded-lg p-3">
+                            <p className="text-[10px] font-bold uppercase tracking-widest text-church-grey">Risk Band</p>
+                            <p className="text-sm font-bold text-church-black">{selectedScenarioDetail.riskBand}</p>
+                          </div>
+                          <div className="bg-white rounded-lg p-3">
+                            <p className="text-[10px] font-bold uppercase tracking-widest text-church-grey">
+                              Confidence
+                            </p>
+                            <p className="text-sm font-bold text-church-black">{selectedScenarioDetail.confidence}%</p>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Delete Button */}
+                      <button
+                        onClick={() => {
+                          deleteScenario(selectedScenarioDetail.id);
+                          setSelectedScenarioDetail(null);
+                        }}
+                        className="w-full py-2 bg-rose-50 text-rose-600 rounded-lg font-bold hover:bg-rose-100 transition-all text-xs"
+                      >
+                        Delete Scenario
                       </button>
                     </div>
-                    <button
-                      onClick={() => loadScenario(scenario)}
-                      className="w-full py-2.5 bg-white border border-church-grey/10 rounded-xl text-xs font-bold text-church-black hover:bg-gold-500 hover:text-white hover:border-gold-500 transition-all flex items-center justify-center gap-2"
-                    >
-                      Load Scenario
-                      <ArrowRight className="w-3 h-3" />
-                    </button>
-                  </div>
-                ))}
+                  ) : (
+                    <div className="py-12 flex items-center justify-center h-full rounded-2xl bg-church-light border border-dashed border-church-grey/20">
+                      <p className="text-sm text-church-grey font-medium">Select a scenario to view details</p>
+                    </div>
+                  )}
+                </div>
               </div>
             ) : (
               <div className="py-12 flex flex-col items-center justify-center text-center space-y-4">
@@ -1618,6 +2037,51 @@ function PriestAITwin() {
           </div>
         </div>
       </div>
+
+      {/* Scenario Name Modal */}
+      {scenarioNameModal.open && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl p-8 shadow-lg max-w-md w-full space-y-6">
+            <h3 className="text-xl font-bold text-church-black">Save Scenario</h3>
+            <div>
+              <label className="block text-sm font-bold text-church-black mb-2">Scenario Name</label>
+              <input
+                type="text"
+                value={scenarioNameModal.name}
+                onChange={(e) =>
+                  setScenarioNameModal({ ...scenarioNameModal, name: e.target.value })
+                }
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    scenarioNameModal.onConfirm(scenarioNameModal.name);
+                  }
+                  if (e.key === 'Escape') {
+                    setScenarioNameModal({ open: false, name: '', onConfirm: () => {} });
+                  }
+                }}
+                autoFocus
+                placeholder="Enter scenario name"
+                className="w-full px-4 py-2 border border-church-grey/20 rounded-xl focus:outline-none focus:ring-2 focus:ring-gold-500"
+              />
+            </div>
+            <div className="flex gap-3 justify-end">
+              <button
+                onClick={() => setScenarioNameModal({ open: false, name: '', onConfirm: () => {} })}
+                className="px-4 py-2 rounded-xl border border-church-grey/20 text-church-grey font-bold hover:bg-church-light transition-all"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={() => scenarioNameModal.onConfirm(scenarioNameModal.name)}
+                disabled={!scenarioNameModal.name.trim()}
+                className="px-6 py-2 rounded-xl bg-gold-500 text-church-black font-bold hover:bg-gold-600 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                Save
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

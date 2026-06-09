@@ -93,13 +93,16 @@ export const dataService = {
     return apiClient.getProjects(entityId, entityType);
   },
 
-  async saveProject(project: Project): Promise<void> {
-    await apiClient.saveProject(project);
-    window.dispatchEvent(new Event('projects_update'));
+  async saveProject(project: Project): Promise<Project> {
+    return apiClient.saveProject(project);
   },
 
   async deleteProject(id: string): Promise<void> {
     await apiClient.deleteProject(id);
+  },
+
+  async getAdminEntities(type?: 'parish' | 'school' | 'seminary', includeAll = false): Promise<any> {
+    return apiClient.getAdminEntities(type, includeAll);
   },
 
   // ------------------------------------------------------------------
@@ -109,8 +112,8 @@ export const dataService = {
     return apiClient.getDonations(projectId);
   },
 
-  async saveDonation(donation: Donation): Promise<void> {
-    await apiClient.saveDonation(donation);
+  async saveDonation(donation: Donation): Promise<Donation> {
+    return apiClient.saveDonation(donation);
   },
 
   // ------------------------------------------------------------------
@@ -120,8 +123,8 @@ export const dataService = {
     return apiClient.getExpenses(projectId);
   },
 
-  async saveExpense(expense: ProjectExpense): Promise<void> {
-    await apiClient.saveExpense(expense);
+  async saveExpense(expense: ProjectExpense): Promise<ProjectExpense> {
+    return apiClient.saveExpense(expense);
   },
 
   // ------------------------------------------------------------------

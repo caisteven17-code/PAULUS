@@ -147,6 +147,8 @@ export function DataManagementControl() {
         entityType: 'parish' as const,
         district: 'District 1',
         vicariate: 'Holy Family',
+        contactNumber: '0917 000 1001',
+        email: 'stmatthews@diocese-sanpablo.ph',
         lastSubmissionDate: new Date('2024-04-15'),
         status: 'on-time' as const,
         monthsLate: 0,
@@ -159,6 +161,8 @@ export function DataManagementControl() {
         entityType: 'parish' as const,
         district: 'District 2',
         vicariate: 'San Pedro Apostol',
+        contactNumber: '0917 000 1002',
+        email: 'sanroque@diocese-sanpablo.ph',
         lastSubmissionDate: new Date('2024-03-20'),
         status: 'warning' as const,
         monthsLate: 1,
@@ -170,6 +174,8 @@ export function DataManagementControl() {
         entityType: 'parish' as const,
         district: 'District 1',
         vicariate: 'Sta. Rosa De Lima',
+        contactNumber: '0917 000 1003',
+        email: 'ourladyofpeace@diocese-sanpablo.ph',
         lastSubmissionDate: new Date('2024-01-10'),
         status: 'action-required' as const,
         monthsLate: 4,
@@ -182,6 +188,8 @@ export function DataManagementControl() {
         entityType: 'seminary' as const,
         district: 'District 3',
         vicariate: 'Holy Family',
+        contactNumber: '0917 000 2001',
+        email: 'stjohnseminary@diocese-sanpablo.ph',
         lastSubmissionDate: new Date('2024-04-10'),
         status: 'on-time' as const,
         monthsLate: 0,
@@ -194,6 +202,8 @@ export function DataManagementControl() {
         entityType: 'school' as const,
         district: 'District 2',
         vicariate: 'San Isidro Labrador',
+        contactNumber: '0917 000 3001',
+        email: 'sacredheartschool@diocese-sanpablo.ph',
         lastSubmissionDate: undefined,
         status: 'not-submitted' as const,
         monthsLate: 0,
@@ -310,6 +320,8 @@ export function DataManagementControl() {
             submissions={filteredSubmissions}
             onViewDetails={(submission) => {}}
             onExportReport={() => {}}
+            showBudgetInfo={false}
+            showExportButton={false}
           />
         )}
 

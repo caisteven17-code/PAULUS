@@ -79,6 +79,8 @@ export interface Seminary {
   capacity: number;
   staff: number;
   collections?: number;
+  lat?: number;
+  lng?: number;
   subsidyType?: 'subsidized' | 'independent';
   status?: 'active' | 'inactive';
   updatedAt?: string;
@@ -90,6 +92,7 @@ export interface DiocesanSchool {
   id: string;
   name: string;
   district?: string;
+  vicariate?: string;
   cluster: 1 | 2 | 3;
   class: EntityClass;
   principal: string;
@@ -99,6 +102,8 @@ export interface DiocesanSchool {
   capacity: number;
   staff: number;
   collections?: number;
+  lat?: number;
+  lng?: number;
   subsidyType?: 'subsidized' | 'independent';
   status?: 'active' | 'inactive';
   updatedAt?: string;
@@ -176,6 +181,7 @@ export interface Project {
   recommendation: string;
   totalExpenses?: number;
   entityId: string;
+  entityName?: string;
   entityType: 'parish' | 'school' | 'seminary' | 'diocese';
 }
 

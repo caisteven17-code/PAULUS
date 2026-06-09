@@ -312,13 +312,17 @@ def _score_source(records: list[dict], all_sources: dict[str, list[dict]]) -> di
     _by_date: dict[str, float | None] = {r["date"]: r.get("temp_avg_c") for r in records}  # noqa: F841
 
     # Cross-source medians for consistency check
-    source_by_date: dict[str, list[float]] = {}
+    source_by_date_temp: dict[str, list[float]] = {}
+    source_by_date_rain: dict[str, list[float]] = {}
     for src_records in all_sources.values():
         for r in src_records:
             d = r["date"]
-            v = r.get("temp_avg_c")
-            if v is not None:
-                source_by_date.setdefault(d, []).append(v)
+            t = r.get("temp_avg_c")
+            rn = r.get("rainfall_mm")
+            if t is not None:
+                source_by_date_temp.setdefault(d, []).append(t)
+            if rn is not None:
+                source_by_date_rain.setdefault(d, []).append(rn)
 
     coverage_count = 0
     plausibility_count = 0
@@ -338,16 +342,36 @@ def _score_source(records: list[dict], all_sources: dict[str, list[dict]]) -> di
         if temp_ok and rain_ok:
             plausibility_count += 1
 
-        # Consistency — within 15% of cross-source median temperature
-        vals = source_by_date.get(r["date"], [])
-        if t is not None and len(vals) >= 2:
-            vals_sorted = sorted(vals)
+        # Consistency — within 15% of cross-source median for BOTH temp and rainfall
+        temp_consistent = False
+        rain_consistent = False
+
+        # Temperature consistency
+        temp_vals = source_by_date_temp.get(r["date"], [])
+        if t is not None and len(temp_vals) >= 2:
+            vals_sorted = sorted(temp_vals)
             med_idx = len(vals_sorted) // 2
             median = vals_sorted[med_idx]
             if median != 0 and abs(t - median) / abs(median) <= 0.15:
-                consistency_count += 1
+                temp_consistent = True
             elif median == 0 and t == 0:
-                consistency_count += 1
+                temp_consistent = True
+
+        # Rainfall consistency
+        rain_vals = source_by_date_rain.get(r["date"], [])
+        if rn is not None and len(rain_vals) >= 2:
+            vals_sorted = sorted(rain_vals)
+            med_idx = len(vals_sorted) // 2
+            median = vals_sorted[med_idx]
+            # For rainfall, allow larger tolerance (0–20%) due to spatial variability
+            if median != 0 and abs(rn - median) / abs(median) <= 0.20:
+                rain_consistent = True
+            elif median == 0 and rn == 0:
+                rain_consistent = True
+
+        # Both must be consistent (or missing) for the record to count
+        if (t is None or temp_consistent) and (rn is None or rain_consistent):
+            consistency_count += 1
 
     cov = round((coverage_count / total) * 100, 2)
     pla = round((plausibility_count / total) * 100, 2)
@@ -355,12 +379,29 @@ def _score_source(records: list[dict], all_sources: dict[str, list[dict]]) -> di
 
     composite = round(cov * 0.30 + pla * 0.30 + con * 0.40, 2)
 
+    # Check for rainfall mismatches (flag if any day has >50% divergence from median)
+    rainfall_warnings = []
+    for r in records:
+        rn = r.get("rainfall_mm")
+        if rn is not None:
+            rain_vals = source_by_date_rain.get(r["date"], [])
+            if len(rain_vals) >= 2:
+                vals_sorted = sorted(rain_vals)
+                med_idx = len(vals_sorted) // 2
+                median = vals_sorted[med_idx]
+                if median != 0 and abs(rn - median) / abs(median) > 0.50:
+                    rainfall_warnings.append(
+                        f"{r['date']}: {rn}mm vs median {median:.1f}mm"
+                    )
+
     return {
         "coverage": cov,
         "plausibility": pla,
         "consistency": con,
         "composite": composite,
         "record_count": total,
+        "rainfall_mismatch_count": len(rainfall_warnings),
+        "rainfall_mismatches": rainfall_warnings[:10],  # first 10 for brevity
     }
 
 
@@ -509,6 +550,16 @@ def collect(
         champion_map[name] = champion
 
         logger.info("  Champion: %s (score %.1f)", champion, scores[champion]["composite"])
+
+        # Warn if champion source has rainfall mismatches
+        if scores[champion].get("rainfall_mismatch_count", 0) > 0:
+            logger.warning(
+                "    ⚠ Champion %s has %d rainfall mismatches (>50%% divergence)",
+                champion,
+                scores[champion]["rainfall_mismatch_count"],
+            )
+            for mismatch in scores[champion].get("rainfall_mismatches", []):
+                logger.warning("      %s", mismatch)
 
         # Build monthly data from champion source
         champion_records = sources[champion]
