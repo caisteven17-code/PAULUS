@@ -1,10 +1,11 @@
 ﻿'use client';
 
 import React, { useState } from 'react';
-import { X, DollarSign, Calendar, User, CreditCard, FileText, Check, ChevronDown, Upload } from 'lucide-react';
+import { X, DollarSign, Calendar, User, CreditCard, FileText, Check, ChevronDown, Upload, AlertCircle } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { formatCurrency } from '../../lib/format';
 import { Donation } from '../../types';
+import { supabaseBrowser } from '../../lib/supabase';
 
 interface DonationEntryModalProps {
   isOpen: boolean;
@@ -20,38 +21,58 @@ export function DonationEntryModal({ isOpen, onClose, onSubmit, projectId, proje
     amount: '',
     date: new Date().toISOString().split('T')[0],
     paymentMethod: 'Cash' as Donation['paymentMethod'],
-    receiptProofName: '',
     notes: '',
   });
-
+  const [receiptFile, setReceiptFile] = useState<File | null>(null);
+  const [uploadError, setUploadError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsSubmitting(true);
+    setUploadError(null);
 
-    // Mock API call
-    setTimeout(() => {
-      onSubmit({
-        projectId,
-        donorName: formData.donorName || 'Anonymous',
-        amount: Number(formData.amount),
-        date: formData.date,
-        paymentMethod: formData.paymentMethod,
-        receiptProofName: formData.receiptProofName || undefined,
-        notes: formData.notes,
-      });
-      setIsSubmitting(false);
-      setFormData({
-        donorName: '',
-        amount: '',
-        date: new Date().toISOString().split('T')[0],
-        paymentMethod: 'Cash',
-        receiptProofName: '',
-        notes: '',
-      });
-      onClose();
-    }, 1000);
+    let receiptProofUrl: string | undefined;
+
+    if (receiptFile) {
+      const ext = receiptFile.name.split('.').pop();
+      const path = `${projectId}/${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`;
+      const { data: uploadData, error: uploadErr } = await supabaseBrowser.storage
+        .from('donation-receipts')
+        .upload(path, receiptFile, { upsert: false });
+
+      if (uploadErr) {
+        setUploadError(`Upload failed: ${uploadErr.message}`);
+        setIsSubmitting(false);
+        return;
+      }
+
+      const { data: urlData } = supabaseBrowser.storage
+        .from('donation-receipts')
+        .getPublicUrl(uploadData.path);
+      receiptProofUrl = urlData.publicUrl;
+    }
+
+    onSubmit({
+      projectId,
+      donorName: formData.donorName || 'Anonymous',
+      amount: Number(formData.amount),
+      date: formData.date,
+      paymentMethod: formData.paymentMethod,
+      receiptProofName: receiptProofUrl,
+      notes: formData.notes,
+    });
+
+    setIsSubmitting(false);
+    setFormData({
+      donorName: '',
+      amount: '',
+      date: new Date().toISOString().split('T')[0],
+      paymentMethod: 'Cash',
+      notes: '',
+    });
+    setReceiptFile(null);
+    onClose();
   };
 
   return (
@@ -201,14 +222,24 @@ export function DonationEntryModal({ isOpen, onClose, onSubmit, projectId, proje
                     <input
                       type="file"
                       accept=".pdf,image/*"
-                      onChange={(e) => setFormData({ ...formData, receiptProofName: e.target.files?.[0]?.name || '' })}
+                      onChange={(e) => {
+                        const file = e.target.files?.[0] ?? null;
+                        setReceiptFile(file);
+                        setUploadError(null);
+                      }}
                       className="block w-full text-sm text-gray-500 file:mr-4 file:rounded-xl file:border-0 file:bg-white file:px-4 file:py-2.5 file:text-xs file:font-bold file:uppercase file:tracking-widest file:text-gold-700 hover:file:bg-gold-100"
                     />
                     <p className="mt-3 text-[10px] font-medium uppercase tracking-wider text-gray-500">
-                      {formData.receiptProofName
-                        ? `Selected: ${formData.receiptProofName}`
+                      {receiptFile
+                        ? `Selected: ${receiptFile.name} (${(receiptFile.size / 1024).toFixed(0)} KB)`
                         : 'Attach a receipt image or PDF if available'}
                     </p>
+                    {uploadError && (
+                      <p className="mt-2 flex items-center gap-1.5 text-[10px] font-bold text-rose-500 uppercase tracking-wider">
+                        <AlertCircle className="w-3 h-3 shrink-0" />
+                        {uploadError}
+                      </p>
+                    )}
                   </div>
                 </div>
 

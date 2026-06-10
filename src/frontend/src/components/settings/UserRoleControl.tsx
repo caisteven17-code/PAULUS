@@ -199,6 +199,19 @@ export function UserRoleControl({ roles, onUpdateRoles, accounts = [] }: UserRol
         updatedPermissions['manage_announcements'] = false;
       }
       setTempRole({ ...tempRole, permissions: updatedPermissions });
+    } else if (permId === 'manage_events' || permId === 'view_events') {
+      // Radio-group: only one events permission can be active at a time
+      const updatedPermissions = { ...tempRole.permissions } as any;
+      updatedPermissions['manage_events'] =
+        permId === 'manage_events' ? !updatedPermissions['manage_events'] : false;
+      updatedPermissions['view_events'] =
+        permId === 'view_events' ? !updatedPermissions['view_events'] : false;
+      if (permId === 'manage_events' && updatedPermissions['manage_events']) {
+        updatedPermissions['view_events'] = false;
+      } else if (permId === 'view_events' && updatedPermissions['view_events']) {
+        updatedPermissions['manage_events'] = false;
+      }
+      setTempRole({ ...tempRole, permissions: updatedPermissions });
     } else if (permId === 'manage_projects' || permId === 'view_projects') {
       // Radio-group: only one project permission can be active at a time
       const updatedPermissions = { ...tempRole.permissions } as any;
@@ -487,6 +500,11 @@ export function UserRoleControl({ roles, onUpdateRoles, accounts = [] }: UserRol
                         const isCurrentlyOn = updated[id] === true;
                         updated['manage_announcements'] = id === 'manage_announcements' ? !isCurrentlyOn : false;
                         updated['view_announcements'] = id === 'view_announcements' ? !isCurrentlyOn : false;
+                      } else if (id === 'manage_events' || id === 'view_events') {
+                        // Radio-group: only one events permission active at a time
+                        const isCurrentlyOn = updated[id] === true;
+                        updated['manage_events'] = id === 'manage_events' ? !isCurrentlyOn : false;
+                        updated['view_events'] = id === 'view_events' ? !isCurrentlyOn : false;
                       } else if (id === 'manage_projects' || id === 'view_projects') {
                         // Radio-group: only one project permission active at a time
                         const isCurrentlyOn = updated[id] === true;
@@ -933,6 +951,8 @@ export function UserRoleControl({ roles, onUpdateRoles, accounts = [] }: UserRol
                                     const isOn = permissionsObj[item.id] === true;
                                     const isAnnouncementItem =
                                       item.id === 'manage_announcements' || item.id === 'view_announcements';
+                                    const isEventsItem =
+                                      item.id === 'manage_events' || item.id === 'view_events';
                                     const isProjectItem = item.id === 'manage_projects' || item.id === 'view_projects';
                                     return (
                                       <div key={item.id} className="flex items-center justify-between gap-6 px-5 py-4">

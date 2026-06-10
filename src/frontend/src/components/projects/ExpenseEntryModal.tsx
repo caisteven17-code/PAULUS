@@ -1,10 +1,11 @@
 'use client';
 
 import React, { useState } from 'react';
-import { X, Wallet, Calendar, CreditCard, FileText, Receipt, Check, ChevronDown, Upload } from 'lucide-react';
+import { X, Wallet, Calendar, CreditCard, FileText, Check, ChevronDown, Upload, AlertCircle } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { formatCurrency } from '../../lib/format';
 import { ProjectExpense } from '../../types';
+import { supabaseBrowser } from '../../lib/supabase';
 
 interface ExpenseEntryModalProps {
   isOpen: boolean;
@@ -20,39 +21,58 @@ export function ExpenseEntryModal({ isOpen, onClose, onSubmit, projectId, projec
     amount: '',
     date: new Date().toISOString().split('T')[0],
     paymentMethod: 'Cash' as ProjectExpense['paymentMethod'],
-    receiptReference: '',
-    proofFileName: '',
     notes: '',
   });
+  const [proofFile, setProofFile] = useState<File | null>(null);
+  const [uploadError, setUploadError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsSubmitting(true);
+    setUploadError(null);
 
-    setTimeout(() => {
-      onSubmit({
-        projectId,
-        description: formData.description,
-        amount: Number(formData.amount),
-        date: formData.date,
-        paymentMethod: formData.paymentMethod,
-        receiptReference: formData.receiptReference,
-        proofFileName: formData.proofFileName || undefined,
-        notes: formData.notes,
-      });
-      setIsSubmitting(false);
-      onClose();
-      setFormData({
-        description: '',
-        amount: '',
-        date: new Date().toISOString().split('T')[0],
-        paymentMethod: 'Cash',
-        receiptReference: '',
-        proofFileName: '',
-        notes: '',
-      });
-    }, 600);
+    let proofFileUrl: string | undefined;
+
+    if (proofFile) {
+      const ext = proofFile.name.split('.').pop();
+      const path = `${projectId}/${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`;
+      const { data: uploadData, error: uploadError } = await supabaseBrowser.storage
+        .from('disbursement-proofs')
+        .upload(path, proofFile, { upsert: false });
+
+      if (uploadError) {
+        setUploadError(`Upload failed: ${uploadError.message}`);
+        setIsSubmitting(false);
+        return;
+      }
+
+      const { data: urlData } = supabaseBrowser.storage
+        .from('disbursement-proofs')
+        .getPublicUrl(uploadData.path);
+      proofFileUrl = urlData.publicUrl;
+    }
+
+    onSubmit({
+      projectId,
+      description: formData.description,
+      amount: Number(formData.amount),
+      date: formData.date,
+      paymentMethod: formData.paymentMethod,
+      proofFileName: proofFileUrl,
+      notes: formData.notes,
+    });
+
+    setIsSubmitting(false);
+    onClose();
+    setFormData({
+      description: '',
+      amount: '',
+      date: new Date().toISOString().split('T')[0],
+      paymentMethod: 'Cash',
+      notes: '',
+    });
+    setProofFile(null);
   };
 
   return (
@@ -90,22 +110,24 @@ export function ExpenseEntryModal({ isOpen, onClose, onSubmit, projectId, projec
 
             <div className="flex-1 overflow-y-auto custom-scrollbar">
               <form onSubmit={handleSubmit} className="p-6 md:p-8 space-y-6 md:space-y-8">
-                <div className="space-y-2">
-                  <label className="text-[11px] font-bold text-gold-700 uppercase tracking-[0.2em] flex items-center gap-2">
-                    <FileText className="w-3.5 h-3.5" />
-                    Description
-                  </label>
-                  <input
-                    type="text"
-                    required
-                    value={formData.description}
-                    onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                    placeholder="Construction materials, equipment, labor, etc."
-                    className="w-full px-5 py-4 bg-gray-50/50 border border-gray-200 rounded-2xl text-sm font-medium focus:outline-none focus:ring-4 focus:ring-gold-500/10 focus:border-gold-500 focus:bg-white transition-all placeholder:text-gray-300"
-                  />
-                </div>
 
+                {/* Row 1: Description | Amount — mirrors Donor Name | Amount in donations */}
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6 md:gap-8">
+                  <div className="space-y-2">
+                    <label className="text-[11px] font-bold text-gold-700 uppercase tracking-[0.2em] flex items-center gap-2">
+                      <FileText className="w-3.5 h-3.5" />
+                      Description
+                    </label>
+                    <input
+                      type="text"
+                      required
+                      value={formData.description}
+                      onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                      placeholder="Materials, labor, equipment…"
+                      className="w-full px-5 py-4 bg-gray-50/50 border border-gray-200 rounded-2xl text-sm font-medium focus:outline-none focus:ring-4 focus:ring-gold-500/10 focus:border-gold-500 focus:bg-white transition-all placeholder:text-gray-300"
+                    />
+                  </div>
+
                   <div className="space-y-2">
                     <label className="text-[11px] font-bold text-gold-700 uppercase tracking-[0.2em] flex items-center gap-2">
                       <Wallet className="w-3.5 h-3.5" />
@@ -138,7 +160,10 @@ export function ExpenseEntryModal({ isOpen, onClose, onSubmit, projectId, projec
                       </div>
                     </div>
                   </div>
+                </div>
 
+                {/* Row 2: Date Paid | Payment Method — mirrors Date Received | Payment Method */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6 md:gap-8">
                   <div className="space-y-2">
                     <label className="text-[11px] font-bold text-gold-700 uppercase tracking-[0.2em] flex items-center gap-2">
                       <Calendar className="w-3.5 h-3.5" />
@@ -152,9 +177,7 @@ export function ExpenseEntryModal({ isOpen, onClose, onSubmit, projectId, projec
                       className="w-full px-5 py-4 bg-gray-50/50 border border-gray-200 rounded-2xl text-sm font-medium focus:outline-none focus:ring-4 focus:ring-gold-500/10 focus:border-gold-500 focus:bg-white transition-all"
                     />
                   </div>
-                </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6 md:gap-8">
                   <div className="space-y-2">
                     <label className="text-[11px] font-bold text-gold-700 uppercase tracking-[0.2em] flex items-center gap-2">
                       <CreditCard className="w-3.5 h-3.5" />
@@ -178,42 +201,9 @@ export function ExpenseEntryModal({ isOpen, onClose, onSubmit, projectId, projec
                       </div>
                     </div>
                   </div>
-
-                  <div className="space-y-2">
-                    <label className="text-[11px] font-bold text-gold-700 uppercase tracking-[0.2em] flex items-center gap-2">
-                      <Receipt className="w-3.5 h-3.5" />
-                      Receipt Reference
-                    </label>
-                    <input
-                      type="text"
-                      value={formData.receiptReference}
-                      onChange={(e) => setFormData({ ...formData, receiptReference: e.target.value })}
-                      placeholder="OR-2026-001"
-                      className="w-full px-5 py-4 bg-gray-50/50 border border-gray-200 rounded-2xl text-sm font-medium focus:outline-none focus:ring-4 focus:ring-gold-500/10 focus:border-gold-500 focus:bg-white transition-all placeholder:text-gray-300"
-                    />
-                  </div>
                 </div>
 
-                <div className="space-y-2">
-                  <label className="text-[11px] font-bold text-gold-700 uppercase tracking-[0.2em] flex items-center gap-2">
-                    <Upload className="w-3.5 h-3.5" />
-                    Proof Of Disbursement
-                  </label>
-                  <div className="rounded-2xl border border-gold-100/50 bg-gold-50/30 p-4">
-                    <input
-                      type="file"
-                      accept=".pdf,image/*"
-                      onChange={(e) => setFormData({ ...formData, proofFileName: e.target.files?.[0]?.name || '' })}
-                      className="block w-full text-sm text-gray-500 file:mr-4 file:rounded-xl file:border-0 file:bg-white file:px-4 file:py-2.5 file:text-xs file:font-bold file:uppercase file:tracking-widest file:text-gold-700 hover:file:bg-gold-100"
-                    />
-                    <p className="mt-3 text-[10px] font-medium uppercase tracking-wider text-gray-500">
-                      {formData.proofFileName
-                        ? `Selected: ${formData.proofFileName}`
-                        : 'Attach a receipt image or PDF if available'}
-                    </p>
-                  </div>
-                </div>
-
+                {/* Notes */}
                 <div className="space-y-2">
                   <label className="text-[11px] font-bold text-gold-700 uppercase tracking-[0.2em] flex items-center gap-2">
                     <FileText className="w-3.5 h-3.5" />
@@ -226,6 +216,37 @@ export function ExpenseEntryModal({ isOpen, onClose, onSubmit, projectId, projec
                     rows={3}
                     className="w-full px-5 py-4 bg-gray-50/50 border border-gray-200 rounded-2xl text-sm font-medium focus:outline-none focus:ring-4 focus:ring-gold-500/10 focus:border-gold-500 focus:bg-white transition-all resize-none placeholder:text-gray-300"
                   />
+                </div>
+
+                {/* Proof of Disbursement */}
+                <div className="space-y-2">
+                  <label className="text-[11px] font-bold text-gold-700 uppercase tracking-[0.2em] flex items-center gap-2">
+                    <Upload className="w-3.5 h-3.5" />
+                    Proof Of Disbursement
+                  </label>
+                  <div className="rounded-2xl border border-gold-100/50 bg-gold-50/30 p-4">
+                    <input
+                      type="file"
+                      accept=".pdf,image/*"
+                      onChange={(e) => {
+                        const file = e.target.files?.[0] ?? null;
+                        setProofFile(file);
+                        setUploadError(null);
+                      }}
+                      className="block w-full text-sm text-gray-500 file:mr-4 file:rounded-xl file:border-0 file:bg-white file:px-4 file:py-2.5 file:text-xs file:font-bold file:uppercase file:tracking-widest file:text-gold-700 hover:file:bg-gold-100"
+                    />
+                    <p className="mt-3 text-[10px] font-medium uppercase tracking-wider text-gray-500">
+                      {proofFile
+                        ? `Selected: ${proofFile.name} (${(proofFile.size / 1024).toFixed(0)} KB)`
+                        : 'Attach a receipt image or PDF if available'}
+                    </p>
+                    {uploadError && (
+                      <p className="mt-2 flex items-center gap-1.5 text-[10px] font-bold text-rose-500 uppercase tracking-wider">
+                        <AlertCircle className="w-3 h-3 shrink-0" />
+                        {uploadError}
+                      </p>
+                    )}
+                  </div>
                 </div>
 
                 <div className="pt-4 md:pt-8 flex flex-col-reverse sm:flex-row gap-3 md:gap-4">

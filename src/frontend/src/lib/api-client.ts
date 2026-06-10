@@ -506,4 +506,15 @@ export const apiClient = {
     if (!res.ok) throw new Error(`PATCH /api/scenarios/priest/${id}?action=archive → ${res.status}`);
     return res.json();
   },
+
+  // ----------------------------------------------------------------
+  // Events
+  // ----------------------------------------------------------------
+  async getEvents(institutionId?: string): Promise<any[]> {
+    return get('/api/events', institutionId ? { institutionId } : {});
+  },
+
+  async saveEvent(event: Record<string, any>): Promise<any> {
+    return post('/api/events', event);
+  },
 };

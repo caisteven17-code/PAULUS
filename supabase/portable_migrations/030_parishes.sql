@@ -107,18 +107,6 @@ CREATE TABLE IF NOT EXISTS parishes.iafr_line_items (
   deleted_at timestamptz
 );
 
-CREATE TABLE IF NOT EXISTS parishes.parish_events (
-  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  institution_id uuid NOT NULL REFERENCES diocese.institutions(id),
-  event_name text NOT NULL,
-  event_level text NOT NULL CHECK (event_level IN ('Major event', 'Minor event')),
-  start_date date NOT NULL,
-  end_date date,
-  created_at timestamptz NOT NULL DEFAULT now(),
-  updated_at timestamptz NOT NULL DEFAULT now(),
-  deleted_at timestamptz
-);
-
 CREATE INDEX IF NOT EXISTS idx_parish_records_period
   ON parishes.financial_records (institution_id, year, month)
   WHERE deleted_at IS NULL;
@@ -147,10 +135,6 @@ CREATE TRIGGER set_updated_at_parish_line_items
 BEFORE UPDATE ON parishes.iafr_line_items
 FOR EACH ROW EXECUTE FUNCTION public.set_row_updated_at();
 
-DROP TRIGGER IF EXISTS set_updated_at_parish_events ON parishes.parish_events;
-CREATE TRIGGER set_updated_at_parish_events
-BEFORE UPDATE ON parishes.parish_events
-FOR EACH ROW EXECUTE FUNCTION public.set_row_updated_at();
 
 
 -- -------------------------------------------------------------

@@ -409,12 +409,23 @@ export function ProjectDetailPage({
                                       <span className="text-sm font-bold text-church-black block tracking-tight">
                                         {donation.donorName}
                                       </span>
+                                      {donation.notes && (
+                                        <span className="text-[9px] text-gray-400 font-medium block max-w-[160px] truncate" title={donation.notes}>
+                                          {donation.notes}
+                                        </span>
+                                      )}
                                       {donation.receiptProofName && (
                                         <div className="flex items-center gap-1.5">
                                           <div className="w-1.5 h-1.5 rounded-full bg-gold-500 animate-pulse" />
-                                          <span className="text-[9px] font-bold text-gold-600 uppercase tracking-widest">
-                                            Proof: {donation.receiptProofName}
-                                          </span>
+                                          <a
+                                            href={donation.receiptProofName}
+                                            target="_blank"
+                                            rel="noopener noreferrer"
+                                            className="text-[9px] font-bold text-gold-600 uppercase tracking-widest hover:text-gold-800 underline underline-offset-2"
+                                            onClick={(e) => e.stopPropagation()}
+                                          >
+                                            View Receipt
+                                          </a>
                                         </div>
                                       )}
                                     </div>
@@ -548,9 +559,15 @@ export function ProjectDetailPage({
                                       </span>
                                     )}
                                     {expense.proofFileName && (
-                                      <span className="text-[9px] font-bold text-gold-600 uppercase tracking-widest block">
-                                        Proof: {expense.proofFileName}
-                                      </span>
+                                      <a
+                                        href={expense.proofFileName}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        className="text-[9px] font-bold text-gold-600 uppercase tracking-widest block hover:text-gold-800 underline underline-offset-2"
+                                        onClick={(e) => e.stopPropagation()}
+                                      >
+                                        View Proof
+                                      </a>
                                     )}
                                   </div>
                                 </td>

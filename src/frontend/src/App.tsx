@@ -15,6 +15,7 @@ import { Projects } from './views/Projects';
 import { WhatIfSimulator } from './views/WhatIfSimulator';
 import { DigitalTwin } from './views/DigitalTwin';
 import { Announcements } from './views/Announcements';
+import { Events } from './views/Events';
 import { HealthTracker } from './views/HealthTracker';
 import { ConsolidatedFinancial } from './views/ConsolidatedFinancial';
 import { AuditLog } from './views/AuditLog';
@@ -58,6 +59,9 @@ const hasProjectAccess = (permissions: Record<string, boolean>) =>
 
 const hasAnnouncementAccess = (permissions: Record<string, boolean>) =>
   permissions.view_announcements === true || permissions.manage_announcements === true;
+
+const hasEventsAccess = (permissions: Record<string, boolean>) =>
+  permissions.view_events === true || permissions.manage_events === true;
 
 const getFirstAllowedTab = (role: Role, permissions: Record<string, boolean>) => {
   if (permissions.view_diocese === true) return 'home';
@@ -104,6 +108,7 @@ const canAccessTab = (tab: string, role: Role, permissions: Record<string, boole
   if (tab === 'projects') return hasProjectAccess(permissions);
   if (tab === 'digital-twin') return permissions.digital_twin === true;
   if (tab === 'announcements') return hasAnnouncementAccess(permissions);
+  if (tab === 'events') return hasEventsAccess(permissions);
   if (tab === 'consolidated') return permissions.view_diocese === true;
   return false;
 };
@@ -269,6 +274,8 @@ export default function App() {
           return <WhatIfSimulator mode="priest" />;
         case 'announcements':
           return <Announcements />;
+        case 'events':
+          return <Events />;
         default:
           return (
             <div className="flex items-center justify-center h-[calc(100vh-80px)]">
@@ -308,6 +315,8 @@ export default function App() {
           return <WhatIfSimulator mode="seminary" />;
         case 'announcements':
           return <Announcements />;
+        case 'events':
+          return <Events />;
         default:
           return (
             <div className="flex items-center justify-center h-[calc(100vh-80px)]">
@@ -346,6 +355,8 @@ export default function App() {
         return <WhatIfSimulator mode="school" />;
       case 'announcements':
         return <Announcements />;
+      case 'events':
+        return <Events />;
       default:
         return (
           <div className="flex items-center justify-center h-[calc(100vh-80px)]">
@@ -638,6 +649,12 @@ export default function App() {
           ) : (
             renderAccessDenied()
           );
+        case 'events':
+          return permissions.view_events || permissions.manage_events ? (
+            <Events />
+          ) : (
+            renderAccessDenied()
+          );
         case 'audit-log':
           return permissions.view_audit_logs ? <AuditLog /> : renderAccessDenied();
         case 'consolidated':
@@ -825,6 +842,12 @@ export default function App() {
         case 'announcements':
           return permissions.view_announcements || permissions.manage_announcements ? (
             <Announcements />
+          ) : (
+            renderAccessDenied()
+          );
+        case 'events':
+          return permissions.view_events || permissions.manage_events ? (
+            <Events />
           ) : (
             renderAccessDenied()
           );

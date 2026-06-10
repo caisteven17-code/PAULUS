@@ -96,18 +96,6 @@ CREATE TABLE IF NOT EXISTS seminaries.fs_line_items (
   deleted_at timestamptz
 );
 
-CREATE TABLE IF NOT EXISTS seminaries.seminary_events (
-  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  institution_id uuid NOT NULL REFERENCES diocese.institutions(id),
-  event_name text NOT NULL,
-  event_level text NOT NULL CHECK (event_level IN ('Major event', 'Minor event')),
-  start_date date NOT NULL,
-  end_date date,
-  created_at timestamptz NOT NULL DEFAULT now(),
-  updated_at timestamptz NOT NULL DEFAULT now(),
-  deleted_at timestamptz
-);
-
 DROP TRIGGER IF EXISTS set_updated_at_seminary_details ON seminaries.details;
 CREATE TRIGGER set_updated_at_seminary_details
 BEFORE UPDATE ON seminaries.details
@@ -126,9 +114,4 @@ FOR EACH ROW EXECUTE FUNCTION public.set_row_updated_at();
 DROP TRIGGER IF EXISTS set_updated_at_seminary_fs_line_items ON seminaries.fs_line_items;
 CREATE TRIGGER set_updated_at_seminary_fs_line_items
 BEFORE UPDATE ON seminaries.fs_line_items
-FOR EACH ROW EXECUTE FUNCTION public.set_row_updated_at();
-
-DROP TRIGGER IF EXISTS set_updated_at_seminary_events ON seminaries.seminary_events;
-CREATE TRIGGER set_updated_at_seminary_events
-BEFORE UPDATE ON seminaries.seminary_events
 FOR EACH ROW EXECUTE FUNCTION public.set_row_updated_at();

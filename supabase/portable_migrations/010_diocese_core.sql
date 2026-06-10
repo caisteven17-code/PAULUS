@@ -120,6 +120,25 @@ CREATE TABLE IF NOT EXISTS diocese.project_expenses (
   deleted_at timestamptz
 );
 
+CREATE TABLE IF NOT EXISTS diocese.events (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  institution_id uuid NOT NULL REFERENCES diocese.institutions(id),
+  event_name text NOT NULL,
+  event_level text NOT NULL DEFAULT 'Minor event' CHECK (event_level IN ('Major event', 'Minor event')),
+  event_type text,
+  expected_financial_impact text CHECK (
+    expected_financial_impact IN ('inflow', 'outflow', 'both', 'none') OR expected_financial_impact IS NULL
+  ),
+  estimated_amount numeric(14, 2),
+  linked_project_id uuid REFERENCES diocese.projects(id) ON DELETE SET NULL,
+  start_date date NOT NULL,
+  end_date date,
+  notes text,
+  created_at timestamptz NOT NULL DEFAULT now(),
+  updated_at timestamptz NOT NULL DEFAULT now(),
+  deleted_at timestamptz
+);
+
 CREATE TABLE IF NOT EXISTS diocese.announcements (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   title text NOT NULL,
@@ -164,6 +183,10 @@ CREATE INDEX IF NOT EXISTS idx_projects_institution_status
   ON diocese.projects (institution_id, status)
   WHERE deleted_at IS NULL;
 
+CREATE INDEX IF NOT EXISTS idx_events_institution_start_date
+  ON diocese.events (institution_id, start_date)
+  WHERE deleted_at IS NULL;
+
 CREATE INDEX IF NOT EXISTS idx_audit_logs_institution_occurred_at
   ON diocese.audit_logs (institution_id, occurred_at DESC)
   WHERE deleted_at IS NULL;
@@ -206,6 +229,11 @@ FOR EACH ROW EXECUTE FUNCTION public.set_row_updated_at();
 DROP TRIGGER IF EXISTS set_updated_at_project_expenses ON diocese.project_expenses;
 CREATE TRIGGER set_updated_at_project_expenses
 BEFORE UPDATE ON diocese.project_expenses
+FOR EACH ROW EXECUTE FUNCTION public.set_row_updated_at();
+
+DROP TRIGGER IF EXISTS set_updated_at_events ON diocese.events;
+CREATE TRIGGER set_updated_at_events
+BEFORE UPDATE ON diocese.events
 FOR EACH ROW EXECUTE FUNCTION public.set_row_updated_at();
 
 DROP TRIGGER IF EXISTS set_updated_at_announcements ON diocese.announcements;

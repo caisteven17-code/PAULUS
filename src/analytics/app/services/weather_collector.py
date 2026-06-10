@@ -27,6 +27,7 @@ Output:
   {out_dir}/laguna_weather_final.json
   {out_dir}/laguna_source_validity_report.json
   {out_dir}/champion_map.json               # used by weather_updater.py
+  {out_dir}/laguna_weather_daily_classified.json  # rows for reference.weather_daily
 """
 
 from __future__ import annotations
@@ -524,9 +525,20 @@ def collect(
         logger.warning("IBTrACS unavailable (%s) — typhoon fields will be 0", exc)
         typhoon_flags = {}
 
+    # Daily classification (reference.weather_daily): Meteostat temperature
+    # validator is one station for all municipalities — fetch it once.
+    from app.services.weather_daily_classifier import (
+        build_chirps_daily_cache,
+        build_daily_rows,
+        build_meteostat_daily_cache,
+    )
+
+    meteostat_daily_cache = build_meteostat_daily_cache(start, end)
+
     master: list[dict] = []
     validity_rows: list[dict] = []
     champion_map: dict[str, str] = {}
+    daily_classified_rows: list[dict] = []
 
     for i, muni in enumerate(MUNICIPALITIES):
         name = muni["name"]
@@ -540,6 +552,19 @@ def collect(
             "nasa_power_ag": fetch_nasa_power_ag(lat, lon, start, end),
             "nasa_power_sb": fetch_nasa_power_sb(lat, lon, start, end),
         }
+
+        # Classify each day for reference.weather_daily: NASA POWER AG is the
+        # source of truth, CHIRPS (rain) and Meteostat (temp) are validators.
+        chirps_daily_cache = build_chirps_daily_cache(lat, lon, start, end)
+        muni_daily_rows = build_daily_rows(
+            name, start, end, sources["nasa_power_ag"], chirps_daily_cache, meteostat_daily_cache
+        )
+        daily_classified_rows.extend(muni_daily_rows)
+        logger.info(
+            "  Daily classification: %d days (CHIRPS coverage %d days)",
+            len(muni_daily_rows),
+            len(chirps_daily_cache),
+        )
 
         # Score each source
         scores = {src: _score_source(recs, sources) for src, recs in sources.items()}
@@ -653,19 +678,54 @@ def collect(
         )
     )
 
+    # Classified daily rows for reference.weather_daily (no indent — large file)
+    daily_classified_path = out_dir / "laguna_weather_daily_classified.json"
+    daily_classified_path.write_text(
+        json.dumps(
+            {
+                "generated_at": datetime.utcnow().isoformat() + "Z",
+                "period_start": start.isoformat(),
+                "period_end": end.isoformat(),
+                "row_count": len(daily_classified_rows),
+                "rows": daily_classified_rows,
+            }
+        )
+    )
+
     logger.info("Done. Output saved to %s", out_dir)
 
     records_loaded = 0
+    daily_rows_loaded = 0
+    legacy_error: Optional[str] = None
     try:
         if load:
-            from app.services.weather_loader import load_from_file
+            from app.services.weather_loader import (
+                load_from_file,
+                rebuild_monthly_summary,
+                upsert_weather_daily,
+            )
 
-            records_loaded = load_from_file(out_dir / "laguna_weather_final.json")
-            logger.info("Loaded %d records into reference.weather_observations", records_loaded)
+            # New pipeline first: reference.weather_daily + monthly summary
+            daily_rows_loaded = upsert_weather_daily(daily_classified_rows)
+            rebuild_monthly_summary(start.isoformat(), end.isoformat())
+            logger.info("Loaded %d rows into reference.weather_daily", daily_rows_loaded)
 
-        _update_run_record(run_id, "success", len(master), records_loaded)
+            # Legacy monthly load (reference.weather_observations). A failure
+            # here must not block the new pipeline — log it and keep going.
+            try:
+                records_loaded = load_from_file(out_dir / "laguna_weather_final.json")
+                logger.info("Loaded %d records into reference.weather_observations", records_loaded)
+            except Exception as exc:
+                legacy_error = f"legacy weather_observations load failed: {exc}"
+                logger.error(legacy_error)
+
+        _update_run_record(
+            run_id, "success", len(master), records_loaded + daily_rows_loaded, error_detail=legacy_error
+        )
     except Exception as exc:
-        _update_run_record(run_id, "failed", len(master), records_loaded, error_detail=str(exc))
+        _update_run_record(
+            run_id, "failed", len(master), records_loaded + daily_rows_loaded, error_detail=str(exc)
+        )
         raise
 
     return {
@@ -673,6 +733,8 @@ def collect(
         "validity": validity_rows,
         "champion_map": champion_map,
         "records_loaded": records_loaded,
+        "daily_rows_loaded": daily_rows_loaded,
+        "daily_rows_classified": len(daily_classified_rows),
     }
 
 
@@ -709,5 +771,7 @@ if __name__ == "__main__":
 
     result = collect(start=start, end=end, out_dir=Path(args.out), load=args.load)
     print(f"Collected {len(result['master'])} municipalities.")
+    print(f"Classified {result['daily_rows_classified']} daily rows for reference.weather_daily")
     if args.load:
         print(f"Loaded {result['records_loaded']} records into reference.weather_observations")
+        print(f"Loaded {result['daily_rows_loaded']} rows into reference.weather_daily (monthly summary rebuilt)")

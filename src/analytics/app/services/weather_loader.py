@@ -5,12 +5,15 @@ Upserts weather output JSON into reference.weather_observations in Supabase.
 Applies the migration in 111_fix_weather_observations_index.sql must be run
 first so the (date, location) partial unique index exists.
 
-Two entry points:
-  load_from_file(path)      — monthly aggregated data from weather_collector.py
-                              → one record per (municipality, month, day=1)
-                              → includes validation against NOAA GSOD and CHIRPS
-  load_incremental(path)    — daily records from weather_updater.py
-                              → one record per (municipality, date)
+Entry points:
+  load_from_file(path)        — monthly aggregated data from weather_collector.py
+                                → one record per (municipality, month, day=1)
+                                → includes validation against NOAA GSOD and CHIRPS
+  load_incremental(path)      — daily records from weather_updater.py
+                                → one record per (municipality, date)
+  load_daily_classified(path) — classified daily rows (weather_daily_classifier)
+                                → upserts reference.weather_daily, then calls
+                                  reference.rebuild_weather_monthly_summary()
 
 Validation (integrated):
   For monthly loads, each municipality-month is validated:
@@ -125,19 +128,32 @@ def _upsert_batch(rows: list[dict]) -> int:
 
     from app.services.supabase_client import get_table
 
-    # Pre-fetch all existing records for these (date, location) pairs in one call
+    # Pre-fetch all existing records for these (date, location) pairs.
+    # PostgREST caps responses at 1000 rows, so page through with .range()
+    # — otherwise pairs beyond the first page get re-inserted and violate
+    # the (date, location) unique index.
     dates = list({r["date"] for r in rows})
     locations = list({r["location"] for r in rows})
 
-    existing_resp = (
-        get_table("reference", "weather_observations")
-        .select("id, date, location")
-        .in_("date", dates)
-        .in_("location", locations)
-        .is_("institution_id", "null")
-        .execute()
-    )
-    existing_map: dict[tuple[str, str], str] = {(r["date"], r["location"]): r["id"] for r in (existing_resp.data or [])}
+    existing_map: dict[tuple[str, str], str] = {}
+    page_size = 1000
+    offset = 0
+    while True:
+        existing_resp = (
+            get_table("reference", "weather_observations")
+            .select("id, date, location")
+            .in_("date", dates)
+            .in_("location", locations)
+            .is_("institution_id", "null")
+            .range(offset, offset + page_size - 1)
+            .execute()
+        )
+        batch = existing_resp.data or []
+        for r in batch:
+            existing_map[(r["date"], r["location"])] = r["id"]
+        if len(batch) < page_size:
+            break
+        offset += page_size
 
     inserts: list[dict] = []
     updates: list[tuple[str, dict]] = []
@@ -327,6 +343,76 @@ def load_incremental(path: Path) -> int:
     return count
 
 
+# ── Classified daily loader (reference.weather_daily, migration 187) ─────────
+
+_DAILY_UPSERT_CHUNK = 500
+
+
+def upsert_weather_daily(rows: list[dict]) -> int:
+    """
+    Upsert classified daily rows into reference.weather_daily.
+    Conflict target is the (date, municipality) unique constraint, so
+    re-running over the same period is safe.
+    """
+    if not rows:
+        return 0
+
+    from app.services.supabase_client import get_table
+
+    total = 0
+    for i in range(0, len(rows), _DAILY_UPSERT_CHUNK):
+        chunk = rows[i : i + _DAILY_UPSERT_CHUNK]
+        get_table("reference", "weather_daily").upsert(
+            chunk, on_conflict="date,municipality"
+        ).execute()
+        total += len(chunk)
+        logger.info("Upserted %d/%d weather_daily rows", total, len(rows))
+
+    return total
+
+
+def rebuild_monthly_summary(period_start: Optional[str] = None, period_end: Optional[str] = None) -> int:
+    """
+    Call reference.rebuild_weather_monthly_summary() to re-aggregate
+    weather_daily into weather_monthly_summary for the given period
+    (ISO dates; None = unbounded). Returns the number of month-rows upserted.
+    """
+    from app.services.supabase_client import get_supabase
+
+    resp = (
+        get_supabase()
+        .schema("reference")
+        .rpc(
+            "rebuild_weather_monthly_summary",
+            {"p_period_start": period_start, "p_period_end": period_end},
+        )
+        .execute()
+    )
+    try:
+        count = int(resp.data)
+    except (TypeError, ValueError):
+        count = 0
+    logger.info("Monthly summary rebuilt — %d month-rows upserted", count)
+    return count
+
+
+def load_daily_classified(path: Path) -> int:
+    """
+    Load classified daily rows (written by weather_collector.py or
+    weather_updater.py) into reference.weather_daily, then rebuild the
+    monthly summary for the file's period. Returns rows upserted.
+    """
+    logger.info("Loading classified daily weather data from %s", path)
+    data = json.loads(path.read_text())
+
+    rows = data.get("rows", [])
+    count = upsert_weather_daily(rows)
+    logger.info("Classified daily load complete — %d rows upserted.", count)
+
+    rebuild_monthly_summary(data.get("period_start"), data.get("period_end"))
+    return count
+
+
 # ── CLI ───────────────────────────────────────────────────────────────────────
 
 if __name__ == "__main__":
@@ -347,17 +433,26 @@ if __name__ == "__main__":
         help="Load from laguna_weather_incremental.json (daily) instead of monthly",
     )
     parser.add_argument(
+        "--daily-classified",
+        action="store_true",
+        help="Load classified daily rows into reference.weather_daily and rebuild the monthly summary",
+    )
+    parser.add_argument(
         "--out", type=str, default=str(DEFAULT_OUT_DIR), help="Directory containing the JSON output files"
     )
     args = parser.parse_args()
 
     out_dir = Path(args.out)
 
-    if args.incremental:
+    if args.daily_classified:
+        target = Path(args.file) if args.file else out_dir / "laguna_weather_daily_classified.json"
+        count = load_daily_classified(target)
+        print(f"Loaded {count} rows into reference.weather_daily (monthly summary rebuilt)")
+    elif args.incremental:
         target = Path(args.file) if args.file else out_dir / "laguna_weather_incremental.json"
         count = load_incremental(target)
+        print(f"Loaded {count} records into reference.weather_observations")
     else:
         target = Path(args.file) if args.file else out_dir / "laguna_weather_final.json"
         count = load_from_file(target)
-
-    print(f"Loaded {count} records into reference.weather_observations")
+        print(f"Loaded {count} records into reference.weather_observations")

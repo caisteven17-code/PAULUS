@@ -11,6 +11,7 @@ import { AdminGatewayController } from './controllers/admin-gateway.controller';
 import { AdminEntitiesGatewayController } from './controllers/admin-entities-gateway.controller';
 import { AdminRolesGatewayController } from './controllers/admin-roles-gateway.controller';
 import { AnnouncementsGatewayController } from './controllers/announcements-gateway.controller';
+import { EventsGatewayController } from './controllers/events-gateway.controller';
 import { AuditLogGatewayController } from './controllers/audit-log-gateway.controller';
 import { ScenarioGatewayController } from './controllers/scenario-gateway.controller';
 import { ScenarioService } from '../../services/scenario.service';
@@ -33,6 +34,7 @@ import { SupabaseService } from '../../services/supabase.service';
     AdminEntitiesGatewayController,
     AdminRolesGatewayController,
     AnnouncementsGatewayController,
+    EventsGatewayController,
     AuditLogGatewayController,
     ScenarioGatewayController,
   ],

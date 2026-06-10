@@ -6,6 +6,11 @@ last N days of weather data from the champion source for each municipality.
 Uses the next-best source as fallback if the champion fails.
 Merges IBTrACS typhoon flags and saves daily records ready for weather_loader.py.
 
+Also classifies each day (NASA POWER AG vs CHIRPS/Meteostat validators) into
+rows for reference.weather_daily — saved to
+laguna_weather_daily_classified_incremental.json — and, with --load, upserts
+them and rebuilds reference.weather_monthly_summary.
+
 The 10-day cadence: run this after the initial collection, then every 10 days to
 keep reference.weather_observations current.  End date is always today minus 7
 days (reanalysis lag) so the request stays within the available data window.
@@ -152,6 +157,11 @@ def update(
     Saves laguna_weather_incremental.json and returns a summary dict.
     """
     from app.services.weather_collector import MUNICIPALITIES
+    from app.services.weather_daily_classifier import (
+        build_chirps_daily_cache,
+        build_daily_rows,
+        build_meteostat_daily_cache,
+    )
     from app.services.weather_ibtracs import get_typhoon_flags
 
     end_date = date.today() - timedelta(days=REANALYSIS_LAG_DAYS)
@@ -187,7 +197,11 @@ def update(
     # Build name→coords lookup from the canonical MUNICIPALITIES list
     muni_coords = {m["name"]: m for m in MUNICIPALITIES}
 
+    # Meteostat temperature validator is one station for all municipalities
+    meteostat_daily_cache = build_meteostat_daily_cache(start_date, end_date)
+
     results: list[dict] = []
+    daily_classified_rows: list[dict] = []
 
     for name, champion in champion_map.items():
         muni = muni_coords.get(name)
@@ -229,6 +243,24 @@ def update(
             _merge_ibtracs(records, typhoon_flags)
             logger.info("[%s] %d daily records from %s", name, len(records), source_used)
 
+        # Classify days for reference.weather_daily — needs NASA POWER AG
+        # specifically (source of truth), regardless of the champion source.
+        if source_used == "nasa_power_ag" and records:
+            nasa_records = records
+        else:
+            try:
+                nasa_records = _fetch_for_source("nasa_power_ag", lat, lon, start_date, end_date)
+            except Exception as exc:
+                logger.warning("[%s] NASA POWER AG fetch for classification failed: %s", name, exc)
+                nasa_records = []
+
+        chirps_daily_cache = build_chirps_daily_cache(lat, lon, start_date, end_date)
+        muni_daily_rows = build_daily_rows(
+            name, start_date, end_date, nasa_records, chirps_daily_cache, meteostat_daily_cache
+        )
+        daily_classified_rows.extend(muni_daily_rows)
+        logger.info("[%s] classified %d days for weather_daily", name, len(muni_daily_rows))
+
         results.append(
             {
                 "municipality": name,
@@ -261,17 +293,53 @@ def update(
     )
     logger.info("Incremental output saved → %s", out_path)
 
+    # Classified daily rows for reference.weather_daily
+    daily_classified_path = out_dir / "laguna_weather_daily_classified_incremental.json"
+    daily_classified_path.write_text(
+        json.dumps(
+            {
+                "generated_at": datetime.utcnow().isoformat() + "Z",
+                "period_start": start_date.isoformat(),
+                "period_end": end_date.isoformat(),
+                "row_count": len(daily_classified_rows),
+                "rows": daily_classified_rows,
+            }
+        )
+    )
+    logger.info("Classified daily output saved → %s", daily_classified_path)
+
     records_loaded = 0
+    daily_rows_loaded = 0
+    legacy_error: Optional[str] = None
     try:
         if load:
-            from app.services.weather_loader import load_incremental
+            from app.services.weather_loader import (
+                load_incremental,
+                rebuild_monthly_summary,
+                upsert_weather_daily,
+            )
 
-            records_loaded = load_incremental(out_path)
-            logger.info("Loaded %d records into reference.weather_observations", records_loaded)
+            # New pipeline first: reference.weather_daily + monthly summary
+            daily_rows_loaded = upsert_weather_daily(daily_classified_rows)
+            rebuild_monthly_summary(start_date.isoformat(), end_date.isoformat())
+            logger.info("Loaded %d rows into reference.weather_daily", daily_rows_loaded)
 
-        _update_run_record(run_id, "success", len(results), records_loaded)
+            # Legacy load (reference.weather_observations). A failure here
+            # must not block the new pipeline — log it and keep going.
+            try:
+                records_loaded = load_incremental(out_path)
+                logger.info("Loaded %d records into reference.weather_observations", records_loaded)
+            except Exception as exc:
+                legacy_error = f"legacy weather_observations load failed: {exc}"
+                logger.error(legacy_error)
+
+        _update_run_record(
+            run_id, "success", len(results), records_loaded + daily_rows_loaded, error_detail=legacy_error
+        )
     except Exception as exc:
-        _update_run_record(run_id, "failed", len(results), records_loaded, error_detail=str(exc))
+        _update_run_record(
+            run_id, "failed", len(results), records_loaded + daily_rows_loaded, error_detail=str(exc)
+        )
         raise
 
     return {
@@ -280,6 +348,8 @@ def update(
         "period_end": end_date.isoformat(),
         "record_count": sum(len(m["daily_records"]) for m in results),
         "records_loaded": records_loaded,
+        "daily_rows_loaded": daily_rows_loaded,
+        "daily_rows_classified": len(daily_classified_rows),
     }
 
 
@@ -316,5 +386,7 @@ if __name__ == "__main__":
         f"({result['record_count']} daily records): "
         f"{result['period_start']} → {result['period_end']}"
     )
+    print(f"Classified {result['daily_rows_classified']} daily rows for reference.weather_daily")
     if args.load:
         print(f"Loaded {result['records_loaded']} records into reference.weather_observations")
+        print(f"Loaded {result['daily_rows_loaded']} rows into reference.weather_daily (monthly summary rebuilt)")

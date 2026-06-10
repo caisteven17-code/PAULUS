@@ -65,6 +65,9 @@ A transform step rolls operational rows up into `fact_monthly_financials` / `fac
 ### `diocese.project_expenses` ✅ *(project.service.ts mapper — exact)*
 `id` (uuid PK) · `project_id` (uuid FK → `diocese.projects.id`) · `description` (text) · `amount` (numeric) · `date` (date) · `payment_method` (text) · `receipt_reference` (text) · `proof_file_name` (text) · `notes` (text)[cite: 2]
 
+### `diocese.events` ✅ *(Shared institution events)*
+`id` (uuid PK) · `institution_id` (uuid FK → `diocese.institutions.id`) · `event_name` (text) · `event_level` (text: Major event/Minor event) · `event_type` (text) · `expected_financial_impact` (text: inflow/outflow/both/none) · `estimated_amount` (numeric) · `linked_project_id` (uuid FK → `diocese.projects.id`, nullable) · `start_date` (date) · `end_date` (date) · `notes` (text)
+
 ### `diocese.announcements` ✅
 `id` (uuid PK) · `title` (text) · `content` (text) · `author` (text) · `author_role` (text) · `priority` (text: low/medium/high) · `category` (text: general/financial/administrative/event)[cite: 2]
 
@@ -166,12 +169,6 @@ Common examples: B.1 weekday/sunday/saturday collections, B.2 other collections,
 Purpose: preserves contribution rows such as SSS, PhilHealth, and Pag-IBIG where the source form separates salary basis, employee share, and employer share.
 
 `id` (uuid PK) · `financial_record_id` (uuid FK → `parishes.financial_records.id` on delete cascade) · `contribution_type` (text: SSS/PhilHealth/Pag-IBIG/Other) · `basic_salary` (numeric(14,2) default 0) · `employee_share` (numeric(14,2) default 0) · `employer_share` (numeric(14,2) default 0) · `total_amount` (numeric(14,2) default 0) · `source_row_number` (int) · `source_label` (text)
-
-### `parishes.fiesta_events` ✅
-`id` (uuid PK) · `institution_id` (uuid FK → `diocese.institutions.id`) · `primary_patron` (text) · `secondary_patron` (text) · `date` (date) · `expected_impact` (text: low/medium/high) · `estimated_collection_increase` (numeric)[cite: 2]
-
-### `parishes.local_calendar` 🆕 *(Per-parish contextual forecasting input)*
-`id` (uuid PK) · `institution_id` (uuid FK → `diocese.institutions.id`) · `event_date` (date) · `end_date` (date) · `title` (text) · `event_type` (text: fiesta/novena/recollection/wedding-season/outreach/construction/other) · `expected_financial_impact` (text: inflow/outflow/both/none) · `estimated_amount` (numeric) · `linked_fiesta_id` (uuid FK → `parishes.fiesta_events.id`, nullable) · `linked_project_id` (uuid FK → `diocese.projects.id`, nullable) · `notes` (text)[cite: 2]
 
 ---
 
