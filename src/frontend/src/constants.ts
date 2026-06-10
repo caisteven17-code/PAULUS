@@ -1,6 +1,6 @@
 'use client';
 
-import { Eye, Database, Users, Church, Zap, Briefcase, Bell, Heart } from 'lucide-react';
+import { Eye, Database, Users, Church, Zap, Briefcase, Bell, Heart, Wallet } from 'lucide-react';
 import { UserRole, Parish, Seminary, DiocesanSchool } from './types';
 
 // ============================================================================
@@ -232,6 +232,22 @@ export const ALL_PERMISSIONS = [
       },
     ],
   },
+  {
+    category: 'Budget',
+    icon: Wallet,
+    permissions: [
+      {
+        id: 'manage_budget',
+        name: 'Manage Budget',
+        description: 'Allows the user to set and update the monthly budget for their institution.',
+      },
+      {
+        id: 'view_budget',
+        name: 'View Budget Only',
+        description: 'Allows the user to view submitted institution budgets without editing them.',
+      },
+    ],
+  },
 ];
 
 export const INITIAL_ROLES: UserRole[] = [
@@ -260,6 +276,8 @@ export const INITIAL_ROLES: UserRole[] = [
       view_announcements: false,
       manage_events: true,
       view_events: false,
+      manage_budget: false,
+      view_budget: true,
       view_priests: true,
       manage_assignments: true,
       view_audit_logs: true,
@@ -294,6 +312,8 @@ export const INITIAL_ROLES: UserRole[] = [
       view_announcements: false,
       manage_events: true,
       view_events: false,
+      manage_budget: false,
+      view_budget: true,
       view_priests: true,
       manage_assignments: true,
       view_audit_logs: false,
@@ -327,6 +347,8 @@ export const INITIAL_ROLES: UserRole[] = [
       view_announcements: false,
       manage_events: true,
       view_events: false,
+      manage_budget: false,
+      view_budget: true,
       view_priests: true,
       manage_assignments: true,
       view_audit_logs: true,
@@ -361,6 +383,8 @@ export const INITIAL_ROLES: UserRole[] = [
       view_announcements: true,
       manage_events: false,
       view_events: true,
+      manage_budget: false,
+      view_budget: true,
       view_priests: true,
       manage_assignments: false,
       view_audit_logs: false,
@@ -394,6 +418,8 @@ export const INITIAL_ROLES: UserRole[] = [
       view_announcements: false,
       manage_events: false,
       view_events: false,
+      manage_budget: false,
+      view_budget: false,
       view_priests: false,
       manage_assignments: false,
       view_audit_logs: false,
@@ -430,6 +456,8 @@ export const INITIAL_ROLES: UserRole[] = [
       view_announcements: true,
       manage_events: true,
       view_events: false,
+      manage_budget: true,
+      view_budget: false,
       view_priests: true,
       manage_assignments: true,
       view_audit_logs: false,
@@ -463,6 +491,8 @@ export const INITIAL_ROLES: UserRole[] = [
       view_announcements: true,
       manage_events: true,
       view_events: false,
+      manage_budget: true,
+      view_budget: false,
       view_priests: false,
       manage_assignments: false,
       view_audit_logs: false,
@@ -498,6 +528,8 @@ export const INITIAL_ROLES: UserRole[] = [
       view_announcements: true,
       manage_events: true,
       view_events: false,
+      manage_budget: true,
+      view_budget: false,
       view_priests: true,
       manage_assignments: true,
       view_audit_logs: false,
@@ -531,6 +563,8 @@ export const INITIAL_ROLES: UserRole[] = [
       view_announcements: true,
       manage_events: true,
       view_events: false,
+      manage_budget: true,
+      view_budget: false,
       view_priests: false,
       manage_assignments: false,
       view_audit_logs: false,
@@ -566,6 +600,8 @@ export const INITIAL_ROLES: UserRole[] = [
       view_announcements: true,
       manage_events: false,
       view_events: true,
+      manage_budget: false,
+      view_budget: true,
       view_priests: false,
       manage_assignments: false,
       view_audit_logs: false,
@@ -599,6 +635,8 @@ export const INITIAL_ROLES: UserRole[] = [
       view_announcements: true,
       manage_events: false,
       view_events: true,
+      manage_budget: false,
+      view_budget: true,
       view_priests: false,
       manage_assignments: false,
       view_audit_logs: false,
@@ -632,6 +670,8 @@ export const INITIAL_ROLES: UserRole[] = [
       view_announcements: true,
       manage_events: true,
       view_events: false,
+      manage_budget: true,
+      view_budget: false,
       view_priests: false,
       manage_assignments: false,
       view_audit_logs: false,
@@ -665,6 +705,8 @@ export const INITIAL_ROLES: UserRole[] = [
       view_announcements: true,
       manage_events: false,
       view_events: true,
+      manage_budget: false,
+      view_budget: true,
       view_priests: false,
       manage_assignments: false,
       view_audit_logs: false,

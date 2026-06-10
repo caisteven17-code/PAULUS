@@ -12,6 +12,7 @@ import { AdminEntitiesGatewayController } from './controllers/admin-entities-gat
 import { AdminRolesGatewayController } from './controllers/admin-roles-gateway.controller';
 import { AnnouncementsGatewayController } from './controllers/announcements-gateway.controller';
 import { EventsGatewayController } from './controllers/events-gateway.controller';
+import { BudgetsGatewayController } from './controllers/budgets-gateway.controller';
 import { LiturgicalCalendarGatewayController } from './controllers/liturgical-calendar-gateway.controller';
 import { AuditLogGatewayController } from './controllers/audit-log-gateway.controller';
 import { ScenarioGatewayController } from './controllers/scenario-gateway.controller';
@@ -36,6 +37,7 @@ import { SupabaseService } from '../../services/supabase.service';
     AdminRolesGatewayController,
     AnnouncementsGatewayController,
     EventsGatewayController,
+    BudgetsGatewayController,
     LiturgicalCalendarGatewayController,
     AuditLogGatewayController,
     ScenarioGatewayController,

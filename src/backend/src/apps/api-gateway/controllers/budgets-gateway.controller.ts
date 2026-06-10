@@ -3,25 +3,25 @@ import { Request, Response } from 'express';
 import { SERVICE_URLS } from '../../../shared/http/service-urls';
 import { requestDownstream } from '../../../shared/http/request-downstream';
 
-@Controller('events')
-export class EventsGatewayController {
+@Controller('budgets')
+export class BudgetsGatewayController {
   @Get()
-  async getEvents(@Req() req: Request, @Res({ passthrough: true }) response: Response) {
+  async getBudgets(@Req() req: Request, @Res({ passthrough: true }) response: Response) {
     const queryIndex = req.url.indexOf('?');
     const suffix = queryIndex >= 0 ? req.url.slice(queryIndex) : '';
     const result = await requestDownstream<unknown>({
-      baseUrl: SERVICE_URLS.announcement,
-      path: `/events${suffix}`,
+      baseUrl: SERVICE_URLS.financial,
+      path: `/budgets${suffix}`,
     });
     response.status(result.status);
     return result.data;
   }
 
   @Post()
-  async saveEvent(@Body() body: unknown, @Res({ passthrough: true }) response: Response) {
+  async saveBudgets(@Body() body: unknown, @Res({ passthrough: true }) response: Response) {
     const result = await requestDownstream<unknown>({
-      baseUrl: SERVICE_URLS.announcement,
-      path: '/events',
+      baseUrl: SERVICE_URLS.financial,
+      path: '/budgets',
       method: 'POST',
       body,
     });

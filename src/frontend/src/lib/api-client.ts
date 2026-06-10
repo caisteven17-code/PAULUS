@@ -510,12 +510,43 @@ export const apiClient = {
   // ----------------------------------------------------------------
   // Events
   // ----------------------------------------------------------------
-  async getEvents(institutionId?: string): Promise<any[]> {
-    return get('/api/events', institutionId ? { institutionId } : {});
+  async getEvents(params?: { institutionId?: string; institutionName?: string; institutionType?: string }): Promise<any[]> {
+    return get('/api/events', {
+      institutionId: params?.institutionId,
+      institutionName: params?.institutionName,
+      institutionType: params?.institutionType,
+    });
   },
 
   async saveEvent(event: Record<string, any>): Promise<any> {
     return post('/api/events', event);
+  },
+
+  // ----------------------------------------------------------------
+  // Institution budgets
+  // ----------------------------------------------------------------
+  async getBudgets(params?: {
+    institutionId?: string;
+    institutionName?: string;
+    institutionType?: string;
+    year?: number;
+  }): Promise<any[]> {
+    return get('/api/budgets', {
+      institutionId: params?.institutionId,
+      institutionName: params?.institutionName,
+      institutionType: params?.institutionType,
+      year: params?.year ? String(params.year) : undefined,
+    });
+  },
+
+  async saveBudgets(payload: {
+    institutionId?: string;
+    institutionName?: string;
+    institutionType?: string;
+    year: number;
+    entries: { month: number; amount: number; notes?: string }[];
+  }): Promise<any[]> {
+    return post('/api/budgets', payload);
   },
 
   // ----------------------------------------------------------------

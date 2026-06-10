@@ -1,8 +1,21 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { CalendarDays, Plus, X, Check, Clock, ChevronDown, AlertCircle } from 'lucide-react';
+import {
+  CalendarDays,
+  Plus,
+  X,
+  Check,
+  Clock,
+  ChevronDown,
+  AlertCircle,
+  Church,
+  GraduationCap,
+  BookOpen,
+  Landmark,
+  Building2,
+} from 'lucide-react';
 import { usePermissions } from '../hooks/usePermissions';
 import { apiClient } from '../lib/api-client';
 
@@ -15,6 +28,8 @@ interface DiocesanEvent {
   end_date?: string;
   notes?: string;
   institution_id?: string;
+  institution_name?: string;
+  institution_type?: string;
 }
 
 const EVENT_TYPES = [
@@ -27,6 +42,15 @@ const EVENT_TYPES = [
   'Mass / Liturgy',
   'Other',
 ];
+
+const DIOCESE_NAME = 'Diocese of San Pablo';
+
+const TYPE_BADGE: Record<string, { label: string; className: string; icon: React.ElementType }> = {
+  parish: { label: 'Parish', className: 'bg-green-50 text-green-700 border border-green-100', icon: Church },
+  school: { label: 'School', className: 'bg-purple-50 text-purple-700 border border-purple-100', icon: GraduationCap },
+  seminary: { label: 'Seminary', className: 'bg-rose-50 text-rose-700 border border-rose-100', icon: BookOpen },
+  diocese: { label: 'Diocese', className: 'bg-gold-50 text-gold-700 border border-gold-200', icon: Landmark },
+};
 
 function formatLongDate(dateStr: string) {
   const d = new Date(dateStr + 'T00:00:00');
@@ -54,8 +78,9 @@ const EMPTY_FORM = {
 };
 
 export function Events() {
-  const { permissions } = usePermissions();
+  const { permissions, user, loading: permissionsLoading } = usePermissions();
   const canManage = permissions.manage_events === true;
+  const isDiocese = permissions.view_diocese === true;
 
   const [events, setEvents] = useState<DiocesanEvent[]>([]);
   const [loading, setLoading] = useState(true);
@@ -64,23 +89,55 @@ export function Events() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [filter, setFilter] = useState<'upcoming' | 'past' | 'all'>('upcoming');
+  const [institutionFilter, setInstitutionFilter] = useState<string>('all');
+
+  // The institution that owns events created from this screen. Diocese-level
+  // users always create events as the diocese — never on another
+  // institution's behalf.
+  const ownerName = isDiocese ? DIOCESE_NAME : user?.entityName || '';
+  const ownerType = isDiocese ? 'diocese' : user?.entityType || '';
 
   useEffect(() => {
+    if (permissionsLoading) return;
+    let active = true;
     setLoading(true);
+    const params = isDiocese
+      ? undefined
+      : {
+          institutionId: user?.entityId,
+          institutionName: user?.entityName,
+          institutionType: user?.entityType,
+        };
     apiClient
-      .getEvents()
-      .then((data) => setEvents(data ?? []))
-      .catch(() => setEvents([]))
-      .finally(() => setLoading(false));
-  }, []);
+      .getEvents(params)
+      .then((data) => active && setEvents(data ?? []))
+      .catch(() => active && setEvents([]))
+      .finally(() => active && setLoading(false));
+    return () => {
+      active = false;
+    };
+  }, [permissionsLoading, isDiocese, user?.entityId, user?.entityName, user?.entityType]);
 
-  const upcoming = events.filter((e) => isUpcoming(e.start_date)).sort(
+  // Institution dropdown options for the diocese overview
+  const institutionOptions = useMemo(() => {
+    const names = new Set<string>();
+    for (const e of events) if (e.institution_name) names.add(e.institution_name);
+    return Array.from(names).sort((a, b) => a.localeCompare(b));
+  }, [events]);
+
+  const scoped = useMemo(
+    () =>
+      institutionFilter === 'all' ? events : events.filter((e) => e.institution_name === institutionFilter),
+    [events, institutionFilter],
+  );
+
+  const upcoming = scoped.filter((e) => isUpcoming(e.start_date)).sort(
     (a, b) => new Date(a.start_date).getTime() - new Date(b.start_date).getTime(),
   );
-  const past = events.filter((e) => !isUpcoming(e.start_date)).sort(
+  const past = scoped.filter((e) => !isUpcoming(e.start_date)).sort(
     (a, b) => new Date(b.start_date).getTime() - new Date(a.start_date).getTime(),
   );
-  const displayed = filter === 'upcoming' ? upcoming : filter === 'past' ? past : events;
+  const displayed = filter === 'upcoming' ? upcoming : filter === 'past' ? past : scoped;
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -92,6 +149,9 @@ export function Events() {
         end_date: formData.end_date || undefined,
         notes: formData.notes || undefined,
         event_type: formData.event_type || undefined,
+        institution_id: isDiocese ? undefined : user?.entityId,
+        institutionName: ownerName || undefined,
+        institutionType: ownerType || undefined,
       });
       setEvents((prev) => [saved, ...prev]);
       setIsModalOpen(false);
@@ -115,11 +175,13 @@ export function Events() {
                 <CalendarDays className="w-5 h-5 text-gold-400" />
               </div>
               <h1 className="text-3xl md:text-4xl font-serif font-bold text-church-black tracking-tight">
-                Parish Events
+                Events
               </h1>
             </div>
             <p className="text-base text-gray-500 font-medium">
-              Schedule and view upcoming activities and celebrations.
+              {isDiocese
+                ? 'Oversee events from every institution across the diocese.'
+                : `Schedule and view activities for ${user?.entityName || 'your institution'}.`}
             </p>
           </div>
 
@@ -136,20 +198,40 @@ export function Events() {
         </div>
 
         {/* Filter tabs */}
-        <div className="flex gap-2 mb-8 bg-white border border-gray-100 rounded-2xl p-1.5 shadow-sm w-fit">
-          {(['upcoming', 'past', 'all'] as const).map((f) => (
-            <button
-              key={f}
-              onClick={() => setFilter(f)}
-              className={`px-5 py-2.5 rounded-xl text-sm font-bold transition-all capitalize ${
-                filter === f
-                  ? 'bg-church-black text-white shadow-md'
-                  : 'text-gray-400 hover:text-gray-700'
-              }`}
-            >
-              {f === 'upcoming' ? `Upcoming (${upcoming.length})` : f === 'past' ? `Past (${past.length})` : `All (${events.length})`}
-            </button>
-          ))}
+        <div className="flex flex-col md:flex-row gap-3 mb-8">
+          <div className="flex gap-2 bg-white border border-gray-100 rounded-2xl p-1.5 shadow-sm w-fit">
+            {(['upcoming', 'past', 'all'] as const).map((f) => (
+              <button
+                key={f}
+                onClick={() => setFilter(f)}
+                className={`px-5 py-2.5 rounded-xl text-sm font-bold transition-all capitalize ${
+                  filter === f
+                    ? 'bg-church-black text-white shadow-md'
+                    : 'text-gray-400 hover:text-gray-700'
+                }`}
+              >
+                {f === 'upcoming' ? `Upcoming (${upcoming.length})` : f === 'past' ? `Past (${past.length})` : `All (${scoped.length})`}
+              </button>
+            ))}
+          </div>
+
+          {/* Institution filter — diocese overview only */}
+          {isDiocese && institutionOptions.length > 0 && (
+            <div className="relative w-full md:w-72">
+              <Building2 className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-300 pointer-events-none" />
+              <select
+                value={institutionFilter}
+                onChange={(e) => setInstitutionFilter(e.target.value)}
+                className="w-full pl-11 pr-10 py-3 bg-white border border-gray-100 rounded-2xl text-sm font-medium shadow-sm focus:outline-none focus:ring-4 focus:ring-gold-500/10 focus:border-gold-500 transition-all appearance-none cursor-pointer"
+              >
+                <option value="all">All institutions</option>
+                {institutionOptions.map((name) => (
+                  <option key={name} value={name}>{name}</option>
+                ))}
+              </select>
+              <ChevronDown className="absolute right-4 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" />
+            </div>
+          )}
         </div>
 
         {/* Events list */}
@@ -187,6 +269,8 @@ export function Events() {
             <AnimatePresence mode="popLayout">
               {displayed.map((event, idx) => {
                 const upcoming = isUpcoming(event.start_date);
+                const ownerBadge = event.institution_type ? TYPE_BADGE[event.institution_type] : undefined;
+                const OwnerIcon = ownerBadge?.icon ?? Building2;
                 return (
                   <motion.div
                     key={event.id}
@@ -240,6 +324,20 @@ export function Events() {
                             <h2 className="text-xl md:text-2xl font-serif font-bold text-church-black leading-tight">
                               {event.event_name}
                             </h2>
+
+                            {/* Owning institution — shown on the diocese overview */}
+                            {isDiocese && event.institution_name && (
+                              <div className="flex items-center gap-2">
+                                <span
+                                  className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-lg text-[10px] font-bold uppercase tracking-widest ${
+                                    ownerBadge?.className ?? 'bg-gray-100 text-gray-500'
+                                  }`}
+                                >
+                                  <OwnerIcon className="w-3 h-3" />
+                                  {event.institution_name}
+                                </span>
+                              </div>
+                            )}
 
                             {/* Date — written out fully for elderly users */}
                             <div className="flex items-center gap-2 text-gray-500">
@@ -305,6 +403,23 @@ export function Events() {
 
               <div className="flex-1 overflow-y-auto custom-scrollbar">
                 <form onSubmit={handleSubmit} className="p-6 md:p-8 space-y-6">
+
+                  {/* Owning institution — locked to the signed-in user's institution */}
+                  <div className="flex items-center gap-3 bg-gray-50/80 border border-gray-100 rounded-2xl px-5 py-4">
+                    <div className="w-9 h-9 rounded-xl bg-church-black flex items-center justify-center shrink-0">
+                      {isDiocese ? (
+                        <Landmark className="w-4 h-4 text-gold-400" />
+                      ) : (
+                        <Building2 className="w-4 h-4 text-gold-400" />
+                      )}
+                    </div>
+                    <div className="min-w-0">
+                      <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Event For</p>
+                      <p className="text-sm font-bold text-church-black truncate">
+                        {ownerName || 'Your institution'}
+                      </p>
+                    </div>
+                  </div>
 
                   {/* Event Name */}
                   <div className="space-y-2">

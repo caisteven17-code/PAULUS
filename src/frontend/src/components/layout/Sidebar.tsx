@@ -22,6 +22,7 @@ import {
   Archive,
   CalendarDays,
   CalendarCheck,
+  Wallet,
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { APP_CONFIG, INITIAL_ROLES } from '../../constants';
@@ -197,6 +198,28 @@ export function Sidebar({ activeTab = '', onNavigate, role, timeframe = '6m', on
                   className={`w-4 h-4 transition-colors ${isActive ? 'text-gold-400' : 'text-white/20 group-hover:text-white/40'}`}
                 />
                 <span className="text-xs font-bold tracking-wide">Events</span>
+                {isActive && (
+                  <div className="ml-auto w-1.5 h-1.5 bg-gold-400 rounded-full shadow-[0_0_8px_rgba(212,175,55,0.6)]" />
+                )}
+              </button>
+            );
+          })()}
+
+        {/* Budget */}
+        {(permissions.view_budget === true || permissions.manage_budget === true) &&
+          (() => {
+            const isActive = activeTab === 'budget';
+            return (
+              <button
+                onClick={() => onNavigate('budget')}
+                className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-300 group ${
+                  isActive ? 'bg-white/10 text-gold-400 shadow-sm' : 'text-white/50 hover:bg-white/5 hover:text-white'
+                }`}
+              >
+                <Wallet
+                  className={`w-4 h-4 transition-colors ${isActive ? 'text-gold-400' : 'text-white/20 group-hover:text-white/40'}`}
+                />
+                <span className="text-xs font-bold tracking-wide">Budget</span>
                 {isActive && (
                   <div className="ml-auto w-1.5 h-1.5 bg-gold-400 rounded-full shadow-[0_0_8px_rgba(212,175,55,0.6)]" />
                 )}
