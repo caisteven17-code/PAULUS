@@ -21,6 +21,7 @@ import {
   Shield,
   Archive,
   CalendarDays,
+  CalendarCheck,
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { APP_CONFIG, INITIAL_ROLES } from '../../constants';
@@ -510,7 +511,8 @@ export function Sidebar({ activeTab = '', onNavigate, role, timeframe = '6m', on
           permissions.manage_roles === true ||
           permissions.manage_entities === true ||
           permissions.upload_csv_admin === true ||
-          permissions.view_audit_logs === true) && (
+          permissions.view_audit_logs === true ||
+          permissions.validate_liturgical_calendar === true) && (
           <div>
             <div
               className={`relative w-full flex items-center gap-3 rounded-xl transition-all duration-300 ${
@@ -524,6 +526,7 @@ export function Sidebar({ activeTab = '', onNavigate, role, timeframe = '6m', on
                   else if (permissions.manage_entities) onNavigate('admin-entity');
                   else if (permissions.download_csv || permissions.upload_csv_admin || permissions.upload_csv_entity)
                     onNavigate('admin-data');
+                  else if (permissions.validate_liturgical_calendar) onNavigate('admin-liturgical');
                   else if (permissions.view_audit_logs) onNavigate('audit-log');
                   setShowAdminDropdown(true);
                 }}
@@ -578,6 +581,12 @@ export function Sidebar({ activeTab = '', onNavigate, role, timeframe = '6m', on
                       show:
                         permissions.download_csv === true ||
                         permissions.upload_csv_admin === true,
+                    },
+                    {
+                      id: 'admin-liturgical',
+                      label: 'Liturgical Validator',
+                      icon: CalendarCheck,
+                      show: permissions.validate_liturgical_calendar === true,
                     },
                     {
                       id: 'admin-archives',

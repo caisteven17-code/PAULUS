@@ -14,7 +14,8 @@ export type AccessRole =
   | 'school_superintendent'
   | 'finance_supervisor'
   | 'finance_officer'
-  | 'school_principal';
+  | 'school_principal'
+  | 'liturgical_validator';
 
 export const ACCESS_ROLE_TO_APP_ROLE: Record<AccessRole, AppRole> = {
   bishop: 'bishop',
@@ -29,6 +30,7 @@ export const ACCESS_ROLE_TO_APP_ROLE: Record<AccessRole, AppRole> = {
   finance_supervisor: 'school',
   finance_officer: 'school',
   school_principal: 'school',
+  liturgical_validator: 'admin',
 };
 
 const roleNameToId = new Map(INITIAL_ROLES.map((role) => [role.name.toLowerCase(), role.id as AccessRole]));
@@ -46,6 +48,7 @@ const legacyRoleToAccessRole: Record<string, AccessRole> = {
   finance_supervisor: 'finance_supervisor',
   finance_officer: 'finance_officer',
   school_principal: 'school_principal',
+  liturgical_validator: 'liturgical_validator',
 
   // Legacy aliases
   admin: 'diocesan_oeconomus',

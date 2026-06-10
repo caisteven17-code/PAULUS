@@ -517,4 +517,69 @@ export const apiClient = {
   async saveEvent(event: Record<string, any>): Promise<any> {
     return post('/api/events', event);
   },
+
+  // ----------------------------------------------------------------
+  // Liturgical calendar review (human-in-the-loop validation)
+  // ----------------------------------------------------------------
+  async getLiturgicalCalendar(filters: {
+    status?: string;
+    season?: string;
+    month?: number;
+    year?: number;
+    reason?: string;
+    page?: number;
+    pageSize?: number;
+  }): Promise<{ records: any[]; total: number; page: number; pageSize: number }> {
+    const params: Record<string, string | undefined> = {
+      status: filters.status,
+      season: filters.season,
+      month: filters.month ? String(filters.month) : undefined,
+      year: filters.year ? String(filters.year) : undefined,
+      reason: filters.reason || undefined,
+      page: filters.page ? String(filters.page) : undefined,
+      pageSize: filters.pageSize ? String(filters.pageSize) : undefined,
+    };
+    return get('/api/liturgical-calendar', params);
+  },
+
+  async reviewLiturgicalRecord(
+    id: string,
+    body: {
+      action: 'approve' | 'approve_with_revisions' | 'reject';
+      reviewedBy?: string;
+      date?: string;
+      celebration_name?: string;
+      reason?: string;
+    },
+  ): Promise<any> {
+    const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+    const token = await getAuthToken();
+    if (token) {
+      headers['Authorization'] = token;
+    }
+    const res = await fetch(`/api/liturgical-calendar/${id}`, {
+      method: 'PATCH',
+      credentials: 'include',
+      headers,
+      body: JSON.stringify(body),
+    });
+    if (!res.ok) {
+      let detail = '';
+      try {
+        const j = await res.json();
+        detail = j?.error ?? j?.message ?? '';
+      } catch {
+        /* ignore */
+      }
+      throw new Error(`PATCH /api/liturgical-calendar/${id} → ${res.status}${detail ? `: ${detail}` : ''}`);
+    }
+    return res.json();
+  },
+
+  async approveAllLiturgicalRecords(
+    filters: { season?: string; month?: number; year?: number; reason?: string },
+    reviewedBy?: string,
+  ): Promise<{ approved: number }> {
+    return post('/api/liturgical-calendar', { filters, reviewedBy });
+  },
 };

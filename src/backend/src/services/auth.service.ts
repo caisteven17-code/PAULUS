@@ -58,6 +58,13 @@ const ROLE_PERMISSION_DEFINITIONS = [
     description: 'Allows the user to upload updated CSVs for their specific entity.',
   },
   {
+    id: 'validate_liturgical_calendar',
+    name: 'Validate Liturgical Calendar',
+    category: 'Data Management',
+    description:
+      'Allows the user to review imported liturgical calendar events — approving, revising, or rejecting dates before they are used by the system.',
+  },
+  {
     id: 'create_users',
     name: 'Create User Accounts',
     category: 'User Management',

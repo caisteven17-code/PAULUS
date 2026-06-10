@@ -28,6 +28,7 @@ interface SettingsProps {
 
 import { UserRoleControl } from '../components/settings/UserRoleControl';
 import { DataManagementControl } from '../components/settings/DataManagementControl';
+import { LiturgicalValidatorControl } from '../components/settings/LiturgicalValidatorControl';
 import { EntityManagementControl } from '../components/settings/EntityManagementControl';
 import { ArchivesControl } from '../components/settings/ArchivesControl';
 import { ParishClassificationLogic } from '../components/settings/ParishClassificationLogic';
@@ -1737,6 +1738,10 @@ export function Settings({ onBack, onLogout, onNavigate, role = 'bishop', initia
               (permissions.download_csv === true ||
                 permissions.upload_csv_admin === true ||
                 permissions.upload_csv_entity === true) && <DataManagementControl />}
+
+            {activeTab === 'liturgical-validator' && permissions.validate_liturgical_calendar === true && (
+              <LiturgicalValidatorControl />
+            )}
 
             {activeTab === 'parish-classification' && permissions.manage_entities === true && (
               <ParishClassificationLogic

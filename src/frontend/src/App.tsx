@@ -52,7 +52,8 @@ const hasAdminPermissions = (permissions: Record<string, boolean>) =>
   permissions.manage_roles === true ||
   permissions.manage_entities === true ||
   permissions.upload_csv_admin === true ||
-  permissions.view_audit_logs === true;
+  permissions.view_audit_logs === true ||
+  permissions.validate_liturgical_calendar === true;
 
 const hasProjectAccess = (permissions: Record<string, boolean>) =>
   permissions.view_projects === true || permissions.manage_projects === true;
@@ -80,6 +81,7 @@ const getFirstAllowedTab = (role: Role, permissions: Record<string, boolean>) =>
     if (permissions.manage_roles === true) return 'admin-user-role';
     if (permissions.manage_entities === true) return 'admin-entity';
     if (permissions.upload_csv_admin === true) return 'admin-data';
+    if (permissions.validate_liturgical_calendar === true) return 'admin-liturgical';
     if (permissions.view_audit_logs === true) return 'audit-log';
   }
   return 'profile';
@@ -507,6 +509,7 @@ export default function App() {
       'admin-user-role': 'role-control',
       'admin-entity': 'entity-management',
       'admin-data': 'data-management',
+      'admin-liturgical': 'liturgical-validator',
       'admin-archives': 'archives',
       'admin-security': 'security',
       settings: 'user-management',
@@ -518,7 +521,8 @@ export default function App() {
         permissions.manage_roles === true ||
         permissions.manage_entities === true ||
         permissions.upload_csv_admin === true ||
-        permissions.view_audit_logs === true;
+        permissions.view_audit_logs === true ||
+        permissions.validate_liturgical_calendar === true;
       if (activeTab !== 'profile' && !hasAdminAccess) return renderAccessDenied();
       return (
         <Settings

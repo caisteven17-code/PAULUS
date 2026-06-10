@@ -7,10 +7,10 @@ import { requestDownstream } from '../../../shared/http/request-downstream';
 export class EventsGatewayController {
   @Get()
   async getEvents(@Query('institutionId') institutionId: string | undefined, @Res({ passthrough: true }) response: Response) {
+    const suffix = institutionId ? `?institutionId=${encodeURIComponent(institutionId)}` : '';
     const result = await requestDownstream<unknown>({
       baseUrl: SERVICE_URLS.announcement,
-      path: '/events',
-      query: institutionId ? { institutionId } : undefined,
+      path: `/events${suffix}`,
     });
     response.status(result.status);
     return result.data;
