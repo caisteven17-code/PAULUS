@@ -30,6 +30,13 @@ class SimulationRequest(BaseModel):
     periods: int = 12
 
 
+class CounterfactualReplayRequest(BaseModel):
+    start_month: int  # 1-12
+    start_year: int
+    modified_receipts: float | None = None
+    modified_expenses: float | None = None
+
+
 class PastoralSimulationRequest(BaseModel):
     assignment_duration_months: int = 12
     collection_impact_pct: float = 5.0
@@ -67,6 +74,28 @@ async def institution_simulation(
         raise HTTPException(status_code=400, detail=str(exc))
     except Exception as exc:
         raise HTTPException(status_code=500, detail=f"Institution simulation error: {exc}")
+
+
+@router.post("/counterfactual-replay/{entity_type}/{institution_id}")
+async def counterfactual_replay(
+    entity_type: EntityType,
+    institution_id: str,
+    body: CounterfactualReplayRequest,
+):
+    """Digital Twin: replay history from a past month with modified values."""
+    try:
+        return await svc_is.run_counterfactual_replay(
+            institution_id,
+            entity_type,
+            start_month=body.start_month,
+            start_year=body.start_year,
+            modified_receipts=body.modified_receipts,
+            modified_expenses=body.modified_expenses,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=f"Counterfactual replay error: {exc}")
 
 
 @router.get("/pastoral-action/{institution_id}")

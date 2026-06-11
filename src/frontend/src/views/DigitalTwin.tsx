@@ -16,6 +16,7 @@ interface InstitutionProfile {
   risk: 'Low' | 'Moderate' | 'High';
   currentBalance: number;
   monthlyCollections: number;
+  monthlyExpenses: number;
   trend: string;
   insight: string;
 }
@@ -35,6 +36,10 @@ interface DigitalTwinProps {
     entityName: string;
     entityType: InstitutionType;
     viewRole: 'priest' | 'school' | 'seminary';
+    entityId?: string;
+    baselineHealthScore?: number;
+    monthlyCollections?: number;
+    monthlyExpenses?: number;
   }) => void;
 }
 
@@ -91,6 +96,7 @@ const FALLBACK_PROFILES: InstitutionProfile[] = [
     risk: 'Low',
     currentBalance: 1860000,
     monthlyCollections: 548000,
+    monthlyExpenses: 465000,
     trend: '+8.4%',
     insight: 'Consistent collection growth and disciplined parish operating expenses.',
   },
@@ -103,6 +109,7 @@ const FALLBACK_PROFILES: InstitutionProfile[] = [
     risk: 'High',
     currentBalance: 690000,
     monthlyCollections: 284000,
+    monthlyExpenses: 301000,
     trend: '-3.2%',
     insight: 'Tight reserves and weak net surplus make this parish sensitive to shocks.',
   },
@@ -115,6 +122,7 @@ const FALLBACK_PROFILES: InstitutionProfile[] = [
     risk: 'Moderate',
     currentBalance: 1290000,
     monthlyCollections: 431000,
+    monthlyExpenses: 396000,
     trend: '+4.9%',
     insight: 'Healthy balance position, but discretionary spending is rising faster than inflows.',
   },
@@ -127,6 +135,7 @@ const FALLBACK_PROFILES: InstitutionProfile[] = [
     risk: 'Moderate',
     currentBalance: 4920000,
     monthlyCollections: 1230000,
+    monthlyExpenses: 1150000,
     trend: '+6.1%',
     insight: 'Stable cash position supported by subsidy continuity and predictable donor base.',
   },
@@ -139,6 +148,7 @@ const FALLBACK_PROFILES: InstitutionProfile[] = [
     risk: 'Moderate',
     currentBalance: 2810000,
     monthlyCollections: 918000,
+    monthlyExpenses: 902000,
     trend: '+1.8%',
     insight: 'Operating margin remains positive, but support dependence is increasing.',
   },
@@ -151,6 +161,7 @@ const FALLBACK_PROFILES: InstitutionProfile[] = [
     risk: 'Low',
     currentBalance: 6480000,
     monthlyCollections: 1840000,
+    monthlyExpenses: 1610000,
     trend: '+9.7%',
     insight: 'Strong tuition performance and reserve growth provide good simulation headroom.',
   },
@@ -163,6 +174,7 @@ const FALLBACK_PROFILES: InstitutionProfile[] = [
     risk: 'Moderate',
     currentBalance: 2140000,
     monthlyCollections: 921000,
+    monthlyExpenses: 935000,
     trend: '-1.1%',
     insight: 'Enrollment-sensitive collections create pressure on school operating flexibility.',
   },
@@ -219,6 +231,7 @@ export function DigitalTwin({ onLaunch }: DigitalTwinProps) {
               risk: (p.risk as 'Low' | 'Moderate' | 'High') ?? 'Moderate',
               currentBalance: p.currentBalance ?? 0,
               monthlyCollections: p.monthlyCollections ?? 0,
+              monthlyExpenses: p.monthlyExpenses ?? 0,
               trend: p.trend ?? '0.0%',
               insight: p.insight ?? '',
             })),
@@ -273,7 +286,16 @@ export function DigitalTwin({ onLaunch }: DigitalTwinProps) {
     }
 
     setTimeout(() => {
-      onLaunch({ entityClass, entityName: selectedInstitution.name, entityType: selectedInstitution.type, viewRole });
+      onLaunch({
+        entityClass,
+        entityName: selectedInstitution.name,
+        entityType: selectedInstitution.type,
+        viewRole,
+        entityId: selectedInstitution.id,
+        baselineHealthScore: selectedInstitution.healthScore,
+        monthlyCollections: selectedInstitution.monthlyCollections,
+        monthlyExpenses: selectedInstitution.monthlyExpenses,
+      });
       setIsLaunching(false);
     }, 1200);
   };
@@ -287,7 +309,16 @@ export function DigitalTwin({ onLaunch }: DigitalTwinProps) {
     setSelectedInstitutionId(inst.id);
     setIsLaunching(true);
     setTimeout(() => {
-      onLaunch({ entityClass, entityName: inst.name, entityType: inst.type, viewRole });
+      onLaunch({
+        entityClass,
+        entityName: inst.name,
+        entityType: inst.type,
+        viewRole,
+        entityId: inst.id,
+        baselineHealthScore: inst.healthScore,
+        monthlyCollections: inst.monthlyCollections,
+        monthlyExpenses: inst.monthlyExpenses,
+      });
       setIsLaunching(false);
     }, 1200);
   };
@@ -315,8 +346,8 @@ export function DigitalTwin({ onLaunch }: DigitalTwinProps) {
                 Enter another institution&apos;s dashboard without changing official records.
               </h1>
               <p className="max-w-3xl text-sm leading-7 text-white/70 md:text-base">
-                Select a parish, seminary, or school, then launch its actual dashboard interface inside a protected
-                bishop-only simulation workspace.
+                Select a parish, seminary, or school, then launch its actual dashboard interface inside the protected
+                bishop-only Digital Twin workspace.
               </p>
             </div>
             <div className="rounded-[32px] border border-[#d8b56a]/25 bg-white/95 p-6 text-gray-900 shadow-xl">
@@ -346,7 +377,7 @@ export function DigitalTwin({ onLaunch }: DigitalTwinProps) {
                   <Database className="h-5 w-5" />
                 </div>
                 <div>
-                  <h2 className="text-base font-black text-gray-900">Simulation Setup</h2>
+                  <h2 className="text-base font-black text-gray-900">Digital Twin Setup</h2>
                   <p className="text-xs text-gray-500">Select type, then launch.</p>
                 </div>
               </div>
@@ -479,8 +510,8 @@ export function DigitalTwin({ onLaunch }: DigitalTwinProps) {
                 <div className="rounded-[32px] border border-dashed border-gray-200 bg-white px-6 py-8 text-center shadow-sm">
                   <p className="text-sm font-black text-gray-700">Ready to launch</p>
                   <p className="mt-1 text-xs leading-5 text-gray-400">
-                    Click <strong>Launch</strong> on the left to open this institution's exact dashboard — the same
-                    interface the institution sees. Use the year/period selectors at the top to navigate across time.
+                    Click <strong>Launch</strong> on the left to open this institution's exact dashboard inside the
+                    Digital Twin workspace. Use the year/period selectors at the top to navigate across time.
                   </p>
                 </div>
               </>

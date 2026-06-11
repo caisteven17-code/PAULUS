@@ -66,6 +66,29 @@ export interface PriestScenario extends CreatePriestScenarioDto {
   isArchived: boolean;
 }
 
+// Digital Twin Scenarios (bishop sandbox — adjusted values + historical replay)
+export interface CreateDigitalTwinScenarioDto {
+  institutionType: 'parish' | 'seminary' | 'school';
+  institutionId?: string | null;
+  institutionName: string;
+  name: string;
+  description?: string;
+  startingMonth?: number | null;
+  startingYear?: number | null;
+  modifiedValues: Record<string, number>;
+  replayResults?: any;
+}
+
+export interface DigitalTwinScenario extends CreateDigitalTwinScenarioDto {
+  id: string;
+  createdById: string;
+  calculatedAt: string | null;
+  createdAt: string;
+  updatedAt: string;
+  deletedAt: string | null;
+  isArchived: boolean;
+}
+
 @Injectable()
 export class ScenarioService {
   constructor(private supabase: SupabaseService) {}
@@ -308,7 +331,106 @@ export class ScenarioService {
     return this.mapPriestScenario(data);
   }
 
+  // ===== DIGITAL TWIN SCENARIOS =====
+
+  async createDigitalTwinScenario(
+    createdById: string,
+    dto: CreateDigitalTwinScenarioDto,
+  ): Promise<DigitalTwinScenario> {
+    createdById = await this.resolveProfileId(createdById);
+    // Demo/fallback institutions carry non-UUID ids; store null (column is uuid).
+    const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(
+      dto.institutionId ?? '',
+    );
+    const { data, error } = await this.supabase.admin
+      .schema('diocese')
+      .from('digital_twin_scenarios')
+      .insert([
+        {
+          created_by_id: createdById,
+          institution_type: dto.institutionType,
+          institution_id: isUuid ? dto.institutionId : null,
+          institution_name: dto.institutionName,
+          name: dto.name,
+          description: dto.description || null,
+          starting_month: dto.startingMonth ?? null,
+          starting_year: dto.startingYear ?? null,
+          modified_values: dto.modifiedValues,
+          replay_results: dto.replayResults ?? null,
+          calculated_at: dto.replayResults ? new Date().toISOString() : null,
+        },
+      ])
+      .select()
+      .single();
+
+    if (error) throw new BadRequestException(error.message);
+    return this.mapDigitalTwinScenario(data);
+  }
+
+  async listDigitalTwinScenarios(createdById: string): Promise<DigitalTwinScenario[]> {
+    const profileId = await this.tryResolveProfileId(createdById);
+    if (!profileId) return []; // unlinked demo session — nothing saved, nothing to list
+    const { data, error } = await this.supabase.admin
+      .schema('diocese')
+      .from('digital_twin_scenarios')
+      .select('*')
+      .eq('created_by_id', profileId)
+      .is('deleted_at', null)
+      .order('created_at', { ascending: false });
+
+    if (error) throw new BadRequestException(error.message);
+    return (data || []).map((item) => this.mapDigitalTwinScenario(item));
+  }
+
+  async getDigitalTwinScenario(scenarioId: string, createdById: string): Promise<DigitalTwinScenario> {
+    createdById = await this.resolveProfileId(createdById);
+    const { data, error } = await this.supabase.admin
+      .schema('diocese')
+      .from('digital_twin_scenarios')
+      .select('*')
+      .eq('id', scenarioId)
+      .eq('created_by_id', createdById)
+      .is('deleted_at', null)
+      .single();
+
+    if (error || !data) throw new NotFoundException('Scenario not found');
+    return this.mapDigitalTwinScenario(data);
+  }
+
+  async deleteDigitalTwinScenario(scenarioId: string, createdById: string): Promise<void> {
+    createdById = await this.resolveProfileId(createdById);
+    const { error } = await this.supabase.admin
+      .schema('diocese')
+      .from('digital_twin_scenarios')
+      .update({ deleted_at: new Date().toISOString() })
+      .eq('id', scenarioId)
+      .eq('created_by_id', createdById);
+
+    if (error) throw new BadRequestException(error.message);
+  }
+
   // ===== HELPERS =====
+
+  private mapDigitalTwinScenario(data: any): DigitalTwinScenario {
+    return {
+      id: data.id,
+      createdById: data.created_by_id,
+      institutionType: data.institution_type,
+      institutionId: data.institution_id,
+      institutionName: data.institution_name,
+      name: data.name,
+      description: data.description,
+      startingMonth: data.starting_month,
+      startingYear: data.starting_year,
+      modifiedValues: data.modified_values,
+      replayResults: data.replay_results,
+      calculatedAt: data.calculated_at,
+      createdAt: data.created_at,
+      updatedAt: data.updated_at,
+      deletedAt: data.deleted_at,
+      isArchived: data.is_archived,
+    };
+  }
 
   private mapInstitutionScenario(data: any): InstitutionScenario {
     return {

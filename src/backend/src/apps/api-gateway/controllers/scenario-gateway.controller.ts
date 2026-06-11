@@ -9,7 +9,12 @@ import {
   Headers,
   BadRequestException,
 } from '@nestjs/common';
-import { ScenarioService, CreateInstitutionScenarioDto, CreatePriestScenarioDto } from '../../../services/scenario.service';
+import {
+  ScenarioService,
+  CreateInstitutionScenarioDto,
+  CreatePriestScenarioDto,
+  CreateDigitalTwinScenarioDto,
+} from '../../../services/scenario.service';
 import * as jwt from 'jsonwebtoken';
 
 @Controller('scenarios')
@@ -85,6 +90,42 @@ export class ScenarioGatewayController {
   ) {
     const userId = this.extractUserIdFromAuth(authorization);
     return this.scenarioService.archiveInstitutionScenario(scenarioId, userId, body.isArchived);
+  }
+
+  // ===== DIGITAL TWIN SCENARIOS =====
+
+  @Post('digital-twin')
+  async createDigitalTwinScenario(
+    @Headers('authorization') authorization: string | undefined,
+    @Body() dto: CreateDigitalTwinScenarioDto,
+  ) {
+    const userId = this.extractUserIdFromAuth(authorization);
+    return this.scenarioService.createDigitalTwinScenario(userId, dto);
+  }
+
+  @Get('digital-twin')
+  async listDigitalTwinScenarios(@Headers('authorization') authorization: string | undefined) {
+    const userId = this.extractUserIdFromAuth(authorization);
+    return this.scenarioService.listDigitalTwinScenarios(userId);
+  }
+
+  @Get('digital-twin/:id')
+  async getDigitalTwinScenario(
+    @Headers('authorization') authorization: string | undefined,
+    @Param('id') scenarioId: string,
+  ) {
+    const userId = this.extractUserIdFromAuth(authorization);
+    return this.scenarioService.getDigitalTwinScenario(scenarioId, userId);
+  }
+
+  @Delete('digital-twin/:id')
+  async deleteDigitalTwinScenario(
+    @Headers('authorization') authorization: string | undefined,
+    @Param('id') scenarioId: string,
+  ) {
+    const userId = this.extractUserIdFromAuth(authorization);
+    await this.scenarioService.deleteDigitalTwinScenario(scenarioId, userId);
+    return { success: true };
   }
 
   // ===== PRIEST SCENARIOS =====

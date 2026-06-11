@@ -14,6 +14,7 @@ import { Home } from './views/Home';
 import { Projects } from './views/Projects';
 import { WhatIfSimulator } from './views/WhatIfSimulator';
 import { DigitalTwin } from './views/DigitalTwin';
+import { DigitalTwinControlsPanel, SandboxState } from './components/layout/DigitalTwinControlsPanel';
 import { Announcements } from './views/Announcements';
 import { Events } from './views/Events';
 import { Budget } from './views/Budget';
@@ -36,6 +37,25 @@ type DigitalTwinSession = {
   entityName: string;
   entityType: 'parish' | 'school' | 'seminary';
   viewRole: 'priest' | 'school' | 'seminary';
+  entityId?: string;
+  baselineHealthScore?: number;
+  monthlyCollections?: number;
+  monthlyExpenses?: number;
+};
+
+// Seed the sandbox from the institution's real monthly figures so the panel
+// opens on the actual baseline instead of zeros. Splits mirror the heuristics
+// used by the panel's period loader (35% pastoral / 65% parish, 12% remittance).
+const buildInitialSandboxState = (session: DigitalTwinSession): SandboxState => {
+  const collections = session.monthlyCollections ?? 0;
+  const expenses = session.monthlyExpenses ?? 0;
+  return {
+    projectedCollections: collections,
+    projectedDisbursements: Math.round(expenses * 0.35),
+    projectedRemittances: Math.round(collections * 0.12),
+    projectedExpenses: Math.round(expenses * 0.65),
+    projectedBudgetAllocation: Math.max(0, Math.round((collections - expenses) * 0.8)),
+  };
 };
 
 const getDigitalTwinDefaultTab = (role: DigitalTwinSession['viewRole']) => {
@@ -138,6 +158,7 @@ export default function App() {
   const [year, setYear] = useState<number>(2026);
   const [digitalTwinSession, setDigitalTwinSession] = useState<DigitalTwinSession | null>(null);
   const [digitalTwinActiveTab, setDigitalTwinActiveTab] = useState('parish-dashboard');
+  const [dtSandboxState, setDtSandboxState] = useState<SandboxState | null>(null);
   // First-login onboarding gate (real Supabase accounts that haven't completed it).
   // Until the check finishes the app shows a spinner so the dashboard never flashes.
   const [onboardingUser, setOnboardingUser] = useState<AuthUser | null>(null);
@@ -534,10 +555,28 @@ export default function App() {
             </main>
           </div>
 
+          {dtSandboxState && (
+            <div className="hidden lg:flex h-screen">
+              <DigitalTwinControlsPanel
+                institutionName={digitalTwinSession.entityName}
+                institutionType={digitalTwinSession.entityType}
+                institutionId={digitalTwinSession.entityId ?? ''}
+                baselineHealthScore={digitalTwinSession.baselineHealthScore ?? 70}
+                baselineNet={
+                  (digitalTwinSession.monthlyCollections ?? 0) - (digitalTwinSession.monthlyExpenses ?? 0)
+                }
+                currentSandboxState={dtSandboxState}
+                onSandboxStateChange={setDtSandboxState}
+                onReset={() => setDtSandboxState(buildInitialSandboxState(digitalTwinSession))}
+              />
+            </div>
+          )}
+
           <div className="fixed left-4 bottom-4 z-[70]">
             <button
               onClick={() => {
                 setDigitalTwinSession(null);
+                setDtSandboxState(null);
                 setActiveTab('digital-twin');
               }}
               className="inline-flex items-center gap-2 rounded-full border border-black/10 bg-yellow-300 px-4 py-2 text-sm font-bold text-gray-800 shadow-lg backdrop-blur transition hover:bg-yellow-400"
@@ -717,6 +756,7 @@ export default function App() {
               onLaunch={(session) => {
                 setDigitalTwinActiveTab(getDigitalTwinDefaultTab(session.viewRole));
                 setDigitalTwinSession(session);
+                setDtSandboxState(buildInitialSandboxState(session));
               }}
             />
           ) : (

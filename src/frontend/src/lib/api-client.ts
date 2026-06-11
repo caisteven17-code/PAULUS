@@ -412,6 +412,42 @@ export const apiClient = {
   },
 
   // ----------------------------------------------------------------
+  // Digital Twin (bishop sandbox — counterfactual replay + private scenarios)
+  // ----------------------------------------------------------------
+  runDigitalTwinReplay: (
+    entityType: 'parish' | 'seminary' | 'school',
+    institutionId: string,
+    body: {
+      start_month: number; // 1-12
+      start_year: number;
+      modified_receipts?: number;
+      modified_expenses?: number;
+    },
+  ) => post<any>(`/api/analytics/prescriptive/counterfactual-replay/${entityType}/${institutionId}`, body),
+
+  async createDigitalTwinScenario(dto: {
+    institutionType: 'parish' | 'seminary' | 'school';
+    institutionId?: string | null;
+    institutionName: string;
+    name: string;
+    description?: string;
+    startingMonth?: number | null;
+    startingYear?: number | null;
+    modifiedValues: Record<string, number>;
+    replayResults?: any;
+  }): Promise<any> {
+    return post('/api/scenarios/digital-twin', dto);
+  },
+
+  async listDigitalTwinScenarios(): Promise<any[]> {
+    return get('/api/scenarios/digital-twin');
+  },
+
+  async deleteDigitalTwinScenario(id: string): Promise<void> {
+    await del(`/api/scenarios/digital-twin/${id}`);
+  },
+
+  // ----------------------------------------------------------------
   // Simulator Scenarios
   // ----------------------------------------------------------------
   async createInstitutionScenario(dto: {
