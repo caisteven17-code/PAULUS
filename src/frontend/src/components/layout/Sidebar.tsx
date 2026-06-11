@@ -136,7 +136,7 @@ export function Sidebar({ activeTab = '', onNavigate, role, timeframe = '6m', on
       </div>
 
       {/* Navigation Section */}
-      <nav className="flex-1 px-3 space-y-1 overflow-y-auto scrollbar-none">
+      <nav className="flex-1 px-3 space-y-1 overflow-y-auto scrollbar-hide">
         {/* Home (bishop/admin) or Announcements (priest) — always first */}
         {(() => {
           if (permissions.view_diocese !== true) return null;

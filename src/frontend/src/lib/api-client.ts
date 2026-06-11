@@ -48,6 +48,38 @@ async function getAuthToken(): Promise<string | null> {
   return null;
 }
 
+// Identify the caller to the backend for permission checks and audit logs.
+// Header values must be ASCII, so strip anything outside printable range.
+function getUserHeaders(): Record<string, string> {
+  const headers: Record<string, string> = {};
+  try {
+    const sessionUser = auth.currentUser as any;
+    let name = sessionUser?.name;
+    let role = sessionUser?.role;
+
+    if (!name || !role) {
+      const stored = localStorage.getItem('currentUser');
+      if (stored) {
+        const user = JSON.parse(stored);
+        name = name || user?.name;
+        role = role || user?.role;
+      }
+    }
+
+    const sanitize = (v: unknown) =>
+      String(v)
+        .normalize('NFKD')
+        .replace(/[^\x20-\x7E]/g, '')
+        .trim();
+
+    if (name) headers['x-user-name'] = sanitize(name);
+    if (role) headers['x-user-role'] = sanitize(role);
+  } catch {
+    // Ignore — backend falls back to "Unknown User"
+  }
+  return headers;
+}
+
 // ------------------------------------------------------------------
 // Helpers
 // ------------------------------------------------------------------
@@ -58,7 +90,7 @@ async function get<T>(path: string, params?: Record<string, string | undefined>)
       if (v !== undefined && v !== null) url.searchParams.set(k, v);
     });
   }
-  const headers: Record<string, string> = {};
+  const headers: Record<string, string> = { ...getUserHeaders() };
   const token = await getAuthToken();
   if (token) {
     headers['Authorization'] = token;
@@ -70,7 +102,7 @@ async function get<T>(path: string, params?: Record<string, string | undefined>)
 }
 
 async function post<T>(path: string, body: unknown): Promise<T> {
-  const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+  const headers: Record<string, string> = { 'Content-Type': 'application/json', ...getUserHeaders() };
   const token = await getAuthToken();
   if (token) {
     headers['Authorization'] = token;
@@ -97,11 +129,37 @@ async function post<T>(path: string, body: unknown): Promise<T> {
   return res.json();
 }
 
+async function patch<T>(path: string, body: unknown): Promise<T> {
+  const headers: Record<string, string> = { 'Content-Type': 'application/json', ...getUserHeaders() };
+  const token = await getAuthToken();
+  if (token) {
+    headers['Authorization'] = token;
+  }
+
+  const res = await fetch(path, {
+    method: 'PATCH',
+    credentials: 'include',
+    headers,
+    body: JSON.stringify(body),
+  });
+  if (!res.ok) {
+    let detail = '';
+    try {
+      const j = await res.json();
+      detail = j?.message ?? j?.error ?? '';
+    } catch {
+      /* ignore */
+    }
+    throw new Error(`PATCH ${path} → ${res.status}${detail ? `: ${detail}` : ''}`);
+  }
+  return res.json();
+}
+
 async function del(path: string, params?: Record<string, string>): Promise<void> {
   const url = new URL(path, window.location.origin);
   if (params) Object.entries(params).forEach(([k, v]) => url.searchParams.set(k, v));
 
-  const headers: Record<string, string> = {};
+  const headers: Record<string, string> = { ...getUserHeaders() };
   const token = await getAuthToken();
   if (token) {
     headers['Authorization'] = token;
@@ -566,6 +624,30 @@ export const apiClient = {
 
   async saveEvent(event: Record<string, any>): Promise<any> {
     return post('/api/events', event);
+  },
+
+  async updateEvent(id: string, updates: Record<string, any>): Promise<any> {
+    return patch(`/api/events/${encodeURIComponent(id)}`, updates);
+  },
+
+  async archiveEvent(id: string): Promise<{ ok: boolean }> {
+    return post(`/api/events/${encodeURIComponent(id)}/archive`, {});
+  },
+
+  async restoreEvent(id: string): Promise<{ ok: boolean }> {
+    return post(`/api/events/${encodeURIComponent(id)}/restore`, {});
+  },
+
+  async getArchivedEvents(params?: {
+    institutionId?: string;
+    institutionName?: string;
+    institutionType?: string;
+  }): Promise<any[]> {
+    return get('/api/events/archived', {
+      institutionId: params?.institutionId,
+      institutionName: params?.institutionName,
+      institutionType: params?.institutionType,
+    });
   },
 
   // ----------------------------------------------------------------

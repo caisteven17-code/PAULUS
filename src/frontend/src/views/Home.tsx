@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import {
   Church,
   GraduationCap,
@@ -22,6 +22,7 @@ import {
   Upload,
 } from 'lucide-react';
 import { motion } from 'motion/react';
+import { apiClient } from '../lib/api-client';
 import { SubmissionTracker } from '../components/projects/SubmissionTracker';
 import { ClassificationManagement, ClassificationRecord } from '../components/ui/ClassificationManagement';
 import ReactECharts from 'echarts-for-react';
@@ -126,26 +127,8 @@ const mockAnnouncements = [
   },
 ];
 
-const institutionStats = [
-  {
-    title: 'Parishes',
-    value: '86',
-    icon: Church,
-    color: 'gold',
-  },
-  {
-    title: 'Seminaries',
-    value: '5',
-    icon: BookOpen,
-    color: 'emerald',
-  },
-  {
-    title: 'Diocesan Schools',
-    value: '7',
-    icon: GraduationCap,
-    color: 'purple',
-  },
-];
+// Fallback values shown until live counts load (or if the backend is unavailable)
+const FALLBACK_INSTITUTION_COUNTS = { parish: 86, seminary: 5, school: 7 };
 
 const financialMetrics = [
   {
@@ -176,6 +159,38 @@ const contributionData = [
 ];
 
 export function Home({ onNavigate, role = 'bishop', permissions = {} }: HomeProps) {
+  const [institutionCounts, setInstitutionCounts] = useState(FALLBACK_INSTITUTION_COUNTS);
+
+  useEffect(() => {
+    let cancelled = false;
+    apiClient
+      .getEntities()
+      .then((entities) => {
+        if (cancelled || !Array.isArray(entities) || entities.length === 0) return;
+        const counts = { parish: 0, seminary: 0, school: 0 };
+        for (const e of entities as any[]) {
+          const type = (e.entity_type ?? e.type ?? '') as keyof typeof counts;
+          if (type in counts) counts[type] += 1;
+        }
+        setInstitutionCounts(counts);
+      })
+      .catch((err) => {
+        console.error('[Home] entity counts fetch failed, keeping fallback values:', err);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const institutionStats = useMemo(
+    () => [
+      { title: 'Parishes', value: String(institutionCounts.parish), icon: Church, color: 'gold' },
+      { title: 'Seminaries', value: String(institutionCounts.seminary), icon: BookOpen, color: 'emerald' },
+      { title: 'Diocesan Schools', value: String(institutionCounts.school), icon: GraduationCap, color: 'purple' },
+    ],
+    [institutionCounts],
+  );
+
   return (
     <div className="flex flex-col min-h-[calc(100vh-80px)] bg-[#FDFCFB]">
       {/* Hero Section - Restored based on user image */}

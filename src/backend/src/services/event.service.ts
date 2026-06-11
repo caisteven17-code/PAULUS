@@ -14,6 +14,7 @@ export interface DiocesanEvent {
   notes?: string;
   linked_project_id?: string;
   created_at?: string;
+  deleted_at?: string;
 }
 
 const DIOCESE_INSTITUTION_NAME = 'Diocese of San Pablo';
@@ -28,6 +29,30 @@ export class EventService {
 
   private isUuid(value?: string): boolean {
     return typeof value === 'string' && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(value);
+  }
+
+  private async writeAuditLog(payload: {
+    userName: string;
+    userRole: string;
+    action: string;
+    detail: string;
+    metadata?: Record<string, any>;
+  }): Promise<void> {
+    const { error } = await this.db()
+      .from('audit_logs')
+      .insert({
+        user_name: payload.userName,
+        user_role: payload.userRole,
+        is_system: false,
+        category: 'system',
+        severity: 'info',
+        action: payload.action,
+        detail: payload.detail,
+        entity: 'event',
+        metadata: payload.metadata ?? null,
+      });
+
+    if (error) console.error('[event.service] writeAuditLog:', error.message);
   }
 
   /**
@@ -94,7 +119,43 @@ export class EventService {
       notes: row.notes ?? undefined,
       linked_project_id: row.linked_project_id ?? undefined,
       created_at: row.created_at,
+      deleted_at: row.deleted_at ?? undefined,
     };
+  }
+
+  /** Attach institution names so the diocese overview can show event owners. */
+  private async attachInstitutions(rows: any[]): Promise<DiocesanEvent[]> {
+    if (rows.length === 0) return [];
+
+    const institutionIds = Array.from(new Set(rows.map((r: any) => r.institution_id).filter(Boolean)));
+    const byId = new Map<string, any>();
+    if (institutionIds.length > 0) {
+      const { data: institutions } = await this.db()
+        .from('institutions')
+        .select('id, name, institution_type')
+        .in('id', institutionIds);
+      for (const inst of institutions ?? []) byId.set(inst.id, inst);
+    }
+
+    return rows.map((row: any) => this.toEvent(row, byId.get(row.institution_id)));
+  }
+
+  private async resolveScope(filters: {
+    institutionId?: string;
+    institutionName?: string;
+    institutionType?: string;
+  }): Promise<{ scopedInstitutionId: string | null; unresolvable: boolean }> {
+    if (!filters.institutionId && !filters.institutionName) {
+      return { scopedInstitutionId: null, unresolvable: false };
+    }
+    const scopedInstitutionId = await this.resolveInstitutionId(
+      filters.institutionId,
+      filters.institutionName,
+      filters.institutionType,
+    );
+    // A scope was requested but couldn't be resolved — return nothing rather
+    // than leaking every institution's events.
+    return { scopedInstitutionId, unresolvable: !scopedInstitutionId };
   }
 
   async getEvents(filters: {
@@ -102,17 +163,8 @@ export class EventService {
     institutionName?: string;
     institutionType?: string;
   } = {}): Promise<DiocesanEvent[]> {
-    let scopedInstitutionId: string | null = null;
-    if (filters.institutionId || filters.institutionName) {
-      scopedInstitutionId = await this.resolveInstitutionId(
-        filters.institutionId,
-        filters.institutionName,
-        filters.institutionType,
-      );
-      // A scope was requested but couldn't be resolved — return nothing rather
-      // than leaking every institution's events.
-      if (!scopedInstitutionId) return [];
-    }
+    const { scopedInstitutionId, unresolvable } = await this.resolveScope(filters);
+    if (unresolvable) return [];
 
     let query = this.db()
       .from('events')
@@ -130,21 +182,34 @@ export class EventService {
       return [];
     }
 
-    const rows = data ?? [];
-    if (rows.length === 0) return [];
+    return this.attachInstitutions(data ?? []);
+  }
 
-    // Attach institution names so the diocese overview can show event owners.
-    const institutionIds = Array.from(new Set(rows.map((r: any) => r.institution_id).filter(Boolean)));
-    const byId = new Map<string, any>();
-    if (institutionIds.length > 0) {
-      const { data: institutions } = await this.db()
-        .from('institutions')
-        .select('id, name, institution_type')
-        .in('id', institutionIds);
-      for (const inst of institutions ?? []) byId.set(inst.id, inst);
+  async getArchivedEvents(filters: {
+    institutionId?: string;
+    institutionName?: string;
+    institutionType?: string;
+  } = {}): Promise<DiocesanEvent[]> {
+    const { scopedInstitutionId, unresolvable } = await this.resolveScope(filters);
+    if (unresolvable) return [];
+
+    let query = this.db()
+      .from('events')
+      .select('*')
+      .not('deleted_at', 'is', null)
+      .order('deleted_at', { ascending: false });
+
+    if (scopedInstitutionId) {
+      query = query.eq('institution_id', scopedInstitutionId);
     }
 
-    return rows.map((row: any) => this.toEvent(row, byId.get(row.institution_id)));
+    const { data, error } = await query;
+    if (error) {
+      console.error('[event.service] getArchivedEvents:', error.message);
+      return [];
+    }
+
+    return this.attachInstitutions(data ?? []);
   }
 
   async saveEvent(
@@ -152,6 +217,8 @@ export class EventService {
       institutionName?: string;
       institutionType?: string;
     },
+    userName = 'Unknown User',
+    userRole = 'unknown',
   ): Promise<DiocesanEvent | null> {
     const institutionId = await this.resolveInstitutionId(
       event.institution_id,
@@ -186,6 +253,116 @@ export class EventService {
       .eq('id', institutionId)
       .maybeSingle();
 
+    await this.writeAuditLog({
+      userName,
+      userRole,
+      action: 'Created Event',
+      detail: `"${event.event_name}" was scheduled for ${event.start_date}`,
+      metadata: { event_id: data.id, institution: institution?.name },
+    });
+
     return this.toEvent(data, institution ?? undefined);
+  }
+
+  async updateEvent(
+    id: string,
+    patch: {
+      event_name?: string;
+      event_level?: DiocesanEvent['event_level'];
+      event_type?: string;
+      start_date?: string;
+      end_date?: string;
+      notes?: string;
+    },
+    userName: string,
+    userRole: string,
+  ): Promise<DiocesanEvent | null> {
+    const updates: Record<string, unknown> = {};
+    if (patch.event_name !== undefined) updates.event_name = patch.event_name;
+    if (patch.event_level !== undefined) updates.event_level = patch.event_level;
+    if (patch.start_date !== undefined) updates.start_date = patch.start_date;
+    // Optional fields: empty string clears the value
+    if ('event_type' in patch) updates.event_type = patch.event_type || null;
+    if ('end_date' in patch) updates.end_date = patch.end_date || null;
+    if ('notes' in patch) updates.notes = patch.notes || null;
+
+    const { data, error } = await this.db()
+      .from('events')
+      .update(updates)
+      .eq('id', id)
+      .is('deleted_at', null)
+      .select()
+      .single();
+
+    if (error || !data) {
+      console.error('[event.service] updateEvent:', error?.message);
+      return null;
+    }
+
+    const { data: institution } = await this.db()
+      .from('institutions')
+      .select('name, institution_type')
+      .eq('id', data.institution_id)
+      .maybeSingle();
+
+    await this.writeAuditLog({
+      userName,
+      userRole,
+      action: 'Edited Event',
+      detail: `"${data.event_name}" was edited by ${userName}`,
+      metadata: { event_id: id, changes: patch },
+    });
+
+    return this.toEvent(data, institution ?? undefined);
+  }
+
+  async archiveEvent(id: string, userName: string, userRole: string): Promise<{ ok: boolean }> {
+    const { data, error } = await this.db()
+      .from('events')
+      .update({ deleted_at: new Date().toISOString() })
+      .eq('id', id)
+      .is('deleted_at', null)
+      .select('event_name')
+      .single();
+
+    if (error || !data) {
+      console.error('[event.service] archiveEvent:', error?.message);
+      return { ok: false };
+    }
+
+    await this.writeAuditLog({
+      userName,
+      userRole,
+      action: 'Archived Event',
+      detail: `"${data.event_name}" was archived by ${userName}`,
+      metadata: { event_id: id, archived_by: userName },
+    });
+
+    return { ok: true };
+  }
+
+  async restoreEvent(id: string, userName: string, userRole: string): Promise<{ ok: boolean }> {
+    const { data, error } = await this.db()
+      .from('events')
+      .update({ deleted_at: null })
+      .eq('id', id)
+      .not('deleted_at', 'is', null)
+      .select('event_name')
+      .single();
+
+    if (error || !data) {
+      console.error('[event.service] restoreEvent:', error?.message);
+      return { ok: false };
+    }
+
+    await this.writeAuditLog({
+      userName,
+      userRole,
+      action: 'Restored Archived Event',
+      detail: `"${data.event_name}" was restored from archive by ${userName}`,
+      metadata: { event_id: id, restored_by: userName },
+    });
+
+    return { ok: true };
   }
 }
