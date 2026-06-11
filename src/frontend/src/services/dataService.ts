@@ -69,6 +69,12 @@ export const dataService = {
     return apiClient.calculateHealthScore(entityId, entityType, entityClass);
   },
 
+  async calculateHealthScores(
+    entities: { entityId: string; entityType: 'parish' | 'seminary' | 'school'; entityClass?: EntityClass }[],
+  ): Promise<FinancialHealthScore[]> {
+    return apiClient.calculateHealthScores(entities);
+  },
+
   /** Kept for backward compatibility — delegates to analyticsService. */
   getDefaultHealthScore(entityId: string, entityType: any): FinancialHealthScore {
     return {

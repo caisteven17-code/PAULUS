@@ -86,7 +86,9 @@ async function post<T>(path: string, body: unknown): Promise<T> {
     let detail = '';
     try {
       const j = await res.json();
-      detail = j?.error ?? j?.message ?? '';
+      // NestJS puts the human-readable text in `message`; `error` is just the
+      // generic status name ("Bad Request"), so prefer message.
+      detail = j?.message ?? j?.error ?? '';
     } catch {
       /* ignore */
     }
@@ -205,6 +207,14 @@ export const apiClient = {
     entityClass?: EntityClass,
   ): Promise<FinancialHealthScore> {
     return get('/api/analytics/health', { entityId, entityType, entityClass });
+  },
+
+  // Batch variant — one request scores every entity; use this from dashboards
+  // instead of firing one request per institution.
+  async calculateHealthScores(
+    entities: { entityId: string; entityType: 'parish' | 'seminary' | 'school'; entityClass?: EntityClass }[],
+  ): Promise<FinancialHealthScore[]> {
+    return post('/api/analytics/health', { entities });
   },
 
   async getDiagnostic(entityId: string, month: string): Promise<DiagnosticResult> {

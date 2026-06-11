@@ -21,6 +21,14 @@ export class ScenarioGatewayController {
 
     try {
       const token = authorization.replace('Bearer ', '');
+
+      // Demo/offline sessions send `Bearer demo-<userId>` (see frontend api-client)
+      if (token.startsWith('demo-')) {
+        const demoUserId = token.slice('demo-'.length);
+        if (!demoUserId) throw new BadRequestException('Invalid demo token: no user ID');
+        return demoUserId;
+      }
+
       // Decode without verification (gateway trusts upstream auth)
       const decoded = jwt.decode(token) as any;
       const userId = decoded?.sub || decoded?.id;
@@ -69,7 +77,7 @@ export class ScenarioGatewayController {
     return { success: true };
   }
 
-  @Patch('institution/:id')
+  @Patch('institution/:id/archive')
   async archiveInstitutionScenario(
     @Headers('authorization') authorization: string | undefined,
     @Param('id') scenarioId: string,
@@ -115,7 +123,7 @@ export class ScenarioGatewayController {
     return { success: true };
   }
 
-  @Patch('priest/:id')
+  @Patch('priest/:id/archive')
   async archivePriestScenario(
     @Headers('authorization') authorization: string | undefined,
     @Param('id') scenarioId: string,

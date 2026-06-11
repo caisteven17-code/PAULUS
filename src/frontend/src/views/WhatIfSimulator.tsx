@@ -33,7 +33,9 @@ interface AITwinProps {
 }
 
 interface FinancialTwinProfile {
-  id: number;
+  id: string; // institution UUID for live profiles, 'demo-*' for fallback data
+  institutionCode?: string; // human-readable code, e.g. P-0001
+  classRaw?: string; // raw institution class letter (A/B/C/D) for estimates
   name: string;
   cashBalance: number;
   monthlyIncome: number;
@@ -43,104 +45,48 @@ interface FinancialTwinProfile {
   expensesHistory: number[];
 }
 
-const parishProfiles: FinancialTwinProfile[] = [
-  {
-    id: 1,
-    name: "St. Matthew's Parish",
-    cashBalance: 200000,
-    monthlyIncome: 50000,
-    monthlyExpenses: 60000,
-    healthScore: 58,
-    collectionsHistory: [44000, 45200, 46800, 47100, 48300, 49500],
-    expensesHistory: [57000, 58100, 58900, 59600, 60200, 61100],
-  },
-  {
-    id: 2,
-    name: 'San Roque Parish',
-    cashBalance: 80000,
-    monthlyIncome: 35000,
-    monthlyExpenses: 45000,
-    healthScore: 41,
-    collectionsHistory: [29000, 30100, 31400, 32900, 34700, 36100],
-    expensesHistory: [46100, 45800, 45400, 45200, 44700, 44500],
-  },
-  {
-    id: 3,
-    name: 'Our Lady of Peace',
-    cashBalance: 350000,
-    monthlyIncome: 80000,
-    monthlyExpenses: 70000,
-    healthScore: 82,
-    collectionsHistory: [74800, 76200, 77900, 79300, 80700, 82100],
-    expensesHistory: [67600, 68400, 69100, 70200, 71100, 71900],
-  },
-  {
-    id: 4,
-    name: "St. Peter's Parish",
-    cashBalance: 120000,
-    monthlyIncome: 45000,
-    monthlyExpenses: 48000,
-    healthScore: 65,
-    collectionsHistory: [39600, 40800, 42300, 43700, 45200, 46800],
-    expensesHistory: [46200, 46900, 47400, 47800, 48200, 48600],
-  },
-];
+// Baseline estimates used when an institution has no financial submissions yet.
+// Keyed by institution class; income/expenses in PHP per month.
+const CLASS_BASELINES: Record<string, { income: number; expenses: number; balance: number }> = {
+  A: { income: 120000, expenses: 95000, balance: 500000 },
+  B: { income: 70000, expenses: 58000, balance: 250000 },
+  C: { income: 35000, expenses: 30000, balance: 100000 },
+  D: { income: 15000, expenses: 14000, balance: 40000 },
+};
 
-const seminaryProfiles: FinancialTwinProfile[] = [
-  {
-    id: 1,
-    name: "St. Peter's College Seminary",
-    cashBalance: 980000,
-    monthlyIncome: 520000,
-    monthlyExpenses: 610000,
-    healthScore: 74,
-    collectionsHistory: [468000, 482000, 501000, 515000, 526000, 538000],
-    expensesHistory: [588000, 596000, 604000, 611000, 618000, 624000],
-  },
-  {
-    id: 2,
-    name: 'Diocesan Memorial Seminary',
-    cashBalance: 640000,
-    monthlyIncome: 410000,
-    monthlyExpenses: 455000,
-    healthScore: 68,
-    collectionsHistory: [384000, 392000, 401000, 407000, 414000, 423000],
-    expensesHistory: [438000, 442000, 449000, 453000, 458000, 462000],
-  },
-];
+const TYPE_BASELINES: Record<FinancialAITwinMode, { income: number; expenses: number; balance: number }> = {
+  parish: CLASS_BASELINES.C,
+  seminary: { income: 450000, expenses: 430000, balance: 800000 },
+  school: { income: 600000, expenses: 560000, balance: 900000 },
+};
 
-const schoolProfiles: FinancialTwinProfile[] = [
-  {
-    id: 1,
-    name: 'San Pablo Diocesan Catholic School',
-    cashBalance: 1250000,
-    monthlyIncome: 870000,
-    monthlyExpenses: 805000,
-    healthScore: 82,
-    collectionsHistory: [812000, 828000, 842000, 856000, 874000, 892000],
-    expensesHistory: [782000, 789000, 796000, 802000, 809000, 816000],
-  },
-  {
-    id: 2,
-    name: 'Sacred Heart School',
-    cashBalance: 540000,
-    monthlyIncome: 430000,
-    monthlyExpenses: 468000,
-    healthScore: 61,
-    collectionsHistory: [398000, 405000, 414000, 421000, 427000, 435000],
-    expensesHistory: [448000, 454000, 459000, 463000, 469000, 474000],
-  },
-  {
-    id: 3,
-    name: 'Holy Family School',
-    cashBalance: 790000,
-    monthlyIncome: 610000,
-    monthlyExpenses: 585000,
-    healthScore: 76,
-    collectionsHistory: [572000, 584000, 596000, 604000, 616000, 628000],
-    expensesHistory: [560000, 566000, 573000, 581000, 589000, 596000],
-  },
-];
+const baselineFor = (mode: FinancialAITwinMode, classRaw?: string) =>
+  (mode === 'parish' && classRaw && CLASS_BASELINES[classRaw]) || TYPE_BASELINES[mode];
+
+interface MlForecastPoint {
+  period: string;
+  value: number;
+  lower_bound: number;
+  upper_bound: number;
+}
+
+interface MlForecast {
+  receipts: MlForecastPoint[];
+  expenses: MlForecastPoint[];
+  championModel: string;
+}
+
+// Zeroed stand-in used only for initial state before institutions load.
+const PLACEHOLDER_PROFILE: FinancialTwinProfile = {
+  id: '',
+  name: '',
+  cashBalance: 0,
+  monthlyIncome: 0,
+  monthlyExpenses: 0,
+  healthScore: 0,
+  collectionsHistory: [],
+  expensesHistory: [],
+};
 
 const financialTwinConfigs = {
   parish: {
@@ -154,7 +100,6 @@ const financialTwinConfigs = {
     incomeChangeLabel: 'Collections Change',
     externalSupportLabel: 'External Support',
     storageKey: 'church_sim_scenarios',
-    profiles: parishProfiles,
   },
   seminary: {
     label: 'Seminary',
@@ -167,7 +112,6 @@ const financialTwinConfigs = {
     incomeChangeLabel: 'Formation Income Change',
     externalSupportLabel: 'Diocesan Subsidy',
     storageKey: 'seminary_twin_scenarios',
-    profiles: seminaryProfiles,
   },
   school: {
     label: 'School',
@@ -180,7 +124,6 @@ const financialTwinConfigs = {
     incomeChangeLabel: 'Tuition Income Change',
     externalSupportLabel: 'Mission Support',
     storageKey: 'school_twin_scenarios',
-    profiles: schoolProfiles,
   },
 } as const;
 
@@ -196,7 +139,7 @@ interface ParishSimulationParams {
 interface ParishSavedScenario {
   id: string;
   name: string;
-  parishId: number;
+  parishId: string;
   params: ParishSimulationParams;
   timestamp: number;
   fullScenario?: any;
@@ -408,23 +351,47 @@ function calculatePriestAnalytics(priest: (typeof priests)[number]) {
   };
 }
 
-function calculateParishResults(params: ParishSimulationParams, parish: FinancialTwinProfile, entityLabel = 'parish') {
+function calculateParishResults(
+  params: ParishSimulationParams,
+  parish: FinancialTwinProfile,
+  entityLabel = 'parish',
+  mlForecast: MlForecast | null = null,
+) {
   const analytics = calculateParishAnalytics(parish);
   const baseMonthlyIncome = analytics.incomeAvg;
   const baseMonthlyExpenses = average(parish.expensesHistory);
 
-  const simMonthlyIncome = baseMonthlyIncome * (1 + params.collectionsChange / 100);
-  const simMonthlyExpenses = baseMonthlyExpenses * (1 + params.expensesChange / 100);
-  const monthlyNet = simMonthlyIncome - simMonthlyExpenses;
+  // Per-month baseline: ML forecast when available, otherwise flat average.
+  // The user's % adjustments scale each month individually, so a seasonal
+  // forecast keeps its shape (Holy Week peak, lean months) under simulation.
+  const forecastIncomeAt = (i: number): number => {
+    if (!mlForecast?.receipts.length) return baseMonthlyIncome;
+    const pts = mlForecast.receipts;
+    return Number(pts[Math.min(i, pts.length - 1)].value);
+  };
+  const forecastExpensesAt = (i: number): number => {
+    if (!mlForecast?.expenses.length) return baseMonthlyExpenses;
+    const pts = mlForecast.expenses;
+    return Number(pts[Math.min(i, pts.length - 1)].value);
+  };
 
   let currentCash = parish.cashBalance + params.oneTimeIncome - params.oneTimeExpense + params.externalSupport;
   let baselineCash = parish.cashBalance;
-  const baselineMonthlyNet = baseMonthlyIncome - baseMonthlyExpenses;
   const projectedData = [{ month: 'Now', baseline: parish.cashBalance, simulated: currentCash }];
 
+  let netSum = 0;
+  let firstDepletionMonth = -1;
   for (let i = 1; i <= params.timeline; i += 1) {
-    baselineCash += baselineMonthlyNet;
-    currentCash += monthlyNet;
+    const baseIncome = forecastIncomeAt(i - 1);
+    const baseExpenses = forecastExpensesAt(i - 1);
+    const simIncome = baseIncome * (1 + params.collectionsChange / 100);
+    const simExpenses = baseExpenses * (1 + params.expensesChange / 100);
+    const monthNet = simIncome - simExpenses;
+    netSum += monthNet;
+
+    baselineCash += baseIncome - baseExpenses;
+    currentCash += monthNet;
+    if (firstDepletionMonth === -1 && currentCash <= 0) firstDepletionMonth = i;
     projectedData.push({
       month: `Month ${i}`,
       baseline: Math.max(0, baselineCash),
@@ -432,9 +399,14 @@ function calculateParishResults(params: ParishSimulationParams, parish: Financia
     });
   }
 
+  const monthlyNet = netSum / params.timeline;
+
   let runwayMonths = -1;
-  if (monthlyNet < 0) {
-    runwayMonths = Math.floor(currentCash / Math.abs(monthlyNet));
+  if (firstDepletionMonth !== -1) {
+    runwayMonths = firstDepletionMonth;
+  } else if (monthlyNet < 0 && currentCash > 0) {
+    // Did not deplete inside the timeline; extrapolate from the average burn.
+    runwayMonths = params.timeline + Math.floor(currentCash / Math.abs(monthlyNet));
   }
 
   let riskLevel = 'Low';
@@ -602,34 +574,48 @@ function calculatePriestScenario(
 
 function ParishAITwin({ mode = 'parish' }: { mode?: FinancialAITwinMode }) {
   const config = financialTwinConfigs[mode];
-  const [liveProfiles, setLiveProfiles] = useState<FinancialTwinProfile[]>(config.profiles);
+  const [liveProfiles, setLiveProfiles] = useState<FinancialTwinProfile[]>([]);
+  const [profilesLoaded, setProfilesLoaded] = useState(false);
+  const [loadError, setLoadError] = useState(false);
   const profiles = liveProfiles;
-  const [selectedParishId, setSelectedParishId] = useState<number>(profiles[0]?.id ?? 1);
+  const [selectedParishId, setSelectedParishId] = useState<string>('');
 
-  // Fetch real institution financial profiles; fall back to hardcoded on failure
+  // Fetch real institution financial profiles; fall back to hardcoded on failure.
+  // Institutions without submissions get class-based baseline estimates so the
+  // simulation still produces meaningful numbers.
   useEffect(() => {
     const entityType = mode === 'seminary' ? 'seminary' : mode === 'school' ? 'school' : 'parish';
     apiClient
       .getFinancialProfiles(entityType as any)
       .then((data) => {
-        if (data?.length) {
-          const mapped: FinancialTwinProfile[] = data.map((p: any, i: number) => ({
-            id: i + 1,
+        if (!data) return;
+        const mapped: FinancialTwinProfile[] = data.map((p: any) => {
+          const hasFinancials = (p.monthlyCollections ?? 0) > 0 || (p.monthlyExpenses ?? 0) > 0;
+          const estimate = baselineFor(mode, p.classRaw);
+          const income = hasFinancials ? p.monthlyCollections : estimate.income;
+          const expenses = hasFinancials ? p.monthlyExpenses : estimate.expenses;
+          return {
+            id: p.id,
+            institutionCode: p.institutionCode || undefined,
+            classRaw: p.classRaw || undefined,
             name: p.name,
-            cashBalance: p.currentBalance ?? 0,
-            monthlyIncome: p.monthlyCollections ?? 0,
-            monthlyExpenses: p.monthlyExpenses ?? 0,
+            cashBalance: hasFinancials ? (p.currentBalance ?? 0) : estimate.balance,
+            monthlyIncome: income,
+            monthlyExpenses: expenses,
             healthScore: p.healthScore ?? 50,
-            collectionsHistory:
-              p.collectionsHistory?.length === 6 ? p.collectionsHistory : Array(6).fill(p.monthlyCollections ?? 0),
-            expensesHistory:
-              p.expensesHistory?.length === 6 ? p.expensesHistory : Array(6).fill(p.monthlyExpenses ?? 0),
-          }));
-          setLiveProfiles(mapped);
-          setSelectedParishId(1);
-        }
+            collectionsHistory: p.collectionsHistory?.length === 6 ? p.collectionsHistory : Array(6).fill(income),
+            expensesHistory: p.expensesHistory?.length === 6 ? p.expensesHistory : Array(6).fill(expenses),
+          };
+        });
+        setLiveProfiles(mapped);
+        setSelectedParishId('');
+        setProfilesLoaded(true);
       })
-      .catch(() => {});
+      .catch((err) => {
+        console.error('[WhatIfSimulator] failed to load institution profiles:', err);
+        setLoadError(true);
+        setProfilesLoaded(true);
+      });
   }, [mode]);
   const [isSimulating, setIsSimulating] = useState(false);
   const [savedScenarios, setSavedScenarios] = useState<ParishSavedScenario[]>([]);
@@ -653,7 +639,7 @@ function ParishAITwin({ mode = 'parish' }: { mode?: FinancialAITwinMode }) {
           .map((s: any) => ({
             id: s.id,
             name: s.name,
-            parishId: 1, // Map to profile
+            parishId: s.institutionId,
             params: {
               collectionsChange: s.incomeChange,
               expensesChange: s.expensesChange,
@@ -686,28 +672,66 @@ function ParishAITwin({ mode = 'parish' }: { mode?: FinancialAITwinMode }) {
   });
 
   const selectedParish = useMemo(
-    () => profiles.find((parish) => parish.id === selectedParishId) || profiles[0],
+    () => (selectedParishId ? profiles.find((parish) => parish.id === selectedParishId) : undefined),
     [profiles, selectedParishId],
   );
-  const selectedParishAnalytics = useMemo(() => calculateParishAnalytics(selectedParish), [selectedParish]);
+  const selectedParishAnalytics = useMemo(
+    () => calculateParishAnalytics(selectedParish ?? PLACEHOLDER_PROFILE),
+    [selectedParish],
+  );
+
+  // ML forecast baseline. Fetched once per institution (24 periods = max
+  // timeline, sliced client-side). Null until loaded or when the predictive
+  // service reports insufficient data — the class/average baseline then applies.
+  const [mlForecast, setMlForecast] = useState<MlForecast | null>(null);
+  const [forecastSource, setForecastSource] = useState<string>('Estimate');
+
+  useEffect(() => {
+    setMlForecast(null);
+    setForecastSource('Estimate');
+    if (!selectedParish?.id) return;
+
+    const entityType = mode === 'seminary' ? 'seminary' : mode === 'school' ? 'school' : 'parish';
+    let cancelled = false;
+    apiClient
+      .getFinancialForecast(entityType, selectedParish.id, 24)
+      .then((data: any) => {
+        if (cancelled) return;
+        if (data?.data_sufficient && data.forecast_receipts?.length) {
+          setMlForecast({
+            receipts: data.forecast_receipts,
+            expenses: data.forecast_expenses ?? [],
+            championModel: data.champion?.champion_model ?? 'ML',
+          });
+          setForecastSource(data.champion?.champion_model ?? 'ML');
+        }
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, [selectedParish?.id, mode]);
 
   const [simulationResults, setSimulationResults] = useState(() =>
-    calculateParishResults(params, selectedParish, config.labelLower),
+    calculateParishResults(params, selectedParish ?? PLACEHOLDER_PROFILE, config.labelLower, null),
   );
 
   useEffect(() => {
-    setSimulationResults(calculateParishResults(params, selectedParish, config.labelLower));
-  }, [selectedParishId, mode]);
+    if (!selectedParish) return;
+    setSimulationResults(calculateParishResults(params, selectedParish, config.labelLower, mlForecast));
+  }, [selectedParishId, mode, mlForecast]);
 
   const handleRunSimulation = () => {
+    if (!selectedParish) return;
     setIsSimulating(true);
     setTimeout(() => {
-      setSimulationResults(calculateParishResults(params, selectedParish, config.labelLower));
+      setSimulationResults(calculateParishResults(params, selectedParish, config.labelLower, mlForecast));
       setIsSimulating(false);
     }, 800);
   };
 
   const handleSaveScenario = async () => {
+    if (!selectedParish?.id) return;
     setScenarioNameModal({
       open: true,
       name: '',
@@ -717,7 +741,7 @@ function ParishAITwin({ mode = 'parish' }: { mode?: FinancialAITwinMode }) {
       const entityType = mode === 'seminary' ? 'seminary' : mode === 'school' ? 'school' : 'parish';
       const scenario = await apiClient.createInstitutionScenario({
         institutionType: entityType,
-        institutionId: selectedParish.id.toString(),
+        institutionId: selectedParish.id,
         institutionName: selectedParish.name,
         name,
         incomeChange: params.collectionsChange,
@@ -747,8 +771,10 @@ function ParishAITwin({ mode = 'parish' }: { mode?: FinancialAITwinMode }) {
       };
       setSavedScenarios([nextScenario, ...savedScenarios]);
       setScenarioNameModal({ open: false, name: '', onConfirm: () => {} });
-        } catch (error) {
+        } catch (error: any) {
           console.error('Failed to save scenario:', error);
+          const detail = String(error?.message ?? '').split('→ 400: ')[1] ?? 'Could not save the scenario. Please try again.';
+          alert(detail);
         }
       },
     });
@@ -766,10 +792,11 @@ function ParishAITwin({ mode = 'parish' }: { mode?: FinancialAITwinMode }) {
   };
 
   const handleLoadScenario = (scenario: ParishSavedScenario) => {
-    setSelectedParishId(scenario.parishId);
-    setParams(scenario.params);
     const parish = profiles.find((item) => item.id === scenario.parishId) || profiles[0];
-    setSimulationResults(calculateParishResults(scenario.params, parish, config.labelLower));
+    if (!parish) return;
+    setSelectedParishId(parish.id);
+    setParams(scenario.params);
+    setSimulationResults(calculateParishResults(scenario.params, parish, config.labelLower, mlForecast));
   };
 
   const handleReset = () => {
@@ -788,6 +815,49 @@ function ParishAITwin({ mode = 'parish' }: { mode?: FinancialAITwinMode }) {
     if (score >= 60) return 'text-amber-500 bg-amber-500/10';
     return 'text-rose-500 bg-rose-500/10';
   };
+
+  if (!profilesLoaded) {
+    return (
+      <div className="p-4 md:p-8 max-w-[1600px] mx-auto">
+        <div className="space-y-1 mb-8">
+          <div className="flex items-center gap-2 text-gold-500">
+            <Zap className="w-5 h-5 fill-current" />
+            <span className="text-[10px] font-bold uppercase tracking-[0.2em]">Financial Intelligence</span>
+          </div>
+          <h1 className="text-3xl font-serif font-bold text-church-black">{config.title}</h1>
+        </div>
+        <div className="bg-white rounded-[32px] p-12 shadow-sm border border-church-grey/10 flex flex-col items-center gap-4">
+          <div className="w-8 h-8 border-2 border-gold-500/30 border-t-gold-500 rounded-full animate-spin" />
+          <p className="text-sm text-church-grey">Loading {config.pluralLower}...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (profilesLoaded && profiles.length === 0) {
+    return (
+      <div className="p-4 md:p-8 max-w-[1600px] mx-auto">
+        <div className="space-y-1 mb-8">
+          <div className="flex items-center gap-2 text-gold-500">
+            <Zap className="w-5 h-5 fill-current" />
+            <span className="text-[10px] font-bold uppercase tracking-[0.2em]">Financial Intelligence</span>
+          </div>
+          <h1 className="text-3xl font-serif font-bold text-church-black">{config.title}</h1>
+        </div>
+        <div className="bg-white rounded-[32px] p-12 shadow-sm border border-church-grey/10 text-center space-y-3">
+          <Info className="w-10 h-10 text-church-grey mx-auto" />
+          <h3 className="text-lg font-bold text-church-black">
+            {loadError ? `Could not load ${config.pluralLower}` : `No ${config.pluralLower} registered yet`}
+          </h3>
+          <p className="text-sm text-church-grey max-w-md mx-auto">
+            {loadError
+              ? 'The institution service did not respond. Check that the backend is running, then reload this page.'
+              : `${config.label} institutions will appear here once an administrator registers them. Simulations can run as soon as an institution exists, even before financial submissions arrive.`}
+          </p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="p-4 md:p-8 space-y-8 max-w-[1600px] mx-auto">
@@ -830,9 +900,12 @@ function ParishAITwin({ mode = 'parish' }: { mode?: FinancialAITwinMode }) {
             <div className="relative">
               <select
                 value={selectedParishId}
-                onChange={(event) => setSelectedParishId(Number(event.target.value))}
-                className="w-full pl-4 pr-10 py-4 bg-church-light border border-church-grey/10 rounded-2xl text-church-black focus:outline-none focus:ring-2 focus:ring-gold-500 appearance-none font-medium"
+                onChange={(event) => setSelectedParishId(event.target.value)}
+                className={`w-full pl-4 pr-10 py-4 bg-church-light border border-church-grey/10 rounded-2xl focus:outline-none focus:ring-2 focus:ring-gold-500 appearance-none font-medium ${selectedParishId ? 'text-church-black' : 'text-church-grey'}`}
               >
+                <option value="" disabled>
+                  Select a {config.labelLower} here
+                </option>
                 {profiles.map((parish) => (
                   <option key={parish.id} value={parish.id}>
                     {parish.name}
@@ -843,27 +916,29 @@ function ParishAITwin({ mode = 'parish' }: { mode?: FinancialAITwinMode }) {
                 <ChevronRight className="w-5 h-5 rotate-90" />
               </div>
             </div>
-            <div className="grid grid-cols-2 gap-4">
-              <div
-                className={`p-4 rounded-2xl border border-church-grey/5 flex flex-col gap-1 ${healthTone(selectedParish.healthScore)}`}
-              >
-                <span className="text-[10px] font-bold uppercase tracking-wider opacity-60">Health Score</span>
-                <span className="text-2xl font-bold">{selectedParish.healthScore}</span>
+            {selectedParish && (
+              <div className="grid grid-cols-2 gap-4">
+                <div
+                  className={`p-4 rounded-2xl border border-church-grey/5 flex flex-col gap-1 ${healthTone(selectedParish.healthScore)}`}
+                >
+                  <span className="text-[10px] font-bold uppercase tracking-wider opacity-60">Health Score</span>
+                  <span className="text-2xl font-bold">{selectedParish.healthScore}</span>
+                </div>
+                <div className="p-4 rounded-2xl bg-church-light border border-church-grey/5 flex flex-col gap-1">
+                  <span className="text-[10px] font-bold text-church-grey uppercase tracking-wider">Current Runway</span>
+                  <span className="text-2xl font-bold text-church-black">
+                    {selectedParish.monthlyIncome >= selectedParish.monthlyExpenses
+                      ? 'No depletion'
+                      : formatRunwayMonths(
+                          Math.floor(
+                            selectedParish.cashBalance /
+                              (selectedParish.monthlyExpenses - selectedParish.monthlyIncome),
+                          ),
+                        )}
+                  </span>
+                </div>
               </div>
-              <div className="p-4 rounded-2xl bg-church-light border border-church-grey/5 flex flex-col gap-1">
-                <span className="text-[10px] font-bold text-church-grey uppercase tracking-wider">Current Runway</span>
-                <span className="text-2xl font-bold text-church-black">
-                  {selectedParish.monthlyIncome >= selectedParish.monthlyExpenses
-                    ? 'No depletion'
-                    : formatRunwayMonths(
-                        Math.floor(
-                          selectedParish.cashBalance /
-                            (selectedParish.monthlyExpenses - selectedParish.monthlyIncome),
-                        ),
-                      )}
-                </span>
-              </div>
-            </div>
+            )}
           </div>
 
           <div className="bg-white rounded-[32px] p-8 shadow-sm border border-church-grey/10 space-y-8">
@@ -1014,6 +1089,19 @@ function ParishAITwin({ mode = 'parish' }: { mode?: FinancialAITwinMode }) {
         </div>
 
         <div className="lg:col-span-7 space-y-8">
+          {!selectedParish ? (
+            <div className="bg-white rounded-[32px] p-12 shadow-sm border border-church-grey/10 flex flex-col items-center justify-center text-center gap-4 min-h-[320px]">
+              <div className="w-16 h-16 rounded-full bg-gold-500/10 flex items-center justify-center">
+                <TrendingUp className="w-8 h-8 text-gold-500" />
+              </div>
+              <h3 className="text-lg font-bold text-church-black">Select a {config.labelLower} to get started</h3>
+              <p className="text-sm text-church-grey max-w-sm">
+                Choose a {config.labelLower} from the dropdown on the left to load its financial baseline and run
+                what-if scenarios.
+              </p>
+            </div>
+          ) : (
+          <>
           <div className="bg-white rounded-[32px] p-8 shadow-sm border border-church-grey/10 space-y-8">
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
               <div className="flex items-center gap-3">
@@ -1022,11 +1110,27 @@ function ParishAITwin({ mode = 'parish' }: { mode?: FinancialAITwinMode }) {
                 </div>
                 <h3 className="text-lg font-bold text-church-black">Analytics-Based Scenario Results</h3>
               </div>
-              <div
-                className={`px-4 py-2 rounded-xl flex items-center gap-2 font-bold text-sm ${simulationResults.riskBg} ${simulationResults.riskColor}`}
-              >
-                <AlertTriangle className="w-4 h-4" />
-                {simulationResults.riskLevel} Risk Level
+              <div className="flex items-center gap-2">
+                <div
+                  className={`px-3 py-1.5 rounded-lg text-[10px] font-bold uppercase tracking-wider ${
+                    mlForecast
+                      ? 'bg-emerald-500/10 text-emerald-600'
+                      : 'bg-amber-500/10 text-amber-600'
+                  }`}
+                  title={
+                    mlForecast
+                      ? `Baseline driven by the ${forecastSource} forecasting model trained on this institution's submissions.`
+                      : 'No financial submissions yet — baseline uses class-based estimates. ML forecasting activates automatically once 6+ months of records exist.'
+                  }
+                >
+                  {mlForecast ? `ML Forecast — ${forecastSource}` : 'Class-Based Estimate'}
+                </div>
+                <div
+                  className={`px-4 py-2 rounded-xl flex items-center gap-2 font-bold text-sm ${simulationResults.riskBg} ${simulationResults.riskColor}`}
+                >
+                  <AlertTriangle className="w-4 h-4" />
+                  {simulationResults.riskLevel} Risk Level
+                </div>
               </div>
             </div>
 
@@ -1322,6 +1426,8 @@ function ParishAITwin({ mode = 'parish' }: { mode?: FinancialAITwinMode }) {
               </div>
             )}
           </div>
+          </>
+          )}
         </div>
       </div>
 
@@ -1374,9 +1480,9 @@ function ParishAITwin({ mode = 'parish' }: { mode?: FinancialAITwinMode }) {
 }
 
 function PriestAITwin() {
-  const [selectedPriestId, setSelectedPriestId] = useState(priests[0].id);
+  const [selectedPriestId, setSelectedPriestId] = useState('');
   const [params, setParams] = useState<PriestSimulationParams>({
-    targetParishId: reassignmentParishes[1].id,
+    targetParishId: '',
     timeline: 12,
     transitionSupport: 'assisted',
     handoffWeeks: 6,
@@ -1420,28 +1526,32 @@ function PriestAITwin() {
   }, []);
 
   const selectedPriest = useMemo(
-    () => priests.find((priest) => priest.id === selectedPriestId) || priests[0],
+    () => (selectedPriestId ? priests.find((priest) => priest.id === selectedPriestId) : undefined),
     [selectedPriestId],
   );
   const selectedParish = useMemo(
-    () => reassignmentParishes.find((parish) => parish.id === params.targetParishId) || reassignmentParishes[0],
+    () => (params.targetParishId ? reassignmentParishes.find((parish) => parish.id === params.targetParishId) : undefined),
     [params.targetParishId],
   );
 
-  const [results, setResults] = useState(() => calculatePriestScenario(selectedPriest, selectedParish, params));
-  const assignmentEvidenceLevel =
-    selectedPriest.previousAssignments >= 2
+  const [results, setResults] = useState<ReturnType<typeof calculatePriestScenario> | null>(null);
+  const assignmentEvidenceLevel = selectedPriest
+    ? selectedPriest.previousAssignments >= 2
       ? 'full'
       : selectedPriest.previousAssignments === 1
         ? 'provisional'
-        : 'insufficient';
+        : 'insufficient'
+    : 'insufficient';
   const hasFullRanking = assignmentEvidenceLevel === 'full';
 
   useEffect(() => {
-    setResults(calculatePriestScenario(selectedPriest, selectedParish, params));
+    if (selectedPriest && selectedParish) {
+      setResults(calculatePriestScenario(selectedPriest, selectedParish, params));
+    }
   }, [selectedPriest, selectedParish]);
 
   const ranking = useMemo(() => {
+    if (!selectedPriest) return [];
     return reassignmentParishes
       .map((parish) => ({
         parish,
@@ -1452,6 +1562,7 @@ function PriestAITwin() {
   }, [selectedPriest, params]);
 
   const runSimulation = () => {
+    if (!selectedPriest || !selectedParish) return;
     setIsSimulating(true);
     setTimeout(() => {
       setResults(calculatePriestScenario(selectedPriest, selectedParish, params));
@@ -1460,6 +1571,7 @@ function PriestAITwin() {
   };
 
   const saveScenario = async () => {
+    if (!selectedPriest || !selectedParish || !results) return;
     setScenarioNameModal({
       open: true,
       name: '',
@@ -1468,23 +1580,22 @@ function PriestAITwin() {
         try {
       const scenario = await apiClient.createPriestScenario({
         priestId: selectedPriestId,
-        priestName: selectedPriest.name,
+        priestName: selectedPriest!.name,
         targetParishId: params.targetParishId,
-        targetParishName: selectedParish.name,
+        targetParishName: selectedParish!.name,
         name,
         transitionSupport: params.transitionSupport,
         handoffWeeks: params.handoffWeeks,
         timelineMonths: params.timeline,
-        // Include results
-        fitScore: results.fitScore,
-        targetLift: results.targetLift,
-        vacatedParishDip: results.vacatedParishDip,
-        dioceseLift: results.dioceseLift,
-        transitionRisk: results.transitionRisk,
-        riskBand: results.riskBand as 'Low' | 'Medium' | 'High',
-        confidence: results.confidence,
-        projectedData: results.projectedData,
-        recommendation: results.recommendation,
+        fitScore: results!.fitScore,
+        targetLift: results!.targetLift,
+        vacatedParishDip: results!.vacatedParishDip,
+        dioceseLift: results!.dioceseLift,
+        transitionRisk: results!.transitionRisk,
+        riskBand: results!.riskBand as 'Low' | 'Medium' | 'High',
+        confidence: results!.confidence,
+        projectedData: results!.projectedData,
+        recommendation: results!.recommendation,
       });
 
       const nextScenario: PriestSavedScenario = {
@@ -1498,8 +1609,10 @@ function PriestAITwin() {
 
       setSavedScenarios([nextScenario, ...savedScenarios]);
       setScenarioNameModal({ open: false, name: '', onConfirm: () => {} });
-        } catch (error) {
+        } catch (error: any) {
           console.error('Failed to save scenario:', error);
+          const detail = String(error?.message ?? '').split('→ 400: ')[1] ?? 'Could not save the scenario. Please try again.';
+          alert(detail);
         }
       },
     });
@@ -1526,13 +1639,9 @@ function PriestAITwin() {
   };
 
   const resetScenario = () => {
-    setSelectedPriestId(priests[0].id);
-    setParams({
-      targetParishId: reassignmentParishes[1].id,
-      timeline: 12,
-      transitionSupport: 'assisted',
-      handoffWeeks: 6,
-    });
+    setSelectedPriestId('');
+    setParams({ targetParishId: '', timeline: 12, transitionSupport: 'assisted', handoffWeeks: 6 });
+    setResults(null);
   };
 
   return (
@@ -1583,8 +1692,9 @@ function PriestAITwin() {
                 <select
                   value={selectedPriestId}
                   onChange={(event) => setSelectedPriestId(event.target.value)}
-                  className="w-full px-4 py-4 bg-church-light border border-church-grey/10 rounded-2xl text-church-black focus:outline-none focus:ring-2 focus:ring-gold-500 font-medium"
+                  className={`w-full px-4 py-4 bg-church-light border border-church-grey/10 rounded-2xl focus:outline-none focus:ring-2 focus:ring-gold-500 font-medium ${selectedPriestId ? 'text-church-black' : 'text-church-grey'}`}
                 >
+                  <option value="" disabled>Select a priest here</option>
                   {priests.map((priest) => (
                     <option key={priest.id} value={priest.id}>
                       {priest.name}
@@ -1600,8 +1710,9 @@ function PriestAITwin() {
                 <select
                   value={params.targetParishId}
                   onChange={(event) => setParams({ ...params, targetParishId: event.target.value })}
-                  className="w-full px-4 py-4 bg-church-light border border-church-grey/10 rounded-2xl text-church-black focus:outline-none focus:ring-2 focus:ring-gold-500 font-medium"
+                  className={`w-full px-4 py-4 bg-church-light border border-church-grey/10 rounded-2xl focus:outline-none focus:ring-2 focus:ring-gold-500 font-medium ${params.targetParishId ? 'text-church-black' : 'text-church-grey'}`}
                 >
+                  <option value="" disabled>Select a receiving parish here</option>
                   {reassignmentParishes.map((parish) => (
                     <option key={parish.id} value={parish.id}>
                       {parish.name}
@@ -1611,28 +1722,34 @@ function PriestAITwin() {
               </div>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div className="p-5 rounded-[24px] bg-gold-50 border border-gold-100 space-y-1">
-                <span className="text-[10px] font-bold uppercase tracking-widest text-gold-700">
-                  Current Priest Profile
-                </span>
-                <p className="text-base font-black text-church-black">{selectedPriest.currentParish}</p>
-                <p className="text-xs text-gray-600 font-semibold">{selectedPriest.strength}</p>
-                <p className="text-[10px] text-gray-500 font-bold uppercase tracking-widest pt-1">
-                  {selectedPriest.previousAssignments} previous assignment
-                  {selectedPriest.previousAssignments === 1 ? '' : 's'}
-                </p>
+            {(selectedPriest || selectedParish) && (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {selectedPriest && (
+                  <div className="p-5 rounded-[24px] bg-gold-50 border border-gold-100 space-y-1">
+                    <span className="text-[10px] font-bold uppercase tracking-widest text-gold-700">
+                      Current Priest Profile
+                    </span>
+                    <p className="text-base font-black text-church-black">{selectedPriest.currentParish}</p>
+                    <p className="text-xs text-gray-600 font-semibold">{selectedPriest.strength}</p>
+                    <p className="text-[10px] text-gray-500 font-bold uppercase tracking-widest pt-1">
+                      {selectedPriest.previousAssignments} previous assignment
+                      {selectedPriest.previousAssignments === 1 ? '' : 's'}
+                    </p>
+                  </div>
+                )}
+                {selectedParish && (
+                  <div className="p-5 rounded-[24px] bg-blue-50 border border-blue-100 space-y-1">
+                    <span className="text-[10px] font-bold uppercase tracking-widest text-blue-700">
+                      Target Parish Context
+                    </span>
+                    <p className="text-base font-black text-church-black">{selectedParish.vicariate}</p>
+                    <p className="text-xs text-gray-600 font-semibold">
+                      {selectedParish.parishClass} • Urgency {selectedParish.urgency}
+                    </p>
+                  </div>
+                )}
               </div>
-              <div className="p-5 rounded-[24px] bg-blue-50 border border-blue-100 space-y-1">
-                <span className="text-[10px] font-bold uppercase tracking-widest text-blue-700">
-                  Target Parish Context
-                </span>
-                <p className="text-base font-black text-church-black">{selectedParish.vicariate}</p>
-                <p className="text-xs text-gray-600 font-semibold">
-                  {selectedParish.parishClass} • Urgency {selectedParish.urgency}
-                </p>
-              </div>
-            </div>
+            )}
 
             <button
               onClick={runSimulation}
@@ -1727,6 +1844,19 @@ function PriestAITwin() {
         </div>
 
         <div className="lg:col-span-7 space-y-8">
+          {(!selectedPriest || !selectedParish || !results) ? (
+            <div className="bg-white rounded-[32px] p-12 shadow-sm border border-church-grey/10 flex flex-col items-center justify-center text-center gap-4 min-h-[320px]">
+              <div className="w-16 h-16 rounded-full bg-gold-500/10 flex items-center justify-center">
+                <Users className="w-8 h-8 text-gold-500" />
+              </div>
+              <h3 className="text-lg font-bold text-church-black">Select a priest and receiving parish to get started</h3>
+              <p className="text-sm text-church-grey max-w-sm">
+                Choose a priest and a target parish from the dropdowns on the left, then run the simulation to see the
+                reassignment impact.
+              </p>
+            </div>
+          ) : (
+          <>
           <div className="bg-white rounded-[32px] p-8 shadow-sm border border-church-grey/10 space-y-8">
             <div className="grid grid-cols-1 gap-4 md:grid-cols-[minmax(0,1fr)_auto] md:items-start">
               <div className="flex items-start gap-3">
@@ -2035,6 +2165,8 @@ function PriestAITwin() {
               </div>
             )}
           </div>
+          </>
+          )}
         </div>
       </div>
 

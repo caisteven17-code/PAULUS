@@ -1257,14 +1257,14 @@ export function BishopDashboard({
 
   useEffect(() => {
     const fetchHealthScores = async () => {
-      const scores = await Promise.all(
-        currentEntities.map((e) =>
-          dataService.calculateHealthScore(
-            e.name,
-            entityType === 'Parishes' ? 'parish' : entityType === 'Seminaries' ? 'seminary' : 'school',
-            e.class,
-          ),
-        ),
+      // Single batch request — per-entity requests (90+) starve the browser
+      // connection pool and block every other API call in dev.
+      const scores = await dataService.calculateHealthScores(
+        currentEntities.map((e) => ({
+          entityId: e.name,
+          entityType: entityType === 'Parishes' ? 'parish' : entityType === 'Seminaries' ? 'seminary' : 'school',
+          entityClass: e.class,
+        })),
       );
       setHealthScores(scores);
     };

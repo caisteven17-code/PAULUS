@@ -600,7 +600,7 @@ export class EntityService {
       const { data: institutions } = await this.supabaseService.admin
         .schema('diocese')
         .from('institutions')
-        .select('id, name, vicariate, class')
+        .select('id, name, vicariate, class, institution_code')
         .eq('institution_type', 'parish')
         .eq('is_active', true)
         .is('deleted_at', null)
@@ -659,10 +659,12 @@ export class EntityService {
 
           result.push({
             id: inst.id,
+            institutionCode: inst.institution_code ?? '',
             name: inst.name,
             type: 'parish',
             location: inst.vicariate ?? '',
             class: inst.class ? `Class ${inst.class}` : '',
+            classRaw: inst.class ?? '',
             healthScore,
             risk,
             currentBalance,
@@ -683,20 +685,49 @@ export class EntityService {
       }
     }
 
-    // Schools and seminaries: use constants until their institutions are seeded in diocese.institutions
+    // Schools and seminaries: read from diocese.institutions so profiles carry
+    // real UUIDs and codes. Financial history stays zeroed until their
+    // financial_records tables receive submissions (frontend falls back to
+    // class-based estimates; ML forecast activates automatically with data).
     if (!type || type === 'school') {
-      INITIAL_SCHOOLS.forEach((s: any) =>
-        result.push(this.buildFallbackProfile(s.id, s.name, 'school', `Cluster ${s.cluster}`, s.class ?? '', 0)),
-      );
+      result.push(...(await this.fetchInstitutionProfiles('school')));
     }
 
     if (!type || type === 'seminary') {
-      INITIAL_SEMINARIES.forEach((s: any) =>
-        result.push(this.buildFallbackProfile(s.id, s.name, 'seminary', s.vicariate ?? '', s.class ?? '', 0)),
-      );
+      result.push(...(await this.fetchInstitutionProfiles('seminary')));
     }
 
     return result;
+  }
+
+  private async fetchInstitutionProfiles(entityType: 'school' | 'seminary'): Promise<any[]> {
+    const { data: institutions } = await this.supabaseService.admin
+      .schema('diocese')
+      .from('institutions')
+      .select('id, name, vicariate, class, institution_code')
+      .eq('institution_type', entityType)
+      .eq('is_active', true)
+      .is('deleted_at', null)
+      .order('name');
+
+    return (institutions ?? []).map((inst: any) => ({
+      id: inst.id,
+      institutionCode: inst.institution_code ?? '',
+      name: inst.name,
+      type: entityType,
+      location: inst.vicariate ?? '',
+      class: inst.class ? `Class ${inst.class}` : '',
+      classRaw: inst.class ?? '',
+      healthScore: 50,
+      risk: 'Moderate',
+      currentBalance: 0,
+      monthlyCollections: 0,
+      monthlyExpenses: 0,
+      collectionsHistory: [],
+      expensesHistory: [],
+      trend: '0.0%',
+      insight: 'Awaiting financial submissions.',
+    }));
   }
 
   private computeFinancialHealthScore(

@@ -60,6 +60,19 @@ export class AnalyticsGatewayController {
     return result.data;
   }
 
+  @Post('health-scores')
+  async calculateHealthScores(@Req() req: Request, @Res({ passthrough: true }) response: Response) {
+    const result = await requestDownstream<unknown>({
+      baseUrl: SERVICE_URLS.analytics,
+      path: '/analytics/health-scores',
+      method: 'POST',
+      body: req.body,
+    });
+
+    response.status(result.status);
+    return result.data;
+  }
+
   @Get('diagnostic')
   async getDiagnostic(
     @Query('entityId') entityId: string,

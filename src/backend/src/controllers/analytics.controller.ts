@@ -1,11 +1,31 @@
-import { Controller, Get, Query, Res, HttpStatus } from '@nestjs/common';
+import { Controller, Get, Post, Query, Body, Res, HttpStatus } from '@nestjs/common';
 import { Response } from 'express';
 import { AnalyticsService } from '../services/analytics.service';
 import { EntityClass } from '../types';
 
+interface HealthScoreBatchEntity {
+  entityId: string;
+  entityType: 'parish' | 'seminary' | 'school';
+  entityClass?: EntityClass;
+}
+
 @Controller('analytics')
 export class AnalyticsController {
   constructor(private readonly analyticsService: AnalyticsService) {}
+
+  // Batch variant — dashboards score every institution at once; issuing one
+  // request instead of 90+ keeps the browser connection pool free.
+  @Post('health-scores')
+  async calculateHealthScores(@Body() body: { entities: HealthScoreBatchEntity[] }, @Res() Res: Response) {
+    const entities = Array.isArray(body?.entities) ? body.entities : [];
+    if (!entities.length) {
+      return Res.status(HttpStatus.BAD_REQUEST).json({ error: 'entities array is required.' });
+    }
+    const scores = await Promise.all(
+      entities.map((e) => this.analyticsService.calculateHealthScore(e.entityId, e.entityType, e.entityClass)),
+    );
+    return Res.status(HttpStatus.OK).json(scores);
+  }
 
   @Get('health-score')
   async calculateHealthScore(

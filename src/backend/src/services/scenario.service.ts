@@ -70,13 +70,45 @@ export interface PriestScenario extends CreatePriestScenarioDto {
 export class ScenarioService {
   constructor(private supabase: SupabaseService) {}
 
+  // The JWT `sub` is the Supabase auth user id (profiles.external_auth_id),
+  // but scenario rows reference profiles.id. Resolve before any query.
+  // Demo/offline sessions carry a random non-UUID id and resolve to null.
+  private async tryResolveProfileId(authUserId: string): Promise<string | null> {
+    const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(authUserId);
+    if (!isUuid) return null;
+
+    const { data, error } = await this.supabase.admin
+      .schema('diocese')
+      .from('profiles')
+      .select('id')
+      .or(`id.eq.${authUserId},external_auth_id.eq.${authUserId}`)
+      .is('deleted_at', null)
+      .limit(1)
+      .maybeSingle();
+
+    if (error) throw new BadRequestException(error.message);
+    return data?.id ?? null;
+  }
+
+  private async resolveProfileId(authUserId: string): Promise<string> {
+    const profileId = await this.tryResolveProfileId(authUserId);
+    if (!profileId) {
+      throw new BadRequestException(
+        'Session is not linked to a registered profile. Sign in with a registered account to save scenarios.',
+      );
+    }
+    return profileId;
+  }
+
   // ===== INSTITUTION SCENARIOS =====
 
   async createInstitutionScenario(
     createdById: string,
     dto: CreateInstitutionScenarioDto,
   ): Promise<InstitutionScenario> {
+    createdById = await this.resolveProfileId(createdById);
     const { data, error } = await this.supabase.admin
+      .schema('diocese')
       .from('institution_simulator_scenarios')
       .insert([
         {
@@ -109,7 +141,11 @@ export class ScenarioService {
   }
 
   async listInstitutionScenarios(createdById: string): Promise<InstitutionScenario[]> {
+    const profileId = await this.tryResolveProfileId(createdById);
+    if (!profileId) return []; // unlinked demo session — nothing saved, nothing to list
+    createdById = profileId;
     const { data, error } = await this.supabase.admin
+      .schema('diocese')
       .from('institution_simulator_scenarios')
       .select('*')
       .eq('created_by_id', createdById)
@@ -124,7 +160,9 @@ export class ScenarioService {
     scenarioId: string,
     createdById: string,
   ): Promise<InstitutionScenario> {
+    createdById = await this.resolveProfileId(createdById);
     const { data, error } = await this.supabase.admin
+      .schema('diocese')
       .from('institution_simulator_scenarios')
       .select('*')
       .eq('id', scenarioId)
@@ -137,7 +175,9 @@ export class ScenarioService {
   }
 
   async deleteInstitutionScenario(scenarioId: string, createdById: string): Promise<void> {
+    createdById = await this.resolveProfileId(createdById);
     const { error } = await this.supabase.admin
+      .schema('diocese')
       .from('institution_simulator_scenarios')
       .update({ deleted_at: new Date().toISOString() })
       .eq('id', scenarioId)
@@ -151,7 +191,9 @@ export class ScenarioService {
     createdById: string,
     isArchived: boolean,
   ): Promise<InstitutionScenario> {
+    createdById = await this.resolveProfileId(createdById);
     const { data, error } = await this.supabase.admin
+      .schema('diocese')
       .from('institution_simulator_scenarios')
       .update({ is_archived: isArchived })
       .eq('id', scenarioId)
@@ -169,7 +211,9 @@ export class ScenarioService {
     createdById: string,
     dto: CreatePriestScenarioDto,
   ): Promise<PriestScenario> {
+    createdById = await this.resolveProfileId(createdById);
     const { data, error } = await this.supabase.admin
+      .schema('diocese')
       .from('priest_reassignment_scenarios')
       .insert([
         {
@@ -203,7 +247,11 @@ export class ScenarioService {
   }
 
   async listPriestScenarios(createdById: string): Promise<PriestScenario[]> {
+    const profileId = await this.tryResolveProfileId(createdById);
+    if (!profileId) return []; // unlinked demo session — nothing saved, nothing to list
+    createdById = profileId;
     const { data, error } = await this.supabase.admin
+      .schema('diocese')
       .from('priest_reassignment_scenarios')
       .select('*')
       .eq('created_by_id', createdById)
@@ -215,7 +263,9 @@ export class ScenarioService {
   }
 
   async getPriestScenario(scenarioId: string, createdById: string): Promise<PriestScenario> {
+    createdById = await this.resolveProfileId(createdById);
     const { data, error } = await this.supabase.admin
+      .schema('diocese')
       .from('priest_reassignment_scenarios')
       .select('*')
       .eq('id', scenarioId)
@@ -228,7 +278,9 @@ export class ScenarioService {
   }
 
   async deletePriestScenario(scenarioId: string, createdById: string): Promise<void> {
+    createdById = await this.resolveProfileId(createdById);
     const { error } = await this.supabase.admin
+      .schema('diocese')
       .from('priest_reassignment_scenarios')
       .update({ deleted_at: new Date().toISOString() })
       .eq('id', scenarioId)
@@ -242,7 +294,9 @@ export class ScenarioService {
     createdById: string,
     isArchived: boolean,
   ): Promise<PriestScenario> {
+    createdById = await this.resolveProfileId(createdById);
     const { data, error } = await this.supabase.admin
+      .schema('diocese')
       .from('priest_reassignment_scenarios')
       .update({ is_archived: isArchived })
       .eq('id', scenarioId)
