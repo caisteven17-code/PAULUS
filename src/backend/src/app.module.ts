@@ -4,6 +4,7 @@ import { ConfigModule } from '@nestjs/config';
 // Services
 import { SupabaseService } from './services/supabase.service';
 import { AppAuthService } from './services/auth.service';
+import { EmailService } from './services/email.service';
 import { EntityService } from './services/entity.service';
 import { FinancialService } from './services/financial.service';
 import { ProjectService } from './services/project.service';
@@ -23,7 +24,7 @@ import { AnalyticsController } from './controllers/analytics.controller';
     }),
   ],
   controllers: [AuthController, EntityController, FinancialController, ProjectController, AnalyticsController],
-  providers: [SupabaseService, AppAuthService, EntityService, FinancialService, ProjectService, AnalyticsService],
-  exports: [SupabaseService, AppAuthService, EntityService, FinancialService, ProjectService, AnalyticsService],
+  providers: [SupabaseService, AppAuthService, EmailService, EntityService, FinancialService, ProjectService, AnalyticsService],
+  exports: [SupabaseService, AppAuthService, EmailService, EntityService, FinancialService, ProjectService, AnalyticsService],
 })
 export class AppModule {}

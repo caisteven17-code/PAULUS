@@ -3,6 +3,7 @@
 import React, { useState } from 'react';
 import { Shield, Eye, EyeOff, LogIn, KeyRound, Mail, Lock, CheckCircle2 } from 'lucide-react';
 import { Footer } from '../components/layout/Footer';
+import { ForgotPasswordModal } from '../components/auth/ForgotPasswordModal';
 import { AccessRole, AppRole, getAccessRoleLabel, getAppRole, normalizeAccessRole } from '../lib/access';
 import { supabaseBrowser } from '../lib/supabase';
 
@@ -17,6 +18,9 @@ export function Login({ onLogin }: LoginProps) {
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+
+  // ── Forgot password modal ───────────────────────────────────────────────
+  const [showForgotPassword, setShowForgotPassword] = useState(false);
 
   // ── MFA step ────────────────────────────────────────────────────────────
   const [step, setStep] = useState<'credentials' | 'mfa'>('credentials');
@@ -294,12 +298,13 @@ export function Login({ onLogin }: LoginProps) {
         </div>
 
         <div className="flex justify-end">
-          <a
-            href="#"
+          <button
+            type="button"
+            onClick={() => setShowForgotPassword(true)}
             className="text-xs sm:text-sm text-[#E6C27A] hover:text-[#D4AF37] hover:underline transition-colors font-medium font-sans"
           >
             Forgot Password?
-          </a>
+          </button>
         </div>
       </div>
 
@@ -478,6 +483,9 @@ export function Login({ onLogin }: LoginProps) {
       <div className="flex-shrink-0 border-t border-slate-200/50 bg-[#FAF9F5]/80 backdrop-blur-md relative z-10">
         <Footer />
       </div>
+
+      {/* Forgot Password flow */}
+      <ForgotPasswordModal open={showForgotPassword} onClose={() => setShowForgotPassword(false)} />
     </div>
   );
 }

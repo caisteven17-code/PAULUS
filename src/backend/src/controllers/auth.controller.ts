@@ -82,6 +82,140 @@ export class AuthController {
     return res.status(HttpStatus.OK).json({ user: user ?? null });
   }
 
+  // ── OTP / Onboarding / Password reset ──────────────────────────────────────
+
+  private otpErrorResponse(res: Response, err: any) {
+    const message: string = err?.message ?? 'Unknown error';
+    switch (message) {
+      case 'NOT_REGISTERED':
+        return res.status(HttpStatus.NOT_FOUND).json({
+          error: 'This email is not registered. Accounts are registered after completing the onboarding form.',
+        });
+      case 'ACCOUNT_ARCHIVED':
+        return res.status(HttpStatus.FORBIDDEN).json({ error: 'This account has been archived. Contact the administrator.' });
+      case 'RATE_LIMITED':
+        return res.status(HttpStatus.TOO_MANY_REQUESTS).json({ error: 'Please wait 60 seconds before requesting another code.' });
+      case 'INVALID_CODE':
+        return res.status(HttpStatus.BAD_REQUEST).json({ error: 'Invalid verification code. Please check the code and try again.' });
+      case 'EXPIRED_CODE':
+        return res.status(HttpStatus.BAD_REQUEST).json({ error: 'This code has expired. Please request a new one.' });
+      case 'OTP_NOT_VERIFIED':
+        return res.status(HttpStatus.BAD_REQUEST).json({ error: 'Email verification is required before saving. Please verify the OTP code first.' });
+      case 'USER_NOT_FOUND':
+        return res.status(HttpStatus.NOT_FOUND).json({ error: 'User account not found.' });
+      case 'SMTP_SEND_FAILED':
+        return res.status(HttpStatus.BAD_GATEWAY).json({
+          error:
+            'Could not send the email — the mail server connection failed. Please contact the administrator (SMTP settings need attention).',
+        });
+      default:
+        return res.status(HttpStatus.INTERNAL_SERVER_ERROR).json({ error: message });
+    }
+  }
+
+  @Post('send-otp')
+  async sendOtp(@Body() body: any, @Req() req: Request, @Res() res: Response) {
+    const { email, purpose } = body ?? {};
+    if (!email || !purpose || !['onboarding', 'forgot_password'].includes(purpose)) {
+      return res.status(HttpStatus.BAD_REQUEST).json({ error: 'email and a valid purpose are required.' });
+    }
+
+    try {
+      const result = await this.authService.sendOtp(email, purpose);
+      await this.auditLogService.logEvent({
+        userName: email,
+        userRole: 'unknown',
+        category: 'auth',
+        severity: 'info',
+        action: 'OTP Sent',
+        detail: `Verification code sent to ${email} (${purpose === 'onboarding' ? 'onboarding' : 'password reset'})`,
+        ipAddress: clientIp(req),
+      });
+      return res.status(HttpStatus.OK).json(result);
+    } catch (err: any) {
+      return this.otpErrorResponse(res, err);
+    }
+  }
+
+  @Post('verify-otp')
+  async verifyOtp(@Body() body: any, @Res() res: Response) {
+    const { email, code, purpose } = body ?? {};
+    if (!email || !code || !purpose) {
+      return res.status(HttpStatus.BAD_REQUEST).json({ error: 'email, code, and purpose are required.' });
+    }
+
+    try {
+      const result = await this.authService.verifyOtp(email, code, purpose);
+      return res.status(HttpStatus.OK).json(result);
+    } catch (err: any) {
+      return this.otpErrorResponse(res, err);
+    }
+  }
+
+  @Post('complete-onboarding')
+  async completeOnboarding(@Body() body: any, @Req() req: Request, @Res() res: Response) {
+    const { userId, email, password, contactNumber, birthday, otpCode } = body ?? {};
+    if (!userId || !email || !password || !contactNumber || !birthday || !otpCode) {
+      return res
+        .status(HttpStatus.BAD_REQUEST)
+        .json({ error: 'userId, email, password, contactNumber, birthday, and otpCode are required.' });
+    }
+    if (String(password).length < 8) {
+      return res.status(HttpStatus.BAD_REQUEST).json({ error: 'Password must be at least 8 characters.' });
+    }
+
+    try {
+      const user = await this.authService.completeOnboarding({
+        userId,
+        email,
+        password,
+        contactNumber,
+        birthday,
+        otpCode,
+      });
+      await this.auditLogService.logEvent({
+        userId,
+        userName: user.displayName || email,
+        userRole: user.roleId ?? user.role ?? 'unknown',
+        category: 'auth',
+        severity: 'success',
+        action: 'Onboarding Completed',
+        detail: `${user.displayName || email} verified their email and completed the onboarding form`,
+        ipAddress: clientIp(req),
+      });
+      return res.status(HttpStatus.OK).json({ ok: true, user });
+    } catch (err: any) {
+      return this.otpErrorResponse(res, err);
+    }
+  }
+
+  @Post('reset-password')
+  async resetPassword(@Body() body: any, @Req() req: Request, @Res() res: Response) {
+    const { email, otpCode, newPassword } = body ?? {};
+    if (!email || !otpCode || !newPassword) {
+      return res.status(HttpStatus.BAD_REQUEST).json({ error: 'email, otpCode, and newPassword are required.' });
+    }
+    if (String(newPassword).length < 8) {
+      return res.status(HttpStatus.BAD_REQUEST).json({ error: 'Password must be at least 8 characters.' });
+    }
+
+    try {
+      const result = await this.authService.resetPassword({ email, otpCode, newPassword });
+      await this.auditLogService.logEvent({
+        userName: email,
+        userRole: 'unknown',
+        category: 'auth',
+        severity: 'success',
+        action: 'Password Reset',
+        detail: `Password was reset via Forgot Password for ${email}`,
+        ipAddress: clientIp(req),
+      });
+      return res.status(HttpStatus.OK).json(result);
+    } catch (err: any) {
+      return this.otpErrorResponse(res, err);
+    }
+  }
+
   @Get('admin/users')
   async listUsers(@Res() res: Response) {
     try {

@@ -19,3 +19,4 @@ out/
 .claude/
 *.tsbuildinfo
 testing/
+.cache/

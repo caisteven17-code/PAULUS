@@ -23,7 +23,9 @@ import { AuditLog } from './views/AuditLog';
 import { ParishDataSubmission } from './views/ParishDataSubmission';
 import { BottomNav } from './components/ui/BottomNav';
 import { StewardChatbot } from './components/ui/StewardChatbot';
+import { OnboardingModal } from './components/auth/OnboardingModal';
 import { auth, AuthUser } from './firebase';
+import { supabaseBrowser } from './lib/supabase';
 import { AppRole, getAppRole } from './lib/access';
 import { usePermissions } from './hooks/usePermissions';
 
@@ -136,6 +138,10 @@ export default function App() {
   const [year, setYear] = useState<number>(2026);
   const [digitalTwinSession, setDigitalTwinSession] = useState<DigitalTwinSession | null>(null);
   const [digitalTwinActiveTab, setDigitalTwinActiveTab] = useState('parish-dashboard');
+  // First-login onboarding gate (real Supabase accounts that haven't completed it).
+  // Until the check finishes the app shows a spinner so the dashboard never flashes.
+  const [onboardingUser, setOnboardingUser] = useState<AuthUser | null>(null);
+  const [onboardingChecked, setOnboardingChecked] = useState(false);
   // Pending = what the user has picked in the dropdowns; applied = what is actually shown
   const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'] as const;
   const currentMonthName = MONTHS[new Date().getMonth()];
@@ -194,6 +200,42 @@ export default function App() {
     }
   }, [activeTab, isAuthReady, isAuthenticated, permissions, permissionsLoading, role]);
 
+  // Gate the whole system behind the onboarding form for real Supabase users.
+  // Demo / localStorage sessions have no Supabase session and are skipped.
+  useEffect(() => {
+    if (!isAuthReady || !isAuthenticated) {
+      setOnboardingUser(null);
+      setOnboardingChecked(false);
+      return;
+    }
+    // Completed earlier in this browser session — the Supabase token may still
+    // carry stale metadata until it refreshes, so trust the local flag.
+    if (typeof window !== 'undefined' && sessionStorage.getItem('onboarding_completed') === 'true') {
+      setOnboardingChecked(true);
+      return;
+    }
+
+    supabaseBrowser.auth
+      .getSession()
+      .then(({ data }) => {
+        const sessionUser = data.session?.user;
+        if (sessionUser && sessionUser.user_metadata?.onboardingCompleted !== true) {
+          setOnboardingUser({
+            id: sessionUser.id,
+            uid: sessionUser.id,
+            email: sessionUser.email ?? '',
+            contactNumber: sessionUser.user_metadata?.contactNumber ?? '',
+          });
+        }
+      })
+      .catch(() => {
+        // Supabase unreachable — demo mode, no onboarding
+      })
+      .finally(() => {
+        setOnboardingChecked(true);
+      });
+  }, [isAuthReady, isAuthenticated]);
+
   /**
    * Handles user logout and state reset
    */
@@ -222,6 +264,28 @@ export default function App() {
 
   if (!isAuthenticated) {
     return <Login onLogin={handleLogin} />;
+  }
+
+  // Hold the app while we determine whether onboarding is required —
+  // prevents the dashboard from flashing before the gate appears.
+  if (!onboardingChecked) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-church-light">
+        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-church-green"></div>
+      </div>
+    );
+  }
+
+  // Mandatory onboarding: the dashboard never renders until the form is done.
+  // The only exits are completing the form or logging out.
+  if (onboardingUser) {
+    return (
+      <OnboardingModal
+        user={onboardingUser}
+        onComplete={() => setOnboardingUser(null)}
+        onLogout={handleLogout}
+      />
+    );
   }
 
   const renderDigitalTwinSessionContent = () => {

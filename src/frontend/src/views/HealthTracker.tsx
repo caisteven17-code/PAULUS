@@ -676,6 +676,8 @@ export function HealthTracker() {
   // ─── ADMIN / BISHOP FULL VIEW ────────────────────────────────────────────────
   const upcomingBirthdays = getUpcomingBirthdays();
   const priestsNeedingCheckup = priests.filter((p) => needsCheckup(p.lastCheckup));
+  // Age stored in the DB may be stale/missing — always derive it from birthDate
+  const displayAge = (p: PriestRecord) => calculateAge(p.birthDate) || p.age || 0;
 
   let filteredPriests = priests;
   if (filter === 'birthdays') filteredPriests = upcomingBirthdays;
@@ -694,14 +696,14 @@ export function HealthTracker() {
     <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 pt-6 pb-20 px-4 md:px-6">
       <div className="max-w-6xl mx-auto">
         {/* Header */}
-        <div className="flex items-center justify-between mb-8">
-          <div className="flex items-center gap-3">
-            <div className="p-3 bg-rose-500 rounded-lg">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-8">
+          <div className="flex items-center gap-3.5">
+            <div className="p-3 bg-gradient-to-br from-rose-500 to-rose-600 rounded-xl shadow-lg shadow-rose-500/20">
               <Heart className="w-6 h-6 text-white" />
             </div>
             <div>
-              <h1 className="text-3xl font-bold text-slate-900">Executive Health Tracker</h1>
-              <p className="text-slate-600">Manage priest health check-ups and birthdays</p>
+              <h1 className="text-2xl sm:text-3xl font-bold text-slate-900">Executive Health Tracker</h1>
+              <p className="text-slate-500 text-sm sm:text-base">Manage priest health check-ups and birthdays</p>
             </div>
           </div>
           {canManageRecords && (
@@ -721,7 +723,7 @@ export function HealthTracker() {
                 });
                 setShowForm(true);
               }}
-              className="flex items-center gap-2 bg-rose-500 hover:bg-rose-600 text-white px-4 py-2 rounded-lg transition-colors"
+              className="flex items-center justify-center gap-2 bg-rose-500 hover:bg-rose-600 text-white px-4 py-2.5 rounded-xl transition-colors font-medium shadow-lg shadow-rose-500/20 active:scale-[0.98]"
             >
               <Plus className="w-5 h-5" />
               Add Record
@@ -731,19 +733,21 @@ export function HealthTracker() {
 
         {/* Stats Cards */}
         <div
-          className={`grid grid-cols-1 gap-4 mb-8 ${apiHealthScore !== null ? 'md:grid-cols-4' : 'md:grid-cols-3'}`}
+          className={`grid grid-cols-1 sm:grid-cols-2 gap-4 mb-8 ${apiHealthScore !== null || healthScoreLoading ? 'lg:grid-cols-4' : 'lg:grid-cols-3'}`}
         >
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
-            className="bg-white rounded-lg border border-slate-200 p-6"
+            className="bg-white rounded-xl border border-slate-200 p-5 hover:shadow-md transition-shadow"
           >
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-slate-600 text-sm font-medium">Total Priests</p>
+                <p className="text-slate-500 text-xs font-bold uppercase tracking-wider">Total Priests</p>
                 <p className="text-3xl font-bold text-slate-900 mt-2">{priests.length}</p>
               </div>
-              <Users className="w-12 h-12 text-slate-400" />
+              <div className="w-12 h-12 bg-blue-50 rounded-xl flex items-center justify-center shrink-0">
+                <Users className="w-6 h-6 text-blue-500" />
+              </div>
             </div>
           </motion.div>
 
@@ -751,14 +755,16 @@ export function HealthTracker() {
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.1 }}
-            className="bg-white rounded-lg border border-slate-200 p-6"
+            className="bg-white rounded-xl border border-slate-200 p-5 hover:shadow-md transition-shadow"
           >
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-slate-600 text-sm font-medium">Upcoming Birthdays (30d)</p>
+                <p className="text-slate-500 text-xs font-bold uppercase tracking-wider">Birthdays (30d)</p>
                 <p className="text-3xl font-bold text-emerald-600 mt-2">{upcomingBirthdays.length}</p>
               </div>
-              <Cake className="w-12 h-12 text-slate-400" />
+              <div className="w-12 h-12 bg-emerald-50 rounded-xl flex items-center justify-center shrink-0">
+                <Cake className="w-6 h-6 text-emerald-500" />
+              </div>
             </div>
           </motion.div>
 
@@ -766,16 +772,16 @@ export function HealthTracker() {
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.2 }}
-            className="bg-white rounded-lg border border-slate-200 p-6"
+            className="bg-white rounded-xl border border-slate-200 p-5 hover:shadow-md transition-shadow"
           >
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-slate-600 text-sm font-medium">Need Check-up</p>
-                <p className="text-3xl font-bold text-amber-600 mt-2">
-                  {priestsNeedingCheckup.length}
-                </p>
+                <p className="text-slate-500 text-xs font-bold uppercase tracking-wider">Need Check-up</p>
+                <p className="text-3xl font-bold text-amber-600 mt-2">{priestsNeedingCheckup.length}</p>
               </div>
-              <Stethoscope className="w-12 h-12 text-slate-400" />
+              <div className="w-12 h-12 bg-amber-50 rounded-xl flex items-center justify-center shrink-0">
+                <Stethoscope className="w-6 h-6 text-amber-500" />
+              </div>
             </div>
           </motion.div>
 
@@ -784,20 +790,24 @@ export function HealthTracker() {
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 0.3 }}
-              className="bg-white rounded-lg border border-slate-200 p-6"
+              className="bg-white rounded-xl border border-slate-200 p-5 hover:shadow-md transition-shadow"
             >
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-slate-600 text-sm font-medium">Financial Health Score</p>
+                  <p className="text-slate-500 text-xs font-bold uppercase tracking-wider">Financial Health</p>
                   <p
                     className={`text-3xl font-bold mt-2 ${apiHealthScore >= 70 ? 'text-emerald-600' : apiHealthScore >= 40 ? 'text-amber-600' : 'text-rose-600'}`}
                   >
                     {apiHealthScore.toFixed(1)}
                   </p>
                 </div>
-                <Heart
-                  className={`w-12 h-12 ${apiHealthScore >= 70 ? 'text-emerald-300' : apiHealthScore >= 40 ? 'text-amber-300' : 'text-rose-300'}`}
-                />
+                <div
+                  className={`w-12 h-12 rounded-xl flex items-center justify-center shrink-0 ${apiHealthScore >= 70 ? 'bg-emerald-50' : apiHealthScore >= 40 ? 'bg-amber-50' : 'bg-rose-50'}`}
+                >
+                  <Heart
+                    className={`w-6 h-6 ${apiHealthScore >= 70 ? 'text-emerald-500' : apiHealthScore >= 40 ? 'text-amber-500' : 'text-rose-500'}`}
+                  />
+                </div>
               </div>
             </motion.div>
           )}
@@ -807,14 +817,14 @@ export function HealthTracker() {
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 0.3 }}
-              className="bg-white rounded-lg border border-slate-200 p-6 animate-pulse"
+              className="bg-white rounded-xl border border-slate-200 p-5 animate-pulse"
             >
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-slate-600 text-sm font-medium">Financial Health Score</p>
+                  <p className="text-slate-500 text-xs font-bold uppercase tracking-wider">Financial Health</p>
                   <div className="h-9 w-20 bg-slate-200 rounded mt-2" />
                 </div>
-                <div className="w-12 h-12 bg-slate-200 rounded-full" />
+                <div className="w-12 h-12 bg-slate-200 rounded-xl" />
               </div>
             </motion.div>
           )}
@@ -1050,6 +1060,9 @@ export function HealthTracker() {
                   <th className="text-left px-4 py-3 text-xs font-bold text-slate-500 uppercase tracking-wider hidden md:table-cell">
                     Parish
                   </th>
+                  <th className="text-left px-4 py-3 text-xs font-bold text-slate-500 uppercase tracking-wider hidden md:table-cell">
+                    Birthday
+                  </th>
                   <th className="text-left px-4 py-3 text-xs font-bold text-slate-500 uppercase tracking-wider hidden sm:table-cell">
                     Age
                   </th>
@@ -1070,9 +1083,16 @@ export function HealthTracker() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
-                {filteredPriests.length === 0 ? (
+                {recordsLoading ? (
                   <tr>
-                    <td colSpan={canManageRecords ? 8 : 7} className="text-center py-12">
+                    <td colSpan={canManageRecords ? 9 : 8} className="text-center py-12">
+                      <div className="w-8 h-8 border-2 border-rose-200 border-t-rose-500 rounded-full animate-spin mx-auto mb-3" />
+                      <p className="text-slate-400 text-sm">Loading records…</p>
+                    </td>
+                  </tr>
+                ) : filteredPriests.length === 0 ? (
+                  <tr>
+                    <td colSpan={canManageRecords ? 9 : 8} className="text-center py-12">
                       <Heart className="w-10 h-10 text-slate-200 mx-auto mb-3" />
                       <p className="text-slate-400 text-sm">
                         {search ? 'No results found for your search.' : 'No records to display.'}
@@ -1080,7 +1100,10 @@ export function HealthTracker() {
                     </td>
                   </tr>
                 ) : (
-                  filteredPriests.map((priest) => (
+                  filteredPriests.map((priest) => {
+                    const age = displayAge(priest);
+                    const daysToBirthday = priest.birthDate ? getDaysUntilBirthday(priest.birthDate) : 999;
+                    return (
                     <tr
                       key={priest.id}
                       onClick={() => setSelectedPriest(priest)}
@@ -1094,8 +1117,23 @@ export function HealthTracker() {
                       <td className="px-4 py-3 text-slate-600 hidden md:table-cell">
                         {priest.parish || '—'}
                       </td>
+                      <td className="px-4 py-3 hidden md:table-cell">
+                        {priest.birthDate ? (
+                          <div className="flex items-center gap-1.5">
+                            <Cake className="w-3.5 h-3.5 text-slate-300 shrink-0" />
+                            <span className="text-slate-600">{formatDate(new Date(priest.birthDate))}</span>
+                            {daysToBirthday <= 30 && (
+                              <span className="text-[10px] bg-emerald-100 text-emerald-700 px-1.5 py-0.5 rounded font-bold whitespace-nowrap">
+                                {daysToBirthday === 0 ? 'Today! 🎉' : `in ${daysToBirthday}d`}
+                              </span>
+                            )}
+                          </div>
+                        ) : (
+                          <span className="text-slate-300">—</span>
+                        )}
+                      </td>
                       <td className="px-4 py-3 text-slate-600 hidden sm:table-cell">
-                        {priest.age ? `${priest.age} yrs` : '—'}
+                        {age ? `${age} yrs` : '—'}
                       </td>
                       <td className="px-4 py-3 hidden lg:table-cell">
                         {priest.lastCheckup ? (
@@ -1185,7 +1223,8 @@ export function HealthTracker() {
                         </td>
                       )}
                     </tr>
-                  ))
+                    );
+                  })
                 )}
               </tbody>
             </table>
@@ -1216,14 +1255,19 @@ export function HealthTracker() {
                 animate={{ scale: 1 }}
                 exit={{ scale: 0.95 }}
                 onClick={(e) => e.stopPropagation()}
-                className="bg-white rounded-xl shadow-xl max-w-2xl w-full p-6"
+                className="bg-white rounded-xl shadow-xl max-w-2xl w-full p-6 max-h-[90vh] overflow-y-auto"
               >
-                <div className="flex items-start justify-between mb-4">
-                  <div>
-                    <h2 className="text-2xl font-bold text-slate-900">{selectedPriest.name}</h2>
-                    <p className="text-slate-600">
-                      {selectedPriest.position} • {selectedPriest.parish}
-                    </p>
+                <div className="flex items-start justify-between mb-5">
+                  <div className="flex items-center gap-3.5">
+                    <div className="w-12 h-12 rounded-full bg-rose-100 flex items-center justify-center shrink-0">
+                      <Heart className="w-6 h-6 text-rose-500" />
+                    </div>
+                    <div>
+                      <h2 className="text-2xl font-bold text-slate-900">{selectedPriest.name}</h2>
+                      <p className="text-slate-500 text-sm">
+                        {[selectedPriest.position, selectedPriest.parish].filter(Boolean).join(' • ') || '—'}
+                      </p>
+                    </div>
                   </div>
                   <button
                     onClick={() => setSelectedPriest(null)}
@@ -1233,62 +1277,76 @@ export function HealthTracker() {
                   </button>
                 </div>
 
-                <div className="grid grid-cols-2 gap-6">
-                  <div>
-                    <p className="text-sm text-slate-600 font-medium">Birth Date</p>
-                    <p className="text-lg font-semibold text-slate-900 mt-1">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div className="bg-slate-50 rounded-xl p-4">
+                    <p className="text-xs text-slate-500 font-bold uppercase tracking-wider flex items-center gap-1.5">
+                      <Cake className="w-3.5 h-3.5 text-rose-400" />
+                      Birthday
+                    </p>
+                    <p className="text-lg font-semibold text-slate-900 mt-1.5">
                       {selectedPriest.birthDate
                         ? formatDate(new Date(selectedPriest.birthDate))
                         : 'N/A'}
                     </p>
-                    {selectedPriest.age > 0 && (
-                      <p className="text-sm text-slate-600 mt-1">Age: {selectedPriest.age} years</p>
+                    {displayAge(selectedPriest) > 0 && (
+                      <p className="text-sm font-bold text-rose-600 mt-0.5">
+                        {displayAge(selectedPriest)} years old
+                      </p>
+                    )}
+                    {selectedPriest.birthDate && getDaysUntilBirthday(selectedPriest.birthDate) <= 30 && (
+                      <p className="text-xs font-bold text-emerald-600 bg-emerald-50 inline-block px-2 py-1 rounded-md mt-2">
+                        🎂{' '}
+                        {getDaysUntilBirthday(selectedPriest.birthDate) === 0
+                          ? 'Birthday is today!'
+                          : `Birthday in ${getDaysUntilBirthday(selectedPriest.birthDate)} day${getDaysUntilBirthday(selectedPriest.birthDate) === 1 ? '' : 's'}`}
+                      </p>
                     )}
                   </div>
-                  <div>
-                    <p className="text-sm text-slate-600 font-medium">Health Status</p>
-                    <p
-                      className={`text-lg font-semibold mt-1 ${HEALTH_STATUS_COLORS[selectedPriest.healthStatus].split(' ')[1]}`}
+                  <div className="bg-slate-50 rounded-xl p-4">
+                    <p className="text-xs text-slate-500 font-bold uppercase tracking-wider">Health Status</p>
+                    <span
+                      className={`inline-flex items-center gap-1 px-2.5 py-1 mt-1.5 rounded-md text-sm font-bold border ${HEALTH_STATUS_COLORS[selectedPriest.healthStatus]}`}
                     >
+                      {HEALTH_STATUS_ICONS[selectedPriest.healthStatus]}{' '}
                       {selectedPriest.healthStatus.replace('-', ' ').toUpperCase()}
-                    </p>
+                    </span>
                   </div>
-                  <div>
-                    <p className="text-sm text-slate-600 font-medium">Email</p>
-                    <p className="text-lg font-semibold text-slate-900 mt-1">
+                  <div className="bg-slate-50 rounded-xl p-4">
+                    <p className="text-xs text-slate-500 font-bold uppercase tracking-wider">Email</p>
+                    <p className="text-sm font-semibold text-slate-900 mt-1.5 break-all">
                       {selectedPriest.email || 'N/A'}
                     </p>
                   </div>
-                  <div>
-                    <p className="text-sm text-slate-600 font-medium">Phone</p>
-                    <p className="text-lg font-semibold text-slate-900 mt-1">
+                  <div className="bg-slate-50 rounded-xl p-4">
+                    <p className="text-xs text-slate-500 font-bold uppercase tracking-wider">Phone</p>
+                    <p className="text-sm font-semibold text-slate-900 mt-1.5">
                       {selectedPriest.phone || 'N/A'}
                     </p>
                   </div>
-                  <div className="col-span-2">
-                    <p className="text-sm text-slate-600 font-medium">Last Check-up</p>
-                    <p className="text-lg font-semibold text-slate-900 mt-1">
+                  <div className="sm:col-span-2 bg-slate-50 rounded-xl p-4">
+                    <p className="text-xs text-slate-500 font-bold uppercase tracking-wider">Last Check-up</p>
+                    <p className="text-lg font-semibold text-slate-900 mt-1.5">
                       {selectedPriest.lastCheckup
                         ? formatDate(new Date(selectedPriest.lastCheckup))
                         : 'N/A'}
                     </p>
                     {selectedPriest.lastCheckup && needsCheckup(selectedPriest.lastCheckup) && (
-                      <p className="text-sm text-amber-700 bg-amber-50 px-3 py-2 rounded mt-2">
+                      <p className="text-sm text-amber-700 bg-amber-50 px-3 py-2 rounded-lg mt-2">
                         ⚠️ Health check-up is overdue. Please schedule immediately.
                       </p>
                     )}
                   </div>
                   {selectedPriest.notes && (
-                    <div className="col-span-2">
-                      <p className="text-sm text-slate-600 font-medium">Notes</p>
-                      <p className="text-slate-700 mt-2 bg-slate-50 p-3 rounded whitespace-pre-line">
+                    <div className="sm:col-span-2 bg-slate-50 rounded-xl p-4">
+                      <p className="text-xs text-slate-500 font-bold uppercase tracking-wider">Notes</p>
+                      <p className="text-sm text-slate-700 mt-2 bg-white border border-slate-100 p-3 rounded-lg whitespace-pre-line">
                         {selectedPriest.notes}
                       </p>
                     </div>
                   )}
                   {selectedPriest.documentName && (
-                    <div className="col-span-2">
-                      <p className="text-sm text-slate-600 font-medium">Document</p>
+                    <div className="sm:col-span-2 bg-slate-50 rounded-xl p-4">
+                      <p className="text-xs text-slate-500 font-bold uppercase tracking-wider">Document</p>
                       {selectedPriest.documentUrl ? (
                         <a
                           href={selectedPriest.documentUrl}

@@ -1,6 +1,11 @@
 import { Injectable } from '@nestjs/common';
 import { SupabaseService } from './supabase.service';
+import { EmailService, OtpPurpose } from './email.service';
 import { AuthUser, AppRole } from '../types';
+
+const OTP_TTL_MS = 10 * 60 * 1000; // codes live 10 minutes
+const OTP_RESEND_THROTTLE_MS = 55 * 1000; // server-side guard behind the 60s client timer
+const OTP_VERIFIED_WINDOW_MS = 15 * 60 * 1000; // verified code usable for follow-up action
 
 const ROLE_PERMISSION_DEFINITIONS = [
   {
@@ -158,7 +163,10 @@ const ROLE_PERMISSION_DEFINITIONS = [
 
 @Injectable()
 export class AppAuthService {
-  constructor(private readonly supabaseService: SupabaseService) {}
+  constructor(
+    private readonly supabaseService: SupabaseService,
+    private readonly emailService: EmailService,
+  ) {}
 
   private isUuid(value?: string): boolean {
     return typeof value === 'string' && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(value);
@@ -549,6 +557,212 @@ export class AppAuthService {
         if (insertPermErr) throw insertPermErr;
       }
     }
+
+    return { ok: true };
+  }
+
+  // ── OTP / Onboarding / Password reset ──────────────────────────────────────
+
+  private otpTable() {
+    return this.supabaseService.admin.schema('diocese').from('otp_verifications');
+  }
+
+  private generateOtpCode(): string {
+    return Math.floor(100000 + Math.random() * 900000).toString();
+  }
+
+  private async findAuthUserByEmail(email: string) {
+    const { data, error } = await this.supabaseService.supabaseServer.auth.admin.listUsers({ perPage: 1000 });
+    if (error) throw error;
+    const lower = email.toLowerCase();
+    return (data.users ?? []).find((u) => (u.email ?? '').toLowerCase() === lower) ?? null;
+  }
+
+  /**
+   * Generates a 6-digit OTP, stores it in diocese.otp_verifications and emails it.
+   * purpose 'forgot_password' requires the email to belong to a user who has
+   * completed onboarding (that is when an email counts as "registered").
+   */
+  async sendOtp(emailRaw: string, purpose: OtpPurpose): Promise<{ ok: true; devMode: boolean }> {
+    const email = emailRaw.toLowerCase().trim();
+
+    if (purpose === 'forgot_password') {
+      const user = await this.findAuthUserByEmail(email);
+      if (!user || user.user_metadata?.onboardingCompleted !== true) {
+        throw new Error('NOT_REGISTERED');
+      }
+      if (user.banned_until) throw new Error('ACCOUNT_ARCHIVED');
+    }
+
+    // Server-side resend throttle (client also enforces a 60s timer)
+    const { data: recent } = await this.otpTable()
+      .select('created_at')
+      .eq('email', email)
+      .eq('purpose', purpose)
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    if (recent?.created_at && Date.now() - new Date(recent.created_at).getTime() < OTP_RESEND_THROTTLE_MS) {
+      throw new Error('RATE_LIMITED');
+    }
+
+    // Invalidate any previous unused codes for this email+purpose
+    await this.otpTable().delete().eq('email', email).eq('purpose', purpose).eq('used', false);
+
+    const code = this.generateOtpCode();
+    const { error: insertError } = await this.otpTable().insert({
+      email,
+      otp_code: code,
+      purpose,
+      expires_at: new Date(Date.now() + OTP_TTL_MS).toISOString(),
+    });
+    if (insertError) throw insertError;
+
+    try {
+      const { devMode } = await this.emailService.sendOtpEmail(email, code, purpose);
+      return { ok: true, devMode };
+    } catch (sendError) {
+      // Email never left the server — remove the code so the user can retry
+      // immediately instead of hitting the 60s resend throttle.
+      await this.otpTable().delete().eq('email', email).eq('purpose', purpose).eq('otp_code', code);
+      throw sendError;
+    }
+  }
+
+  /** Validates a pending OTP and marks it used. */
+  async verifyOtp(emailRaw: string, codeRaw: string, purpose: OtpPurpose): Promise<{ ok: true }> {
+    const email = emailRaw.toLowerCase().trim();
+    const code = codeRaw.trim();
+
+    const { data, error } = await this.otpTable()
+      .select('*')
+      .eq('email', email)
+      .eq('otp_code', code)
+      .eq('purpose', purpose)
+      .eq('used', false)
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    if (error) throw error;
+    if (!data) throw new Error('INVALID_CODE');
+    if (new Date(data.expires_at).getTime() < Date.now()) throw new Error('EXPIRED_CODE');
+
+    const { error: updateError } = await this.otpTable()
+      .update({ used: true, used_at: new Date().toISOString() })
+      .eq('id', data.id);
+    if (updateError) throw updateError;
+
+    return { ok: true };
+  }
+
+  /**
+   * Follow-up actions (complete-onboarding, reset-password) re-check that the
+   * supplied code was verified recently, so the OTP step cannot be skipped.
+   */
+  private async assertRecentlyVerifiedOtp(email: string, code: string, purpose: OtpPurpose): Promise<void> {
+    const { data, error } = await this.otpTable()
+      .select('used_at')
+      .eq('email', email)
+      .eq('otp_code', code.trim())
+      .eq('purpose', purpose)
+      .eq('used', true)
+      .order('used_at', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    if (error) throw error;
+    const usedAt = data?.used_at ? new Date(data.used_at).getTime() : 0;
+    if (!usedAt || Date.now() - usedAt > OTP_VERIFIED_WINDOW_MS) {
+      throw new Error('OTP_NOT_VERIFIED');
+    }
+  }
+
+  /**
+   * Saves the onboarding form after its OTP was verified: updates the auth user
+   * (email, password, metadata) and persists birthday / contact number /
+   * onboarding_completed to diocese.profiles.
+   */
+  async completeOnboarding(body: {
+    userId: string;
+    email: string;
+    password: string;
+    contactNumber: string;
+    birthday: string;
+    otpCode: string;
+  }): Promise<AuthUser> {
+    const { userId, password, contactNumber, birthday, otpCode } = body;
+    const email = body.email.toLowerCase().trim();
+
+    await this.assertRecentlyVerifiedOtp(email, otpCode, 'onboarding');
+
+    const { data: current, error: getError } =
+      await this.supabaseService.supabaseServer.auth.admin.getUserById(userId);
+    if (getError || !current?.user) throw new Error('USER_NOT_FOUND');
+
+    const mergedMeta: Record<string, any> = {
+      ...(current.user.user_metadata ?? {}),
+      contactNumber,
+      birthday,
+      onboardingCompleted: true,
+    };
+
+    const { data, error } = await this.supabaseService.supabaseServer.auth.admin.updateUserById(userId, {
+      email,
+      password,
+      email_confirm: true,
+      user_metadata: mergedMeta,
+    });
+    if (error) throw error;
+
+    try {
+      // Make sure the diocese.profiles row exists, then store the onboarding fields
+      await this.upsertDioceseProfile(userId, {
+        email,
+        displayName: mergedMeta.displayName ?? mergedMeta.display_name,
+        role: mergedMeta.role,
+        entityName: mergedMeta.entityName ?? mergedMeta.entity_name,
+        entityType: mergedMeta.entityType ?? mergedMeta.entity_type,
+        entityId: mergedMeta.entityId ?? mergedMeta.entity_id,
+      });
+      const { error: profileError } = await this.supabaseService.admin
+        .schema('diocese')
+        .from('profiles')
+        .update({
+          email,
+          birthday: birthday || null,
+          contact_number: contactNumber ?? '',
+          onboarding_completed: true,
+          updated_at: new Date().toISOString(),
+        })
+        .eq('external_auth_id', userId);
+      if (profileError) throw profileError;
+    } catch (profileError) {
+      console.error(
+        '[auth.service] Onboarding profile update failed for user',
+        userId,
+        ':',
+        (profileError as any)?.message ?? profileError,
+      );
+    }
+
+    return this.mapSupabaseUser(data.user);
+  }
+
+  /** Sets a new password after the forgot-password OTP was verified. */
+  async resetPassword(body: { email: string; otpCode: string; newPassword: string }): Promise<{ ok: true }> {
+    const email = body.email.toLowerCase().trim();
+
+    await this.assertRecentlyVerifiedOtp(email, body.otpCode, 'forgot_password');
+
+    const user = await this.findAuthUserByEmail(email);
+    if (!user) throw new Error('NOT_REGISTERED');
+
+    const { error } = await this.supabaseService.supabaseServer.auth.admin.updateUserById(user.id, {
+      password: body.newPassword,
+    });
+    if (error) throw error;
 
     return { ok: true };
   }
