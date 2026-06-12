@@ -12,7 +12,8 @@ Entry points:
   load_incremental(path)      — daily records from weather_updater.py
                                 → one record per (municipality, date)
   load_daily_classified(path) — classified daily rows (weather_daily_classifier)
-                                → upserts reference.weather_daily, then calls
+                                → upserts reference.weather_rainfall_daily and
+                                  reference.weather_temperature_daily, then calls
                                   reference.rebuild_weather_monthly_summary()
 
 Validation (integrated):
@@ -343,14 +344,14 @@ def load_incremental(path: Path) -> int:
     return count
 
 
-# ── Classified daily loader (reference.weather_daily, migration 187) ─────────
+# ── Classified daily loaders (split daily tables, migration 189) ─────────────
 
 _DAILY_UPSERT_CHUNK = 500
 
 
-def upsert_weather_daily(rows: list[dict]) -> int:
+def _upsert_daily_table(table: str, rows: list[dict]) -> int:
     """
-    Upsert classified daily rows into reference.weather_daily.
+    Upsert classified daily rows into a reference-schema daily table.
     Conflict target is the (date, municipality) unique constraint, so
     re-running over the same period is safe.
     """
@@ -362,19 +363,29 @@ def upsert_weather_daily(rows: list[dict]) -> int:
     total = 0
     for i in range(0, len(rows), _DAILY_UPSERT_CHUNK):
         chunk = rows[i : i + _DAILY_UPSERT_CHUNK]
-        get_table("reference", "weather_daily").upsert(
+        get_table("reference", table).upsert(
             chunk, on_conflict="date,municipality"
         ).execute()
         total += len(chunk)
-        logger.info("Upserted %d/%d weather_daily rows", total, len(rows))
+        logger.info("Upserted %d/%d %s rows", total, len(rows), table)
 
     return total
 
 
+def upsert_weather_rainfall_daily(rows: list[dict]) -> int:
+    """Upsert classified rainfall rows into reference.weather_rainfall_daily."""
+    return _upsert_daily_table("weather_rainfall_daily", rows)
+
+
+def upsert_weather_temperature_daily(rows: list[dict]) -> int:
+    """Upsert classified temperature rows into reference.weather_temperature_daily."""
+    return _upsert_daily_table("weather_temperature_daily", rows)
+
+
 def rebuild_monthly_summary(period_start: Optional[str] = None, period_end: Optional[str] = None) -> int:
     """
-    Call reference.rebuild_weather_monthly_summary() to re-aggregate
-    weather_daily into weather_monthly_summary for the given period
+    Call reference.rebuild_weather_monthly_summary() to re-aggregate the split
+    daily tables into weather_monthly_summary for the given period
     (ISO dates; None = unbounded). Returns the number of month-rows upserted.
     """
     from app.services.supabase_client import get_supabase
@@ -399,15 +410,28 @@ def rebuild_monthly_summary(period_start: Optional[str] = None, period_end: Opti
 def load_daily_classified(path: Path) -> int:
     """
     Load classified daily rows (written by weather_collector.py or
-    weather_updater.py) into reference.weather_daily, then rebuild the
-    monthly summary for the file's period. Returns rows upserted.
+    weather_updater.py) into reference.weather_rainfall_daily and
+    reference.weather_temperature_daily, then rebuild the monthly summary
+    for the file's period. Returns total rows upserted across both tables.
     """
     logger.info("Loading classified daily weather data from %s", path)
     data = json.loads(path.read_text())
 
-    rows = data.get("rows", [])
-    count = upsert_weather_daily(rows)
-    logger.info("Classified daily load complete — %d rows upserted.", count)
+    if "rain_rows" not in data and "temp_rows" not in data:
+        raise ValueError(
+            f"{path} has the pre-migration-189 single-table shape ('rows' key). "
+            "Re-run weather_collector.py (or weather_updater.py) to regenerate it "
+            "with the split rain_rows/temp_rows shape."
+        )
+
+    rain_count = upsert_weather_rainfall_daily(data.get("rain_rows", []))
+    temp_count = upsert_weather_temperature_daily(data.get("temp_rows", []))
+    count = rain_count + temp_count
+    logger.info(
+        "Classified daily load complete — %d rainfall + %d temperature rows upserted.",
+        rain_count,
+        temp_count,
+    )
 
     rebuild_monthly_summary(data.get("period_start"), data.get("period_end"))
     return count
@@ -435,7 +459,10 @@ if __name__ == "__main__":
     parser.add_argument(
         "--daily-classified",
         action="store_true",
-        help="Load classified daily rows into reference.weather_daily and rebuild the monthly summary",
+        help=(
+            "Load classified daily rows into reference.weather_rainfall_daily and "
+            "reference.weather_temperature_daily, then rebuild the monthly summary"
+        ),
     )
     parser.add_argument(
         "--out", type=str, default=str(DEFAULT_OUT_DIR), help="Directory containing the JSON output files"
@@ -447,7 +474,10 @@ if __name__ == "__main__":
     if args.daily_classified:
         target = Path(args.file) if args.file else out_dir / "laguna_weather_daily_classified.json"
         count = load_daily_classified(target)
-        print(f"Loaded {count} rows into reference.weather_daily (monthly summary rebuilt)")
+        print(
+            f"Loaded {count} rows into reference.weather_rainfall_daily + "
+            f"reference.weather_temperature_daily (monthly summary rebuilt)"
+        )
     elif args.incremental:
         target = Path(args.file) if args.file else out_dir / "laguna_weather_incremental.json"
         count = load_incremental(target)

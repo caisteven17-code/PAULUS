@@ -27,7 +27,8 @@ Output:
   {out_dir}/laguna_weather_final.json
   {out_dir}/laguna_source_validity_report.json
   {out_dir}/champion_map.json               # used by weather_updater.py
-  {out_dir}/laguna_weather_daily_classified.json  # rows for reference.weather_daily
+  {out_dir}/laguna_weather_daily_classified.json  # rain_rows/temp_rows for the
+                                                  # split daily weather tables
 """
 
 from __future__ import annotations
@@ -525,20 +526,25 @@ def collect(
         logger.warning("IBTrACS unavailable (%s) — typhoon fields will be 0", exc)
         typhoon_flags = {}
 
-    # Daily classification (reference.weather_daily): Meteostat temperature
-    # validator is one station for all municipalities — fetch it once.
+    # Daily classification (reference.weather_rainfall_daily and
+    # reference.weather_temperature_daily): the Meteostat and NOAA GSOD
+    # temperature validators are station-based and shared by all
+    # municipalities — fetch each once.
     from app.services.weather_daily_classifier import (
         build_chirps_daily_cache,
         build_daily_rows,
         build_meteostat_daily_cache,
+        build_noaa_gsod_daily_cache,
     )
 
     meteostat_daily_cache = build_meteostat_daily_cache(start, end)
+    gsod_daily_cache = build_noaa_gsod_daily_cache(start, end)
 
     master: list[dict] = []
     validity_rows: list[dict] = []
     champion_map: dict[str, str] = {}
-    daily_classified_rows: list[dict] = []
+    daily_rain_rows: list[dict] = []
+    daily_temp_rows: list[dict] = []
 
     for i, muni in enumerate(MUNICIPALITIES):
         name = muni["name"]
@@ -553,16 +559,26 @@ def collect(
             "nasa_power_sb": fetch_nasa_power_sb(lat, lon, start, end),
         }
 
-        # Classify each day for reference.weather_daily: NASA POWER AG is the
-        # source of truth, CHIRPS (rain) and Meteostat (temp) are validators.
+        # Classify each day for the split daily tables: NASA POWER AG is the
+        # source of truth; CHIRPS + Open-Meteo validate rainfall, Meteostat +
+        # NOAA GSOD validate temperature.
         chirps_daily_cache = build_chirps_daily_cache(lat, lon, start, end)
-        muni_daily_rows = build_daily_rows(
-            name, start, end, sources["nasa_power_ag"], chirps_daily_cache, meteostat_daily_cache
+        muni_rain_rows, muni_temp_rows = build_daily_rows(
+            name,
+            start,
+            end,
+            sources["nasa_power_ag"],
+            chirps_daily_cache,
+            meteostat_daily_cache,
+            open_meteo_records=sources["open_meteo"],
+            gsod_cache=gsod_daily_cache,
         )
-        daily_classified_rows.extend(muni_daily_rows)
+        daily_rain_rows.extend(muni_rain_rows)
+        daily_temp_rows.extend(muni_temp_rows)
         logger.info(
-            "  Daily classification: %d days (CHIRPS coverage %d days)",
-            len(muni_daily_rows),
+            "  Daily classification: %d rain rows, %d temp rows (CHIRPS coverage %d days)",
+            len(muni_rain_rows),
+            len(muni_temp_rows),
             len(chirps_daily_cache),
         )
 
@@ -678,7 +694,7 @@ def collect(
         )
     )
 
-    # Classified daily rows for reference.weather_daily (no indent — large file)
+    # Classified daily rows for the split daily tables (no indent — large file)
     daily_classified_path = out_dir / "laguna_weather_daily_classified.json"
     daily_classified_path.write_text(
         json.dumps(
@@ -686,8 +702,10 @@ def collect(
                 "generated_at": datetime.utcnow().isoformat() + "Z",
                 "period_start": start.isoformat(),
                 "period_end": end.isoformat(),
-                "row_count": len(daily_classified_rows),
-                "rows": daily_classified_rows,
+                "rain_row_count": len(daily_rain_rows),
+                "temp_row_count": len(daily_temp_rows),
+                "rain_rows": daily_rain_rows,
+                "temp_rows": daily_temp_rows,
             }
         )
     )
@@ -702,13 +720,18 @@ def collect(
             from app.services.weather_loader import (
                 load_from_file,
                 rebuild_monthly_summary,
-                upsert_weather_daily,
+                upsert_weather_rainfall_daily,
+                upsert_weather_temperature_daily,
             )
 
-            # New pipeline first: reference.weather_daily + monthly summary
-            daily_rows_loaded = upsert_weather_daily(daily_classified_rows)
+            # New pipeline first: split daily tables + monthly summary
+            daily_rows_loaded = upsert_weather_rainfall_daily(daily_rain_rows)
+            daily_rows_loaded += upsert_weather_temperature_daily(daily_temp_rows)
             rebuild_monthly_summary(start.isoformat(), end.isoformat())
-            logger.info("Loaded %d rows into reference.weather_daily", daily_rows_loaded)
+            logger.info(
+                "Loaded %d rows into reference.weather_rainfall_daily + reference.weather_temperature_daily",
+                daily_rows_loaded,
+            )
 
             # Legacy monthly load (reference.weather_observations). A failure
             # here must not block the new pipeline — log it and keep going.
@@ -734,7 +757,7 @@ def collect(
         "champion_map": champion_map,
         "records_loaded": records_loaded,
         "daily_rows_loaded": daily_rows_loaded,
-        "daily_rows_classified": len(daily_classified_rows),
+        "daily_rows_classified": len(daily_rain_rows) + len(daily_temp_rows),
     }
 
 
@@ -771,7 +794,13 @@ if __name__ == "__main__":
 
     result = collect(start=start, end=end, out_dir=Path(args.out), load=args.load)
     print(f"Collected {len(result['master'])} municipalities.")
-    print(f"Classified {result['daily_rows_classified']} daily rows for reference.weather_daily")
+    print(
+        f"Classified {result['daily_rows_classified']} daily rows for "
+        f"reference.weather_rainfall_daily + reference.weather_temperature_daily"
+    )
     if args.load:
         print(f"Loaded {result['records_loaded']} records into reference.weather_observations")
-        print(f"Loaded {result['daily_rows_loaded']} rows into reference.weather_daily (monthly summary rebuilt)")
+        print(
+            f"Loaded {result['daily_rows_loaded']} rows into the split daily weather tables "
+            f"(monthly summary rebuilt)"
+        )

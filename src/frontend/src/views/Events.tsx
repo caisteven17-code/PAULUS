@@ -266,12 +266,12 @@ export function Events() {
     filter === 'ongoing'
       ? ongoing
       : filter === 'upcoming'
-      ? upcoming
-      : filter === 'past'
-      ? past
-      : filter === 'archived'
-      ? scopedArchived
-      : all;
+        ? upcoming
+        : filter === 'past'
+          ? past
+          : filter === 'archived'
+            ? scopedArchived
+            : all;
 
   const tabCounts: Record<EventTab, number> = {
     ongoing: ongoing.length,
@@ -377,41 +377,58 @@ export function Events() {
     ? ['ongoing', 'upcoming', 'past', 'all', 'archived']
     : ['ongoing', 'upcoming', 'past', 'all'];
 
-  return (
-    <div className="min-h-screen bg-[radial-gradient(circle_at_top,_rgba(212,175,55,0.08),_transparent_32%),linear-gradient(180deg,#f8fafc_0%,#eef2f7_100%)] pt-6 pb-20 px-4 md:px-6">
-      <div className="max-w-5xl mx-auto">
+  const summaryCards = [
+    { label: 'Ongoing', value: ongoing.length, icon: Activity },
+    { label: 'Upcoming', value: upcoming.length, icon: CalendarDays },
+    { label: 'Past', value: past.length, icon: Clock },
+  ];
 
+  return (
+    <div className="min-h-screen bg-[#f5f5f5] pt-8 pb-20 px-4 sm:px-6 lg:px-8">
+      <div className="mx-auto w-full max-w-7xl">
         {/* ── Header ── */}
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-8">
-          <div className="flex items-center gap-3">
-            <div className="w-11 h-11 rounded-2xl bg-slate-950 flex items-center justify-center shrink-0">
-              <CalendarDays className="w-5 h-5 text-gold-500" />
+        <div className="mb-6 overflow-hidden rounded-3xl border border-black/10 bg-black text-white shadow-[0_18px_48px_rgba(15,23,42,0.12)]">
+          <div className="flex flex-col gap-6 p-6 md:p-8 lg:flex-row lg:items-center lg:justify-between">
+            <div className="flex min-w-0 items-center gap-4">
+              <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl border border-gold-500/25 bg-white/5">
+                <CalendarDays className="h-5 w-5 text-gold-400" />
+              </div>
+              <div className="min-w-0">
+                <p className="text-[10px] font-black uppercase tracking-[0.28em] text-gold-400">Diocesan Calendar</p>
+                <h1 className="mt-1 font-serif text-3xl font-bold leading-none tracking-normal text-white md:text-4xl">
+                  Events
+                </h1>
+                <p className="mt-2 max-w-2xl text-sm font-medium leading-relaxed text-white/55">
+                  {isDiocese
+                    ? 'Oversee events from every institution across the diocese.'
+                    : `Schedule and view activities for ${user?.entityName || 'your institution'}.`}
+                </p>
+              </div>
             </div>
-            <div>
-              <h1 className="text-3xl md:text-4xl font-serif font-bold tracking-tight text-slate-950">Events</h1>
-              <p className="text-sm text-slate-500">
-                {isDiocese
-                  ? 'Oversee events from every institution across the diocese.'
-                  : `Schedule and view activities for ${user?.entityName || 'your institution'}.`}
-              </p>
+
+            <div className="grid grid-cols-3 gap-2 sm:min-w-[360px]">
+              {summaryCards.map((card) => {
+                const Icon = card.icon;
+                return (
+                  <div key={card.label} className="rounded-2xl border border-white/10 bg-white/[0.06] p-3">
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="text-[10px] font-black uppercase tracking-[0.18em] text-white/35">
+                        {card.label}
+                      </span>
+                      <Icon className="h-3.5 w-3.5 text-gold-400" />
+                    </div>
+                    <p className="mt-2 text-2xl font-black leading-none text-white">{card.value}</p>
+                  </div>
+                );
+              })}
             </div>
           </div>
-
-          {canManage && (
-            <button
-              onClick={openCreateModal}
-              className="inline-flex items-center justify-center gap-3 rounded-2xl bg-gold-500 hover:bg-gold-600 text-church-green-dark px-6 py-4 font-bold text-[11px] uppercase tracking-[0.22em] transition-all shadow-xl shadow-gold-500/20 shrink-0"
-            >
-              <Plus className="w-4 h-4" />
-              New Event
-            </button>
-          )}
         </div>
 
         {/* ── Tabs + institution dropdown ── */}
-        <div className="mb-4 space-y-3">
-          <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-3">
-            <div className="inline-flex flex-wrap items-center gap-1 rounded-[24px] border border-slate-200 bg-white p-1.5 shadow-sm">
+        <div className="mb-6 rounded-3xl border border-slate-200 bg-white p-3 shadow-[0_12px_32px_rgba(15,23,42,0.06)]">
+          <div className="flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
+            <div className="grid grid-cols-2 gap-2 sm:flex sm:flex-wrap">
               {visibleTabs.map((id) => {
                 const meta = TAB_META[id];
                 const Icon = meta.icon;
@@ -420,14 +437,14 @@ export function Events() {
                   <button
                     key={id}
                     onClick={() => setFilter(id)}
-                    className={`inline-flex items-center gap-2 rounded-[18px] px-4 md:px-5 py-3 text-[11px] font-black uppercase tracking-[0.16em] transition-all ${
+                    className={`inline-flex h-11 items-center justify-center gap-2 rounded-2xl px-4 text-[11px] font-black uppercase tracking-[0.14em] transition-all ${
                       isActive
-                        ? 'bg-slate-950 text-white shadow-lg'
-                        : 'text-slate-500 hover:bg-slate-100 hover:text-slate-700'
+                        ? 'bg-black text-white shadow-lg shadow-black/10'
+                        : 'border border-transparent text-slate-500 hover:border-slate-200 hover:bg-slate-50 hover:text-slate-800'
                     }`}
                   >
-                    <Icon className="w-4 h-4" />
-                    <span className="hidden sm:inline">{meta.label}</span>
+                    <Icon className={`h-4 w-4 ${isActive ? 'text-gold-400' : 'text-slate-400'}`} />
+                    <span>{meta.label}</span>
                     <span
                       className={`rounded-full px-2 py-0.5 text-[9px] font-black tabular-nums ${
                         isActive ? 'bg-white/20 text-white' : 'bg-slate-100 text-slate-500'
@@ -441,93 +458,108 @@ export function Events() {
             </div>
 
             {/* Institution filter — diocese overview only */}
-            {isDiocese && institutionOptions.length > 0 && (
-              <div className="relative w-full lg:w-72">
-                <Building2 className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-300 pointer-events-none" />
-                <select
-                  value={institutionFilter}
-                  onChange={(e) => setInstitutionFilter(e.target.value)}
-                  className="w-full pl-11 pr-10 py-3 bg-white border border-slate-200 rounded-2xl text-sm font-medium shadow-sm focus:outline-none focus:ring-4 focus:ring-gold-500/10 focus:border-gold-500 transition-all appearance-none cursor-pointer"
+            <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+              {isDiocese && institutionOptions.length > 0 && (
+                <div className="relative w-full sm:w-72">
+                  <Building2 className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+                  <select
+                    value={institutionFilter}
+                    onChange={(e) => setInstitutionFilter(e.target.value)}
+                    className="h-11 w-full cursor-pointer appearance-none rounded-2xl border border-slate-200 bg-slate-50 pl-11 pr-10 text-sm font-bold text-slate-700 transition-all focus:border-gold-500 focus:bg-white focus:outline-none focus:ring-4 focus:ring-gold-500/10"
+                  >
+                    <option value="all">All institutions</option>
+                    {institutionOptions.map((name) => (
+                      <option key={name} value={name}>
+                        {name}
+                      </option>
+                    ))}
+                  </select>
+                  <ChevronDown className="pointer-events-none absolute right-4 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+                </div>
+              )}
+              {canManage && (
+                <button
+                  onClick={openCreateModal}
+                  className="inline-flex h-11 shrink-0 items-center justify-center gap-2 rounded-2xl bg-gold-500 px-5 text-[11px] font-black uppercase tracking-[0.18em] text-black shadow-lg shadow-gold-500/20 transition-all hover:bg-gold-400"
                 >
-                  <option value="all">All institutions</option>
-                  {institutionOptions.map((name) => (
-                    <option key={name} value={name}>{name}</option>
-                  ))}
-                </select>
-                <ChevronDown className="absolute right-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
-              </div>
-            )}
+                  <Plus className="h-4 w-4" />
+                  New Event
+                </button>
+              )}
+            </div>
           </div>
 
           {filter === 'archived' && (
-            <p className="px-1 text-xs text-slate-400">
+            <p className="mt-3 rounded-2xl bg-slate-50 px-4 py-3 text-xs font-semibold text-slate-500">
               Archived events are hidden from the calendar — restore one to bring it back.
             </p>
           )}
         </div>
 
         {/* ── Filter bar ── */}
-        <div className="flex flex-wrap items-center gap-2 bg-white border border-slate-200 rounded-2xl p-2.5 shadow-sm mb-8">
-          <div className="relative flex-1 min-w-[200px]">
-            <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-300 pointer-events-none" />
+        <div className="mb-6 grid grid-cols-1 gap-2 rounded-3xl border border-slate-200 bg-white p-3 shadow-[0_12px_32px_rgba(15,23,42,0.05)] lg:grid-cols-[minmax(220px,1fr)_180px_160px_minmax(310px,auto)_auto]">
+          <div className="relative">
+            <Search className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
             <input
               type="text"
               value={filters.search}
               onChange={(e) => setFilters({ ...filters, search: e.target.value })}
               placeholder="Search events…"
-              className="w-full pl-10 pr-3 py-2.5 bg-slate-50/50 border border-slate-200 rounded-xl text-sm font-medium focus:outline-none focus:ring-4 focus:ring-gold-500/10 focus:border-gold-500 focus:bg-white transition-all placeholder:text-slate-300"
+              className="h-11 w-full rounded-2xl border border-slate-200 bg-slate-50 pl-11 pr-4 text-sm font-semibold text-slate-800 transition-all placeholder:text-slate-400 focus:border-gold-500 focus:bg-white focus:outline-none focus:ring-4 focus:ring-gold-500/10"
             />
           </div>
 
           <select
             value={filters.type}
             onChange={(e) => setFilters({ ...filters, type: e.target.value })}
-            className="px-3 py-2.5 bg-slate-50/50 border border-slate-200 rounded-xl text-sm font-medium focus:outline-none focus:ring-4 focus:ring-gold-500/10 focus:border-gold-500 focus:bg-white transition-all cursor-pointer"
+            className="h-11 cursor-pointer rounded-2xl border border-slate-200 bg-slate-50 px-4 text-sm font-semibold text-slate-700 transition-all focus:border-gold-500 focus:bg-white focus:outline-none focus:ring-4 focus:ring-gold-500/10"
           >
             <option value="all">All types</option>
             {EVENT_TYPES.map((t) => (
-              <option key={t} value={t}>{t}</option>
+              <option key={t} value={t}>
+                {t}
+              </option>
             ))}
           </select>
 
           <select
             value={filters.level}
             onChange={(e) => setFilters({ ...filters, level: e.target.value })}
-            className="px-3 py-2.5 bg-slate-50/50 border border-slate-200 rounded-xl text-sm font-medium focus:outline-none focus:ring-4 focus:ring-gold-500/10 focus:border-gold-500 focus:bg-white transition-all cursor-pointer"
+            className="h-11 cursor-pointer rounded-2xl border border-slate-200 bg-slate-50 px-4 text-sm font-semibold text-slate-700 transition-all focus:border-gold-500 focus:bg-white focus:outline-none focus:ring-4 focus:ring-gold-500/10"
           >
             <option value="all">All levels</option>
             <option value="Major event">Major event</option>
             <option value="Minor event">Minor event</option>
           </select>
 
-          <div className="flex items-center gap-1.5">
-            <span className="text-[10px] font-black uppercase tracking-[0.18em] text-slate-300 pl-1">From</span>
+          <div className="grid grid-cols-[auto_minmax(0,1fr)_auto_minmax(0,1fr)] items-center gap-2">
+            <span className="text-[10px] font-black uppercase tracking-[0.18em] text-slate-400">From</span>
             <input
               type="date"
               value={filters.dateFrom}
               onChange={(e) => setFilters({ ...filters, dateFrom: e.target.value })}
-              className="px-3 py-2.5 bg-slate-50/50 border border-slate-200 rounded-xl text-sm font-medium focus:outline-none focus:ring-4 focus:ring-gold-500/10 focus:border-gold-500 focus:bg-white transition-all"
+              className="h-11 min-w-0 rounded-2xl border border-slate-200 bg-slate-50 px-4 text-sm font-semibold text-slate-700 transition-all focus:border-gold-500 focus:bg-white focus:outline-none focus:ring-4 focus:ring-gold-500/10"
             />
-            <span className="text-[10px] font-black uppercase tracking-[0.18em] text-slate-300">To</span>
+            <span className="text-[10px] font-black uppercase tracking-[0.18em] text-slate-400">To</span>
             <input
               type="date"
               value={filters.dateTo}
               min={filters.dateFrom || undefined}
               onChange={(e) => setFilters({ ...filters, dateTo: e.target.value })}
-              className="px-3 py-2.5 bg-slate-50/50 border border-slate-200 rounded-xl text-sm font-medium focus:outline-none focus:ring-4 focus:ring-gold-500/10 focus:border-gold-500 focus:bg-white transition-all"
+              className="h-11 min-w-0 rounded-2xl border border-slate-200 bg-slate-50 px-4 text-sm font-semibold text-slate-700 transition-all focus:border-gold-500 focus:bg-white focus:outline-none focus:ring-4 focus:ring-gold-500/10"
             />
           </div>
 
           {hasActiveFilters && (
             <>
-              <span className="text-xs font-bold text-slate-400 whitespace-nowrap px-1">
+              <span className="hidden items-center justify-center rounded-2xl bg-slate-50 px-3 text-xs font-bold text-slate-400 lg:flex">
                 {displayed.length} found
               </span>
               <button
                 onClick={() => setFilters(EMPTY_FILTERS)}
-                className="inline-flex items-center gap-1.5 px-3.5 py-2.5 rounded-xl border border-slate-200 text-xs font-bold text-slate-500 hover:bg-slate-50 hover:text-slate-700 transition-all shrink-0"
+                className="inline-flex h-11 items-center justify-center gap-2 rounded-2xl border border-slate-200 px-4 text-xs font-black uppercase tracking-[0.14em] text-slate-500 transition-all hover:bg-slate-50 hover:text-slate-900"
               >
-                <X className="w-3.5 h-3.5" />
+                <X className="h-3.5 w-3.5" />
                 Clear
               </button>
             </>
@@ -536,17 +568,17 @@ export function Events() {
 
         {/* ── Events list ── */}
         {loading ? (
-          <div className="flex flex-col items-center justify-center py-24 gap-4">
-            <div className="w-10 h-10 border-4 border-slate-200 border-t-slate-950 rounded-full animate-spin" />
+          <div className="flex flex-col items-center justify-center gap-4 rounded-3xl border border-slate-200 bg-white py-24">
+            <div className="h-10 w-10 animate-spin rounded-full border-4 border-slate-200 border-t-black" />
             <p className="text-slate-400 font-medium">Loading events…</p>
           </div>
         ) : displayed.length === 0 ? (
-          <div className="flex flex-col items-center justify-center py-24 gap-5 rounded-[32px] border border-dashed border-slate-200 bg-white/80">
-            <div className="w-20 h-20 bg-slate-50 rounded-[24px] flex items-center justify-center border border-dashed border-slate-200">
+          <div className="flex flex-col items-center justify-center gap-5 rounded-3xl border border-dashed border-slate-300 bg-white py-24">
+            <div className="flex h-20 w-20 items-center justify-center rounded-3xl border border-dashed border-slate-200 bg-slate-50">
               {filter === 'archived' ? (
-                <Archive className="w-9 h-9 text-slate-200" />
+                <Archive className="h-9 w-9 text-slate-300" />
               ) : (
-                <CalendarDays className="w-9 h-9 text-slate-200" />
+                <CalendarDays className="h-9 w-9 text-slate-300" />
               )}
             </div>
             <div className="text-center space-y-1">
@@ -557,27 +589,27 @@ export function Events() {
                 {hasActiveFilters
                   ? 'Try adjusting or clearing the filters above.'
                   : filter === 'ongoing'
-                  ? 'No events happening right now.'
-                  : filter === 'upcoming'
-                  ? 'No upcoming events scheduled yet.'
-                  : filter === 'past'
-                  ? 'No past events recorded.'
-                  : filter === 'archived'
-                  ? 'Archived events will appear here.'
-                  : 'No events recorded yet.'}
+                    ? 'No events happening right now.'
+                    : filter === 'upcoming'
+                      ? 'No upcoming events scheduled yet.'
+                      : filter === 'past'
+                        ? 'No past events recorded.'
+                        : filter === 'archived'
+                          ? 'Archived events will appear here.'
+                          : 'No events recorded yet.'}
               </p>
             </div>
             {canManage && (filter === 'ongoing' || filter === 'upcoming') && !hasActiveFilters && (
               <button
                 onClick={openCreateModal}
-                className="px-6 py-3 bg-slate-950 text-white rounded-xl text-sm font-bold hover:bg-slate-800 transition-all"
+                className="rounded-2xl bg-black px-6 py-3 text-sm font-bold text-white transition-all hover:bg-slate-800"
               >
                 Schedule First Event
               </button>
             )}
           </div>
         ) : (
-          <div className="space-y-4">
+          <div className="space-y-3">
             <AnimatePresence mode="popLayout">
               {displayed.map((event, idx) => {
                 const isArchivedTab = filter === 'archived';
@@ -604,23 +636,25 @@ export function Events() {
                     animate={{ opacity: 1, y: 0 }}
                     exit={{ opacity: 0, y: -8 }}
                     transition={{ delay: idx * 0.04 }}
-                    className={`relative bg-white rounded-2xl border border-slate-200/70 hover:border-slate-300 hover:shadow-md transition-all overflow-hidden ${
+                    className={`group relative overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-[0_8px_26px_rgba(15,23,42,0.04)] transition-all hover:border-slate-300 hover:shadow-[0_18px_42px_rgba(15,23,42,0.08)] ${
                       isArchivedTab || !current ? 'opacity-70' : ''
                     }`}
                   >
                     <div className={`absolute left-0 top-0 bottom-0 w-1 ${rail}`} />
 
-                    <div className="flex gap-5 p-5 md:p-6 pl-6 md:pl-7">
+                    <div className="grid gap-5 p-5 pl-6 md:grid-cols-[82px_minmax(0,1fr)_auto] md:items-center md:p-6 md:pl-8">
                       {/* Date column */}
-                      <div className="w-14 shrink-0 text-center pt-0.5">
-                        <div className="text-[10px] font-black uppercase tracking-widest text-slate-400">{tile.month}</div>
-                        <div className="text-3xl font-serif font-bold text-slate-900 leading-none mt-1">{tile.day}</div>
-                        <div className="text-[10px] font-bold text-slate-300 mt-1">{tile.year}</div>
+                      <div className="flex h-20 w-20 shrink-0 flex-col items-center justify-center rounded-2xl border border-slate-200 bg-slate-50 text-center">
+                        <div className="text-[10px] font-black uppercase tracking-widest text-slate-400">
+                          {tile.month}
+                        </div>
+                        <div className="mt-1 font-serif text-3xl font-bold leading-none text-slate-950">{tile.day}</div>
+                        <div className="mt-1 text-[10px] font-black text-slate-300">{tile.year}</div>
                       </div>
 
                       <div className="flex-1 min-w-0">
                         <div className="flex items-start justify-between gap-3">
-                          <h2 className="text-lg md:text-xl font-serif font-bold text-slate-950 leading-snug">
+                          <h2 className="font-serif text-xl font-bold leading-tight text-slate-950 md:text-2xl">
                             {event.event_name}
                           </h2>
 
@@ -629,25 +663,25 @@ export function Events() {
                               {isArchivedTab ? (
                                 <button
                                   onClick={() => handleRestore(event)}
-                                  className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-bold text-slate-500 hover:text-emerald-700 hover:bg-emerald-50 transition-colors"
+                                  className="inline-flex h-10 items-center gap-2 rounded-2xl border border-emerald-100 bg-emerald-50 px-4 text-xs font-black text-emerald-700 transition-colors hover:bg-emerald-100"
                                 >
-                                  <RotateCcw className="w-3.5 h-3.5" />
+                                  <RotateCcw className="h-3.5 w-3.5" />
                                   Restore
                                 </button>
                               ) : (
                                 <>
                                   <button
                                     onClick={() => openEditModal(event)}
-                                    className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-bold text-slate-500 hover:text-blue-700 hover:bg-blue-50 transition-colors"
+                                    className="inline-flex h-10 items-center gap-2 rounded-2xl border border-slate-200 bg-white px-4 text-xs font-black text-slate-600 transition-colors hover:bg-slate-50 hover:text-slate-950"
                                   >
-                                    <Edit2 className="w-3.5 h-3.5" />
+                                    <Edit2 className="h-3.5 w-3.5" />
                                     Edit
                                   </button>
                                   <button
                                     onClick={() => handleArchive(event)}
-                                    className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-bold text-slate-500 hover:text-amber-700 hover:bg-amber-50 transition-colors"
+                                    className="inline-flex h-10 items-center gap-2 rounded-2xl border border-slate-200 bg-white px-4 text-xs font-black text-slate-600 transition-colors hover:bg-amber-50 hover:text-amber-700"
                                   >
-                                    <Archive className="w-3.5 h-3.5" />
+                                    <Archive className="h-3.5 w-3.5" />
                                     Archive
                                   </button>
                                 </>
@@ -657,7 +691,7 @@ export function Events() {
                         </div>
 
                         {ongoing && !isArchivedTab && (
-                          <div className="flex items-center gap-1.5 mt-1.5 text-xs font-bold text-emerald-600">
+                          <div className="mt-3 inline-flex items-center gap-1.5 rounded-full border border-emerald-100 bg-emerald-50 px-3 py-1 text-[10px] font-black uppercase tracking-[0.12em] text-emerald-700">
                             <span className="relative flex h-2 w-2">
                               <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
                               <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500" />
@@ -666,17 +700,17 @@ export function Events() {
                           </div>
                         )}
 
-                        <p className="text-sm font-medium text-slate-600 mt-1.5">
+                        <p className="mt-3 text-sm font-bold text-slate-600">
                           {formatLongDate(event.start_date)}
                           {event.end_date && event.end_date !== event.start_date && (
-                            <> &mdash; {formatLongDate(event.end_date)}</>
+                            <> - {formatLongDate(event.end_date)}</>
                           )}
                         </p>
 
-                        <p className="text-xs text-slate-400 mt-1">{metaParts.join('  ·  ')}</p>
+                        <p className="mt-1 text-xs font-semibold text-slate-400">{metaParts.join(' / ')}</p>
 
                         {event.notes && (
-                          <p className="text-sm text-slate-500 leading-relaxed mt-2.5 max-w-xl">{event.notes}</p>
+                          <p className="mt-3 max-w-3xl text-sm leading-relaxed text-slate-500">{event.notes}</p>
                         )}
                       </div>
                     </div>
@@ -725,7 +759,6 @@ export function Events() {
 
               <div className="flex-1 overflow-y-auto custom-scrollbar">
                 <form onSubmit={handleSubmit} className="p-6 md:p-8 space-y-6">
-
                   {/* Owning institution — locked to the signed-in user's institution */}
                   {!editingId && (
                     <div className="flex items-center gap-3 bg-slate-50/80 border border-slate-100 rounded-2xl px-5 py-4">
@@ -738,9 +771,7 @@ export function Events() {
                       </div>
                       <div className="min-w-0">
                         <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Event For</p>
-                        <p className="text-sm font-bold text-slate-950 truncate">
-                          {ownerName || 'Your institution'}
-                        </p>
+                        <p className="text-sm font-bold text-slate-950 truncate">{ownerName || 'Your institution'}</p>
                       </div>
                     </div>
                   )}
@@ -794,7 +825,9 @@ export function Events() {
                         >
                           <option value="">— Select type —</option>
                           {EVENT_TYPES.map((t) => (
-                            <option key={t} value={t}>{t}</option>
+                            <option key={t} value={t}>
+                              {t}
+                            </option>
                           ))}
                         </select>
                         <ChevronDown className="absolute right-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />

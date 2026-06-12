@@ -25,6 +25,17 @@ export class AnnouncementsGatewayController {
     return result.data;
   }
 
+  @Get('scheduled')
+  async getScheduledAnnouncements(@Req() req: Request, @Res({ passthrough: true }) res: Response) {
+    const result = await requestDownstream<unknown>({
+      baseUrl: SERVICE_URLS.announcement,
+      path: '/announcements/scheduled',
+      headers: this.headers(req),
+    });
+    res.status(result.status);
+    return result.data;
+  }
+
   @Get('drafts')
   async getDrafts(@Req() req: Request, @Res({ passthrough: true }) res: Response) {
     const result = await requestDownstream<unknown>({
@@ -105,6 +116,24 @@ export class AnnouncementsGatewayController {
       baseUrl: SERVICE_URLS.announcement,
       path: `/announcements/${id}/restore`,
       method: 'POST',
+      headers: this.headers(req),
+    });
+    res.status(result.status);
+    return result.data;
+  }
+
+  @Post(':id/pin')
+  async setPinned(
+    @Param('id') id: string,
+    @Body() body: unknown,
+    @Req() req: Request,
+    @Res({ passthrough: true }) res: Response,
+  ) {
+    const result = await requestDownstream<unknown>({
+      baseUrl: SERVICE_URLS.announcement,
+      path: `/announcements/${id}/pin`,
+      method: 'POST',
+      body,
       headers: this.headers(req),
     });
     res.status(result.status);

@@ -31,6 +31,14 @@ export class AnnouncementController {
     return res.status(HttpStatus.OK).json(data);
   }
 
+  @Get('scheduled')
+  async getScheduledAnnouncements(@Req() req: Request, @Res() res: Response) {
+    const { role } = getCallerInfo(req);
+    if (!canManage(role)) return res.status(HttpStatus.FORBIDDEN).json({ error: 'Forbidden' });
+    const data = await this.announcementService.getScheduledAnnouncements();
+    return res.status(HttpStatus.OK).json(data);
+  }
+
   @Get('drafts')
   async getDrafts(@Req() req: Request, @Res() res: Response) {
     const { role } = getCallerInfo(req);
@@ -108,6 +116,16 @@ export class AnnouncementController {
     const result = await this.announcementService.restoreAnnouncement(id, name, role);
     if (!result.ok) return res.status(HttpStatus.BAD_REQUEST).json({ error: 'Could not restore.' });
     return res.status(HttpStatus.OK).json({ ok: true });
+  }
+
+  @Post(':id/pin')
+  async setPinned(@Param('id') id: string, @Body() body: any, @Req() req: Request, @Res() res: Response) {
+    const { name, role } = getCallerInfo(req);
+    if (!canManage(role)) return res.status(HttpStatus.FORBIDDEN).json({ error: 'Forbidden' });
+
+    const result = await this.announcementService.setPinned(id, body?.pinned === true, name, role);
+    if (!result) return res.status(HttpStatus.BAD_REQUEST).json({ error: 'Could not update pin. Only active announcements can be pinned.' });
+    return res.status(HttpStatus.OK).json(result);
   }
 
   // ── Edit ────────────────────────────────────────────────────────────────────

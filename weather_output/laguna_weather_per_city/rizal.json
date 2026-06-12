@@ -3,16 +3,16 @@
   "latitude": 14.1003,
   "longitude": 121.3917,
   "period_start": "2023-01-01",
-  "period_end": "2026-06-03",
+  "period_end": "2026-06-06",
   "champion_source": "nasa_power_ag",
   "scores": {
     "open_meteo": {
       "coverage": 100.0,
       "plausibility": 100.0,
-      "consistency": 13.28,
-      "composite": 65.31,
-      "record_count": 1250,
-      "rainfall_mismatch_count": 844,
+      "consistency": 13.25,
+      "composite": 65.3,
+      "record_count": 1253,
+      "rainfall_mismatch_count": 846,
       "rainfall_mismatches": [
         "2023-01-01: 1.6mm vs median 10.8mm",
         "2023-01-02: 2.0mm vs median 11.5mm",
@@ -31,7 +31,7 @@
       "plausibility": 100.0,
       "consistency": 100.0,
       "composite": 100.0,
-      "record_count": 1250,
+      "record_count": 1253,
       "rainfall_mismatch_count": 0,
       "rainfall_mismatches": []
     },
@@ -40,7 +40,7 @@
       "plausibility": 100.0,
       "consistency": 100.0,
       "composite": 100.0,
-      "record_count": 1250,
+      "record_count": 1253,
       "rainfall_mismatch_count": 0,
       "rainfall_mismatches": []
     }
@@ -671,11 +671,11 @@
       "period": "2026-06",
       "year": 2026,
       "month": 6,
-      "temp_avg_c": 27.08,
-      "temp_max_c": 29.53,
-      "temp_min_c": 25.28,
-      "rainfall_mm": 268.71,
-      "wind_ms_avg": 1.63,
+      "temp_avg_c": 27.25,
+      "temp_max_c": 29.39,
+      "temp_min_c": 25.53,
+      "rainfall_mm": 273.23,
+      "wind_ms_avg": 1.69,
       "typhoon_days_count": 0,
       "major_events_count": 0,
       "minor_events_count": 0,
@@ -10684,6 +10684,30 @@
         "temp_min_c": 23.8,
         "rainfall_mm": 25.0,
         "wind_ms": 3.62
+      },
+      {
+        "date": "2026-06-04",
+        "temp_avg_c": 26.6,
+        "temp_max_c": 30.4,
+        "temp_min_c": 24.7,
+        "rainfall_mm": 0.9,
+        "wind_ms": 3.15
+      },
+      {
+        "date": "2026-06-05",
+        "temp_avg_c": 26.0,
+        "temp_max_c": 29.2,
+        "temp_min_c": 24.5,
+        "rainfall_mm": 7.9,
+        "wind_ms": 3.45
+      },
+      {
+        "date": "2026-06-06",
+        "temp_avg_c": 26.6,
+        "temp_max_c": 30.0,
+        "temp_min_c": 24.2,
+        "rainfall_mm": 0.1,
+        "wind_ms": 2.93
       }
     ],
     "nasa_power_ag": [
@@ -20686,6 +20710,30 @@
         "temp_min_c": 25.11,
         "rainfall_mm": 11.99,
         "wind_ms": 1.67
+      },
+      {
+        "date": "2026-06-04",
+        "temp_avg_c": 27.43,
+        "temp_max_c": 29.04,
+        "temp_min_c": 25.89,
+        "rainfall_mm": 1.13,
+        "wind_ms": 1.79
+      },
+      {
+        "date": "2026-06-05",
+        "temp_avg_c": 27.61,
+        "temp_max_c": 29.9,
+        "temp_min_c": 25.8,
+        "rainfall_mm": 1.58,
+        "wind_ms": 1.72
+      },
+      {
+        "date": "2026-06-06",
+        "temp_avg_c": 27.23,
+        "temp_max_c": 28.81,
+        "temp_min_c": 25.64,
+        "rainfall_mm": 1.81,
+        "wind_ms": 1.73
       }
     ],
     "nasa_power_sb": [
@@ -30688,6 +30736,30 @@
         "temp_min_c": 25.11,
         "rainfall_mm": 11.99,
         "wind_ms": 2.38
+      },
+      {
+        "date": "2026-06-04",
+        "temp_avg_c": 27.43,
+        "temp_max_c": 29.04,
+        "temp_min_c": 25.89,
+        "rainfall_mm": 1.13,
+        "wind_ms": 2.44
+      },
+      {
+        "date": "2026-06-05",
+        "temp_avg_c": 27.61,
+        "temp_max_c": 29.9,
+        "temp_min_c": 25.8,
+        "rainfall_mm": 1.58,
+        "wind_ms": 2.44
+      },
+      {
+        "date": "2026-06-06",
+        "temp_avg_c": 27.23,
+        "temp_max_c": 28.81,
+        "temp_min_c": 25.64,
+        "rainfall_mm": 1.81,
+        "wind_ms": 2.44
       }
     ]
   }

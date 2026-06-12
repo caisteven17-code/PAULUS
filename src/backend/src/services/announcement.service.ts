@@ -10,6 +10,7 @@ export interface Announcement {
   priority: 'low' | 'medium' | 'high';
   category: 'general' | 'financial' | 'administrative' | 'event';
   status: 'draft' | 'active' | 'past' | 'archived';
+  pinned: boolean;
   startDate: number;
   endDate: number | null;
   publishedAt: number | null;
@@ -35,6 +36,7 @@ export class AnnouncementService {
       priority: row.priority,
       category: row.category,
       status: row.status,
+      pinned: row.pinned === true,
       startDate: new Date(row.start_date).getTime(),
       endDate: row.end_date ? new Date(row.end_date).getTime() : null,
       publishedAt: row.published_at ? new Date(row.published_at).getTime() : null,
@@ -115,10 +117,33 @@ export class AnnouncementService {
       return [];
     }
 
-    // Filter out those where end_date has passed (belt-and-suspenders)
+    // Filter out those where end_date has passed (belt-and-suspenders).
+    // Pinned-first ordering happens here (not in SQL) so the query still works
+    // on databases where migration 194 has not been applied yet.
     return (data ?? [])
       .filter((row) => !row.end_date || new Date(row.end_date).getTime() >= Date.now())
-      .map((row) => this.toAnnouncement(row));
+      .map((row) => this.toAnnouncement(row))
+      .sort((a, b) => Number(b.pinned) - Number(a.pinned));
+  }
+
+  /** Published announcements whose start_date is still in the future. */
+  async getScheduledAnnouncements(): Promise<Announcement[]> {
+    const now = new Date().toISOString();
+    const { data, error } = await this.supabaseService.admin
+      .schema('diocese')
+      .from('announcements')
+      .select('*')
+      .eq('status', 'active')
+      .gt('start_date', now)
+      .is('deleted_at', null)
+      .order('start_date', { ascending: true });
+
+    if (error) {
+      console.error('[announcement.service] getScheduledAnnouncements:', error.message);
+      return [];
+    }
+
+    return (data ?? []).map((row) => this.toAnnouncement(row));
   }
 
   async getDrafts(): Promise<Announcement[]> {
@@ -369,6 +394,37 @@ export class AnnouncementService {
     });
 
     return { ok: true };
+  }
+
+  async setPinned(
+    id: string,
+    pinned: boolean,
+    userName: string,
+    userRole: string,
+  ): Promise<Announcement | null> {
+    const { data, error } = await this.supabaseService.admin
+      .schema('diocese')
+      .from('announcements')
+      .update({ pinned, pinned_at: pinned ? new Date().toISOString() : null })
+      .eq('id', id)
+      .eq('status', 'active')
+      .select()
+      .single();
+
+    if (error || !data) {
+      console.error('[announcement.service] setPinned:', error?.message);
+      return null;
+    }
+
+    await this.writeAuditLog({
+      userName,
+      userRole,
+      action: pinned ? 'Pinned Announcement' : 'Unpinned Announcement',
+      detail: `"${data.title}" was ${pinned ? 'pinned to' : 'unpinned from'} the top of the board by ${userName}`,
+      metadata: { announcement_id: id, pinned },
+    });
+
+    return this.toAnnouncement(data);
   }
 
   async updateAnnouncement(

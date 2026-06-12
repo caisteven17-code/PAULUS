@@ -14,14 +14,20 @@ import {
   Wallet,
   ClipboardList,
   CalendarDays,
+  CalendarClock,
   Archive,
   RotateCcw,
   FileText,
   Clock,
-  Eye,
   AlertTriangle,
-  Info,
+  AlertCircle,
   ChevronRight,
+  ChevronDown,
+  Search,
+  Pin,
+  PinOff,
+  Copy,
+  Check,
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { useAuth } from '../firebase';
@@ -39,6 +45,7 @@ interface Announcement {
   priority: 'low' | 'medium' | 'high';
   category: 'general' | 'financial' | 'administrative' | 'event';
   status: 'draft' | 'active' | 'past' | 'archived';
+  pinned: boolean;
   startDate: number;
   endDate: number | null;
   publishedAt: number | null;
@@ -47,24 +54,29 @@ interface Announcement {
   createdAt: number;
 }
 
-type Tab = 'active' | 'drafts' | 'past' | 'archived';
+type Tab = 'active' | 'scheduled' | 'drafts' | 'past' | 'archived';
+type SortMode = 'newest' | 'oldest' | 'priority';
 
 // ── Static maps ──────────────────────────────────────────────────────────────
 
 const PRIORITY_STYLES = {
-  low:    { badge: 'bg-sky-50 text-sky-700 border-sky-100',    rail: 'border-sky-400',   label: 'Routine'   },
-  medium: { badge: 'bg-amber-50 text-amber-700 border-amber-100', rail: 'border-amber-400', label: 'Important' },
-  high:   { badge: 'bg-rose-50 text-rose-700 border-rose-100',  rail: 'border-rose-400',  label: 'Urgent'    },
+  low:    { badge: 'bg-sky-50 text-sky-700 border-sky-100',       rail: 'bg-sky-400',   label: 'Routine'   },
+  medium: { badge: 'bg-amber-50 text-amber-700 border-amber-100', rail: 'bg-amber-400', label: 'Important' },
+  high:   { badge: 'bg-rose-50 text-rose-700 border-rose-100',    rail: 'bg-rose-500',  label: 'Urgent'    },
 } as const;
 
 const CATEGORY_META = {
-  general:        { icon: Megaphone,    label: 'General'        },
-  financial:      { icon: Wallet,       label: 'Financial'      },
+  general:        { icon: Megaphone,     label: 'General'        },
+  financial:      { icon: Wallet,        label: 'Financial'      },
   administrative: { icon: ClipboardList, label: 'Administrative' },
-  event:          { icon: CalendarDays, label: 'Event'          },
+  event:          { icon: CalendarDays,  label: 'Event'          },
 } as const;
 
 const GRACE_PERIOD_MS = 5 * 60 * 1000;
+const TITLE_MAX = 120;
+const CONTENT_MAX = 2000;
+
+const EMPTY_FILTERS = { search: '', category: 'all', priority: 'all' } as const;
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -84,31 +96,69 @@ function formatCountdown(totalSeconds: number): string {
   return `${m}:${String(s).padStart(2, '0')}`;
 }
 
-// ── Small labeled action button ──────────────────────────────────────────────
+function dateTileParts(ts: number): { month: string; day: string; year: string } {
+  const d = new Date(ts);
+  return {
+    month: d.toLocaleString('en-US', { month: 'short' }).toUpperCase(),
+    day: String(d.getDate()),
+    year: String(d.getFullYear()),
+  };
+}
 
-const BUTTON_TONES = {
-  neutral: 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50',
-  blue:    'border-blue-200 bg-blue-50 text-blue-700 hover:bg-blue-100',
-  primary: 'border-emerald-200 bg-emerald-50 text-emerald-700 hover:bg-emerald-100',
-  warning: 'border-amber-200 bg-amber-50 text-amber-700 hover:bg-amber-100',
-  danger:  'border-rose-200 bg-rose-50 text-rose-700 hover:bg-rose-100',
+/** Format a timestamp for a datetime-local input in the user's local time. */
+function toLocalInputValue(ts: number): string {
+  const d = new Date(ts);
+  const pad = (n: number) => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}
+
+// ── Small action buttons (Events-style outline buttons) ─────────────────────
+
+const ROW_BUTTON_TONES = {
+  neutral: 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50 hover:text-slate-950',
+  warning: 'border-slate-200 bg-white text-slate-600 hover:bg-amber-50 hover:text-amber-700',
+  danger:  'border-rose-200 bg-rose-50 text-rose-600 hover:bg-rose-100',
+  primary: 'border-emerald-100 bg-emerald-50 text-emerald-700 hover:bg-emerald-100',
 } as const;
 
-function ActionButton({
-  icon: Icon, label, tone, onClick,
+function RowButton({
+  icon: Icon, label, tone = 'neutral', onClick,
 }: {
   icon: React.ElementType;
   label: string;
-  tone: keyof typeof BUTTON_TONES;
+  tone?: keyof typeof ROW_BUTTON_TONES;
   onClick(): void;
 }) {
   return (
     <button
       onClick={(e) => { e.stopPropagation(); onClick(); }}
-      className={`inline-flex items-center gap-1.5 rounded-xl border px-3.5 py-2 text-xs font-bold transition-colors ${BUTTON_TONES[tone]}`}
+      className={`inline-flex h-10 items-center gap-2 rounded-2xl border px-4 text-xs font-black transition-colors ${ROW_BUTTON_TONES[tone]}`}
     >
-      <Icon className="w-3.5 h-3.5" />
+      <Icon className="h-3.5 w-3.5" />
       {label}
+    </button>
+  );
+}
+
+function IconRowButton({
+  icon: Icon, title, active = false, onClick,
+}: {
+  icon: React.ElementType;
+  title: string;
+  active?: boolean;
+  onClick(): void;
+}) {
+  return (
+    <button
+      onClick={(e) => { e.stopPropagation(); onClick(); }}
+      title={title}
+      className={`inline-flex h-10 w-10 items-center justify-center rounded-2xl border transition-colors ${
+        active
+          ? 'border-gold-500/40 bg-gold-50 text-gold-600 hover:bg-gold-100'
+          : 'border-slate-200 bg-white text-slate-500 hover:bg-slate-50 hover:text-slate-950'
+      }`}
+    >
+      <Icon className="h-4 w-4" />
     </button>
   );
 }
@@ -122,17 +172,29 @@ export function Announcements() {
   const canManage = permissions.manage_announcements;
 
   // ── Lists ──────────────────────────────────────────────────────────────────
-  const [activeList,   setActiveList]   = useState<Announcement[]>([]);
-  const [draftList,    setDraftList]    = useState<Announcement[]>([]);
-  const [pastList,     setPastList]     = useState<Announcement[]>([]);
-  const [archivedList, setArchivedList] = useState<Announcement[]>([]);
+  const [activeList,    setActiveList]    = useState<Announcement[]>([]);
+  const [scheduledList, setScheduledList] = useState<Announcement[]>([]);
+  const [draftList,     setDraftList]     = useState<Announcement[]>([]);
+  const [pastList,      setPastList]      = useState<Announcement[]>([]);
+  const [archivedList,  setArchivedList]  = useState<Announcement[]>([]);
 
   // ── UI state ───────────────────────────────────────────────────────────────
   const [tab,                  setTab]                  = useState<Tab>('active');
-  const [filter,               setFilter]               = useState<'all' | Announcement['category']>('all');
+  const [filters,              setFilters]              = useState<{ search: string; category: string; priority: string }>(EMPTY_FILTERS);
+  const [sort,                 setSort]                 = useState<SortMode>('newest');
   const [selectedAnnouncement, setSelectedAnnouncement] = useState<Announcement | null>(null);
   const [showForm,             setShowForm]             = useState(false);
   const [editingId,            setEditingId]            = useState<string | null>(null);
+  const [loading,              setLoading]              = useState(true);
+  const [isSubmitting,         setIsSubmitting]         = useState(false);
+  const [formError,            setFormError]            = useState<string | null>(null);
+  const [confirmState, setConfirmState] = useState<null | {
+    title: string;
+    message: string;
+    confirmLabel: string;
+    tone: 'danger' | 'warning';
+    action(): void;
+  }>(null);
 
   // Grace-period countdown ticker (1s so the Delete button countdown is smooth)
   const [tick, setTick] = useState(0);
@@ -169,6 +231,11 @@ export function Announcements() {
     if (res.ok) setActiveList(await res.json());
   }, []);
 
+  const fetchScheduled = useCallback(async () => {
+    const res = await fetch('/api/announcements/scheduled', { credentials: 'include', headers: authHeaders });
+    if (res.ok) setScheduledList(await res.json());
+  }, [authHeaders]);
+
   const fetchDrafts = useCallback(async () => {
     const res = await fetch('/api/announcements/drafts', { credentials: 'include', headers: authHeaders });
     if (res.ok) setDraftList(await res.json());
@@ -185,21 +252,25 @@ export function Announcements() {
   }, [authHeaders]);
 
   // Initial load — fetch all lists up front so the tab count badges are accurate
-  useEffect(() => { fetchActive(); }, [fetchActive]);
+  useEffect(() => {
+    fetchActive().catch(() => {}).finally(() => setLoading(false));
+  }, [fetchActive]);
   useEffect(() => {
     if (!canManage) return;
+    fetchScheduled();
     fetchDrafts();
     fetchPast();
     fetchArchived();
-  }, [canManage, fetchDrafts, fetchPast, fetchArchived]);
+  }, [canManage, fetchScheduled, fetchDrafts, fetchPast, fetchArchived]);
 
   // Refresh the list behind a tab when it is opened
   useEffect(() => {
     if (!canManage) return;
-    if (tab === 'drafts') fetchDrafts();
+    if (tab === 'scheduled') fetchScheduled();
+    else if (tab === 'drafts') fetchDrafts();
     else if (tab === 'past') fetchPast();
     else if (tab === 'archived') fetchArchived();
-  }, [tab, canManage, fetchDrafts, fetchPast, fetchArchived]);
+  }, [tab, canManage, fetchScheduled, fetchDrafts, fetchPast, fetchArchived]);
 
   // ── Toast helper ───────────────────────────────────────────────────────────
   const showToast = useCallback((message: string) => {
@@ -212,100 +283,118 @@ export function Announcements() {
   const resetForm = useCallback(() => {
     setFormData({ title: '', content: '', priority: 'medium', category: 'general', startDate: '', endDate: '', saveAs: 'active' });
     setEditingId(null);
+    setFormError(null);
   }, []);
 
   // ── Submit form ────────────────────────────────────────────────────────────
   const handleSubmitForm = useCallback(async () => {
     if (!formData.title.trim() || !formData.content.trim()) {
-      alert('Please fill in the title and content.');
+      setFormError('Please fill in both the title and the content.');
       return;
     }
-
-    if (editingId) {
-      // Edit existing announcement
-      const res = await fetch(`/api/announcements/${editingId}`, {
-        method: 'PATCH',
-        credentials: 'include',
-        headers: authHeaders,
-        body: JSON.stringify({
-          title:     formData.title,
-          content:   formData.content,
-          priority:  formData.priority,
-          category:  formData.category,
-          startDate: formData.startDate || undefined,
-          endDate:   formData.endDate   || null,
-        }),
-      });
-      if (res.ok) {
-        const updated: Announcement = await res.json();
-        setActiveList((prev) => prev.map((a) => a.id === editingId ? updated : a));
-        setDraftList((prev)  => prev.map((a) => a.id === editingId ? updated : a));
-        showToast('Changes saved.');
-      }
-    } else {
-      // Create new
-      const body = {
-        title:      formData.title,
-        content:    formData.content,
-        author:     user?.name  || "Chancellor's Office",
-        authorRole: user?.role  || 'chancellor',
-        priority:   formData.priority,
-        category:   formData.category,
-        status:     formData.saveAs,
-        startDate:  formData.startDate ? new Date(formData.startDate).toISOString() : undefined,
-        endDate:    formData.endDate   ? new Date(formData.endDate).toISOString()   : undefined,
-      };
-
-      const res = await fetch('/api/announcements', {
-        method: 'POST',
-        credentials: 'include',
-        headers: authHeaders,
-        body: JSON.stringify(body),
-      });
-
-      if (res.ok) {
-        const created: Announcement = await res.json();
-        if (created.status === 'draft') {
-          setDraftList((prev) => [created, ...prev]);
-          setTab('drafts');
-          showToast('Draft saved. Find it in the Drafts tab.');
-        } else {
-          setActiveList((prev) => [created, ...prev]);
-          showToast('Announcement published to the board.');
-        }
-      } else {
-        // Optimistic fallback
-        const now = Date.now();
-        const optimistic: Announcement = {
-          id: Math.random().toString(36).substr(2, 9),
-          title: formData.title, content: formData.content,
-          author: user?.name || "Chancellor's Office",
-          authorRole: user?.role || 'chancellor',
-          priority: formData.priority, category: formData.category,
-          status: formData.saveAs,
-          startDate: formData.startDate ? new Date(formData.startDate).getTime() : now,
-          endDate:   formData.endDate   ? new Date(formData.endDate).getTime()   : null,
-          publishedAt: formData.saveAs === 'active' ? now : null,
-          archivedAt: null, archivedBy: null,
-          createdAt: now,
-        };
-        if (optimistic.status === 'draft') setDraftList((prev) => [optimistic, ...prev]);
-        else setActiveList((prev) => [optimistic, ...prev]);
-      }
+    if (formData.startDate && formData.endDate && new Date(formData.endDate) <= new Date(formData.startDate)) {
+      setFormError('The end viewing date must be after the start viewing date.');
+      return;
     }
+    setFormError(null);
+    setIsSubmitting(true);
 
-    resetForm();
-    setShowForm(false);
-  }, [editingId, formData, resetForm, user, authHeaders, showToast]);
+    try {
+      if (editingId) {
+        // Edit existing announcement
+        const res = await fetch(`/api/announcements/${editingId}`, {
+          method: 'PATCH',
+          credentials: 'include',
+          headers: authHeaders,
+          body: JSON.stringify({
+            title:     formData.title,
+            content:   formData.content,
+            priority:  formData.priority,
+            category:  formData.category,
+            startDate: formData.startDate ? new Date(formData.startDate).toISOString() : undefined,
+            endDate:   formData.endDate   ? new Date(formData.endDate).toISOString()   : null,
+          }),
+        });
+        if (!res.ok) {
+          setFormError('Could not save changes. Please try again.');
+          return;
+        }
+        const updated: Announcement = await res.json();
+        if (updated.status === 'draft') {
+          setDraftList((prev) => prev.map((a) => a.id === editingId ? updated : a));
+        } else {
+          // A changed start date can move the post between Active and Scheduled
+          fetchActive();
+          fetchScheduled();
+        }
+        showToast('Changes saved.');
+      } else {
+        // Create new
+        const body = {
+          title:      formData.title,
+          content:    formData.content,
+          author:     user?.name  || "Chancellor's Office",
+          authorRole: user?.role  || 'chancellor',
+          priority:   formData.priority,
+          category:   formData.category,
+          status:     formData.saveAs,
+          startDate:  formData.startDate ? new Date(formData.startDate).toISOString() : undefined,
+          endDate:    formData.endDate   ? new Date(formData.endDate).toISOString()   : undefined,
+        };
+
+        const res = await fetch('/api/announcements', {
+          method: 'POST',
+          credentials: 'include',
+          headers: authHeaders,
+          body: JSON.stringify(body),
+        });
+
+        if (res.ok) {
+          const created: Announcement = await res.json();
+          if (created.status === 'draft') {
+            setDraftList((prev) => [created, ...prev]);
+            setTab('drafts');
+            showToast('Draft saved. Find it in the Drafts tab.');
+          } else if (created.startDate > Date.now()) {
+            setScheduledList((prev) => [...prev, created].sort((a, b) => a.startDate - b.startDate));
+            setTab('scheduled');
+            showToast(`Scheduled — "${created.title}" goes live on ${formatDate(new Date(created.startDate))}.`);
+          } else {
+            setActiveList((prev) => [created, ...prev]);
+            showToast('Announcement published to the board.');
+          }
+        } else {
+          // Optimistic fallback
+          const now = Date.now();
+          const optimistic: Announcement = {
+            id: Math.random().toString(36).substr(2, 9),
+            title: formData.title, content: formData.content,
+            author: user?.name || "Chancellor's Office",
+            authorRole: user?.role || 'chancellor',
+            priority: formData.priority, category: formData.category,
+            status: formData.saveAs,
+            pinned: false,
+            startDate: formData.startDate ? new Date(formData.startDate).getTime() : now,
+            endDate:   formData.endDate   ? new Date(formData.endDate).getTime()   : null,
+            publishedAt: formData.saveAs === 'active' ? now : null,
+            archivedAt: null, archivedBy: null,
+            createdAt: now,
+          };
+          if (optimistic.status === 'draft') setDraftList((prev) => [optimistic, ...prev]);
+          else if (optimistic.startDate > now) setScheduledList((prev) => [...prev, optimistic].sort((a, b) => a.startDate - b.startDate));
+          else setActiveList((prev) => [optimistic, ...prev]);
+        }
+      }
+
+      resetForm();
+      setShowForm(false);
+    } finally {
+      setIsSubmitting(false);
+    }
+  }, [editingId, formData, resetForm, user, authHeaders, showToast, fetchActive, fetchScheduled]);
 
   // ── Hard delete (grace period / drafts) ────────────────────────────────────
-  const handleHardDelete = useCallback(async (a: Announcement) => {
-    const isDraft = a.status === 'draft';
-    const msg = isDraft
-      ? 'Permanently delete this draft? This cannot be undone.'
-      : 'Permanently delete this announcement? This cannot be undone.';
-    if (!confirm(msg)) return;
-
+  const performDelete = useCallback(async (a: Announcement) => {
     const res = await fetch(`/api/announcements/${a.id}`, {
       method: 'DELETE',
       credentials: 'include',
@@ -313,17 +402,29 @@ export function Announcements() {
     });
 
     if (res.ok) {
-      setActiveList((prev) => prev.filter((x) => x.id !== a.id));
-      setDraftList((prev)  => prev.filter((x) => x.id !== a.id));
+      setActiveList((prev)    => prev.filter((x) => x.id !== a.id));
+      setScheduledList((prev) => prev.filter((x) => x.id !== a.id));
+      setDraftList((prev)     => prev.filter((x) => x.id !== a.id));
       showToast(`"${a.title}" permanently deleted.`);
     } else {
-      const err = await res.json().catch(() => ({ error: 'Unknown error' }));
-      alert(err.error || 'Could not delete. The 5-minute delete window may have closed — use Archive instead.');
+      const err = await res.json().catch(() => ({ error: '' }));
+      showToast(err.error || 'Could not delete. The 5-minute delete window may have closed — use Archive instead.');
     }
   }, [authHeaders, showToast]);
 
+  const requestDelete = useCallback((a: Announcement) => {
+    const isDraft = a.status === 'draft';
+    setConfirmState({
+      title: isDraft ? 'Delete this draft?' : 'Permanently delete this post?',
+      message: `"${a.title}" will be permanently removed. This cannot be undone.`,
+      confirmLabel: 'Delete permanently',
+      tone: 'danger',
+      action: () => performDelete(a),
+    });
+  }, [performDelete]);
+
   // ── Archive ────────────────────────────────────────────────────────────────
-  const handleArchive = useCallback(async (a: Announcement) => {
+  const performArchive = useCallback(async (a: Announcement) => {
     // Optimistic
     setActiveList((prev) => prev.filter((x) => x.id !== a.id));
     setPastList((prev)   => prev.filter((x) => x.id !== a.id));
@@ -341,8 +442,19 @@ export function Announcements() {
       // Restore on failure
       if (a.status === 'active') setActiveList((prev) => [a, ...prev]);
       else setPastList((prev) => [a, ...prev]);
+      showToast('Could not archive. Please try again.');
     }
   }, [authHeaders, showToast, fetchArchived]);
+
+  const requestArchive = useCallback((a: Announcement) => {
+    setConfirmState({
+      title: 'Move to the Archive?',
+      message: `"${a.title}" will leave the board and be stored in the Archive tab. You can restore it anytime.`,
+      confirmLabel: 'Archive',
+      tone: 'warning',
+      action: () => performArchive(a),
+    });
+  }, [performArchive]);
 
   // ── Restore from archive ───────────────────────────────────────────────────
   const handleRestore = useCallback(async (a: Announcement) => {
@@ -356,10 +468,11 @@ export function Announcements() {
       setArchivedList((prev) => prev.filter((x) => x.id !== a.id));
       showToast(`"${a.title}" is back on the Active Board.`);
       fetchActive();
+      fetchScheduled();
     } else {
-      alert('Could not restore. Please try again.');
+      showToast('Could not restore. Please try again.');
     }
-  }, [authHeaders, showToast, fetchActive]);
+  }, [authHeaders, showToast, fetchActive, fetchScheduled]);
 
   // ── Publish draft ──────────────────────────────────────────────────────────
   const handlePublishDraft = useCallback(async (a: Announcement) => {
@@ -371,11 +484,54 @@ export function Announcements() {
 
     if (res.ok) {
       const published: Announcement = await res.json();
-      setDraftList((prev)  => prev.filter((x) => x.id !== a.id));
-      setActiveList((prev) => [published, ...prev]);
-      showToast(`"${a.title}" published to the Active Board.`);
+      setDraftList((prev) => prev.filter((x) => x.id !== a.id));
+      if (published.startDate > Date.now()) {
+        setScheduledList((prev) => [...prev, published].sort((x, y) => x.startDate - y.startDate));
+        showToast(`"${a.title}" scheduled — it goes live on ${formatDate(new Date(published.startDate))}.`);
+      } else {
+        setActiveList((prev) => [published, ...prev]);
+        showToast(`"${a.title}" published to the Active Board.`);
+      }
     } else {
-      alert('Could not publish. Please try again.');
+      showToast('Could not publish. Please try again.');
+    }
+  }, [authHeaders, showToast]);
+
+  // ── Publish a scheduled post immediately ───────────────────────────────────
+  const handlePublishScheduledNow = useCallback(async (a: Announcement) => {
+    const res = await fetch(`/api/announcements/${a.id}`, {
+      method: 'PATCH',
+      credentials: 'include',
+      headers: authHeaders,
+      body: JSON.stringify({ startDate: new Date().toISOString() }),
+    });
+
+    if (res.ok) {
+      setScheduledList((prev) => prev.filter((x) => x.id !== a.id));
+      fetchActive();
+      showToast(`"${a.title}" is now live on the Active Board.`);
+    } else {
+      showToast('Could not publish. Please try again.');
+    }
+  }, [authHeaders, showToast, fetchActive]);
+
+  // ── Pin / unpin ────────────────────────────────────────────────────────────
+  const handleTogglePin = useCallback(async (a: Announcement) => {
+    const next = !a.pinned;
+    setActiveList((prev) => prev.map((x) => x.id === a.id ? { ...x, pinned: next } : x));
+
+    const res = await fetch(`/api/announcements/${a.id}/pin`, {
+      method: 'POST',
+      credentials: 'include',
+      headers: authHeaders,
+      body: JSON.stringify({ pinned: next }),
+    });
+
+    if (res.ok) {
+      showToast(next ? `"${a.title}" pinned to the top of the board.` : `"${a.title}" unpinned.`);
+    } else {
+      setActiveList((prev) => prev.map((x) => x.id === a.id ? { ...x, pinned: a.pinned } : x));
+      showToast('Could not update the pin. Please try again.');
     }
   }, [authHeaders, showToast]);
 
@@ -386,19 +542,62 @@ export function Announcements() {
       content:   a.content,
       priority:  a.priority,
       category:  a.category,
-      startDate: a.startDate ? new Date(a.startDate).toISOString().slice(0, 16) : '',
-      endDate:   a.endDate   ? new Date(a.endDate).toISOString().slice(0, 16)   : '',
+      startDate: a.startDate ? toLocalInputValue(a.startDate) : '',
+      endDate:   a.endDate   ? toLocalInputValue(a.endDate)   : '',
       saveAs:    a.status === 'draft' ? 'draft' : 'active',
     });
     setEditingId(a.id);
+    setFormError(null);
+    setShowForm(true);
+  }, []);
+
+  // ── Duplicate ──────────────────────────────────────────────────────────────
+  const handleDuplicate = useCallback((a: Announcement) => {
+    setFormData({
+      title:     `Copy of ${a.title}`.slice(0, TITLE_MAX),
+      content:   a.content,
+      priority:  a.priority,
+      category:  a.category,
+      startDate: '',
+      endDate:   '',
+      saveAs:    'active',
+    });
+    setEditingId(null);
+    setFormError(null);
     setShowForm(true);
   }, []);
 
   // ── Derived lists ──────────────────────────────────────────────────────────
-  const filteredActive = useMemo(
-    () => filter === 'all' ? activeList : activeList.filter((a) => a.category === filter),
-    [activeList, filter],
-  );
+  const currentList =
+    tab === 'active'    ? activeList    :
+    tab === 'scheduled' ? scheduledList :
+    tab === 'drafts'    ? draftList     :
+    tab === 'past'      ? pastList      : archivedList;
+
+  const hasActiveFilters =
+    filters.search.trim() !== '' || filters.category !== 'all' || filters.priority !== 'all';
+
+  const displayed = useMemo(() => {
+    const q = filters.search.trim().toLowerCase();
+    const filtered = currentList.filter((a) =>
+      (filters.category === 'all' || a.category === filters.category) &&
+      (filters.priority === 'all' || a.priority === filters.priority) &&
+      (!q || a.title.toLowerCase().includes(q) || a.content.toLowerCase().includes(q) || a.author.toLowerCase().includes(q)),
+    );
+
+    const priorityRank = { high: 0, medium: 1, low: 2 } as const;
+    const sorted = [...filtered].sort((a, b) => {
+      if (sort === 'oldest') return a.createdAt - b.createdAt;
+      if (sort === 'priority') return priorityRank[a.priority] - priorityRank[b.priority] || b.createdAt - a.createdAt;
+      // 'newest' — scheduled posts read most naturally soonest-to-go-live first
+      if (tab === 'scheduled') return a.startDate - b.startDate;
+      return b.createdAt - a.createdAt;
+    });
+
+    // Pinned posts always lead the Active Board (stable sort keeps order within groups)
+    if (tab === 'active') sorted.sort((a, b) => Number(b.pinned) - Number(a.pinned));
+    return sorted;
+  }, [currentList, filters, sort, tab]);
 
   const announcementCounts = useMemo(() => ({
     total:  activeList.length,
@@ -409,8 +608,8 @@ export function Announcements() {
   // ── Access guard ───────────────────────────────────────────────────────────
   if (!permissions.view_announcements && !canManage) {
     return (
-      <div className="min-h-screen bg-slate-50 flex items-center justify-center p-4">
-        <div className="bg-white p-12 rounded-[40px] border border-slate-100 shadow-xl max-w-md text-center space-y-6">
+      <div className="min-h-screen bg-[#f5f5f5] flex items-center justify-center p-4">
+        <div className="bg-white p-12 rounded-3xl border border-slate-200 shadow-xl max-w-md text-center space-y-6">
           <div className="w-20 h-20 bg-rose-50 rounded-full flex items-center justify-center text-rose-500 mx-auto">
             <Bell className="w-10 h-10" />
           </div>
@@ -423,7 +622,7 @@ export function Announcements() {
     );
   }
 
-  const TAB_ORDER: Tab[] = ['active', 'drafts', 'past', 'archived'];
+  const TAB_ORDER: Tab[] = ['active', 'scheduled', 'drafts', 'past', 'archived'];
 
   const TAB_META: Record<Tab, { label: string; icon: React.ElementType; count: number; description: string }> = {
     active: {
@@ -431,6 +630,12 @@ export function Announcements() {
       icon: Bell,
       count: activeList.length,
       description: 'Live announcements that everyone can see right now.',
+    },
+    scheduled: {
+      label: 'Scheduled',
+      icon: CalendarClock,
+      count: scheduledList.length,
+      description: 'Published posts waiting for their start date — they go live on the board automatically.',
     },
     drafts: {
       label: 'Drafts',
@@ -452,56 +657,83 @@ export function Announcements() {
     },
   };
 
-  return (
-    <div className="min-h-screen bg-[radial-gradient(circle_at_top,_rgba(212,175,55,0.08),_transparent_32%),linear-gradient(180deg,#f8fafc_0%,#eef2f7_100%)] pt-6 pb-20 px-4 md:px-6">
-      <div className="max-w-6xl mx-auto">
+  const summaryCards = [
+    { label: 'Total Posts',    value: announcementCounts.total,  icon: Megaphone     },
+    { label: 'Urgent Notices', value: announcementCounts.urgent, icon: AlertTriangle },
+    { label: 'Event Updates',  value: announcementCounts.events, icon: CalendarDays  },
+  ];
 
-        {/* ── Header ── */}
-        <div className="rounded-[36px] border border-white/70 bg-white/85 backdrop-blur-xl shadow-[0_24px_80px_rgba(15,23,42,0.08)] p-6 md:p-8 mb-8">
-          <div className="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-6">
-            <div className="max-w-3xl">
-              <div className="inline-flex items-center gap-3 rounded-full bg-slate-950 px-4 py-2 text-white mb-5">
-                <Bell className="w-4 h-4 text-gold-500" />
-                <span className="text-[10px] font-black uppercase tracking-[0.28em]">Announcement Board</span>
+  const emptyMeta: Record<Tab, { message: string; sub: string }> = {
+    active:    { message: 'No active announcements', sub: 'Posts will appear here once published.' },
+    scheduled: { message: 'Nothing scheduled',       sub: 'Posts with a future start date wait here until they go live.' },
+    drafts:    { message: 'No drafts',               sub: 'Announcements you save as drafts will appear here.' },
+    past:      { message: 'No past announcements',   sub: 'Posts whose end date has passed will appear here.' },
+    archived:  { message: 'Archive is empty',        sub: 'Archived announcements are stored here.' },
+  };
+  const EmptyIcon = TAB_META[tab].icon;
+
+  return (
+    <div className="min-h-screen bg-[#f5f5f5] pt-8 pb-20 px-4 sm:px-6 lg:px-8">
+      <div className="mx-auto w-full max-w-7xl">
+
+        {/* ── Masthead ── */}
+        <div className="relative mb-6 overflow-hidden rounded-3xl border border-black/10 bg-slate-950 text-white shadow-[0_18px_48px_rgba(15,23,42,0.12)]">
+          <div className="absolute inset-x-0 top-0 h-[3px] bg-gold-500" />
+          <div className="flex flex-col gap-4 p-6 md:flex-row md:items-end md:justify-between md:px-8 md:py-7">
+            <div className="min-w-0">
+              <div className="flex items-center gap-3">
+                <Bell className="h-4 w-4 text-gold-400" />
+                <p className="text-[10px] font-black uppercase tracking-[0.3em] text-gold-400">
+                  Official Bulletin · Chancellor&apos;s Office
+                </p>
               </div>
-              <h1 className="text-3xl md:text-5xl font-serif font-bold tracking-tight text-slate-950">
+              <h1 className="mt-3 font-serif text-3xl font-bold leading-none tracking-normal text-white md:text-4xl">
                 Chancellor&apos;s Board
               </h1>
-              <p className="mt-3 text-sm md:text-base text-slate-600 max-w-2xl leading-relaxed">
+              <p className="mt-3 max-w-2xl text-sm font-medium leading-relaxed text-white/50">
                 Central posting space for diocesan updates, directives, financial notices, and event reminders.
               </p>
             </div>
-            {canManage && (
-              <button
-                onClick={() => { resetForm(); setShowForm(true); }}
-                className="inline-flex items-center justify-center gap-3 rounded-2xl bg-gold-500 hover:bg-gold-600 text-church-green-dark px-6 py-4 font-bold text-[11px] uppercase tracking-[0.22em] transition-all shadow-xl shadow-gold-500/20"
-              >
-                <Plus className="w-4 h-4" />
-                New Announcement
-              </button>
-            )}
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-8">
-            {[
-              { label: 'Total Posts',     value: announcementCounts.total,  tone: 'bg-slate-50 text-slate-700 border-slate-200'   },
-              { label: 'Urgent Notices',  value: announcementCounts.urgent, tone: 'bg-rose-50 text-rose-700 border-rose-200'       },
-              { label: 'Event Updates',   value: announcementCounts.events, tone: 'bg-emerald-50 text-emerald-700 border-emerald-200' },
-            ].map((item) => (
-              <div key={item.label} className={`rounded-3xl border px-5 py-4 ${item.tone}`}>
-                <p className="text-[10px] font-black uppercase tracking-[0.24em] opacity-70">{item.label}</p>
-                <p className="mt-2 text-3xl font-serif font-bold">{item.value}</p>
+            <div className="shrink-0 space-y-2.5">
+              <p className="text-[10px] font-black uppercase tracking-[0.2em] text-white/35 md:text-right">
+                As of {formatDate(new Date())}
+              </p>
+              <div className="flex items-stretch divide-x divide-white/10 overflow-hidden rounded-2xl border border-white/10 bg-white/[0.03] sm:min-w-[360px]">
+                {summaryCards.map((card) => {
+                  const Icon = card.icon;
+                  return (
+                    <div key={card.label} className="flex-1 px-4 py-3">
+                      <div className="flex items-center gap-2">
+                        <Icon className="h-3.5 w-3.5 shrink-0 text-gold-400" />
+                        <span className="truncate text-[10px] font-black uppercase tracking-[0.14em] text-white/40">
+                          {card.label}
+                        </span>
+                      </div>
+                      <p className="mt-1.5 font-serif text-2xl font-bold leading-none text-white">{card.value}</p>
+                    </div>
+                  );
+                })}
               </div>
-            ))}
+            </div>
           </div>
         </div>
 
-        {/* ── Toolbar ── */}
-        {canManage ? (
-          <div className="mb-6 space-y-3">
-            <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-3">
-              {/* Segmented tabs */}
-              <div className="inline-flex flex-wrap items-center gap-1 rounded-[24px] border border-slate-200 bg-white p-1.5 shadow-sm">
+        {/* ── Sidebar + feed ── */}
+        <div className={`grid grid-cols-1 gap-6 lg:items-start ${canManage ? 'lg:grid-cols-[280px_minmax(0,1fr)]' : ''}`}>
+          {canManage && (
+          <aside className="custom-scrollbar space-y-4 lg:sticky lg:top-2 lg:max-h-[calc(100vh-9rem)] lg:overflow-y-auto">
+              <button
+                onClick={() => { resetForm(); setShowForm(true); }}
+                className="inline-flex h-12 w-full items-center justify-center gap-2 rounded-2xl bg-gold-500 px-5 text-[11px] font-black uppercase tracking-[0.18em] text-black shadow-lg shadow-gold-500/20 transition-all hover:bg-gold-400"
+              >
+                <Plus className="h-4 w-4" />
+                New Announcement
+              </button>
+
+              <nav className="rounded-3xl border border-slate-200 bg-white p-2 shadow-[0_12px_32px_rgba(15,23,42,0.05)]">
+                <p className="px-4 pb-1 pt-3 text-[10px] font-black uppercase tracking-[0.2em] text-slate-400">
+                  Board Sections
+                </p>
                 {TAB_ORDER.map((id) => {
                   const meta = TAB_META[id];
                   const Icon = meta.icon;
@@ -510,17 +742,17 @@ export function Announcements() {
                     <button
                       key={id}
                       onClick={() => setTab(id)}
-                      className={`inline-flex items-center gap-2 rounded-[18px] px-4 md:px-5 py-3 text-[11px] font-black uppercase tracking-[0.16em] transition-all ${
+                      className={`flex w-full items-center gap-3 rounded-2xl px-4 py-3 text-left text-[11px] font-black uppercase tracking-[0.14em] transition-all ${
                         isActive
-                          ? 'bg-slate-950 text-white shadow-lg'
-                          : 'text-slate-500 hover:bg-slate-100 hover:text-slate-700'
+                          ? 'bg-slate-950 text-white shadow-lg shadow-slate-950/15'
+                          : 'text-slate-500 hover:bg-slate-50 hover:text-slate-800'
                       }`}
                     >
-                      <Icon className="w-4 h-4" />
-                      <span className="hidden sm:inline">{meta.label}</span>
+                      <Icon className={`h-4 w-4 shrink-0 ${isActive ? 'text-gold-400' : 'text-slate-400'}`} />
+                      <span className="flex-1 truncate">{meta.label}</span>
                       <span
                         className={`rounded-full px-2 py-0.5 text-[9px] font-black tabular-nums ${
-                          isActive ? 'bg-white/20 text-white' : 'bg-slate-100 text-slate-500'
+                          isActive ? 'bg-white/15 text-white' : 'bg-slate-100 text-slate-500'
                         }`}
                       >
                         {meta.count}
@@ -528,333 +760,449 @@ export function Announcements() {
                     </button>
                   );
                 })}
-              </div>
+                <p className="m-2 rounded-2xl bg-slate-50 px-3.5 py-3 text-[11px] font-medium leading-relaxed text-slate-500">
+                  {TAB_META[tab].description}
+                </p>
+              </nav>
+          </aside>
+          )}
 
-              {/* Category dropdown — same row, only relevant on the Active Board */}
-              {tab === 'active' && (
-                <label className="inline-flex items-center gap-2 self-start lg:self-auto">
-                  <span className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400">Category</span>
-                  <select
-                    value={filter}
-                    onChange={(e) => setFilter(e.target.value as typeof filter)}
-                    className="rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-xs font-bold text-slate-700 outline-none focus:border-gold-500 focus:ring-4 focus:ring-gold-500/10"
-                  >
-                    <option value="all">All Posts</option>
-                    <option value="general">General</option>
-                    <option value="financial">Financial</option>
-                    <option value="administrative">Administrative</option>
-                    <option value="event">Event</option>
-                  </select>
-                </label>
-              )}
-            </div>
+          <div className="min-w-0">
+        {/* ── Filter bar ── */}
+        <div className="mb-4 grid grid-cols-1 gap-2 rounded-3xl border border-slate-200 bg-white p-3 shadow-[0_12px_32px_rgba(15,23,42,0.05)] xl:grid-cols-[minmax(180px,1fr)_150px_150px_150px_auto_auto]">
+          <div className="relative">
+            <Search className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+            <input
+              type="text"
+              value={filters.search}
+              onChange={(e) => setFilters({ ...filters, search: e.target.value })}
+              placeholder="Search announcements…"
+              className="h-11 w-full rounded-2xl border border-slate-200 bg-slate-50 pl-11 pr-4 text-sm font-semibold text-slate-800 transition-all placeholder:text-slate-400 focus:border-gold-500 focus:bg-white focus:outline-none focus:ring-4 focus:ring-gold-500/10"
+            />
+          </div>
 
-            {/* What-am-I-looking-at helper */}
-            <div className="flex items-start gap-2.5 rounded-2xl border border-slate-100 bg-white/70 px-4 py-3">
-              <Info className="w-4 h-4 text-gold-600 shrink-0 mt-0.5" />
-              <p className="text-xs text-slate-600 leading-relaxed">{TAB_META[tab].description}</p>
+          <select
+            value={filters.category}
+            onChange={(e) => setFilters({ ...filters, category: e.target.value })}
+            className="h-11 cursor-pointer rounded-2xl border border-slate-200 bg-slate-50 px-4 text-sm font-semibold text-slate-700 transition-all focus:border-gold-500 focus:bg-white focus:outline-none focus:ring-4 focus:ring-gold-500/10"
+          >
+            <option value="all">All categories</option>
+            <option value="general">General</option>
+            <option value="financial">Financial</option>
+            <option value="administrative">Administrative</option>
+            <option value="event">Event</option>
+          </select>
+
+          <select
+            value={filters.priority}
+            onChange={(e) => setFilters({ ...filters, priority: e.target.value })}
+            className="h-11 cursor-pointer rounded-2xl border border-slate-200 bg-slate-50 px-4 text-sm font-semibold text-slate-700 transition-all focus:border-gold-500 focus:bg-white focus:outline-none focus:ring-4 focus:ring-gold-500/10"
+          >
+            <option value="all">All priorities</option>
+            <option value="high">Urgent</option>
+            <option value="medium">Important</option>
+            <option value="low">Routine</option>
+          </select>
+
+          <select
+            value={sort}
+            onChange={(e) => setSort(e.target.value as SortMode)}
+            className="h-11 cursor-pointer rounded-2xl border border-slate-200 bg-slate-50 px-4 text-sm font-semibold text-slate-700 transition-all focus:border-gold-500 focus:bg-white focus:outline-none focus:ring-4 focus:ring-gold-500/10"
+          >
+            <option value="newest">Newest first</option>
+            <option value="oldest">Oldest first</option>
+            <option value="priority">By priority</option>
+          </select>
+
+          {hasActiveFilters && (
+            <>
+              <span className="hidden items-center justify-center rounded-2xl bg-slate-50 px-3 text-xs font-bold text-slate-400 xl:flex">
+                {displayed.length} found
+              </span>
+              <button
+                onClick={() => setFilters(EMPTY_FILTERS)}
+                className="inline-flex h-11 items-center justify-center gap-2 rounded-2xl border border-slate-200 px-4 text-xs font-black uppercase tracking-[0.14em] text-slate-500 transition-all hover:bg-slate-50 hover:text-slate-900"
+              >
+                <X className="h-3.5 w-3.5" />
+                Clear
+              </button>
+            </>
+          )}
+        </div>
+
+        {/* ── List ── */}
+        {loading ? (
+          <div className="flex flex-col items-center justify-center gap-4 rounded-3xl border border-slate-200 bg-white py-24">
+            <div className="h-10 w-10 animate-spin rounded-full border-4 border-slate-200 border-t-black" />
+            <p className="text-slate-400 font-medium">Loading announcements…</p>
+          </div>
+        ) : displayed.length === 0 ? (
+          <div className="flex flex-col items-center justify-center gap-5 rounded-3xl border border-dashed border-slate-300 bg-white py-24">
+            <div className="flex h-20 w-20 items-center justify-center rounded-3xl border border-dashed border-slate-200 bg-slate-50">
+              <EmptyIcon className="h-9 w-9 text-slate-300" />
             </div>
+            <div className="text-center space-y-1">
+              <p className="text-xl font-serif font-bold text-slate-950">
+                {hasActiveFilters ? 'No announcements match your filters' : emptyMeta[tab].message}
+              </p>
+              <p className="text-sm text-slate-400">
+                {hasActiveFilters ? 'Try adjusting or clearing the filters above.' : emptyMeta[tab].sub}
+              </p>
+            </div>
+            {canManage && tab === 'active' && !hasActiveFilters && (
+              <button
+                onClick={() => { resetForm(); setShowForm(true); }}
+                className="rounded-2xl bg-black px-6 py-3 text-sm font-bold text-white transition-all hover:bg-slate-800"
+              >
+                Post First Announcement
+              </button>
+            )}
           </div>
         ) : (
-          /* View-only users: just a simple category filter */
-          <div className="flex flex-wrap items-center gap-2 mb-8">
-            <span className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400 mr-1">Filter</span>
-            {(['all', 'general', 'financial', 'administrative', 'event'] as const).map((cat) => {
-              const isActive = filter === cat;
-              const meta = cat === 'all' ? null : CATEGORY_META[cat];
-              const Icon = meta?.icon;
-              return (
-                <button
-                  key={cat}
-                  onClick={() => setFilter(cat)}
-                  className={`inline-flex items-center gap-1.5 rounded-full border px-3.5 py-2 text-[10px] font-black uppercase tracking-[0.16em] transition-all ${
-                    isActive
-                      ? 'bg-gold-500 text-church-green-dark border-gold-500 shadow-md shadow-gold-500/20'
-                      : 'bg-white text-slate-500 border-slate-200 hover:border-slate-300 hover:text-slate-700'
-                  }`}
-                >
-                  {Icon ? <Icon className="w-3.5 h-3.5" /> : null}
-                  {cat === 'all' ? 'All Posts' : meta?.label}
-                </button>
-              );
-            })}
+          <div className="space-y-3">
+            <AnimatePresence mode="popLayout">
+              {displayed.map((a, i) => (
+                <AnnouncementRow
+                  key={a.id}
+                  announcement={a}
+                  index={i}
+                  tab={tab}
+                  canManage={canManage}
+                  tick={tick}
+                  onView={() => setSelectedAnnouncement(a)}
+                  onEdit={() => handleEdit(a)}
+                  onDelete={() => requestDelete(a)}
+                  onArchive={() => requestArchive(a)}
+                  onRestore={() => handleRestore(a)}
+                  onPublish={() => handlePublishDraft(a)}
+                  onPublishNow={() => handlePublishScheduledNow(a)}
+                  onTogglePin={() => handleTogglePin(a)}
+                  onDuplicate={() => handleDuplicate(a)}
+                />
+              ))}
+            </AnimatePresence>
           </div>
         )}
-
-        {/* ── Lists ── */}
-        <div className="space-y-4">
-          <AnimatePresence mode="popLayout">
-
-            {/* Active */}
-            {tab === 'active' && (filteredActive.length === 0 ? (
-              <EmptyState icon={Bell} message="No active announcements" sub="Posts will appear here once published." />
-            ) : filteredActive.map((a, i) => (
-              <AnnouncementCard
-                key={a.id}
-                announcement={a}
-                index={i}
-                canManage={canManage}
-                tick={tick}
-                onView={() => setSelectedAnnouncement(a)}
-                onEdit={() => handleEdit(a)}
-                onDelete={() => handleHardDelete(a)}
-                onArchive={() => handleArchive(a)}
-              />
-            )))}
-
-            {/* Drafts */}
-            {tab === 'drafts' && (draftList.length === 0 ? (
-              <EmptyState icon={FileText} message="No drafts" sub="Announcements you save as drafts will appear here." />
-            ) : draftList.map((a, i) => (
-              <DraftCard
-                key={a.id}
-                announcement={a}
-                index={i}
-                onView={() => setSelectedAnnouncement(a)}
-                onEdit={() => handleEdit(a)}
-                onPublish={() => handlePublishDraft(a)}
-                onDelete={() => handleHardDelete(a)}
-              />
-            )))}
-
-            {/* Past */}
-            {tab === 'past' && (pastList.length === 0 ? (
-              <EmptyState icon={Clock} message="No past announcements" sub="Announcements whose end date has passed will appear here." />
-            ) : pastList.map((a, i) => (
-              <PastCard
-                key={a.id}
-                announcement={a}
-                index={i}
-                onView={() => setSelectedAnnouncement(a)}
-                onArchive={() => handleArchive(a)}
-              />
-            )))}
-
-            {/* Archived */}
-            {tab === 'archived' && (archivedList.length === 0 ? (
-              <EmptyState icon={Archive} message="Archive is empty" sub="Archived announcements are stored here." />
-            ) : archivedList.map((a, i) => (
-              <ArchivedCard
-                key={a.id}
-                announcement={a}
-                index={i}
-                onView={() => setSelectedAnnouncement(a)}
-                onRestore={() => handleRestore(a)}
-              />
-            )))}
-
-          </AnimatePresence>
+          </div>
         </div>
       </div>
 
       {/* ── Create / Edit modal ── */}
       <AnimatePresence>
         {showForm && (
-          <motion.div
-            initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-            className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center z-50 p-4"
-            onClick={() => setShowForm(false)}
-          >
+          <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
             <motion.div
-              initial={{ opacity: 0, scale: 0.96, y: 20 }}
+              initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+              onClick={() => setShowForm(false)}
+              className="absolute inset-0 bg-black/60 backdrop-blur-sm"
+            />
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95, y: 20 }}
               animate={{ opacity: 1, scale: 1, y: 0 }}
-              exit={{ opacity: 0, scale: 0.96, y: 20 }}
-              onClick={(e) => e.stopPropagation()}
-              className="bg-white rounded-[32px] shadow-2xl max-w-3xl w-full p-6 md:p-8 border border-slate-100 max-h-[90vh] overflow-y-auto"
+              exit={{ opacity: 0, scale: 0.95, y: 20 }}
+              className="relative flex max-h-[90vh] w-full max-w-2xl flex-col overflow-hidden rounded-3xl bg-white shadow-2xl"
             >
-              <div className="flex items-center justify-between mb-8">
+              {/* Modal header — dark with gold trim, distinct from Events */}
+              <div className="sticky top-0 z-10 flex items-center justify-between border-b border-gold-500/50 bg-slate-950 p-6 text-white md:p-8">
                 <div>
-                  <p className="text-[10px] font-black uppercase tracking-[0.28em] text-gold-600 mb-2">
-                    Announcement Editor
+                  <p className="mb-1 text-[10px] font-black uppercase tracking-[0.28em] text-gold-400">
+                    {editingId ? 'Announcement Editor' : 'New Post'}
                   </p>
-                  <h2 className="text-3xl font-serif font-bold text-slate-950">
+                  <h2 className="font-serif text-xl font-bold tracking-tight text-white md:text-2xl">
                     {editingId ? 'Edit Announcement' : 'New Announcement'}
                   </h2>
                 </div>
-                <button onClick={() => setShowForm(false)} className="p-2 hover:bg-slate-100 rounded-2xl transition-colors">
-                  <X className="w-6 h-6 text-slate-500" />
+                <button
+                  onClick={() => setShowForm(false)}
+                  className="flex h-10 w-10 items-center justify-center rounded-full text-white/50 transition-all hover:rotate-90 hover:bg-white/10"
+                >
+                  <X className="w-5 h-5" />
                 </button>
               </div>
 
-              <div className="space-y-5">
-                <div>
-                  <label className="block text-[11px] font-black uppercase tracking-[0.22em] text-slate-500 mb-3">Title</label>
-                  <input
-                    type="text"
-                    value={formData.title}
-                    onChange={(e) => setFormData({ ...formData, title: e.target.value })}
-                    placeholder="Announcement title"
-                    className="w-full px-5 py-4 border border-slate-200 rounded-2xl focus:ring-4 focus:ring-gold-500/10 focus:border-gold-500 outline-none text-sm font-medium"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-[11px] font-black uppercase tracking-[0.22em] text-slate-500 mb-3">Content</label>
-                  <textarea
-                    value={formData.content}
-                    onChange={(e) => setFormData({ ...formData, content: e.target.value })}
-                    placeholder="Announcement content"
-                    rows={6}
-                    className="w-full px-5 py-4 border border-slate-200 rounded-2xl focus:ring-4 focus:ring-gold-500/10 focus:border-gold-500 outline-none resize-none text-sm font-medium"
-                  />
-                </div>
-
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-                  <div>
-                    <label className="block text-[11px] font-black uppercase tracking-[0.22em] text-slate-500 mb-3">Category</label>
-                    <select
-                      value={formData.category}
-                      onChange={(e) => setFormData({ ...formData, category: e.target.value as Announcement['category'] })}
-                      className="w-full px-5 py-4 border border-slate-200 rounded-2xl focus:ring-4 focus:ring-gold-500/10 focus:border-gold-500 outline-none text-sm font-medium"
-                    >
-                      <option value="general">General</option>
-                      <option value="financial">Financial</option>
-                      <option value="administrative">Administrative</option>
-                      <option value="event">Event</option>
-                    </select>
-                  </div>
-                  <div>
-                    <label className="block text-[11px] font-black uppercase tracking-[0.22em] text-slate-500 mb-3">Priority</label>
-                    <select
-                      value={formData.priority}
-                      onChange={(e) => setFormData({ ...formData, priority: e.target.value as Announcement['priority'] })}
-                      className="w-full px-5 py-4 border border-slate-200 rounded-2xl focus:ring-4 focus:ring-gold-500/10 focus:border-gold-500 outline-none text-sm font-medium"
-                    >
-                      <option value="low">Low – Routine</option>
-                      <option value="medium">Medium – Important</option>
-                      <option value="high">High – Urgent</option>
-                    </select>
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-                  <div>
-                    <label className="block text-[11px] font-black uppercase tracking-[0.22em] text-slate-500 mb-3">
-                      Start Viewing Date
+              <div className="custom-scrollbar flex-1 overflow-y-auto">
+                <div className="space-y-6 p-6 md:p-8">
+                  {/* Title */}
+                  <div className="space-y-2">
+                    <label className="flex items-center gap-2 text-[11px] font-bold uppercase tracking-[0.2em] text-gold-700">
+                      <Megaphone className="h-3.5 w-3.5" />
+                      Title
                     </label>
                     <input
-                      type="datetime-local"
-                      value={formData.startDate}
-                      onChange={(e) => setFormData({ ...formData, startDate: e.target.value })}
-                      className="w-full px-5 py-4 border border-slate-200 rounded-2xl focus:ring-4 focus:ring-gold-500/10 focus:border-gold-500 outline-none text-sm font-medium"
+                      type="text"
+                      value={formData.title}
+                      maxLength={TITLE_MAX}
+                      onChange={(e) => setFormData({ ...formData, title: e.target.value })}
+                      placeholder="e.g. Clergy Assembly, Financial Report Deadline…"
+                      className="w-full rounded-2xl border border-slate-200 bg-slate-50/50 px-5 py-4 text-base font-medium transition-all placeholder:text-slate-300 focus:border-gold-500 focus:bg-white focus:outline-none focus:ring-4 focus:ring-gold-500/10"
                     />
-                    <p className="text-[10px] text-slate-400 mt-1">Leave blank to show immediately.</p>
+                    <p className="text-right text-[10px] font-semibold text-slate-400">
+                      {formData.title.length}/{TITLE_MAX}
+                    </p>
                   </div>
-                  <div>
-                    <label className="block text-[11px] font-black uppercase tracking-[0.22em] text-slate-500 mb-3">
-                      End Viewing Date
-                    </label>
-                    <input
-                      type="datetime-local"
-                      value={formData.endDate}
-                      onChange={(e) => setFormData({ ...formData, endDate: e.target.value })}
-                      className="w-full px-5 py-4 border border-slate-200 rounded-2xl focus:ring-4 focus:ring-gold-500/10 focus:border-gold-500 outline-none text-sm font-medium"
-                    />
-                    <p className="text-[10px] text-slate-400 mt-1">Leave blank to keep active indefinitely.</p>
-                  </div>
-                </div>
 
-                {!editingId && (
-                  <div>
-                    <label className="block text-[11px] font-black uppercase tracking-[0.22em] text-slate-500 mb-3">Save As</label>
-                    <div className="grid grid-cols-2 gap-3">
-                      {(['draft', 'active'] as const).map((opt) => (
-                        <button
-                          key={opt}
-                          type="button"
-                          onClick={() => setFormData({ ...formData, saveAs: opt })}
-                          className={`px-5 py-4 rounded-2xl border-2 font-bold text-sm transition-all ${
-                            formData.saveAs === opt
-                              ? opt === 'draft'
-                                ? 'border-slate-400 bg-slate-100 text-slate-900'
-                                : 'border-gold-500 bg-gold-50 text-gold-800'
-                              : 'border-slate-200 text-slate-500 hover:border-slate-300'
-                          }`}
+                  {/* Content */}
+                  <div className="space-y-2">
+                    <label className="text-[11px] font-bold uppercase tracking-[0.2em] text-gold-700">
+                      Content
+                    </label>
+                    <textarea
+                      value={formData.content}
+                      maxLength={CONTENT_MAX}
+                      onChange={(e) => setFormData({ ...formData, content: e.target.value })}
+                      placeholder="Write the full announcement here…"
+                      rows={6}
+                      className="w-full resize-none rounded-2xl border border-slate-200 bg-slate-50/50 px-5 py-4 text-sm font-medium transition-all placeholder:text-slate-300 focus:border-gold-500 focus:bg-white focus:outline-none focus:ring-4 focus:ring-gold-500/10"
+                    />
+                    <p className="text-right text-[10px] font-semibold text-slate-400">
+                      {formData.content.length}/{CONTENT_MAX}
+                    </p>
+                  </div>
+
+                  {/* Category | Priority */}
+                  <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
+                    <div className="space-y-2">
+                      <label className="text-[11px] font-bold uppercase tracking-[0.2em] text-gold-700">
+                        Category
+                      </label>
+                      <div className="relative">
+                        <select
+                          value={formData.category}
+                          onChange={(e) => setFormData({ ...formData, category: e.target.value as Announcement['category'] })}
+                          className="w-full cursor-pointer appearance-none rounded-2xl border border-slate-200 bg-slate-50/50 px-5 py-4 text-sm font-medium transition-all focus:border-gold-500 focus:bg-white focus:outline-none focus:ring-4 focus:ring-gold-500/10"
                         >
-                          {opt === 'draft' ? 'Save as Draft' : 'Publish Now'}
-                        </button>
-                      ))}
+                          <option value="general">General</option>
+                          <option value="financial">Financial</option>
+                          <option value="administrative">Administrative</option>
+                          <option value="event">Event</option>
+                        </select>
+                        <ChevronDown className="pointer-events-none absolute right-4 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+                      </div>
                     </div>
-                    {formData.saveAs === 'active' && (
-                      <p className="text-[10px] text-amber-600 mt-2 flex items-center gap-1">
-                        <AlertTriangle className="w-3 h-3" />
-                        Once published, you have 5 minutes to delete. After that, only edit or archive is available.
-                      </p>
-                    )}
-                  </div>
-                )}
 
-                <div className="flex flex-col-reverse sm:flex-row gap-3 pt-4">
-                  <button
-                    onClick={() => setShowForm(false)}
-                    className="flex-1 bg-slate-100 hover:bg-slate-200 text-slate-900 px-5 py-4 rounded-2xl transition-colors font-bold text-sm"
-                  >
-                    Cancel
-                  </button>
-                  <button
-                    onClick={handleSubmitForm}
-                    className="flex-1 flex items-center justify-center gap-2 bg-slate-950 hover:bg-slate-800 text-white px-5 py-4 rounded-2xl transition-colors font-bold text-sm"
-                  >
-                    <Send className="w-4 h-4" />
-                    {editingId ? 'Save Changes' : formData.saveAs === 'draft' ? 'Save Draft' : 'Publish Announcement'}
-                  </button>
+                    <div className="space-y-2">
+                      <label className="text-[11px] font-bold uppercase tracking-[0.2em] text-gold-700">
+                        Priority
+                      </label>
+                      <div className="relative">
+                        <select
+                          value={formData.priority}
+                          onChange={(e) => setFormData({ ...formData, priority: e.target.value as Announcement['priority'] })}
+                          className="w-full cursor-pointer appearance-none rounded-2xl border border-slate-200 bg-slate-50/50 px-5 py-4 text-sm font-medium transition-all focus:border-gold-500 focus:bg-white focus:outline-none focus:ring-4 focus:ring-gold-500/10"
+                        >
+                          <option value="low">Low – Routine</option>
+                          <option value="medium">Medium – Important</option>
+                          <option value="high">High – Urgent</option>
+                        </select>
+                        <ChevronDown className="pointer-events-none absolute right-4 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Start | End viewing dates */}
+                  <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
+                    <div className="space-y-2">
+                      <label className="text-[11px] font-bold uppercase tracking-[0.2em] text-gold-700">
+                        Start Viewing Date <span className="font-medium normal-case text-slate-300">(optional)</span>
+                      </label>
+                      <input
+                        type="datetime-local"
+                        value={formData.startDate}
+                        onChange={(e) => setFormData({ ...formData, startDate: e.target.value })}
+                        className="w-full rounded-2xl border border-slate-200 bg-slate-50/50 px-5 py-4 text-sm font-medium transition-all focus:border-gold-500 focus:bg-white focus:outline-none focus:ring-4 focus:ring-gold-500/10"
+                      />
+                      <p className="text-[10px] font-medium text-slate-400">
+                        Leave blank to show immediately. A future date schedules the post.
+                      </p>
+                    </div>
+                    <div className="space-y-2">
+                      <label className="text-[11px] font-bold uppercase tracking-[0.2em] text-gold-700">
+                        End Viewing Date <span className="font-medium normal-case text-slate-300">(optional)</span>
+                      </label>
+                      <input
+                        type="datetime-local"
+                        value={formData.endDate}
+                        min={formData.startDate || undefined}
+                        onChange={(e) => setFormData({ ...formData, endDate: e.target.value })}
+                        className="w-full rounded-2xl border border-slate-200 bg-slate-50/50 px-5 py-4 text-sm font-medium transition-all focus:border-gold-500 focus:bg-white focus:outline-none focus:ring-4 focus:ring-gold-500/10"
+                      />
+                      <p className="text-[10px] font-medium text-slate-400">Leave blank to keep the post up indefinitely.</p>
+                    </div>
+                  </div>
+
+                  {/* Save As */}
+                  {!editingId && (
+                    <div className="space-y-2">
+                      <label className="text-[11px] font-bold uppercase tracking-[0.2em] text-gold-700">Save As</label>
+                      <div className="grid grid-cols-2 gap-3">
+                        {(['draft', 'active'] as const).map((opt) => (
+                          <button
+                            key={opt}
+                            type="button"
+                            onClick={() => setFormData({ ...formData, saveAs: opt })}
+                            className={`rounded-2xl border-2 px-5 py-4 text-sm font-bold transition-all ${
+                              formData.saveAs === opt
+                                ? opt === 'draft'
+                                  ? 'border-slate-400 bg-slate-100 text-slate-900'
+                                  : 'border-gold-500 bg-gold-50 text-gold-800'
+                                : 'border-slate-200 text-slate-500 hover:border-slate-300'
+                            }`}
+                          >
+                            {opt === 'draft' ? 'Save as Draft' : 'Publish Now'}
+                          </button>
+                        ))}
+                      </div>
+                      {formData.saveAs === 'active' && (
+                        <p className="flex items-center gap-1.5 text-[10px] font-medium text-amber-600">
+                          <AlertTriangle className="h-3 w-3 shrink-0" />
+                          Once published, you have 5 minutes to delete. After that, only edit or archive is available.
+                        </p>
+                      )}
+                    </div>
+                  )}
+
+                  {formError && (
+                    <p className="flex items-center gap-2 rounded-xl bg-rose-50 px-4 py-3 text-sm font-semibold text-rose-500">
+                      <AlertCircle className="h-4 w-4 shrink-0" />
+                      {formError}
+                    </p>
+                  )}
+
+                  {/* Buttons */}
+                  <div className="flex flex-col-reverse gap-3 pt-2 sm:flex-row">
+                    <button
+                      type="button"
+                      onClick={() => setShowForm(false)}
+                      className="w-full rounded-2xl px-6 py-4 text-sm font-bold text-slate-500 transition-all hover:bg-slate-50 sm:flex-1"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      onClick={handleSubmitForm}
+                      disabled={isSubmitting}
+                      className="flex w-full items-center justify-center gap-3 rounded-2xl bg-gold-500 px-6 py-4 text-sm font-bold text-church-green-dark shadow-xl shadow-gold-500/20 transition-all hover:bg-gold-600 disabled:opacity-50 sm:flex-[2]"
+                    >
+                      {isSubmitting ? (
+                        <div className="h-5 w-5 animate-spin rounded-full border-2 border-church-green-dark/30 border-t-church-green-dark" />
+                      ) : (
+                        <>
+                          {editingId ? <Check className="h-5 w-5" /> : <Send className="h-4 w-4" />}
+                          {editingId ? 'SAVE CHANGES' : formData.saveAs === 'draft' ? 'SAVE DRAFT' : 'PUBLISH ANNOUNCEMENT'}
+                        </>
+                      )}
+                    </button>
+                  </div>
                 </div>
               </div>
             </motion.div>
-          </motion.div>
+          </div>
         )}
       </AnimatePresence>
 
       {/* ── View modal ── */}
       <AnimatePresence>
         {selectedAnnouncement && (
-          <motion.div
-            initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-            className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center z-50 p-4"
-            onClick={() => setSelectedAnnouncement(null)}
-          >
+          <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
             <motion.div
-              initial={{ opacity: 0, scale: 0.96, y: 20 }}
+              initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+              onClick={() => setSelectedAnnouncement(null)}
+              className="absolute inset-0 bg-black/60 backdrop-blur-sm"
+            />
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95, y: 20 }}
               animate={{ opacity: 1, scale: 1, y: 0 }}
-              exit={{ opacity: 0, scale: 0.96, y: 20 }}
-              onClick={(e) => e.stopPropagation()}
-              className="bg-white rounded-[32px] shadow-2xl max-w-3xl w-full p-6 md:p-8 max-h-[85vh] overflow-y-auto border border-slate-100"
+              exit={{ opacity: 0, scale: 0.95, y: 20 }}
+              className="relative flex max-h-[85vh] w-full max-w-2xl flex-col overflow-hidden rounded-3xl bg-white shadow-2xl"
             >
-              <div className="flex items-start justify-between gap-4 mb-6">
+              <div className="sticky top-0 z-10 flex items-start justify-between gap-4 border-b border-gold-500/50 bg-slate-950 p-6 text-white md:p-8">
                 <div className="min-w-0">
-                  <div className="flex flex-wrap items-center gap-2 mb-4">
-                    <span className={`inline-flex items-center rounded-full border px-3 py-1 text-[10px] font-black uppercase tracking-[0.2em] ${PRIORITY_STYLES[selectedAnnouncement.priority].badge}`}>
+                  <div className="mb-3 flex flex-wrap items-center gap-2">
+                    {selectedAnnouncement.pinned && selectedAnnouncement.status === 'active' && (
+                      <span className="inline-flex items-center gap-1.5 rounded-full border border-gold-500/30 bg-gold-50 px-3 py-1 text-[10px] font-black uppercase tracking-[0.16em] text-gold-700">
+                        <Pin className="h-3 w-3" />
+                        Pinned
+                      </span>
+                    )}
+                    <span className={`inline-flex items-center rounded-full border px-3 py-1 text-[10px] font-black uppercase tracking-[0.16em] ${PRIORITY_STYLES[selectedAnnouncement.priority].badge}`}>
                       {PRIORITY_STYLES[selectedAnnouncement.priority].label}
                     </span>
-                    <span className="inline-flex items-center rounded-full border border-slate-200 px-3 py-1 text-[10px] font-black uppercase tracking-[0.2em] text-slate-500">
+                    <span className="inline-flex items-center rounded-full border border-white/20 bg-white/10 px-3 py-1 text-[10px] font-black uppercase tracking-[0.16em] text-white/70">
                       {CATEGORY_META[selectedAnnouncement.category].label}
                     </span>
                     {selectedAnnouncement.status !== 'active' && (
-                      <span className="inline-flex items-center rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-[10px] font-black uppercase tracking-[0.2em] text-slate-500">
+                      <span className="inline-flex items-center rounded-full border border-white/20 bg-white/10 px-3 py-1 text-[10px] font-black uppercase tracking-[0.16em] text-white/70">
                         {selectedAnnouncement.status}
                       </span>
                     )}
                   </div>
-                  <h2 className="text-3xl font-serif font-bold text-slate-950 leading-tight">
+                  <h2 className="font-serif text-2xl font-bold leading-tight text-white md:text-3xl">
                     {selectedAnnouncement.title}
                   </h2>
-                  <div className="flex flex-wrap items-center gap-4 mt-4 text-sm text-slate-500">
-                    <div className="flex items-center gap-1.5"><User className="w-4 h-4" />{selectedAnnouncement.author}</div>
-                    <div className="flex items-center gap-1.5"><Calendar className="w-4 h-4" />{formatDate(new Date(selectedAnnouncement.createdAt))}</div>
+                  <div className="mt-3 flex flex-wrap items-center gap-4 text-sm text-white/60">
+                    <div className="flex items-center gap-1.5"><User className="h-4 w-4" />{selectedAnnouncement.author}</div>
+                    <div className="flex items-center gap-1.5"><Calendar className="h-4 w-4" />{formatDate(new Date(selectedAnnouncement.createdAt))}</div>
                     {selectedAnnouncement.endDate && (
-                      <div className="flex items-center gap-1.5"><Clock className="w-4 h-4" />Visible until {formatDate(new Date(selectedAnnouncement.endDate))}</div>
+                      <div className="flex items-center gap-1.5"><Clock className="h-4 w-4" />Visible until {formatDate(new Date(selectedAnnouncement.endDate))}</div>
                     )}
                   </div>
                 </div>
-                <button onClick={() => setSelectedAnnouncement(null)} className="p-2 hover:bg-slate-100 rounded-2xl transition-colors shrink-0">
-                  <X className="w-6 h-6 text-slate-500" />
+                <button
+                  onClick={() => setSelectedAnnouncement(null)}
+                  className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-white/50 transition-all hover:rotate-90 hover:bg-white/10"
+                >
+                  <X className="w-5 h-5" />
                 </button>
               </div>
-              <div className="rounded-[28px] border border-slate-100 bg-slate-50/70 p-6">
-                <p className="text-slate-700 whitespace-pre-wrap leading-relaxed">{selectedAnnouncement.content}</p>
+              <div className="custom-scrollbar flex-1 overflow-y-auto p-6 md:p-8">
+                <div className="rounded-3xl border border-slate-100 bg-slate-50/70 p-6">
+                  <p className="whitespace-pre-wrap leading-relaxed text-slate-700">{selectedAnnouncement.content}</p>
+                </div>
               </div>
             </motion.div>
-          </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* ── Confirm dialog ── */}
+      <AnimatePresence>
+        {confirmState && (
+          <div className="fixed inset-0 z-[120] flex items-center justify-center p-4">
+            <motion.div
+              initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+              onClick={() => setConfirmState(null)}
+              className="absolute inset-0 bg-black/60 backdrop-blur-sm"
+            />
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 20 }}
+              className="relative w-full max-w-md rounded-3xl bg-white p-6 shadow-2xl md:p-8"
+            >
+              <div className={`flex h-12 w-12 items-center justify-center rounded-2xl ${
+                confirmState.tone === 'danger' ? 'bg-rose-50 text-rose-500' : 'bg-amber-50 text-amber-600'
+              }`}>
+                {confirmState.tone === 'danger' ? <Trash2 className="h-5 w-5" /> : <Archive className="h-5 w-5" />}
+              </div>
+              <h3 className="mt-4 font-serif text-2xl font-bold text-slate-950">{confirmState.title}</h3>
+              <p className="mt-2 text-sm leading-relaxed text-slate-500">{confirmState.message}</p>
+              <div className="mt-6 flex flex-col-reverse gap-3 sm:flex-row">
+                <button
+                  onClick={() => setConfirmState(null)}
+                  className="flex-1 rounded-2xl px-5 py-3.5 text-sm font-bold text-slate-500 transition-all hover:bg-slate-50"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={() => { const { action } = confirmState; setConfirmState(null); action(); }}
+                  className={`flex-1 rounded-2xl px-5 py-3.5 text-sm font-bold text-white transition-all ${
+                    confirmState.tone === 'danger' ? 'bg-rose-600 hover:bg-rose-500' : 'bg-amber-500 hover:bg-amber-400'
+                  }`}
+                >
+                  {confirmState.confirmLabel}
+                </button>
+              </div>
+            </motion.div>
+          </div>
         )}
       </AnimatePresence>
 
@@ -863,9 +1211,9 @@ export function Announcements() {
         {toast && (
           <motion.div
             initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 20 }}
-            className="fixed bottom-24 left-1/2 -translate-x-1/2 z-50 bg-slate-950 text-white px-6 py-4 rounded-2xl shadow-2xl flex items-center gap-4 text-sm font-medium"
+            className="fixed bottom-24 left-1/2 z-[130] -translate-x-1/2 rounded-2xl bg-slate-950 px-6 py-4 text-sm font-medium text-white shadow-2xl"
           >
-            <span>{toast.message}</span>
+            {toast.message}
           </motion.div>
         )}
       </AnimatePresence>
@@ -873,226 +1221,194 @@ export function Announcements() {
   );
 }
 
-// ── Sub-components ────────────────────────────────────────────────────────────
+// ── Announcement card (one Events-style skeleton for every tab) ──────────────
 
-function EmptyState({ icon: Icon, message, sub }: { icon: React.ElementType; message: string; sub: string }) {
-  return (
-    <motion.div
-      initial={{ opacity: 0 }} animate={{ opacity: 1 }}
-      className="rounded-[32px] border border-dashed border-slate-200 bg-white/80 p-16 text-center"
-    >
-      <Icon className="w-12 h-12 text-slate-300 mx-auto mb-4" />
-      <p className="text-lg font-serif font-bold text-slate-900">{message}</p>
-      <p className="text-slate-500 mt-1">{sub}</p>
-    </motion.div>
-  );
-}
-
-function AnnouncementCard({
-  announcement: a, index, canManage, tick,
-  onView, onEdit, onDelete, onArchive,
+function AnnouncementRow({
+  announcement: a, index, tab, canManage, tick,
+  onView, onEdit, onDelete, onArchive, onRestore, onPublish, onPublishNow, onTogglePin, onDuplicate,
 }: {
-  announcement: Announcement; index: number; canManage: boolean; tick: number;
-  onView(): void; onEdit(): void; onDelete(): void; onArchive(): void;
+  announcement: Announcement;
+  index: number;
+  tab: Tab;
+  canManage: boolean;
+  tick: number;
+  onView(): void;
+  onEdit(): void;
+  onDelete(): void;
+  onArchive(): void;
+  onRestore(): void;
+  onPublish(): void;
+  onPublishNow(): void;
+  onTogglePin(): void;
+  onDuplicate(): void;
 }) {
   const priority = PRIORITY_STYLES[a.priority];
-  const Icon = CATEGORY_META[a.category].icon;
-  const inGrace = canManage && withinGracePeriod(a.publishedAt);
+  const category = CATEGORY_META[a.category];
+  const tile = dateTileParts(a.startDate);
+  const muted = tab === 'past' || tab === 'archived';
+  const inGrace = canManage && (tab === 'active' || tab === 'scheduled') && withinGracePeriod(a.publishedAt);
   const secsLeft = inGrace ? gracePeriodSecondsLeft(a.publishedAt) : 0;
   void tick; // consumed so the countdown re-renders every second
+
+  let rail: string = priority.rail;
+  if (tab === 'drafts') rail = 'bg-slate-300';
+  else if (muted) rail = 'bg-slate-200';
+  else if (tab === 'active' && a.pinned) rail = 'bg-gold-500';
+
+  const metaParts: string[] = [a.author];
+  if (tab === 'active') {
+    metaParts.push(`Posted ${formatDate(new Date(a.createdAt))}`);
+    if (a.endDate) metaParts.push(`Visible until ${formatDate(new Date(a.endDate))}`);
+  } else if (tab === 'scheduled') {
+    metaParts.push(`Created ${formatDate(new Date(a.createdAt))}`);
+    if (a.endDate) metaParts.push(`Visible until ${formatDate(new Date(a.endDate))}`);
+  } else if (tab === 'drafts') {
+    metaParts.push(`Created ${formatDate(new Date(a.createdAt))}`);
+  } else if (tab === 'past') {
+    if (a.endDate) metaParts.push(`Ended ${formatDate(new Date(a.endDate))}`);
+    metaParts.push('Auto-archives after 1 year');
+  } else if (tab === 'archived' && a.archivedAt) {
+    metaParts.push(`Archived ${formatDate(new Date(a.archivedAt))}${a.archivedBy ? ` by ${a.archivedBy}` : ''}`);
+  }
 
   return (
     <motion.div
       key={a.id}
       role="button" tabIndex={0}
-      initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -20 }}
+      initial={{ opacity: 0, y: 12 }}
+      animate={{ opacity: 1, y: 0 }}
+      exit={{ opacity: 0, y: -8 }}
       transition={{ delay: index * 0.04 }}
       onClick={onView}
       onKeyDown={(e) => e.key === 'Enter' && onView()}
-      className={`w-full cursor-pointer text-left bg-white rounded-[30px] border-l-4 ${priority.rail} p-6 border-t border-r border-b border-slate-100 shadow-sm hover:shadow-xl hover:shadow-slate-900/5 transition-all`}
+      className={`group relative cursor-pointer overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-[0_8px_26px_rgba(15,23,42,0.04)] transition-all hover:border-slate-300 hover:shadow-[0_18px_42px_rgba(15,23,42,0.08)] ${
+        muted ? 'opacity-70' : ''
+      }`}
     >
-      <div className="flex items-start gap-4">
-        <div className="h-12 w-12 rounded-2xl bg-slate-100 flex items-center justify-center text-slate-700 shrink-0">
-          <Icon className="w-5 h-5" />
-        </div>
-        <div className="flex-1 min-w-0">
-          <div className="flex flex-wrap items-center gap-2 mb-3">
-            <span className={`inline-flex items-center rounded-full border px-3 py-1 text-[10px] font-black uppercase tracking-[0.2em] ${priority.badge}`}>
-              {priority.label}
-            </span>
-            <span className="inline-flex items-center rounded-full border border-slate-200 px-3 py-1 text-[10px] font-black uppercase tracking-[0.2em] text-slate-500">
-              {CATEGORY_META[a.category].label}
-            </span>
-          </div>
-          <h3 className="font-bold text-xl text-slate-950 leading-tight">{a.title}</h3>
-          <p className="text-slate-600 mt-3 line-clamp-2 leading-relaxed">{a.content}</p>
-          <div className="flex flex-wrap items-center gap-4 mt-4 text-sm text-slate-500">
-            <div className="flex items-center gap-1.5"><User className="w-4 h-4" />{a.author}</div>
-            <div className="flex items-center gap-1.5"><Calendar className="w-4 h-4" />{formatDate(new Date(a.createdAt))}</div>
-            {a.endDate && (
-              <div className="flex items-center gap-1.5"><Clock className="w-4 h-4" />Visible until {formatDate(new Date(a.endDate))}</div>
-            )}
-          </div>
-        </div>
-      </div>
+      <div className={`absolute left-0 top-0 bottom-0 w-1 ${rail}`} />
 
-      {canManage ? (
-        <div className="mt-5 pt-4 border-t border-slate-100 flex flex-wrap items-center gap-2">
-          <ActionButton icon={Eye}     label="View"    tone="neutral" onClick={onView} />
-          <ActionButton icon={Edit2}   label="Edit"    tone="blue"    onClick={onEdit} />
-          <ActionButton icon={Archive} label="Archive" tone="warning" onClick={onArchive} />
-          {inGrace && (
-            <>
-              <ActionButton icon={Trash2} label={`Delete · ${formatCountdown(secsLeft)}`} tone="danger" onClick={onDelete} />
-              <span className="hidden md:inline text-[10px] font-medium text-slate-400 ml-1">
-                Permanent delete closes 5 minutes after publishing
-              </span>
-            </>
-          )}
+      <div className="grid gap-5 p-5 pl-6 md:grid-cols-[82px_minmax(0,1fr)] md:p-6 md:pl-8">
+        {/* Date column — dark tile with gold accent (Events uses a light one) */}
+        <div className={`flex h-20 w-20 shrink-0 flex-col items-center justify-center rounded-2xl text-center ${
+          muted ? 'border border-slate-200 bg-slate-100' : 'bg-slate-950'
+        }`}>
+          <div className={`text-[10px] font-black uppercase tracking-widest ${muted ? 'text-slate-400' : 'text-gold-400'}`}>{tile.month}</div>
+          <div className={`mt-1 font-serif text-3xl font-bold leading-none ${muted ? 'text-slate-500' : 'text-white'}`}>{tile.day}</div>
+          <div className={`mt-1 text-[10px] font-black ${muted ? 'text-slate-400' : 'text-white/40'}`}>{tile.year}</div>
         </div>
-      ) : (
-        <div className="mt-4 flex items-center gap-1 text-xs font-bold text-slate-400">
-          Read full announcement <ChevronRight className="w-3.5 h-3.5" />
-        </div>
-      )}
-    </motion.div>
-  );
-}
 
-function DraftCard({
-  announcement: a, index, onView, onEdit, onPublish, onDelete,
-}: {
-  announcement: Announcement; index: number;
-  onView(): void; onEdit(): void; onPublish(): void; onDelete(): void;
-}) {
-  const Icon = CATEGORY_META[a.category].icon;
-  const priority = PRIORITY_STYLES[a.priority];
+        <div className="min-w-0 flex-1">
+          <div className="flex items-start justify-between gap-3">
+            <h2 className={`font-serif text-xl font-bold leading-tight md:text-2xl ${muted ? 'text-slate-600' : 'text-slate-950'}`}>
+              {a.title}
+            </h2>
 
-  return (
-    <motion.div
-      initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -20 }}
-      transition={{ delay: index * 0.04 }}
-      className="w-full bg-white rounded-[30px] border-l-4 border-slate-300 p-6 border-t border-r border-b border-slate-100 shadow-sm"
-    >
-      <div className="flex items-start gap-4">
-        <div className="h-12 w-12 rounded-2xl bg-slate-100 flex items-center justify-center text-slate-400 shrink-0">
-          <Icon className="w-5 h-5" />
-        </div>
-        <div className="flex-1 min-w-0">
-          <div className="flex flex-wrap items-center gap-2 mb-3">
-            <span className="inline-flex items-center rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-[10px] font-black uppercase tracking-[0.2em] text-slate-500">
-              Draft — not published
-            </span>
-            <span className={`inline-flex items-center rounded-full border px-3 py-1 text-[10px] font-black uppercase tracking-[0.2em] ${priority.badge}`}>
-              {priority.label}
-            </span>
-          </div>
-          <h3 className="font-bold text-xl text-slate-700 leading-tight">{a.title}</h3>
-          <p className="text-slate-500 mt-3 line-clamp-2 leading-relaxed">{a.content}</p>
-          <div className="flex flex-wrap items-center gap-4 mt-4 text-sm text-slate-400">
-            <div className="flex items-center gap-1.5"><User className="w-4 h-4" />{a.author}</div>
-            <div className="flex items-center gap-1.5"><Calendar className="w-4 h-4" />Created {formatDate(new Date(a.createdAt))}</div>
-            {a.endDate && <div className="flex items-center gap-1.5"><Clock className="w-4 h-4" />Will show until {formatDate(new Date(a.endDate))}</div>}
-          </div>
-        </div>
-      </div>
-
-      <div className="mt-5 pt-4 border-t border-slate-100 flex flex-wrap items-center gap-2">
-        <ActionButton icon={Eye}    label="View"   tone="neutral" onClick={onView} />
-        <ActionButton icon={Edit2}  label="Edit"   tone="blue"    onClick={onEdit} />
-        <ActionButton icon={Send}   label="Publish" tone="primary" onClick={onPublish} />
-        <ActionButton icon={Trash2} label="Delete" tone="danger"  onClick={onDelete} />
-      </div>
-    </motion.div>
-  );
-}
-
-function PastCard({
-  announcement: a, index, onView, onArchive,
-}: {
-  announcement: Announcement; index: number; onView(): void; onArchive(): void;
-}) {
-  const Icon = CATEGORY_META[a.category].icon;
-
-  return (
-    <motion.div
-      initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -20 }}
-      transition={{ delay: index * 0.04 }}
-      className="w-full bg-white/70 rounded-[30px] border-l-4 border-slate-200 p-6 border-t border-r border-b border-slate-100 shadow-sm"
-    >
-      <div className="flex items-start gap-4">
-        <div className="h-12 w-12 rounded-2xl bg-slate-50 flex items-center justify-center text-slate-300 shrink-0">
-          <Icon className="w-5 h-5" />
-        </div>
-        <div className="flex-1 min-w-0">
-          <div className="flex flex-wrap items-center gap-2 mb-3">
-            <span className="inline-flex items-center rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-[10px] font-black uppercase tracking-[0.2em] text-slate-400">
-              Ended — no longer on the board
-            </span>
-          </div>
-          <h3 className="font-bold text-xl text-slate-500 leading-tight">{a.title}</h3>
-          <p className="text-slate-400 mt-3 line-clamp-2 leading-relaxed">{a.content}</p>
-          <div className="flex flex-wrap items-center gap-4 mt-4 text-sm text-slate-400">
-            <div className="flex items-center gap-1.5"><User className="w-4 h-4" />{a.author}</div>
-            {a.endDate && <div className="flex items-center gap-1.5"><Clock className="w-4 h-4" />Ended {formatDate(new Date(a.endDate))}</div>}
-          </div>
-        </div>
-      </div>
-
-      <div className="mt-5 pt-4 border-t border-slate-100 flex flex-wrap items-center gap-2">
-        <ActionButton icon={Eye}     label="View"    tone="neutral" onClick={onView} />
-        <ActionButton icon={Archive} label="Archive" tone="warning" onClick={onArchive} />
-        <span className="hidden md:inline text-[10px] font-medium text-slate-400 ml-1">
-          Moves to the Archive automatically after 1 year
-        </span>
-      </div>
-    </motion.div>
-  );
-}
-
-function ArchivedCard({
-  announcement: a, index, onView, onRestore,
-}: {
-  announcement: Announcement; index: number; onView(): void; onRestore(): void;
-}) {
-  const Icon = CATEGORY_META[a.category].icon;
-
-  return (
-    <motion.div
-      initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -20 }}
-      transition={{ delay: index * 0.04 }}
-      className="w-full bg-white/60 rounded-[30px] border-l-4 border-slate-100 p-6 border-t border-r border-b border-slate-100 shadow-sm"
-    >
-      <div className="flex items-start gap-4">
-        <div className="h-12 w-12 rounded-2xl bg-slate-50 flex items-center justify-center text-slate-300 shrink-0">
-          <Icon className="w-5 h-5" />
-        </div>
-        <div className="flex-1 min-w-0">
-          <div className="flex flex-wrap items-center gap-2 mb-3">
-            <span className="inline-flex items-center rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-[10px] font-black uppercase tracking-[0.2em] text-slate-400">
-              Archived record
-            </span>
-          </div>
-          <h3 className="font-bold text-xl text-slate-500 leading-tight">{a.title}</h3>
-          <p className="text-slate-400 mt-3 line-clamp-2 leading-relaxed">{a.content}</p>
-          <div className="flex flex-wrap items-center gap-4 mt-4 text-sm text-slate-400">
-            <div className="flex items-center gap-1.5"><User className="w-4 h-4" />{a.author}</div>
-            {a.archivedAt && (
-              <div className="flex items-center gap-1.5">
-                <Archive className="w-4 h-4" />
-                Archived {formatDate(new Date(a.archivedAt))}{a.archivedBy ? ` by ${a.archivedBy}` : ''}
+            {canManage && (
+              <div className="-mr-1 -mt-0.5 flex shrink-0 flex-wrap items-center justify-end gap-1">
+                {tab === 'active' && (
+                  <>
+                    <IconRowButton
+                      icon={a.pinned ? PinOff : Pin}
+                      title={a.pinned ? 'Unpin from top' : 'Pin to top'}
+                      active={a.pinned}
+                      onClick={onTogglePin}
+                    />
+                    <IconRowButton icon={Copy} title="Duplicate" onClick={onDuplicate} />
+                    <RowButton icon={Edit2} label="Edit" onClick={onEdit} />
+                    <RowButton icon={Archive} label="Archive" tone="warning" onClick={onArchive} />
+                    {inGrace && (
+                      <RowButton icon={Trash2} label={`Delete · ${formatCountdown(secsLeft)}`} tone="danger" onClick={onDelete} />
+                    )}
+                  </>
+                )}
+                {tab === 'scheduled' && (
+                  <>
+                    <IconRowButton icon={Copy} title="Duplicate" onClick={onDuplicate} />
+                    <RowButton icon={Send} label="Publish now" tone="primary" onClick={onPublishNow} />
+                    <RowButton icon={Edit2} label="Edit" onClick={onEdit} />
+                    {inGrace && (
+                      <RowButton icon={Trash2} label={`Delete · ${formatCountdown(secsLeft)}`} tone="danger" onClick={onDelete} />
+                    )}
+                  </>
+                )}
+                {tab === 'drafts' && (
+                  <>
+                    <RowButton icon={Send} label="Publish" tone="primary" onClick={onPublish} />
+                    <RowButton icon={Edit2} label="Edit" onClick={onEdit} />
+                    <RowButton icon={Trash2} label="Delete" tone="danger" onClick={onDelete} />
+                  </>
+                )}
+                {tab === 'past' && (
+                  <>
+                    <IconRowButton icon={Copy} title="Duplicate" onClick={onDuplicate} />
+                    <RowButton icon={Archive} label="Archive" tone="warning" onClick={onArchive} />
+                  </>
+                )}
+                {tab === 'archived' && (
+                  <>
+                    <IconRowButton icon={Copy} title="Duplicate" onClick={onDuplicate} />
+                    <RowButton icon={RotateCcw} label="Restore" tone="primary" onClick={onRestore} />
+                  </>
+                )}
               </div>
             )}
           </div>
-        </div>
-      </div>
 
-      <div className="mt-5 pt-4 border-t border-slate-100 flex flex-wrap items-center gap-2">
-        <ActionButton icon={Eye}       label="View"    tone="neutral" onClick={onView} />
-        <ActionButton icon={RotateCcw} label="Restore" tone="primary" onClick={onRestore} />
-        <span className="hidden md:inline text-[10px] font-medium text-slate-400 ml-1">
-          Restoring sends the post back to the Active Board
-        </span>
+          {/* Badges */}
+          <div className="mt-3 flex flex-wrap items-center gap-2">
+            {tab === 'active' && a.pinned && (
+              <span className="inline-flex items-center gap-1.5 rounded-full border border-gold-500/30 bg-gold-50 px-3 py-1 text-[10px] font-black uppercase tracking-[0.12em] text-gold-700">
+                <Pin className="h-3 w-3" />
+                Pinned
+              </span>
+            )}
+            {tab === 'scheduled' && (
+              <span className="inline-flex items-center gap-1.5 rounded-full border border-gold-500/30 bg-gold-50 px-3 py-1 text-[10px] font-black uppercase tracking-[0.12em] text-gold-700">
+                <span className="relative flex h-2 w-2">
+                  <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-gold-400 opacity-75" />
+                  <span className="relative inline-flex h-2 w-2 rounded-full bg-gold-500" />
+                </span>
+                Goes live {formatDate(new Date(a.startDate))}
+              </span>
+            )}
+            {tab === 'drafts' && (
+              <span className="inline-flex items-center rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-[10px] font-black uppercase tracking-[0.12em] text-slate-500">
+                Draft — not published
+              </span>
+            )}
+            {tab === 'past' && (
+              <span className="inline-flex items-center rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-[10px] font-black uppercase tracking-[0.12em] text-slate-400">
+                Ended — no longer on the board
+              </span>
+            )}
+            {tab === 'archived' && (
+              <span className="inline-flex items-center rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-[10px] font-black uppercase tracking-[0.12em] text-slate-400">
+                Archived record
+              </span>
+            )}
+            <span className={`inline-flex items-center rounded-full border px-3 py-1 text-[10px] font-black uppercase tracking-[0.12em] ${priority.badge}`}>
+              {priority.label}
+            </span>
+            <span className="inline-flex items-center gap-1.5 rounded-full border border-slate-200 px-3 py-1 text-[10px] font-black uppercase tracking-[0.12em] text-slate-500">
+              <category.icon className="h-3 w-3" />
+              {category.label}
+            </span>
+          </div>
+
+          {/* Content preview */}
+          <p className={`mt-3 max-w-3xl text-sm leading-relaxed line-clamp-2 ${muted ? 'text-slate-400' : 'text-slate-500'}`}>
+            {a.content}
+          </p>
+
+          {/* Meta — small-caps register line */}
+          <p className="mt-3 text-[10px] font-bold uppercase tracking-[0.14em] text-slate-400">{metaParts.join('  ·  ')}</p>
+
+          {!canManage && (
+            <p className="mt-3 inline-flex items-center gap-1 text-xs font-bold text-slate-400 transition-colors group-hover:text-slate-600">
+              Read full announcement <ChevronRight className="h-3.5 w-3.5" />
+            </p>
+          )}
+        </div>
       </div>
     </motion.div>
   );
