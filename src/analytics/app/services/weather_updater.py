@@ -162,7 +162,7 @@ def update(
         build_chirps_daily_cache,
         build_daily_rows,
         build_meteostat_daily_cache,
-        build_noaa_gsod_daily_cache,
+        build_noaa_gsod_station_caches,
     )
     from app.services.weather_ibtracs import get_typhoon_flags
 
@@ -202,7 +202,7 @@ def update(
     # The Meteostat and NOAA GSOD temperature validators are station-based and
     # shared by all municipalities — fetch each once.
     meteostat_daily_cache = build_meteostat_daily_cache(start_date, end_date)
-    gsod_daily_cache = build_noaa_gsod_daily_cache(start_date, end_date)
+    gsod_station_caches = build_noaa_gsod_station_caches(start_date, end_date)
 
     results: list[dict] = []
     daily_rain_rows: list[dict] = []
@@ -279,7 +279,9 @@ def update(
             chirps_daily_cache,
             meteostat_daily_cache,
             open_meteo_records=open_meteo_records,
-            gsod_cache=gsod_daily_cache,
+            gsod_station_caches=gsod_station_caches,
+            lat=lat,
+            lon=lon,
         )
         daily_rain_rows.extend(muni_rain_rows)
         daily_temp_rows.extend(muni_temp_rows)

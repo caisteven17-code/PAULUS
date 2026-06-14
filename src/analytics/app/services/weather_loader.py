@@ -117,6 +117,8 @@ def _typhoon_signal_from_monthly(
 
 # ── Batch upsert helper ───────────────────────────────────────────────────────
 
+_OBSERVATIONS_CHUNK = 500
+
 
 def _upsert_batch(rows: list[dict]) -> int:
     """
@@ -129,10 +131,8 @@ def _upsert_batch(rows: list[dict]) -> int:
 
     from app.services.supabase_client import get_table
 
-    # Pre-fetch all existing records for these (date, location) pairs.
-    # PostgREST caps responses at 1000 rows, so page through with .range()
-    # — otherwise pairs beyond the first page get re-inserted and violate
-    # the (date, location) unique index.
+    # Fetch existing (date, location) → id so we can tag rows with their PK.
+    # PostgREST caps responses at 1000 rows, so page through with .range().
     dates = list({r["date"] for r in rows})
     locations = list({r["location"] for r in rows})
 
@@ -156,25 +156,19 @@ def _upsert_batch(rows: list[dict]) -> int:
             break
         offset += page_size
 
-    inserts: list[dict] = []
-    updates: list[tuple[str, dict]] = []
-
+    # Tag each row with its existing id (if any), then upsert in chunks.
+    # Rows with an id → ON CONFLICT (id) DO UPDATE; rows without → INSERT.
+    tagged: list[dict] = []
     for row in rows:
-        key = (row["date"], row["location"])
-        payload = {k: v for k, v in row.items() if k != "id"}
-        if key in existing_map:
-            updates.append((existing_map[key], payload))
-        else:
-            inserts.append(row)
+        rec_id = existing_map.get((row["date"], row["location"]))
+        tagged.append({**row, "id": rec_id} if rec_id else {**row})
 
-    if inserts:
-        get_table("reference", "weather_observations").insert(inserts).execute()
-        logger.info("Inserted %d new weather records", len(inserts))
-
-    for rec_id, payload in updates:
-        get_table("reference", "weather_observations").update(payload).eq("id", rec_id).execute()
-    if updates:
-        logger.info("Updated %d existing weather records", len(updates))
+    total = 0
+    for i in range(0, len(tagged), _OBSERVATIONS_CHUNK):
+        chunk = tagged[i : i + _OBSERVATIONS_CHUNK]
+        get_table("reference", "weather_observations").upsert(chunk).execute()
+        total += len(chunk)
+        logger.info("Upserted %d/%d weather_observations rows", total, len(tagged))
 
     return len(rows)
 
@@ -186,9 +180,14 @@ def load_from_file(path: Path) -> int:
     """
     Load monthly-aggregated champion data from laguna_weather_final.json.
     Validates each municipality-month against NOAA GSOD and CHIRPS.
+    CHIRPS caches are pre-fetched for all municipalities in parallel so the
+    load does not make 30 sequential HTTP round-trips.
     Stores one record per (municipality, month) with date = first day of month.
     Returns the total number of rows upserted.
     """
+    from concurrent.futures import ThreadPoolExecutor
+    from datetime import date as date_class
+
     logger.info("Loading monthly weather data from %s", path)
     data = json.loads(path.read_text())
     now_iso = datetime.now(timezone.utc).isoformat()
@@ -199,32 +198,49 @@ def load_from_file(path: Path) -> int:
     except ImportError:
         logger.warning("weather_validation module not available — skipping validation")
 
+    period_start = date_class.fromisoformat(data.get("period_start", "2023-01-01"))
+    period_end = date_class.fromisoformat(data.get("period_end", "2023-12-31"))
+
     # ── Pre-fetch Meteostat once for the full date range ─────────────────────
     meteostat_cache: dict = {}
     if validate_month:
         try:
-            from datetime import date as date_class
-            period_start = date_class.fromisoformat(data.get("period_start", "2023-01-01"))
-            period_end = date_class.fromisoformat(data.get("period_end", "2023-12-31"))
             meteostat_cache = build_meteostat_cache(period_start, period_end)
         except Exception as exc:
             logger.warning("Meteostat cache build failed: %s", exc)
+
+    # ── Pre-fetch CHIRPS for all municipalities in parallel ───────────────────
+    chirps_caches: dict[str, dict] = {}
+    if validate_month:
+        nasa_munis = [
+            m for m in data.get("municipalities", [])
+            if m.get("champion_source") == "nasa_power_ag"
+            and m.get("latitude") is not None
+            and m.get("longitude") is not None
+        ]
+
+        def _fetch_chirps(muni: dict) -> tuple[str, dict]:
+            mname = muni["municipality"]
+            try:
+                cache = build_chirps_cache(muni["latitude"], muni["longitude"], period_start, period_end)
+                logger.info("  CHIRPS %-20s → %d months", mname, len(cache))
+                return mname, cache
+            except Exception as exc:
+                logger.warning("CHIRPS failed for %s: %s", mname, exc)
+                return mname, {}
+
+        logger.info("Pre-fetching CHIRPS for %d municipalities in parallel…", len(nasa_munis))
+        with ThreadPoolExecutor(max_workers=8) as pool:
+            for mname, cache in pool.map(_fetch_chirps, nasa_munis):
+                chirps_caches[mname] = cache
+        logger.info("CHIRPS prefetch complete.")
 
     rows: list[dict] = []
     for muni in data.get("municipalities", []):
         name = muni["municipality"]
         source = muni["champion_source"]
-        lat = muni.get("latitude")
-        lon = muni.get("longitude")
 
-        # ── Pre-fetch CHIRPS once per municipality for the full date range ────
-        chirps_cache: dict = {}
-        if validate_month and source == "nasa_power_ag" and lat is not None and lon is not None:
-            try:
-                chirps_cache = build_chirps_cache(lat, lon, period_start, period_end)
-                logger.info("  CHIRPS cache for %-20s → %d months", name, len(chirps_cache))
-            except Exception as exc:
-                logger.warning("CHIRPS cache build failed for %s: %s", name, exc)
+        chirps_cache = chirps_caches.get(name, {})
 
         for m in muni.get("monthly_data", []):
             year = int(m["year"])

@@ -226,10 +226,22 @@ def fetch_open_meteo(lat: float, lon: float, start: date, end: date) -> list[dic
     return records
 
 
-def _fetch_nasa_power(lat: float, lon: float, start: date, end: date, community: str, wind_param: str) -> list[dict]:
+def _fetch_nasa_power(
+    lat: float,
+    lon: float,
+    start: date,
+    end: date,
+    community: str,
+    wind_param: str,
+    extra_params: str = "",
+) -> list[dict]:
+    param_str = f"T2M,T2M_MAX,T2M_MIN,PRECTOTCORR,{wind_param}"
+    if extra_params:
+        param_str += f",{extra_params}"
+
     params = urllib.parse.urlencode(
         {
-            "parameters": f"T2M,T2M_MAX,T2M_MIN,PRECTOTCORR,{wind_param}",
+            "parameters": param_str,
             "community": community,
             "longitude": lon,
             "latitude": lat,
@@ -253,6 +265,7 @@ def _fetch_nasa_power(lat: float, lon: float, start: date, end: date, community:
     t2m_min = props.get("T2M_MIN", {})
     precip = props.get("PRECTOTCORR", {})
     wind = props.get(wind_param, {})
+    rh2m = props.get("RH2M", {})  # relative humidity — AG community only
 
     records = []
     for key in t2m:
@@ -283,13 +296,16 @@ def _fetch_nasa_power(lat: float, lon: float, start: date, end: date, community:
                 "temp_min_c": t_min,
                 "rainfall_mm": _safe(precip.get(key)),
                 "wind_ms": _safe(wind.get(key)),
+                "rh_pct": _safe(rh2m.get(key)) if rh2m else None,
             }
         )
     return records
 
 
 def fetch_nasa_power_ag(lat: float, lon: float, start: date, end: date) -> list[dict]:
-    return _fetch_nasa_power(lat, lon, start, end, community="AG", wind_param="WS10M")
+    # RH2M (relative humidity at 2m) is fetched exclusively for the AG community;
+    # it is used by compute_heat_index() to produce PAGASA heat index tiers.
+    return _fetch_nasa_power(lat, lon, start, end, community="AG", wind_param="WS10M", extra_params="RH2M")
 
 
 def fetch_nasa_power_sb(lat: float, lon: float, start: date, end: date) -> list[dict]:
@@ -533,12 +549,19 @@ def collect(
     from app.services.weather_daily_classifier import (
         build_chirps_daily_cache,
         build_daily_rows,
+        build_gpm_imerg_daily_cache,
         build_meteostat_daily_cache,
-        build_noaa_gsod_daily_cache,
+        build_noaa_gsod_station_caches,
+        compute_confidence_scores,
     )
 
     meteostat_daily_cache = build_meteostat_daily_cache(start, end)
-    gsod_daily_cache = build_noaa_gsod_daily_cache(start, end)
+    gsod_station_caches = build_noaa_gsod_station_caches(start, end)
+
+    # GPM IMERG is a gridded satellite product covering all of Laguna uniformly
+    # — fetch once for the Province bbox rather than per-municipality.
+    imerg_daily_cache = build_gpm_imerg_daily_cache(start, end)
+    logger.info("GPM IMERG cache ready: %d days", len(imerg_daily_cache))
 
     master: list[dict] = []
     validity_rows: list[dict] = []
@@ -571,15 +594,20 @@ def collect(
             chirps_daily_cache,
             meteostat_daily_cache,
             open_meteo_records=sources["open_meteo"],
-            gsod_cache=gsod_daily_cache,
+            gsod_station_caches=gsod_station_caches,
+            imerg_cache=imerg_daily_cache,
+            lat=lat,
+            lon=lon,
         )
         daily_rain_rows.extend(muni_rain_rows)
         daily_temp_rows.extend(muni_temp_rows)
         logger.info(
-            "  Daily classification: %d rain rows, %d temp rows (CHIRPS coverage %d days)",
+            "  Daily classification: %d rain rows, %d temp rows "
+            "(CHIRPS %d days, IMERG %d days)",
             len(muni_rain_rows),
             len(muni_temp_rows),
             len(chirps_daily_cache),
+            len(imerg_daily_cache),
         )
 
         # Score each source
@@ -694,6 +722,21 @@ def collect(
         )
     )
 
+    # Confidence scoring across all municipalities
+    confidence = compute_confidence_scores(daily_rain_rows, daily_temp_rows)
+    logger.info(
+        "Confidence scores — overall: %.1f%% | rainfall MAE: %.1f%% WCI: %.1f%% | "
+        "temperature MAE: %.1f%% WCI: %.1f%%",
+        confidence["overall_confidence_pct"],
+        confidence["rainfall"]["mae_confidence_pct"],
+        confidence["rainfall"]["weighted_confidence_index_pct"],
+        confidence["temperature"]["mae_confidence_pct"],
+        confidence["temperature"]["weighted_confidence_index_pct"],
+    )
+    (out_dir / "laguna_weather_confidence.json").write_text(
+        json.dumps(confidence, indent=2)
+    )
+
     # Classified daily rows for the split daily tables (no indent — large file)
     daily_classified_path = out_dir / "laguna_weather_daily_classified.json"
     daily_classified_path.write_text(
@@ -704,6 +747,7 @@ def collect(
                 "period_end": end.isoformat(),
                 "rain_row_count": len(daily_rain_rows),
                 "temp_row_count": len(daily_temp_rows),
+                "confidence": confidence,
                 "rain_rows": daily_rain_rows,
                 "temp_rows": daily_temp_rows,
             }

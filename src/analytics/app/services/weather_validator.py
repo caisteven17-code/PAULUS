@@ -64,9 +64,9 @@ RAIN_FLAG_RELDELTA = RAIN_RELMAE_THRESHOLD * 2  # relative
 # https://www.ncei.noaa.gov/access/search/data-search/global-summary-of-the-day
 
 GSOD_STATIONS = [
-    {"id": "984290-99999", "name": "Ninoy Aquino Intl AP", "lat": 14.508, "lon": 121.020},
-    {"id": "984330-99999", "name": "Ambulong", "lat": 13.767, "lon": 121.050},
-    {"id": "984100-99999", "name": "Science Garden", "lat": 14.650, "lon": 121.050},
+    {"id": "98429099999", "name": "Ninoy Aquino Intl AP", "lat": 14.508, "lon": 121.020},
+    {"id": "98433099999", "name": "Ambulong", "lat": 13.767, "lon": 121.050},
+    {"id": "98328099999", "name": "Science Garden (PAGASA)", "lat": 14.650, "lon": 121.050},
 ]
 
 GSOD_API = "https://www.ncei.noaa.gov/access/services/data/v1"
@@ -117,12 +117,15 @@ def fetch_gsod_monthly(station_id: str, start: date, end: date) -> list[dict]:
 
         try:
             if r.get("TEMP") is not None:
-                monthly[key]["temps"].append(float(r["TEMP"]))
+                # GSOD ignores units=metric for these stations — TEMP is in °F.
+                temp_f = float(r["TEMP"])
+                monthly[key]["temps"].append((temp_f - 32) * 5 / 9)
         except (TypeError, ValueError):
             pass
         try:
             if r.get("PRCP") is not None:
-                monthly[key]["rain"].append(float(r["PRCP"]))
+                # PRCP is in inches; convert to mm.
+                monthly[key]["rain"].append(float(r["PRCP"]) * 25.4)
         except (TypeError, ValueError):
             pass
 
