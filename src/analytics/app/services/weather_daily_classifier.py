@@ -2,13 +2,13 @@
 Daily Weather Classifier
 =========================
 Classifies each day per municipality into rainfall and temperature categories,
-cross-checking the source of truth (NASA POWER AG) against THREE validators per
+cross-checking the source of truth (NASA POWER AG) against FIVE validators per
 dimension at the DAILY level:
 
   Rainfall    : CHIRPS (satellite + gauge), Open-Meteo ERA5-Land (reanalysis),
-                and GPM IMERG (passive microwave satellite)
-  Temperature : Meteostat (station), NOAA GSOD (station),
-                and Open-Meteo ERA5-Land (reanalysis)
+                GPM IMERG (passive microwave satellite), ERA5 Full, UKMO
+  Temperature : NOAA GSOD (station), Open-Meteo ERA5-Land (reanalysis),
+                ERA5 Full, ECMWF IFS, UKMO
 
 Output rows match reference.weather_rainfall_daily and
 reference.weather_temperature_daily (migration 189). Monthly counts and the
@@ -42,7 +42,7 @@ NASA POWER AG (parameter RH2M).
     danger          42 °C ≤ HI < 52 °C
     extreme_danger  HI ≥ 52 °C
 
-  Note: temperature VALIDATORS (Meteostat, NOAA GSOD, Open-Meteo) compare
+  Note: temperature VALIDATORS (NOAA GSOD, Open-Meteo, ERA5, ECMWF IFS, UKMO) compare
   against NASA POWER AG raw maximum temperature (not the heat index).
   Agreement is determined from raw temperature; classification is applied
   to the computed heat index once the raw temperature is validated.
@@ -66,7 +66,16 @@ WMO quality flag mapping (WMO No. 1269, 2020):
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 Confidence scoring (Murphy, 1988; Cohen, 1960; Landis & Koch, 1977):
-  MAE-normalized per-validator confidence: C = max(0, 1 - MAE/τ) × 100%
+  Both dimensions use Absolute MedAE at the daily level:
+  Rainfall    — C = max(0, 1 − MedAE_abs / 10.0 mm) × 100%
+  Temperature — C = max(0, 1 − MedAE_abs / 3.0 °C) × 100%
+  Relative MedAE (used by weather_validator.py) is intentionally reserved
+  for monthly aggregates — at the daily level, the median rainfall is ~4 mm
+  and even a 2 mm absolute difference yields 50 % relative error, making
+  relative thresholds non-discriminating (Aryastana et al., 2022).
+  Median replaces mean throughout — robust to typhoon outlier days
+  (ASCMO, 2025). Validator aggregation uses median of per-validator scores
+  so one underperforming source cannot collapse the result (ORSA, 2021).
   Weighted Confidence Index (WCI): weighted mean of per-day validator counts
   Cohen's Kappa (κ): categorical agreement corrected for chance, per validator
   See compute_confidence_scores() for the full implementation.
@@ -100,28 +109,38 @@ TEMP_EXTREME_DANGER_MIN_C = 52.0
 
 # ── Source agreement tolerances (daily) ───────────────────────────────────────
 
-RAIN_AGREE_TOLERANCE_MM = 10.0   # NASA POWER AG vs each rainfall validator
-TEMP_AGREE_TOLERANCE_C = 3.0     # NASA POWER AG vs each temperature validator (raw)
+RAIN_AGREE_TOLERANCE_MM = 10.0   # NASA POWER AG vs each rainfall validator (per-row agreement gate)
+TEMP_AGREE_TOLERANCE_C = 3.0     # NASA POWER AG vs each temperature validator (per-row agreement gate)
+
+# Both dimensions use absolute MedAE for confidence scoring at the daily level.
+# Relative MedAE (used by weather_validator.py) is reserved for monthly
+# aggregates — daily median rainfall of ~4 mm makes relative thresholds
+# non-discriminating (Aryastana et al., 2022).
+# Rainfall reuses RAIN_AGREE_TOLERANCE_MM (10.0 mm) — same scale.
+# Temperature reuses TEMP_AGREE_TOLERANCE_C (3.0 °C) — same scale.
 
 # NOAA GSOD finalizes international station data with a 30–90 day lag.
 # Cap GSOD requests at this many days before today to avoid requesting
 # unfinalized records (reanalysis products use REANALYSIS_LAG_DAYS = 7).
 GSOD_LAG_DAYS = 90
 
-# ── Agreement status labels (must match CHECK constraints in migration 189) ───
+# ── Agreement status labels (must match CHECK constraints in migration) ────────
 
 STATUS_ALL_AGREE = "All validators agree"
-STATUS_MAJORITY_AGREE = "Majority agree (2/3)"
 STATUS_ONE_AGREES = "One validator agrees"
 STATUS_NONE_AGREE = "No validators agree"
+# Majority/minority statuses are built dynamically: "Majority agree (3/5)", "Minority agree (2/5)"
 
-# WMO No. 1269 quality flag mapping
-WMO_FLAG = {
-    STATUS_ALL_AGREE: "Correct",
-    STATUS_MAJORITY_AGREE: "Probably Correct",
-    STATUS_ONE_AGREES: "Probably Suspect",
-    STATUS_NONE_AGREE: "Suspect",
-}
+
+def _wmo_flag(status: str) -> str:
+    """Map an agreement_status string to a WMO No. 1269 quality flag."""
+    if status == STATUS_ALL_AGREE:
+        return "Correct"
+    if status.startswith("Majority agree"):
+        return "Probably Correct"
+    if status.startswith("Minority agree") or status == STATUS_ONE_AGREES:
+        return "Probably Suspect"
+    return "Suspect"
 
 # GPM IMERG bounding box for Laguna Province (0.1° grid)
 # Lat: 13.85–14.60°N → indices 1038–1045
@@ -221,7 +240,7 @@ def _validate_dimension(
     classification_value: Optional[float] = None,
 ) -> Optional[dict]:
     """
-    Apply majority agreement rule (≥ 2 of 3) for one weather dimension.
+    Apply majority agreement rule (≥ n//2 + 1 of n) for one weather dimension.
 
     truth_value         : NASA POWER AG raw value (used for validator comparison).
     validators          : [(name, value), ...] — all checked simultaneously.
@@ -240,7 +259,7 @@ def _validate_dimension(
     present = [(name, val, classify_fn(val)) for name, val in validators if val is not None]
     missing = [name for name, val in validators if val is None]
     n_total = len(validators)
-    majority = n_total // 2 + 1  # 2 out of 3
+    majority = n_total // 2 + 1
 
     if truth_value is None and not present:
         return None
@@ -254,7 +273,7 @@ def _validate_dimension(
             "validators_agreed": 0,
             "sources_agree": False,
             "agreement_status": status,
-            "wmo_quality_flag": WMO_FLAG[status],
+            "wmo_quality_flag": _wmo_flag(status),
             "reason": (
                 f"Not cross-checked: NASA POWER AG has no data for this day; "
                 f"classified from {name} alone."
@@ -269,7 +288,7 @@ def _validate_dimension(
             "validators_agreed": 0,
             "sources_agree": False,
             "agreement_status": status,
-            "wmo_quality_flag": WMO_FLAG[status],
+            "wmo_quality_flag": _wmo_flag(status),
             "reason": (
                 f"No validator data available ({', '.join(missing)} all missing). "
                 f"Classified from NASA POWER AG alone (unvalidated)."
@@ -294,7 +313,11 @@ def _validate_dimension(
     if agreed >= majority:
         classification = truth_cat
         sources_agree = True
-        status = STATUS_ALL_AGREE if agreed == n_total else STATUS_MAJORITY_AGREE
+        status = STATUS_ALL_AGREE if agreed == n_total else f"Majority agree ({agreed}/{n_total})"
+    elif agreed >= 2:
+        classification = "inconclusive"
+        sources_agree = False
+        status = f"Minority agree ({agreed}/{n_total})"
     elif agreed == 1:
         classification = "inconclusive"
         sources_agree = False
@@ -324,6 +347,13 @@ def _validate_dimension(
             + (f"Conflicting: {_fmt(conflicting)}." if conflicting else "")
             + f" Classified from NASA POWER AG."
         )
+    elif agreed >= 2:
+        reason = (
+            f"Minority agree ({agreed}/{n_total}): {_fmt(agreeing)} agree with "
+            f"NASA POWER AG {truth_value:.2f} {unit}, but below majority ({majority}/{n_total}). "
+            + (f"Conflicting: {_fmt(conflicting)}." if conflicting else "")
+            + " Classified as inconclusive."
+        )
     elif agreed == 1 and conflicting:
         a_name, _av, _ac, a_diff = agreeing[0]
         reason = (
@@ -350,7 +380,7 @@ def _validate_dimension(
         "validators_agreed": agreed,
         "sources_agree": sources_agree,
         "agreement_status": status,
-        "wmo_quality_flag": WMO_FLAG[status],
+        "wmo_quality_flag": _wmo_flag(status),
         "reason": reason,
     }
 
@@ -359,29 +389,37 @@ def classify_day(
     date_iso: str,
     municipality: str,
     *,
-    # Rainfall — source of truth + 3 validators
+    # Rainfall — source of truth + 5 validators
     nasa_rainfall_mm: Optional[float],
     chirps_rainfall_mm: Optional[float],
     open_meteo_rainfall_mm: Optional[float],
     imerg_rainfall_mm: Optional[float],
-    # Temperature — source of truth (raw + heat index) + 3 validators (raw)
+    era5_rainfall_mm: Optional[float],
+    ukmo_rainfall_mm: Optional[float],
+    # Temperature — source of truth (raw + heat index) + 5 validators (raw)
     nasa_temp_c: Optional[float],        # raw temp_max_c for validator comparison
     nasa_heat_index_c: Optional[float],  # computed heat index for PAGASA classification
-    meteostat_temp_c: Optional[float],
     gsod_temp_c: Optional[float],
     open_meteo_temp_c: Optional[float],
+    era5_temp_c: Optional[float],
+    ecmwf_ifs_temp_c: Optional[float],
+    ukmo_temp_c: Optional[float],
     # Raw records for storage
     nasa_power_raw: Optional[dict] = None,
     open_meteo_raw: Optional[dict] = None,
+    open_meteo_era5_raw: Optional[dict] = None,
+    ecmwf_ifs_raw: Optional[dict] = None,
+    ukmo_raw: Optional[dict] = None,
     nasa_rh_pct: Optional[float] = None,
 ) -> tuple[Optional[dict], Optional[dict]]:
     """
     Build reference.weather_rainfall_daily and reference.weather_temperature_daily
     rows for one (date, municipality).
 
-    Rainfall uses 3 validators (CHIRPS, Open-Meteo ERA5-Land, GPM IMERG).
-    Temperature validates raw temp_max_c against 3 station/reanalysis sources,
-    then classifies the computed heat index (Rothfusz 1990) against PAGASA tiers.
+    Rainfall uses 5 validators (CHIRPS, Open-Meteo ERA5-Land, GPM IMERG, ERA5 full, UKMO).
+    Temperature validates raw temp_max_c against 5 reanalysis sources (NOAA GSOD,
+    Open-Meteo ERA5-Land, ERA5 Full, ECMWF IFS, UKMO), then classifies the computed
+    heat index (Rothfusz 1990) against PAGASA tiers.
 
     Returns (rain_row, temp_row); either is None when all sources are missing.
     """
@@ -391,6 +429,8 @@ def classify_day(
             ("CHIRPS", chirps_rainfall_mm),
             ("Open-Meteo ERA5-Land", open_meteo_rainfall_mm),
             ("GPM IMERG", imerg_rainfall_mm),
+            ("ERA5 (Full)", era5_rainfall_mm),
+            ("UKMO", ukmo_rainfall_mm),
         ],
         classify_rain,
         RAIN_AGREE_TOLERANCE_MM,
@@ -401,9 +441,11 @@ def classify_day(
     temp = _validate_dimension(
         nasa_temp_c,
         [
-            ("Meteostat", meteostat_temp_c),
             ("NOAA GSOD", gsod_temp_c),
             ("Open-Meteo ERA5-Land", open_meteo_temp_c),
+            ("ERA5 (Full)", era5_temp_c),
+            ("ECMWF IFS", ecmwf_ifs_temp_c),
+            ("UKMO", ukmo_temp_c),
         ],
         classify_temp,
         TEMP_AGREE_TOLERANCE_C,
@@ -420,9 +462,13 @@ def classify_day(
             "chirps_rainfall_mm": round(chirps_rainfall_mm, 2) if chirps_rainfall_mm is not None else None,
             "open_meteo_rainfall_mm": round(open_meteo_rainfall_mm, 2) if open_meteo_rainfall_mm is not None else None,
             "imerg_rainfall_mm": round(imerg_rainfall_mm, 2) if imerg_rainfall_mm is not None else None,
+            "era5_rainfall_mm": round(era5_rainfall_mm, 2) if era5_rainfall_mm is not None else None,
+            "ukmo_rainfall_mm": round(ukmo_rainfall_mm, 2) if ukmo_rainfall_mm is not None else None,
             "diff_nasa_chirps_mm": _diff(nasa_rainfall_mm, chirps_rainfall_mm),
             "diff_nasa_open_meteo_mm": _diff(nasa_rainfall_mm, open_meteo_rainfall_mm),
             "diff_nasa_imerg_mm": _diff(nasa_rainfall_mm, imerg_rainfall_mm),
+            "diff_nasa_era5_mm": _diff(nasa_rainfall_mm, era5_rainfall_mm),
+            "diff_nasa_ukmo_mm": _diff(nasa_rainfall_mm, ukmo_rainfall_mm),
             "rain_classification": rain["classification"],
             "validators_agreed": rain["validators_agreed"],
             "sources_agree": rain["sources_agree"],
@@ -443,6 +489,8 @@ def classify_day(
                 }
                 if imerg_rainfall_mm is not None else None
             ),
+            "era5_raw": open_meteo_era5_raw,
+            "ukmo_raw": ukmo_raw,
         }
 
     temp_row = None
@@ -453,12 +501,16 @@ def classify_day(
             "nasa_power_temp_c": round(nasa_temp_c, 2) if nasa_temp_c is not None else None,
             "nasa_power_heat_index_c": round(nasa_heat_index_c, 2) if nasa_heat_index_c is not None else None,
             "nasa_power_rh_pct": round(nasa_rh_pct, 2) if nasa_rh_pct is not None else None,
-            "meteostat_temp_c": round(meteostat_temp_c, 2) if meteostat_temp_c is not None else None,
             "noaa_gsod_temp_c": round(gsod_temp_c, 2) if gsod_temp_c is not None else None,
             "open_meteo_temp_c": round(open_meteo_temp_c, 2) if open_meteo_temp_c is not None else None,
-            "diff_nasa_meteostat_c": _diff(nasa_temp_c, meteostat_temp_c),
+            "era5_temp_c": round(era5_temp_c, 2) if era5_temp_c is not None else None,
+            "ecmwf_ifs_temp_c": round(ecmwf_ifs_temp_c, 2) if ecmwf_ifs_temp_c is not None else None,
+            "ukmo_temp_c": round(ukmo_temp_c, 2) if ukmo_temp_c is not None else None,
             "diff_nasa_gsod_c": _diff(nasa_temp_c, gsod_temp_c),
             "diff_nasa_open_meteo_c": _diff(nasa_temp_c, open_meteo_temp_c),
+            "diff_nasa_era5_c": _diff(nasa_temp_c, era5_temp_c),
+            "diff_nasa_ecmwf_ifs_c": _diff(nasa_temp_c, ecmwf_ifs_temp_c),
+            "diff_nasa_ukmo_c": _diff(nasa_temp_c, ukmo_temp_c),
             "temp_classification": temp["classification"],
             "validators_agreed": temp["validators_agreed"],
             "sources_agree": temp["sources_agree"],
@@ -466,10 +518,6 @@ def classify_day(
             "wmo_quality_flag": temp["wmo_quality_flag"],
             "reason": temp["reason"],
             "nasa_power_raw": nasa_power_raw,
-            "meteostat_raw": (
-                {"source": "meteostat", "station": "98429", "temp_max_c": round(meteostat_temp_c, 2)}
-                if meteostat_temp_c is not None else None
-            ),
             "gsod_raw": (
                 {
                     "source": "noaa_gsod",
@@ -482,6 +530,9 @@ def classify_day(
                 {"source": "open_meteo_era5land", "temp_max_c": round(open_meteo_temp_c, 2)}
                 if open_meteo_temp_c is not None else None
             ),
+            "era5_temp_raw": open_meteo_era5_raw,
+            "ecmwf_ifs_raw": ecmwf_ifs_raw,
+            "ukmo_temp_raw": ukmo_raw,
         }
 
     return rain_row, temp_row
@@ -493,28 +544,35 @@ def build_daily_rows(
     end: date,
     nasa_records: list[dict],
     chirps_cache: dict[str, float],
-    meteostat_cache: dict[str, float],
     open_meteo_records: Optional[list[dict]] = None,
     gsod_station_caches: Optional[list[dict]] = None,
     imerg_cache: Optional[dict[str, float]] = None,
+    era5_records: Optional[list[dict]] = None,
+    ecmwf_ifs_records: Optional[list[dict]] = None,
+    ukmo_records: Optional[list[dict]] = None,
     lat: Optional[float] = None,
     lon: Optional[float] = None,
 ) -> tuple[list[dict], list[dict]]:
     """
     Classify every day in [start, end] for one municipality.
 
-    nasa_records         : daily dicts from weather_collector (include RH2M field).
-    open_meteo_records   : daily dicts from fetch_open_meteo (temp_max_c + rainfall_mm).
-    chirps_cache         : {iso_date: rainfall_mm}
-    meteostat_cache      : {iso_date: temp_max_c}
-    gsod_station_caches  : list of {lat, lon, name, cache: {iso_date: temp_max_c}}
-                           IDW-weighted per municipality (Shepard, 1968).
-    imerg_cache          : {iso_date: rainfall_mm}  ← GPM IMERG 3rd rainfall validator
+    nasa_records        : daily dicts from weather_collector (include RH2M field).
+    chirps_cache        : {iso_date: rainfall_mm}
+    open_meteo_records  : daily dicts from fetch_open_meteo ERA5-Land (temp_max_c + rainfall_mm).
+    gsod_station_caches : list of {lat, lon, name, cache: {iso_date: temp_max_c}}
+                          IDW-weighted per municipality (Shepard, 1968).
+    imerg_cache         : {iso_date: rainfall_mm}  ← GPM IMERG rainfall validator
+    era5_records        : daily dicts from fetch_open_meteo_era5 (4th rainfall + temp validator).
+    ecmwf_ifs_records   : daily dicts from fetch_open_meteo_ecmwf_ifs (5th temp validator).
+    ukmo_records        : daily dicts from fetch_open_meteo_ukmo (5th rainfall + temp validator).
 
     Returns (rain_rows, temp_rows).
     """
-    nasa_by_date = {r["date"]: r for r in nasa_records}
-    open_by_date = {r["date"]: r for r in (open_meteo_records or [])}
+    nasa_by_date      = {r["date"]: r for r in nasa_records}
+    open_by_date      = {r["date"]: r for r in (open_meteo_records or [])}
+    era5_by_date      = {r["date"]: r for r in (era5_records or [])}
+    ecmwf_ifs_by_date = {r["date"]: r for r in (ecmwf_ifs_records or [])}
+    ukmo_by_date      = {r["date"]: r for r in (ukmo_records or [])}
     gsod_station_caches = gsod_station_caches or []
     imerg_cache = imerg_cache or {}
 
@@ -542,9 +600,19 @@ def build_daily_rows(
         open_meteo_rain = open_meteo.get("rainfall_mm") if open_meteo else None
         open_meteo_temp = open_meteo.get("temp_max_c") if open_meteo else None
 
+        era5 = era5_by_date.get(d)
+        era5_rain = era5.get("rainfall_mm") if era5 else None
+        era5_temp = era5.get("temp_max_c") if era5 else None
+
+        ecmwf_ifs = ecmwf_ifs_by_date.get(d)
+        ecmwf_ifs_temp = ecmwf_ifs.get("temp_max_c") if ecmwf_ifs else None
+
+        ukmo = ukmo_by_date.get(d)
+        ukmo_rain = ukmo.get("rainfall_mm") if ukmo else None
+        ukmo_temp = ukmo.get("temp_max_c") if ukmo else None
+
         chirps_rain = chirps_cache.get(d)
         imerg_rain = imerg_cache.get(d)
-        met_temp = meteostat_cache.get(d)
         gsod_temp = _gsod_idw(lat, lon, gsod_station_caches, d) if (lat is not None and lon is not None) else None
 
         rain_row, temp_row = classify_day(
@@ -554,13 +622,20 @@ def build_daily_rows(
             chirps_rainfall_mm=chirps_rain,
             open_meteo_rainfall_mm=open_meteo_rain,
             imerg_rainfall_mm=imerg_rain,
+            era5_rainfall_mm=era5_rain,
+            ukmo_rainfall_mm=ukmo_rain,
             nasa_temp_c=nasa_temp,
             nasa_heat_index_c=nasa_hi,
-            meteostat_temp_c=met_temp,
             gsod_temp_c=gsod_temp,
             open_meteo_temp_c=open_meteo_temp,
+            era5_temp_c=era5_temp,
+            ecmwf_ifs_temp_c=ecmwf_ifs_temp,
+            ukmo_temp_c=ukmo_temp,
             nasa_power_raw=nasa,
             open_meteo_raw=open_meteo,
+            open_meteo_era5_raw=era5,
+            ecmwf_ifs_raw=ecmwf_ifs,
+            ukmo_raw=ukmo,
             nasa_rh_pct=nasa_rh,
         )
         if rain_row is not None:
@@ -573,59 +648,6 @@ def build_daily_rows(
 
 
 # ── Daily validator caches ────────────────────────────────────────────────────
-
-
-def build_meteostat_daily_cache(start: date, end: date) -> dict[str, float]:
-    """
-    Fetch DAILY MAXIMUM temperature from Meteostat (Ninoy Aquino Intl AP,
-    WMO 98429). Returns {iso_date: temp_max_c}. Empty dict on any failure.
-    """
-    try:
-        from meteostat import Station, daily as meteostat_daily
-        from datetime import datetime as dt_class
-    except ImportError:
-        logger.warning("meteostat not installed — run: pip install meteostat")
-        return {}
-
-    from app.services.weather_validation import METEOSTAT_STATION_ID, METEOSTAT_STATION_NAME
-
-    logger.info(
-        "Fetching Meteostat DAILY MAX temperature from %s (%s to %s)...",
-        METEOSTAT_STATION_NAME, start, end,
-    )
-
-    try:
-        station = Station(METEOSTAT_STATION_ID)
-        start_dt = dt_class(start.year, start.month, start.day)
-        end_dt = dt_class(end.year, end.month, end.day)
-        data = meteostat_daily(station, start_dt, end_dt).fetch()
-
-        if data is None or len(data) == 0:
-            logger.warning("Meteostat returned no daily data for station %s", METEOSTAT_STATION_ID)
-            return {}
-
-        cache: dict[str, float] = {}
-        for idx, row in data.iterrows():
-            temp = None
-            for col in ("tmax", "temp_max", "tempmax"):
-                temp = row.get(col)
-                if temp is not None:
-                    break
-            if temp is None:
-                continue
-            try:
-                val = float(temp)
-                if not math.isnan(val):
-                    cache[idx.date().isoformat()] = round(val, 2)
-            except (TypeError, ValueError, AttributeError):
-                continue
-
-        logger.info("Meteostat daily cache built: %d days", len(cache))
-        return cache
-
-    except Exception as exc:
-        logger.warning("Meteostat daily fetch failed: %s", exc)
-        return {}
 
 
 def build_noaa_gsod_station_caches(start: date, end: date) -> list[dict]:
@@ -723,7 +745,7 @@ def build_noaa_gsod_station_caches(start: date, end: date) -> list[dict]:
     logger.info(
         "NOAA GSOD station caches built: %d stations, %d total station-days "
         "(%.0f%% avg coverage of %d-day window). "
-        "Dates beyond %s (GSOD_LAG_DAYS=%d) are covered by Meteostat + Open-Meteo.",
+        "Dates beyond %s (GSOD_LAG_DAYS=%d) are covered by Open-Meteo ERA5-Land, ECMWF IFS, and UKMO.",
         len(station_caches), total_days,
         total_days / (len(station_caches) * expected) * 100 if station_caches else 0,
         expected, gsod_end, GSOD_LAG_DAYS,
@@ -963,15 +985,27 @@ def compute_confidence_scores(
 
     Three metrics per dimension (Murphy 1988; Cohen 1960; Landis & Koch 1977):
 
-    1. MAE-Normalized Confidence (per validator):
-       C = max(0, 1 − MAE/τ) × 100%   where τ is the tolerance threshold.
-       Averaged only over validators that have actual data — validators with
-       zero coverage are excluded from the denominator, not scored as 0%.
-       This prevents a missing optional validator (e.g. GPM IMERG when no
-       EARTHDATA_BEARER_TOKEN is set) from artificially depressing the score.
+    1. Robust Error Confidence (per validator):
+       Both dimensions — Absolute MedAE: C = max(0, 1 − MedAE_abs/τ) × 100%
+                   Rainfall:    τ = RAIN_AGREE_TOLERANCE_MM (10.0 mm)
+                   Temperature: τ = TEMP_AGREE_TOLERANCE_C  (3.0 °C)
+                   Relative MedAE is intentionally reserved for monthly
+                   aggregates (weather_validator.py). At the daily level the
+                   median NASA POWER rainfall is ~4 mm, so even a 2 mm
+                   absolute difference yields 50 % relative error — relative
+                   thresholds become non-discriminating across the dataset
+                   (Aryastana et al., 2022; MDPI Remote Sensing, 2021).
+       Median is used instead of mean so typhoon-day outliers do not inflate
+       the error estimate for the entire dataset (ASCMO, 2025; ORSA, 2021).
+       Validator aggregation uses median of per-validator scores so a single
+       underperforming source (e.g. GPM IMERG under heavy typhoon cloud cover)
+       cannot collapse the overall dimension score (ORSA, arXiv:2111.09043).
+       Validators with zero coverage are excluded from the median entirely —
+       not counted as 0 % — so an absent optional source (e.g. GPM IMERG when
+       EARTHDATA_BEARER_TOKEN is unset) does not depress the score.
 
     2. Weighted Confidence Index (WCI):
-       weights: 3/3 → 1.0, 2/3 → 0.67, 1/3 → 0.33, 0/3 → 0.0
+       weights: 5/5 → 1.00, 4/5 → 0.80, 3/5 → 0.60, 2/5 → 0.40, 1/5 → 0.20, 0/5 → 0.00
        WCI = mean of per-day weights.
 
     3. Cohen's Kappa (κ) per validator:
@@ -982,16 +1016,32 @@ def compute_confidence_scores(
 
     Returns a full report dict with per-validator and overall scores.
     """
-    def _mae_confidence(diffs: list[float], tolerance: float) -> float:
-        # Returns 0.0 when no data — but callers use coverage-weighted averaging
-        # so a validator with 0 comparisons contributes 0 weight, not 0 score.
+    def _abs_medae_confidence(diffs: list[float], tolerance: float) -> float:
+        # Robust to outliers (typhoon days). Primary confidence metric.
+        if not diffs:
+            return 0.0
+        medae = sorted(diffs)[len(diffs) // 2]
+        return round(max(0.0, 1 - medae / tolerance) * 100, 2)
+
+    def _abs_mae_confidence(diffs: list[float], tolerance: float) -> float:
+        # Mean-based — sensitive to extreme values (typhoon days inflate this).
+        # Kept as a comparison metric alongside MedAE.
         if not diffs:
             return 0.0
         mae = sum(diffs) / len(diffs)
         return round(max(0.0, 1 - mae / tolerance) * 100, 2)
 
+    def _median_score(scores: list[float]) -> float:
+        # Median of validator confidence scores — one bad source cannot collapse
+        # the result (ORSA, 2021).
+        if not scores:
+            return 0.0
+        s = sorted(scores)
+        return round(s[len(s) // 2], 2)
+
     def _wci(rows: list[dict]) -> float:
-        weight_map = {3: 1.0, 2: 0.67, 1: 0.33, 0: 0.0}
+        # Linear proportion of validators that agreed (5-validator scale)
+        weight_map = {5: 1.00, 4: 0.80, 3: 0.60, 2: 0.40, 1: 0.20, 0: 0.00}
         if not rows:
             return 0.0
         weights = [weight_map.get(r.get("validators_agreed", 0), 0.0) for r in rows]
@@ -1033,98 +1083,210 @@ def compute_confidence_scores(
         return "Almost Perfect"
 
     # ── Rainfall confidence ───────────────────────────────────────────────────
-    chirps_diffs = [r["diff_nasa_chirps_mm"] for r in rain_rows if r.get("diff_nasa_chirps_mm") is not None]
-    om_rain_diffs = [r["diff_nasa_open_meteo_mm"] for r in rain_rows if r.get("diff_nasa_open_meteo_mm") is not None]
-    imerg_diffs = [r["diff_nasa_imerg_mm"] for r in rain_rows if r.get("diff_nasa_imerg_mm") is not None]
+    chirps_diffs    = [r["diff_nasa_chirps_mm"]    for r in rain_rows if r.get("diff_nasa_chirps_mm")    is not None]
+    om_rain_diffs   = [r["diff_nasa_open_meteo_mm"] for r in rain_rows if r.get("diff_nasa_open_meteo_mm") is not None]
+    imerg_diffs     = [r["diff_nasa_imerg_mm"]      for r in rain_rows if r.get("diff_nasa_imerg_mm")      is not None]
+    era5_rain_diffs = [r["diff_nasa_era5_mm"]       for r in rain_rows if r.get("diff_nasa_era5_mm")       is not None]
+    ukmo_rain_diffs = [r["diff_nasa_ukmo_mm"]       for r in rain_rows if r.get("diff_nasa_ukmo_mm")       is not None]
 
-    c_chirps = _mae_confidence(chirps_diffs, RAIN_AGREE_TOLERANCE_MM)
-    c_om_rain = _mae_confidence(om_rain_diffs, RAIN_AGREE_TOLERANCE_MM)
-    c_imerg = _mae_confidence(imerg_diffs, RAIN_AGREE_TOLERANCE_MM)
-    rain_scores = [s for s in [c_chirps, c_om_rain, c_imerg] if s is not None]
-    rain_mae_confidence = round(sum(rain_scores) / len(rain_scores), 2) if rain_scores else 0.0
+    # MedAE — primary (robust to typhoon-day outliers)
+    c_chirps    = _abs_medae_confidence(chirps_diffs,    RAIN_AGREE_TOLERANCE_MM)
+    c_om_rain   = _abs_medae_confidence(om_rain_diffs,   RAIN_AGREE_TOLERANCE_MM)
+    c_imerg     = _abs_medae_confidence(imerg_diffs,     RAIN_AGREE_TOLERANCE_MM)
+    c_era5_rain = _abs_medae_confidence(era5_rain_diffs, RAIN_AGREE_TOLERANCE_MM)
+    c_ukmo_rain = _abs_medae_confidence(ukmo_rain_diffs, RAIN_AGREE_TOLERANCE_MM)
+
+    # MAE — comparison metric (mean-based; inflated by extreme typhoon days)
+    mae_chirps    = _abs_mae_confidence(chirps_diffs,    RAIN_AGREE_TOLERANCE_MM)
+    mae_om_rain   = _abs_mae_confidence(om_rain_diffs,   RAIN_AGREE_TOLERANCE_MM)
+    mae_imerg     = _abs_mae_confidence(imerg_diffs,     RAIN_AGREE_TOLERANCE_MM)
+    mae_era5_rain = _abs_mae_confidence(era5_rain_diffs, RAIN_AGREE_TOLERANCE_MM)
+    mae_ukmo_rain = _abs_mae_confidence(ukmo_rain_diffs, RAIN_AGREE_TOLERANCE_MM)
+
+    # Include a validator in the median only when it has actual comparison data.
+    # A validator with data but high error legitimately scores 0 and is included;
+    # a validator with no data at all is excluded entirely.
+    rain_medae_scores = (
+        ([c_chirps]    if chirps_diffs    else []) +
+        ([c_om_rain]   if om_rain_diffs   else []) +
+        ([c_imerg]     if imerg_diffs     else []) +
+        ([c_era5_rain] if era5_rain_diffs else []) +
+        ([c_ukmo_rain] if ukmo_rain_diffs else [])
+    )
+    rain_mae_scores = (
+        ([mae_chirps]    if chirps_diffs    else []) +
+        ([mae_om_rain]   if om_rain_diffs   else []) +
+        ([mae_imerg]     if imerg_diffs     else []) +
+        ([mae_era5_rain] if era5_rain_diffs else []) +
+        ([mae_ukmo_rain] if ukmo_rain_diffs else [])
+    )
+    rain_medae_confidence = _median_score(rain_medae_scores)
+    rain_mae_confidence   = _median_score(rain_mae_scores)
     rain_wci = _wci(rain_rows)
 
-    k_chirps = _kappa(rain_rows, "nasa_power_rainfall_mm", "chirps_rainfall_mm", classify_rain)
-    k_om_rain = _kappa(rain_rows, "nasa_power_rainfall_mm", "open_meteo_rainfall_mm", classify_rain)
-    k_imerg = _kappa(rain_rows, "nasa_power_rainfall_mm", "imerg_rainfall_mm", classify_rain)
+    k_chirps    = _kappa(rain_rows, "nasa_power_rainfall_mm", "chirps_rainfall_mm",     classify_rain)
+    k_om_rain   = _kappa(rain_rows, "nasa_power_rainfall_mm", "open_meteo_rainfall_mm", classify_rain)
+    k_imerg     = _kappa(rain_rows, "nasa_power_rainfall_mm", "imerg_rainfall_mm",      classify_rain)
+    k_era5_rain = _kappa(rain_rows, "nasa_power_rainfall_mm", "era5_rainfall_mm",       classify_rain)
+    k_ukmo_rain = _kappa(rain_rows, "nasa_power_rainfall_mm", "ukmo_rainfall_mm",       classify_rain)
 
     # ── Temperature confidence ────────────────────────────────────────────────
-    met_diffs = [r["diff_nasa_meteostat_c"] for r in temp_rows if r.get("diff_nasa_meteostat_c") is not None]
-    gsod_diffs = [r["diff_nasa_gsod_c"] for r in temp_rows if r.get("diff_nasa_gsod_c") is not None]
-    om_temp_diffs = [r["diff_nasa_open_meteo_c"] for r in temp_rows if r.get("diff_nasa_open_meteo_c") is not None]
+    gsod_diffs        = [r["diff_nasa_gsod_c"]         for r in temp_rows if r.get("diff_nasa_gsod_c")         is not None]
+    om_temp_diffs     = [r["diff_nasa_open_meteo_c"]   for r in temp_rows if r.get("diff_nasa_open_meteo_c")   is not None]
+    era5_temp_diffs   = [r["diff_nasa_era5_c"]         for r in temp_rows if r.get("diff_nasa_era5_c")         is not None]
+    ecmwf_ifs_diffs   = [r["diff_nasa_ecmwf_ifs_c"]   for r in temp_rows if r.get("diff_nasa_ecmwf_ifs_c")    is not None]
+    ukmo_temp_diffs   = [r["diff_nasa_ukmo_c"]         for r in temp_rows if r.get("diff_nasa_ukmo_c")         is not None]
 
-    c_met = _mae_confidence(met_diffs, TEMP_AGREE_TOLERANCE_C)
-    c_gsod = _mae_confidence(gsod_diffs, TEMP_AGREE_TOLERANCE_C)
-    c_om_temp = _mae_confidence(om_temp_diffs, TEMP_AGREE_TOLERANCE_C)
-    temp_scores = [s for s in [c_met, c_gsod, c_om_temp] if s is not None]
-    temp_mae_confidence = round(sum(temp_scores) / len(temp_scores), 2) if temp_scores else 0.0
+    # MedAE — primary
+    c_gsod         = _abs_medae_confidence(gsod_diffs,       TEMP_AGREE_TOLERANCE_C)
+    c_om_temp      = _abs_medae_confidence(om_temp_diffs,    TEMP_AGREE_TOLERANCE_C)
+    c_era5_temp    = _abs_medae_confidence(era5_temp_diffs,  TEMP_AGREE_TOLERANCE_C)
+    c_ecmwf_ifs    = _abs_medae_confidence(ecmwf_ifs_diffs,  TEMP_AGREE_TOLERANCE_C)
+    c_ukmo_temp    = _abs_medae_confidence(ukmo_temp_diffs,  TEMP_AGREE_TOLERANCE_C)
+
+    # MAE — comparison
+    mae_gsod        = _abs_mae_confidence(gsod_diffs,       TEMP_AGREE_TOLERANCE_C)
+    mae_om_temp     = _abs_mae_confidence(om_temp_diffs,    TEMP_AGREE_TOLERANCE_C)
+    mae_era5_temp   = _abs_mae_confidence(era5_temp_diffs,  TEMP_AGREE_TOLERANCE_C)
+    mae_ecmwf_ifs   = _abs_mae_confidence(ecmwf_ifs_diffs,  TEMP_AGREE_TOLERANCE_C)
+    mae_ukmo_temp   = _abs_mae_confidence(ukmo_temp_diffs,  TEMP_AGREE_TOLERANCE_C)
+
+    temp_medae_scores = (
+        ([c_gsod]       if gsod_diffs       else []) +
+        ([c_om_temp]    if om_temp_diffs    else []) +
+        ([c_era5_temp]  if era5_temp_diffs  else []) +
+        ([c_ecmwf_ifs]  if ecmwf_ifs_diffs  else []) +
+        ([c_ukmo_temp]  if ukmo_temp_diffs  else [])
+    )
+    temp_mae_scores = (
+        ([mae_gsod]      if gsod_diffs      else []) +
+        ([mae_om_temp]   if om_temp_diffs   else []) +
+        ([mae_era5_temp] if era5_temp_diffs else []) +
+        ([mae_ecmwf_ifs] if ecmwf_ifs_diffs else []) +
+        ([mae_ukmo_temp] if ukmo_temp_diffs else [])
+    )
+    temp_medae_confidence = _median_score(temp_medae_scores)
+    temp_mae_confidence   = _median_score(temp_mae_scores)
     temp_wci = _wci(temp_rows)
 
-    k_met = _kappa(temp_rows, "nasa_power_temp_c", "meteostat_temp_c", classify_temp)
-    k_gsod = _kappa(temp_rows, "nasa_power_temp_c", "noaa_gsod_temp_c", classify_temp)
-    k_om_temp = _kappa(temp_rows, "nasa_power_temp_c", "open_meteo_temp_c", classify_temp)
+    k_gsod       = _kappa(temp_rows, "nasa_power_temp_c", "noaa_gsod_temp_c",   classify_temp)
+    k_om_temp    = _kappa(temp_rows, "nasa_power_temp_c", "open_meteo_temp_c",  classify_temp)
+    k_era5_temp  = _kappa(temp_rows, "nasa_power_temp_c", "era5_temp_c",        classify_temp)
+    k_ecmwf_ifs  = _kappa(temp_rows, "nasa_power_temp_c", "ecmwf_ifs_temp_c",  classify_temp)
+    k_ukmo_temp  = _kappa(temp_rows, "nasa_power_temp_c", "ukmo_temp_c",        classify_temp)
 
     # Primary metric: Weighted Confidence Index (majority-rule validator agreement,
     # triple collocation principle — Stoffelen, 1998; Scipal et al., 2008).
-    # Secondary metric: MAE-normalized confidence (magnitude accuracy vs tolerance).
-    # Overall = 60% WCI + 40% MAE, following the precedence of categorical
-    # agreement over point-value accuracy for classification-based applications.
+    # Secondary metric: Robust error confidence (Relative MedAE for rainfall,
+    # Absolute MedAE for temperature). Coverage-weighted so the dimension with
+    # more rows contributes proportionally to the overall score.
+    # Overall = 60% WCI + 40% error confidence, following the precedence of
+    # categorical agreement over point-value accuracy for classification tasks.
     overall_wci = round((rain_wci + temp_wci) / 2, 2)
-    overall_mae = round((rain_mae_confidence + temp_mae_confidence) / 2, 2)
-    overall_confidence = round(0.6 * overall_wci + 0.4 * overall_mae, 2)
+    total_rows = len(rain_rows) + len(temp_rows)
+    overall_medae = round(
+        (rain_medae_confidence * len(rain_rows) + temp_medae_confidence * len(temp_rows)) / total_rows, 2
+    ) if total_rows else 0.0
+    overall_mae = round(
+        (rain_mae_confidence * len(rain_rows) + temp_mae_confidence * len(temp_rows)) / total_rows, 2
+    ) if total_rows else 0.0
+    # Primary formula uses MedAE (robust); MAE shown for comparison only
+    overall_confidence = round(0.6 * overall_wci + 0.4 * overall_medae, 2)
 
     return {
         "overall_confidence_pct": overall_confidence,
         "overall_wci_pct": overall_wci,
+        "overall_medae_confidence_pct": overall_medae,
         "overall_mae_confidence_pct": overall_mae,
+        "note_metrics": (
+            "overall_confidence uses MedAE (robust primary metric). "
+            "MAE shown for comparison — expect it to read lower when typhoon-day "
+            "outliers inflate the mean error."
+        ),
         "rainfall": {
             "total_rows": len(rain_rows),
+            "medae_confidence_pct": rain_medae_confidence,
             "mae_confidence_pct": rain_mae_confidence,
             "weighted_confidence_index_pct": rain_wci,
             "per_validator": {
                 "CHIRPS": {
-                    "mae_confidence_pct": c_chirps,
+                    "medae_confidence_pct": c_chirps,
+                    "mae_confidence_pct": mae_chirps,
                     "kappa": k_chirps,
                     "kappa_strength": _kappa_label(k_chirps),
                     "n_comparisons": len(chirps_diffs),
                 },
                 "Open-Meteo ERA5-Land": {
-                    "mae_confidence_pct": c_om_rain,
+                    "medae_confidence_pct": c_om_rain,
+                    "mae_confidence_pct": mae_om_rain,
                     "kappa": k_om_rain,
                     "kappa_strength": _kappa_label(k_om_rain),
                     "n_comparisons": len(om_rain_diffs),
                 },
                 "GPM IMERG": {
-                    "mae_confidence_pct": c_imerg,
+                    "medae_confidence_pct": c_imerg,
+                    "mae_confidence_pct": mae_imerg,
                     "kappa": k_imerg,
                     "kappa_strength": _kappa_label(k_imerg),
                     "n_comparisons": len(imerg_diffs),
+                },
+                "ERA5 (Full)": {
+                    "medae_confidence_pct": c_era5_rain,
+                    "mae_confidence_pct": mae_era5_rain,
+                    "kappa": k_era5_rain,
+                    "kappa_strength": _kappa_label(k_era5_rain),
+                    "n_comparisons": len(era5_rain_diffs),
+                },
+                "UKMO": {
+                    "medae_confidence_pct": c_ukmo_rain,
+                    "mae_confidence_pct": mae_ukmo_rain,
+                    "kappa": k_ukmo_rain,
+                    "kappa_strength": _kappa_label(k_ukmo_rain),
+                    "n_comparisons": len(ukmo_rain_diffs),
                 },
             },
         },
         "temperature": {
             "total_rows": len(temp_rows),
             "note": "Validation uses raw temp_max_c; classification uses Rothfusz heat index.",
+            "medae_confidence_pct": temp_medae_confidence,
             "mae_confidence_pct": temp_mae_confidence,
             "weighted_confidence_index_pct": temp_wci,
             "per_validator": {
-                "Meteostat": {
-                    "mae_confidence_pct": c_met,
-                    "kappa": k_met,
-                    "kappa_strength": _kappa_label(k_met),
-                    "n_comparisons": len(met_diffs),
-                },
                 "NOAA GSOD": {
-                    "mae_confidence_pct": c_gsod,
+                    "medae_confidence_pct": c_gsod,
+                    "mae_confidence_pct": mae_gsod,
                     "kappa": k_gsod,
                     "kappa_strength": _kappa_label(k_gsod),
                     "n_comparisons": len(gsod_diffs),
                 },
                 "Open-Meteo ERA5-Land": {
-                    "mae_confidence_pct": c_om_temp,
+                    "medae_confidence_pct": c_om_temp,
+                    "mae_confidence_pct": mae_om_temp,
                     "kappa": k_om_temp,
                     "kappa_strength": _kappa_label(k_om_temp),
                     "n_comparisons": len(om_temp_diffs),
+                },
+                "ERA5 (Full)": {
+                    "medae_confidence_pct": c_era5_temp,
+                    "mae_confidence_pct": mae_era5_temp,
+                    "kappa": k_era5_temp,
+                    "kappa_strength": _kappa_label(k_era5_temp),
+                    "n_comparisons": len(era5_temp_diffs),
+                },
+                "ECMWF IFS": {
+                    "medae_confidence_pct": c_ecmwf_ifs,
+                    "mae_confidence_pct": mae_ecmwf_ifs,
+                    "kappa": k_ecmwf_ifs,
+                    "kappa_strength": _kappa_label(k_ecmwf_ifs),
+                    "n_comparisons": len(ecmwf_ifs_diffs),
+                },
+                "UKMO": {
+                    "medae_confidence_pct": c_ukmo_temp,
+                    "mae_confidence_pct": mae_ukmo_temp,
+                    "kappa": k_ukmo_temp,
+                    "kappa_strength": _kappa_label(k_ukmo_temp),
+                    "n_comparisons": len(ukmo_temp_diffs),
                 },
             },
         },

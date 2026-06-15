@@ -6,8 +6,8 @@ last N days of weather data from the champion source for each municipality.
 Uses the next-best source as fallback if the champion fails.
 Merges IBTrACS typhoon flags and saves daily records ready for weather_loader.py.
 
-Also classifies each day (NASA POWER AG vs CHIRPS + Open-Meteo for rainfall
-and Meteostat + NOAA GSOD for temperature) into rows for
+Also classifies each day (NASA POWER AG vs 5 validators each for rainfall
+and temperature — CHIRPS/Open-Meteo/IMERG/ERA5/UKMO and GSOD/Open-Meteo/ERA5/ECMWF IFS/UKMO) into rows for
 reference.weather_rainfall_daily and reference.weather_temperature_daily —
 saved to laguna_weather_daily_classified_incremental.json — and, with --load,
 upserts them and rebuilds reference.weather_monthly_summary.
@@ -157,11 +157,15 @@ def update(
     Falls back to the next-best source if the champion returns no data.
     Saves laguna_weather_incremental.json and returns a summary dict.
     """
-    from app.services.weather_collector import MUNICIPALITIES
+    from app.services.weather_collector import (
+        MUNICIPALITIES,
+        fetch_open_meteo_ecmwf_ifs,
+        fetch_open_meteo_era5,
+        fetch_open_meteo_ukmo,
+    )
     from app.services.weather_daily_classifier import (
         build_chirps_daily_cache,
         build_daily_rows,
-        build_meteostat_daily_cache,
         build_noaa_gsod_station_caches,
     )
     from app.services.weather_ibtracs import get_typhoon_flags
@@ -199,9 +203,7 @@ def update(
     # Build name→coords lookup from the canonical MUNICIPALITIES list
     muni_coords = {m["name"]: m for m in MUNICIPALITIES}
 
-    # The Meteostat and NOAA GSOD temperature validators are station-based and
-    # shared by all municipalities — fetch each once.
-    meteostat_daily_cache = build_meteostat_daily_cache(start_date, end_date)
+    # NOAA GSOD station caches are shared by all municipalities — fetch once.
     gsod_station_caches = build_noaa_gsod_station_caches(start_date, end_date)
 
     results: list[dict] = []
@@ -271,15 +273,33 @@ def update(
                 open_meteo_records = []
 
         chirps_daily_cache = build_chirps_daily_cache(lat, lon, start_date, end_date)
+        try:
+            era5_records = fetch_open_meteo_era5(lat, lon, start_date, end_date)
+        except Exception as exc:
+            logger.warning("[%s] ERA5 fetch failed: %s", name, exc)
+            era5_records = []
+        try:
+            ecmwf_ifs_records = fetch_open_meteo_ecmwf_ifs(lat, lon, start_date, end_date)
+        except Exception as exc:
+            logger.warning("[%s] ECMWF IFS fetch failed: %s", name, exc)
+            ecmwf_ifs_records = []
+        try:
+            ukmo_records = fetch_open_meteo_ukmo(lat, lon, start_date, end_date)
+        except Exception as exc:
+            logger.warning("[%s] UKMO fetch failed: %s", name, exc)
+            ukmo_records = []
+
         muni_rain_rows, muni_temp_rows = build_daily_rows(
             name,
             start_date,
             end_date,
             nasa_records,
             chirps_daily_cache,
-            meteostat_daily_cache,
             open_meteo_records=open_meteo_records,
             gsod_station_caches=gsod_station_caches,
+            era5_records=era5_records,
+            ecmwf_ifs_records=ecmwf_ifs_records,
+            ukmo_records=ukmo_records,
             lat=lat,
             lon=lon,
         )

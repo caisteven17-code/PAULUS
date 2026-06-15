@@ -165,8 +165,22 @@ def _fetch_json(url: str, max_retries: int = 4, base_delay: float = 2.0) -> Opti
         try:
             with urllib.request.urlopen(url, timeout=30) as resp:
                 return json.loads(resp.read().decode("utf-8"))
+        except urllib.error.HTTPError as exc:
+            # 429 means the rate-limit window hasn't reset — wait a full minute
+            # before retrying rather than the standard exponential backoff.
+            wait = 60.0 if exc.code == 429 else base_delay * (2 ** attempt)
+            if attempt < max_retries - 1:
+                logger.warning(
+                    "Fetch failed (%s) — retrying in %.0fs: %s",
+                    type(exc).__name__,
+                    wait,
+                    url[:80],
+                )
+                time.sleep(wait)
+            else:
+                logger.error("All retries exhausted for %s: %s", url[:80], exc)
         except Exception as exc:
-            wait = base_delay * (2**attempt)
+            wait = base_delay * (2 ** attempt)
             if attempt < max_retries - 1:
                 logger.warning(
                     "Fetch failed (%s) — retrying in %.0fs: %s",
@@ -183,47 +197,79 @@ def _fetch_json(url: str, max_retries: int = 4, base_delay: float = 2.0) -> Opti
 # ── Source fetchers (daily → list of {date, temp_avg_c, rainfall_mm, wind_ms}) ─
 
 
-def fetch_open_meteo(lat: float, lon: float, start: date, end: date) -> list[dict]:
-    params = urllib.parse.urlencode(
-        {
-            "latitude": lat,
-            "longitude": lon,
-            "start_date": start.isoformat(),
-            "end_date": end.isoformat(),
-            "daily": "temperature_2m_max,temperature_2m_min,temperature_2m_mean,precipitation_sum,windspeed_10m_max",
-            "timezone": "Asia/Manila",
-            "wind_speed_unit": "ms",
-        }
-    )
-    url = f"https://archive-api.open-meteo.com/v1/archive?{params}"
-    data = _fetch_json(url)
-    if not data or "daily" not in data:
-        return []
-
+def _parse_open_meteo_daily(data: dict) -> list[dict]:
+    """Parse Open-Meteo archive JSON into a list of daily dicts."""
     daily = data["daily"]
     dates = daily.get("time", [])
     temp_mean = daily.get("temperature_2m_mean", [None] * len(dates))
-    temp_max = daily.get("temperature_2m_max", [None] * len(dates))
-    temp_min = daily.get("temperature_2m_min", [None] * len(dates))
-    rain = daily.get("precipitation_sum", [None] * len(dates))
-    wind = daily.get("windspeed_10m_max", [None] * len(dates))
-
+    temp_max  = daily.get("temperature_2m_max",  [None] * len(dates))
+    temp_min  = daily.get("temperature_2m_min",  [None] * len(dates))
+    rain      = daily.get("precipitation_sum",    [None] * len(dates))
+    wind      = daily.get("windspeed_10m_max",    [None] * len(dates))
     records = []
     for i, d in enumerate(dates):
         t_avg = temp_mean[i]
         if t_avg is None and temp_max[i] is not None and temp_min[i] is not None:
             t_avg = (temp_max[i] + temp_min[i]) / 2
-        records.append(
-            {
-                "date": d,
-                "temp_avg_c": t_avg,
-                "temp_max_c": temp_max[i],
-                "temp_min_c": temp_min[i],
-                "rainfall_mm": rain[i],
-                "wind_ms": wind[i],
-            }
-        )
+        records.append({
+            "date": d,
+            "temp_avg_c": t_avg,
+            "temp_max_c": temp_max[i],
+            "temp_min_c": temp_min[i],
+            "rainfall_mm": rain[i],
+            "wind_ms": wind[i],
+        })
     return records
+
+
+def _open_meteo_params(lat, lon, start, end, model=None):
+    p = {
+        "latitude": lat,
+        "longitude": lon,
+        "start_date": start.isoformat(),
+        "end_date": end.isoformat(),
+        "daily": "temperature_2m_max,temperature_2m_min,temperature_2m_mean,precipitation_sum,windspeed_10m_max",
+        "timezone": "Asia/Manila",
+        "wind_speed_unit": "ms",
+    }
+    if model:
+        p["models"] = model
+    return urllib.parse.urlencode(p)
+
+
+def fetch_open_meteo(lat: float, lon: float, start: date, end: date) -> list[dict]:
+    url = f"https://archive-api.open-meteo.com/v1/archive?{_open_meteo_params(lat, lon, start, end)}"
+    data = _fetch_json(url)
+    if not data or "daily" not in data:
+        return []
+    return _parse_open_meteo_daily(data)
+
+
+def fetch_open_meteo_era5(lat: float, lon: float, start: date, end: date) -> list[dict]:
+    """ERA5 (full global reanalysis) via Open-Meteo archive — 4th rainfall + temp validator."""
+    url = f"https://archive-api.open-meteo.com/v1/archive?{_open_meteo_params(lat, lon, start, end, model='era5')}"
+    data = _fetch_json(url)
+    if not data or "daily" not in data:
+        return []
+    return _parse_open_meteo_daily(data)
+
+
+def fetch_open_meteo_ecmwf_ifs(lat: float, lon: float, start: date, end: date) -> list[dict]:
+    """ECMWF IFS reanalysis via Open-Meteo archive — replaces Meteostat for temperature validation."""
+    url = f"https://archive-api.open-meteo.com/v1/archive?{_open_meteo_params(lat, lon, start, end, model='ecmwf_ifs')}"
+    data = _fetch_json(url)
+    if not data or "daily" not in data:
+        return []
+    return _parse_open_meteo_daily(data)
+
+
+def fetch_open_meteo_ukmo(lat: float, lon: float, start: date, end: date) -> list[dict]:
+    """UK Met Office (UKMO) via Open-Meteo archive — 5th rainfall + temp validator (replaces JRA-55)."""
+    url = f"https://archive-api.open-meteo.com/v1/archive?{_open_meteo_params(lat, lon, start, end, model='ukmo_seamless')}"
+    data = _fetch_json(url)
+    if not data or "daily" not in data:
+        return []
+    return _parse_open_meteo_daily(data)
 
 
 def _fetch_nasa_power(
@@ -543,19 +589,16 @@ def collect(
         typhoon_flags = {}
 
     # Daily classification (reference.weather_rainfall_daily and
-    # reference.weather_temperature_daily): the Meteostat and NOAA GSOD
-    # temperature validators are station-based and shared by all
-    # municipalities — fetch each once.
+    # reference.weather_temperature_daily): NOAA GSOD station caches are
+    # shared by all municipalities — fetch once before the per-city loop.
     from app.services.weather_daily_classifier import (
         build_chirps_daily_cache,
         build_daily_rows,
         build_gpm_imerg_daily_cache,
-        build_meteostat_daily_cache,
         build_noaa_gsod_station_caches,
         compute_confidence_scores,
     )
 
-    meteostat_daily_cache = build_meteostat_daily_cache(start, end)
     gsod_station_caches = build_noaa_gsod_station_caches(start, end)
 
     # GPM IMERG is a gridded satellite product covering all of Laguna uniformly
@@ -575,16 +618,27 @@ def collect(
         lon = muni["lon"]
         logger.info("[%d/%d] %s", i + 1, len(MUNICIPALITIES), name)
 
-        # Fetch from all 3 sources
+        # Fetch from all 3 champion-selection sources.
+        # Open-Meteo is separated so we can space it from the validator calls.
+        open_meteo_records = fetch_open_meteo(lat, lon, start, end)
+        time.sleep(5.0)
         sources = {
-            "open_meteo": fetch_open_meteo(lat, lon, start, end),
+            "open_meteo": open_meteo_records,
             "nasa_power_ag": fetch_nasa_power_ag(lat, lon, start, end),
             "nasa_power_sb": fetch_nasa_power_sb(lat, lon, start, end),
         }
 
+        # Extra reanalysis validators (ERA5 full + ECMWF IFS + UKMO via Open-Meteo).
+        # 5s gaps + 60s auto-wait on 429 keep us within the free-tier rate limit.
+        era5_records      = fetch_open_meteo_era5(lat, lon, start, end)
+        time.sleep(5.0)
+        ecmwf_ifs_records = fetch_open_meteo_ecmwf_ifs(lat, lon, start, end)
+        time.sleep(5.0)
+        ukmo_records      = fetch_open_meteo_ukmo(lat, lon, start, end)
+        time.sleep(5.0)
+
         # Classify each day for the split daily tables: NASA POWER AG is the
-        # source of truth; CHIRPS + Open-Meteo validate rainfall, Meteostat +
-        # NOAA GSOD validate temperature.
+        # source of truth; 5 validators each for rainfall and temperature.
         chirps_daily_cache = build_chirps_daily_cache(lat, lon, start, end)
         muni_rain_rows, muni_temp_rows = build_daily_rows(
             name,
@@ -592,10 +646,12 @@ def collect(
             end,
             sources["nasa_power_ag"],
             chirps_daily_cache,
-            meteostat_daily_cache,
             open_meteo_records=sources["open_meteo"],
             gsod_station_caches=gsod_station_caches,
             imerg_cache=imerg_daily_cache,
+            era5_records=era5_records,
+            ecmwf_ifs_records=ecmwf_ifs_records,
+            ukmo_records=ukmo_records,
             lat=lat,
             lon=lon,
         )
@@ -603,11 +659,14 @@ def collect(
         daily_temp_rows.extend(muni_temp_rows)
         logger.info(
             "  Daily classification: %d rain rows, %d temp rows "
-            "(CHIRPS %d days, IMERG %d days)",
+            "(CHIRPS %d days, IMERG %d days, ERA5 %d days, ECMWF IFS %d days, UKMO %d days)",
             len(muni_rain_rows),
             len(muni_temp_rows),
             len(chirps_daily_cache),
             len(imerg_daily_cache),
+            len(era5_records),
+            len(ecmwf_ifs_records),
+            len(ukmo_records),
         )
 
         # Score each source
@@ -673,7 +732,7 @@ def collect(
         )
 
         # Polite delay between municipalities to respect rate limits
-        time.sleep(1.5)
+        time.sleep(5.0)
 
     # Save outputs
     master_path = out_dir / "laguna_weather_final.json"
@@ -725,11 +784,14 @@ def collect(
     # Confidence scoring across all municipalities
     confidence = compute_confidence_scores(daily_rain_rows, daily_temp_rows)
     logger.info(
-        "Confidence scores — overall: %.1f%% | rainfall MAE: %.1f%% WCI: %.1f%% | "
-        "temperature MAE: %.1f%% WCI: %.1f%%",
+        "Confidence scores — overall: %.1f%% | "
+        "rainfall MedAE: %.1f%% MAE: %.1f%% WCI: %.1f%% | "
+        "temperature MedAE: %.1f%% MAE: %.1f%% WCI: %.1f%%",
         confidence["overall_confidence_pct"],
+        confidence["rainfall"]["medae_confidence_pct"],
         confidence["rainfall"]["mae_confidence_pct"],
         confidence["rainfall"]["weighted_confidence_index_pct"],
+        confidence["temperature"]["medae_confidence_pct"],
         confidence["temperature"]["mae_confidence_pct"],
         confidence["temperature"]["weighted_confidence_index_pct"],
     )
