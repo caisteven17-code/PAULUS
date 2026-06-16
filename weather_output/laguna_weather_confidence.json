@@ -1,94 +1,20 @@
 {
-  "overall_confidence_pct": 77.32,
-  "overall_wci_pct": 84.44,
-  "overall_medae_confidence_pct": 66.65,
-  "overall_mae_confidence_pct": 45.15,
-  "note_metrics": "overall_confidence uses MedAE (robust primary metric). MAE shown for comparison \u2014 expect it to read lower when typhoon-day outliers inflate the mean error.",
+  "overall_fleiss_kappa": 0.3738,
+  "overall_fleiss_strength": "Fair",
+  "overall_wci_pct": 78.18,
   "rainfall": {
-    "total_rows": 37650,
-    "medae_confidence_pct": 74.3,
-    "mae_confidence_pct": 44.85,
-    "weighted_confidence_index_pct": 89.63,
-    "per_validator": {
-      "CHIRPS": {
-        "medae_confidence_pct": 65.8,
-        "mae_confidence_pct": 31.78,
-        "kappa": 0.2168,
-        "kappa_strength": "Fair",
-        "n_comparisons": 36480
-      },
-      "Open-Meteo ERA5-Land": {
-        "medae_confidence_pct": 74.3,
-        "mae_confidence_pct": 47.21,
-        "kappa": 0.5464,
-        "kappa_strength": "Moderate",
-        "n_comparisons": 35140
-      },
-      "GPM IMERG": {
-        "medae_confidence_pct": 77.0,
-        "mae_confidence_pct": 52.44,
-        "kappa": 0.4552,
-        "kappa_strength": "Moderate",
-        "n_comparisons": 30120
-      },
-      "ERA5 (Full)": {
-        "medae_confidence_pct": 75.6,
-        "mae_confidence_pct": 44.85,
-        "kappa": 0.5089,
-        "kappa_strength": "Moderate",
-        "n_comparisons": 35140
-      },
-      "UKMO": {
-        "medae_confidence_pct": 72.7,
-        "mae_confidence_pct": 39.07,
-        "kappa": 0.3308,
-        "kappa_strength": "Fair",
-        "n_comparisons": 33885
-      }
-    }
+    "total_rows": 37680,
+    "n_items_for_kappa": 37680,
+    "fleiss_kappa": 0.3041,
+    "fleiss_strength": "Fair",
+    "weighted_confidence_index_pct": 87.3
   },
   "temperature": {
-    "total_rows": 37650,
-    "note": "Validation uses raw temp_max_c; classification uses Rothfusz heat index.",
-    "medae_confidence_pct": 59.0,
-    "mae_confidence_pct": 45.45,
-    "weighted_confidence_index_pct": 79.25,
-    "per_validator": {
-      "NOAA GSOD": {
-        "medae_confidence_pct": 42.0,
-        "mae_confidence_pct": 34.9,
-        "kappa": 0.1828,
-        "kappa_strength": "Slight",
-        "n_comparisons": 28680
-      },
-      "Open-Meteo ERA5-Land": {
-        "medae_confidence_pct": 59.33,
-        "mae_confidence_pct": 45.45,
-        "kappa": 0.3949,
-        "kappa_strength": "Fair",
-        "n_comparisons": 35140
-      },
-      "ERA5 (Full)": {
-        "medae_confidence_pct": 59.0,
-        "mae_confidence_pct": 50.02,
-        "kappa": 0.416,
-        "kappa_strength": "Moderate",
-        "n_comparisons": 35140
-      },
-      "ECMWF IFS": {
-        "medae_confidence_pct": 59.33,
-        "mae_confidence_pct": 45.45,
-        "kappa": 0.3949,
-        "kappa_strength": "Fair",
-        "n_comparisons": 35140
-      },
-      "UKMO": {
-        "medae_confidence_pct": 52.0,
-        "mae_confidence_pct": 37.72,
-        "kappa": 0.3094,
-        "kappa_strength": "Fair",
-        "n_comparisons": 33885
-      }
-    }
+    "total_rows": 37680,
+    "n_items_for_kappa": 37680,
+    "note": "Validation bins raw temp_c; classification display uses Rothfusz heat index.",
+    "fleiss_kappa": 0.4434,
+    "fleiss_strength": "Moderate",
+    "weighted_confidence_index_pct": 69.06
   }
 }

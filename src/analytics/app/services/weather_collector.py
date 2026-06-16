@@ -38,6 +38,7 @@ import logging
 import time
 import urllib.parse
 import urllib.request
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
 from typing import Optional
@@ -595,16 +596,19 @@ def collect(
         build_chirps_daily_cache,
         build_daily_rows,
         build_gpm_imerg_daily_cache,
+        build_gsmap_nrt_daily_cache,
         build_noaa_gsod_station_caches,
         compute_confidence_scores,
     )
 
     gsod_station_caches = build_noaa_gsod_station_caches(start, end)
 
-    # GPM IMERG is a gridded satellite product covering all of Laguna uniformly
-    # — fetch once for the Province bbox rather than per-municipality.
+    # GPM IMERG and GSMaP NRT are gridded satellite products covering Laguna
+    # uniformly — fetch once for the Province bbox rather than per-municipality.
     imerg_daily_cache = build_gpm_imerg_daily_cache(start, end)
     logger.info("GPM IMERG cache ready: %d days", len(imerg_daily_cache))
+    gsmap_daily_cache = build_gsmap_nrt_daily_cache(start, end)
+    logger.info("GSMaP NRT cache ready: %d days", len(gsmap_daily_cache))
 
     master: list[dict] = []
     validity_rows: list[dict] = []
@@ -618,28 +622,54 @@ def collect(
         lon = muni["lon"]
         logger.info("[%d/%d] %s", i + 1, len(MUNICIPALITIES), name)
 
-        # Fetch from all 3 champion-selection sources.
-        # Open-Meteo is separated so we can space it from the validator calls.
-        open_meteo_records = fetch_open_meteo(lat, lon, start, end)
-        time.sleep(5.0)
-        sources = {
-            "open_meteo": open_meteo_records,
-            "nasa_power_ag": fetch_nasa_power_ag(lat, lon, start, end),
-            "nasa_power_sb": fetch_nasa_power_sb(lat, lon, start, end),
-        }
+        # Parallel group 1: NASA POWER servers + Open-Meteo base — independent
+        # CDNs, so concurrent I/O is safe and cuts per-municipality latency by
+        # ~60% compared to sequential + 5s sleeps.
+        def _run_parallel_sources(lat=lat, lon=lon, start=start, end=end):
+            tasks = {
+                "open_meteo":    lambda: fetch_open_meteo(lat, lon, start, end),
+                "nasa_power_ag": lambda: fetch_nasa_power_ag(lat, lon, start, end),
+                "nasa_power_sb": lambda: fetch_nasa_power_sb(lat, lon, start, end),
+            }
+            results: dict[str, list[dict]] = {}
+            with ThreadPoolExecutor(max_workers=len(tasks)) as pool:
+                futs = {pool.submit(fn): key for key, fn in tasks.items()}
+                for fut in as_completed(futs):
+                    key = futs[fut]
+                    try:
+                        results[key] = fut.result()
+                    except Exception as exc:  # noqa: BLE001
+                        logger.warning("Parallel fetch %s failed: %s", key, exc)
+                        results[key] = []
+            return results
 
-        # Extra reanalysis validators (ERA5 full + ECMWF IFS + UKMO via Open-Meteo).
-        # 5s gaps + 60s auto-wait on 429 keep us within the free-tier rate limit.
-        era5_records      = fetch_open_meteo_era5(lat, lon, start, end)
-        time.sleep(5.0)
-        ecmwf_ifs_records = fetch_open_meteo_ecmwf_ifs(lat, lon, start, end)
-        time.sleep(5.0)
-        ukmo_records      = fetch_open_meteo_ukmo(lat, lon, start, end)
-        time.sleep(5.0)
+        sources = _run_parallel_sources()
+
+        # Parallel group 2: CHIRPS (separate server) + Open-Meteo validator trio
+        # (same server — keep sequential with 2s gaps to respect rate limits).
+        def _run_chirps_and_validators(lat=lat, lon=lon, start=start, end=end):
+            with ThreadPoolExecutor(max_workers=1) as chirps_pool:
+                chirps_fut = chirps_pool.submit(build_chirps_daily_cache, lat, lon, start, end)
+                # Stagger Open-Meteo validator calls while CHIRPS job is in flight
+                era5_recs  = fetch_open_meteo_era5(lat, lon, start, end)
+                time.sleep(2.0)
+                ecmwf_recs = fetch_open_meteo_ecmwf_ifs(lat, lon, start, end)
+                time.sleep(2.0)
+                ukmo_recs  = fetch_open_meteo_ukmo(lat, lon, start, end)
+                time.sleep(2.0)
+                try:
+                    chirps_cache = chirps_fut.result()  # CHIRPS has its own poll timeout
+                except Exception as exc:  # noqa: BLE001
+                    logger.warning("CHIRPS fetch failed: %s", exc)
+                    chirps_cache = {}
+            return era5_recs, ecmwf_recs, ukmo_recs, chirps_cache
+
+        era5_records, ecmwf_ifs_records, ukmo_records, chirps_daily_cache = (
+            _run_chirps_and_validators()
+        )
 
         # Classify each day for the split daily tables: NASA POWER AG is the
         # source of truth; 5 validators each for rainfall and temperature.
-        chirps_daily_cache = build_chirps_daily_cache(lat, lon, start, end)
         muni_rain_rows, muni_temp_rows = build_daily_rows(
             name,
             start,
@@ -649,6 +679,7 @@ def collect(
             open_meteo_records=sources["open_meteo"],
             gsod_station_caches=gsod_station_caches,
             imerg_cache=imerg_daily_cache,
+            gsmap_cache=gsmap_daily_cache,
             era5_records=era5_records,
             ecmwf_ifs_records=ecmwf_ifs_records,
             ukmo_records=ukmo_records,
@@ -784,15 +815,13 @@ def collect(
     # Confidence scoring across all municipalities
     confidence = compute_confidence_scores(daily_rain_rows, daily_temp_rows)
     logger.info(
-        "Confidence scores — overall: %.1f%% | "
-        "rainfall MedAE: %.1f%% MAE: %.1f%% WCI: %.1f%% | "
-        "temperature MedAE: %.1f%% MAE: %.1f%% WCI: %.1f%%",
-        confidence["overall_confidence_pct"],
-        confidence["rainfall"]["medae_confidence_pct"],
-        confidence["rainfall"]["mae_confidence_pct"],
+        "Confidence scores — Fleiss kappa overall: %s (%s) | "
+        "rainfall kappa: %s WCI: %.1f%% | temperature kappa: %s WCI: %.1f%%",
+        confidence["overall_fleiss_kappa"],
+        confidence["overall_fleiss_strength"],
+        confidence["rainfall"]["fleiss_kappa"],
         confidence["rainfall"]["weighted_confidence_index_pct"],
-        confidence["temperature"]["medae_confidence_pct"],
-        confidence["temperature"]["mae_confidence_pct"],
+        confidence["temperature"]["fleiss_kappa"],
         confidence["temperature"]["weighted_confidence_index_pct"],
     )
     (out_dir / "laguna_weather_confidence.json").write_text(
