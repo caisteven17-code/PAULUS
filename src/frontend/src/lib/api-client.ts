@@ -614,7 +614,11 @@ export const apiClient = {
   // ----------------------------------------------------------------
   // Events
   // ----------------------------------------------------------------
-  async getEvents(params?: { institutionId?: string; institutionName?: string; institutionType?: string }): Promise<any[]> {
+  async getEvents(params?: {
+    institutionId?: string;
+    institutionName?: string;
+    institutionType?: string;
+  }): Promise<any[]> {
     return get('/api/events', {
       institutionId: params?.institutionId,
       institutionName: params?.institutionName,
@@ -685,7 +689,9 @@ export const apiClient = {
     season?: string;
     month?: number;
     year?: number;
+    celebration?: string;
     reason?: string;
+    validation?: 'all' | 'matched' | 'mismatched';
     page?: number;
     pageSize?: number;
   }): Promise<{ records: any[]; total: number; page: number; pageSize: number }> {
@@ -694,7 +700,9 @@ export const apiClient = {
       season: filters.season,
       month: filters.month ? String(filters.month) : undefined,
       year: filters.year ? String(filters.year) : undefined,
+      celebration: filters.celebration || undefined,
       reason: filters.reason || undefined,
+      validation: filters.validation && filters.validation !== 'all' ? filters.validation : undefined,
       page: filters.page ? String(filters.page) : undefined,
       pageSize: filters.pageSize ? String(filters.pageSize) : undefined,
     };
@@ -708,6 +716,7 @@ export const apiClient = {
       reviewedBy?: string;
       date?: string;
       celebration_name?: string;
+      name_source?: string;
       reason?: string;
     },
   ): Promise<any> {
@@ -736,7 +745,14 @@ export const apiClient = {
   },
 
   async approveAllLiturgicalRecords(
-    filters: { season?: string; month?: number; year?: number; reason?: string },
+    filters: {
+      season?: string;
+      month?: number;
+      year?: number;
+      celebration?: string;
+      reason?: string;
+      validation?: 'all' | 'matched' | 'mismatched';
+    },
     reviewedBy?: string,
   ): Promise<{ approved: number }> {
     return post('/api/liturgical-calendar', { filters, reviewedBy });

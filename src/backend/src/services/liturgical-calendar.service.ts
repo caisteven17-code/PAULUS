@@ -13,9 +13,17 @@ export interface LiturgicalCalendarRecord {
   celebration_name: string;
   rank?: string;
   liturgical_season?: string;
-  psalter_week?: string;
   source_name: string;
   source_url: string;
+  source_reference?: string;
+  validation_status?: string;
+  validation_reason?: string;
+  gcatholic_match_status?: string;
+  romcal_match_status?: string;
+  litcal_match_status?: string;
+  gcatholic_celebration_name?: string;
+  romcal_celebration_name?: string;
+  litcal_celebration_name?: string;
   review_status: LiturgicalReviewStatus;
   reviewed_by?: string;
   reviewed_at?: string;
@@ -30,7 +38,9 @@ export interface LiturgicalCalendarFilters {
   season?: string;
   month?: number;
   year?: number;
+  celebration?: string;
   reason?: string;
+  validation?: 'all' | 'matched' | 'mismatched';
   page?: number;
   pageSize?: number;
 }
@@ -63,8 +73,24 @@ export class LiturgicalCalendarService {
     if (filters.year) {
       query = query.eq('year', filters.year);
     }
+    if (filters.celebration) {
+      query = query.ilike('celebration_name', `%${filters.celebration}%`);
+    }
     if (filters.reason) {
-      query = query.ilike('review_notes', `%${filters.reason}%`);
+      query = query.or(`review_notes.ilike.%${filters.reason}%,validation_reason.ilike.%${filters.reason}%`);
+    }
+    if (filters.validation && filters.validation !== 'all') {
+      if (filters.validation === 'matched') {
+        query = query.in('validation_status', [
+          'matched_both',
+          'matched_gcatholic_only',
+          'matched_romcal_only',
+          'matched_litcal_only',
+          'source_of_truth_only',
+        ]);
+      } else if (filters.validation === 'mismatched') {
+        query = query.in('validation_status', ['mismatched_all', 'validator_missing']);
+      }
     }
     return query;
   }
@@ -106,7 +132,7 @@ export class LiturgicalCalendarService {
 
   async approveWithRevisions(
     id: string,
-    patch: { date?: string; celebration_name?: string },
+    patch: { date?: string; celebration_name?: string; name_source?: string },
     reviewedBy: string,
   ): Promise<{ record?: LiturgicalCalendarRecord; errorMessage?: string }> {
     const { data: existing, error: fetchError } = await this.db()
@@ -125,7 +151,11 @@ export class LiturgicalCalendarService {
       reviewed_at: new Date().toISOString(),
       revision_payload: {
         previous: { date: existing.date, celebration_name: existing.celebration_name },
-        revised: patch,
+        revised: {
+          date: patch.date,
+          celebration_name: patch.celebration_name,
+          name_source: patch.name_source,
+        },
       },
     };
     if (patch.date) {
@@ -143,12 +173,7 @@ export class LiturgicalCalendarService {
       update.celebration_name = patch.celebration_name;
     }
 
-    const { data, error } = await this.db()
-      .from('liturgical_calendar')
-      .update(update)
-      .eq('id', id)
-      .select()
-      .single();
+    const { data, error } = await this.db().from('liturgical_calendar').update(update).eq('id', id).select().single();
     if (error || !data) {
       console.error('[liturgical-calendar.service] approveWithRevisions:', error?.message);
       if (error?.code === '23505') {

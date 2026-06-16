@@ -1,0 +1,6052 @@
+{
+ "year": 2027,
+ "schemaVersion": "2.0",
+ "provenance": "validated",
+ "validatedThrough": 2032,
+ "generatedAt": "2026-06-15T19:52:20Z",
+ "contentHash": "aeaca538f342235ebc1fa3d18192578db7fcbd316ece4c19da79fd4f7c90a64f",
+ "dayCount": 365,
+ "liturgicalYears": [
+  {
+   "endingYear": 2027,
+   "startingYear": 2026,
+   "sundayCycle": "B",
+   "start": "2026-11-29",
+   "end": "2027-11-27",
+   "seasons": [
+    {
+     "season": "advent",
+     "start": "2026-11-29",
+     "end": "2026-12-24"
+    },
+    {
+     "season": "christmas",
+     "start": "2026-12-25",
+     "end": "2027-01-10"
+    },
+    {
+     "season": "ordinaryTimeFirst",
+     "start": "2027-01-11",
+     "end": "2027-02-09"
+    },
+    {
+     "season": "lent",
+     "start": "2027-02-10",
+     "end": "2027-03-25"
+    },
+    {
+     "season": "paschalTriduum",
+     "start": "2027-03-25",
+     "end": "2027-03-28",
+     "triduumDays": {
+      "holy_thursday": "2027-03-25",
+      "good_friday": "2027-03-26",
+      "holy_saturday": "2027-03-27",
+      "easter_sunday": "2027-03-28"
+     }
+    },
+    {
+     "season": "easter",
+     "start": "2027-03-28",
+     "end": "2027-05-16"
+    },
+    {
+     "season": "ordinaryTimeSecond",
+     "start": "2027-05-17",
+     "end": "2027-11-27"
+    }
+   ]
+  },
+  {
+   "endingYear": 2028,
+   "startingYear": 2027,
+   "sundayCycle": "C",
+   "start": "2027-11-28",
+   "end": "2028-12-02",
+   "seasons": [
+    {
+     "season": "advent",
+     "start": "2027-11-28",
+     "end": "2027-12-24"
+    },
+    {
+     "season": "christmas",
+     "start": "2027-12-25",
+     "end": "2028-01-09"
+    },
+    {
+     "season": "ordinaryTimeFirst",
+     "start": "2028-01-10",
+     "end": "2028-02-29"
+    },
+    {
+     "season": "lent",
+     "start": "2028-03-01",
+     "end": "2028-04-13"
+    },
+    {
+     "season": "paschalTriduum",
+     "start": "2028-04-13",
+     "end": "2028-04-16",
+     "triduumDays": {
+      "holy_thursday": "2028-04-13",
+      "good_friday": "2028-04-14",
+      "holy_saturday": "2028-04-15",
+      "easter_sunday": "2028-04-16"
+     }
+    },
+    {
+     "season": "easter",
+     "start": "2028-04-16",
+     "end": "2028-06-04"
+    },
+    {
+     "season": "ordinaryTimeSecond",
+     "start": "2028-06-05",
+     "end": "2028-12-02"
+    }
+   ]
+  }
+ ],
+ "days": [
+  {
+   "date": "2027-01-01",
+   "season": "christmas",
+   "celebration": {
+    "key": "mary-mother-of-god",
+    "title": {
+     "en": "Mary, the Holy Mother of God",
+     "tl": "Maria, Ina ng Diyos"
+    },
+    "designation": "Solemnity"
+   },
+   "options": []
+  },
+  {
+   "date": "2027-01-02",
+   "season": "christmas",
+   "celebration": {
+    "key": "saints-basil-the-great-and-gregory-nazianzen-bishops-and-doctors",
+    "title": {
+     "en": "Saints Basil the Great and Gregory Nazianzen, Bishops and Doctors",
+     "tl": "Mga San Basilio Magno at Gregorio Nasianseno, mga Obispo at Pantas ng Simbahan"
+    },
+    "designation": "Obligatory Memorial"
+   },
+   "options": []
+  },
+  {
+   "date": "2027-01-03",
+   "season": "christmas",
+   "celebration": {
+    "key": "epiphany",
+    "title": {
+     "en": "The Epiphany of the Lord",
+     "tl": "Pagpapakita ng Panginoon"
+    },
+    "designation": "Solemnity of the Lord"
+   },
+   "options": []
+  },
+  {
+   "date": "2027-01-04",
+   "season": "christmas",
+   "celebration": {
+    "key": "monday-of-christmas-time-after-epiphany-2027-01-04",
+    "title": {
+     "en": "Monday of Christmas Time after Epiphany",
+     "tl": "Lunes Kasunod ng Pagpapakita ng Panginoon"
+    },
+    "designation": "Weekday / feria"
+   },
+   "options": []
+  },
+  {
+   "date": "2027-01-05",
+   "season": "christmas",
+   "celebration": {
+    "key": "tuesday-of-christmas-time-after-epiphany-2027-01-05",
+    "title": {
+     "en": "Tuesday of Christmas Time after Epiphany",
+     "tl": "Martes Kasunod ng Pagpapakita ng Panginoon"
+    },
+    "designation": "Weekday / feria"
+   },
+   "options": []
+  },
+  {
+   "date": "2027-01-06",
+   "season": "christmas",
+   "celebration": {
+    "key": "wednesday-of-christmas-time-after-epiphany-2027-01-06",
+    "title": {
+     "en": "Wednesday of Christmas Time after Epiphany",
+     "tl": "Miyerkules Kasunod ng Pagpapakita ng Panginoon"
+    },
+    "designation": "Weekday / feria"
+   },
+   "options": []
+  },
+  {
+   "date": "2027-01-07",
+   "season": "christmas",
+   "celebration": {
+    "key": "thursday-of-christmas-time-after-epiphany-2027-01-07",
+    "title": {
+     "en": "Thursday of Christmas Time after Epiphany",
+     "tl": "Huwebes Kasunod ng Pagpapakita ng Panginoon"
+    },
+    "designation": "Weekday / feria"
+   },
+   "options": [
+    {
+     "key": "saint-raymond-of-penyafort-priest",
+     "title": {
+      "en": "Saint Raymond of Penyafort, priest",
+      "tl": "San Raymundo de Penyafort, pari"
+     },
+     "designation": "Optional Memorial"
+    }
+   ]
+  },
+  {
+   "date": "2027-01-08",
+   "season": "christmas",
+   "celebration": {
+    "key": "friday-of-christmas-time-after-epiphany-2027-01-08",
+    "title": {
+     "en": "Friday of Christmas Time after Epiphany",
+     "tl": "Biyernes Kasunod ng Pagpapakita ng Panginoon"
+    },
+    "designation": "Weekday / feria"
+   },
+   "options": []
+  },
+  {
+   "date": "2027-01-09",
+   "season": "christmas",
+   "celebration": {
+    "key": "translation-jesus-nazareno",
+    "title": {
+     "en": "Our Lord Jesus Christ, Señor Jesus Nazareno",
+     "tl": "Señor Jesus Nazareno"
+    },
+    "designation": "Proper Feast"
+   },
+   "options": []
+  },
+  {
+   "date": "2027-01-10",
+   "season": "christmas",
+   "celebration": {
+    "key": "baptism-of-the-lord",
+    "title": {
+     "en": "The Baptism of the Lord",
+     "tl": "Pagbibinyag sa Panginoon"
+    },
+    "designation": "Feast of the Lord"
+   },
+   "options": []
+  },
+  {
+   "date": "2027-01-11",
+   "season": "ordinary_time",
+   "celebration": {
+    "key": "monday-in-ordinary-time-2027-01-11",
+    "title": {
+     "en": "Monday of the 1st Week in Ordinary Time",
+     "tl": "Lunes sa Unang Linggo sa Karaniwang Panahon"
+    },
+    "designation": "Weekday / feria"
+   },
+   "options": []
+  },
+  {
+   "date": "2027-01-12",
+   "season": "ordinary_time",
+   "celebration": {
+    "key": "tuesday-in-ordinary-time-2027-01-12",
+    "title": {
+     "en": "Tuesday of the 1st Week in Ordinary Time",
+     "tl": "Martes sa Unang Linggo sa Karaniwang Panahon"
+    },
+    "designation": "Weekday / feria"
+   },
+   "options": []
+  },
+  {
+   "date": "2027-01-13",
+   "season": "ordinary_time",
+   "celebration": {
+    "key": "wednesday-in-ordinary-time-2027-01-13",
+    "title": {
+     "en": "Wednesday of the 1st Week in Ordinary Time",
+     "tl": "Miyerkules sa Unang Linggo sa Karaniwang Panahon"
+    },
+    "designation": "Weekday / feria"
+   },
+   "options": [
+    {
+     "key": "saint-hilary-of-poitiers-bishop-and-doctor",
+     "title": {
+      "en": "Saint Hilary of Poitiers, bishop and doctor",
+      "tl": "San Hilario, obispo at pantas ng Simbahan"
+     },
+     "designation": "Optional Memorial"
+    }
+   ]
+  },
+  {
+   "date": "2027-01-14",
+   "season": "ordinary_time",
+   "celebration": {
+    "key": "thursday-in-ordinary-time-2027-01-14",
+    "title": {
+     "en": "Thursday of the 1st Week in Ordinary Time",
+     "tl": "Huwebes sa Unang Linggo sa Karaniwang Panahon"
+    },
+    "designation": "Weekday / feria"
+   },
+   "options": []
+  },
+  {
+   "date": "2027-01-15",
+   "season": "ordinary_time",
+   "celebration": {
+    "key": "friday-in-ordinary-time-2027-01-15",
+    "title": {
+     "en": "Friday of the 1st Week in Ordinary Time",
+     "tl": "Biyernes sa Unang Linggo sa Karaniwang Panahon"
+    },
+    "designation": "Weekday / feria"
+   },
+   "options": []
+  },
+  {
+   "date": "2027-01-16",
+   "season": "ordinary_time",
+   "celebration": {
+    "key": "saturday-in-ordinary-time-2027-01-16",
+    "title": {
+     "en": "Saturday of the 1st Week in Ordinary Time",
+     "tl": "Sabado sa Unang Linggo sa Karaniwang Panahon"
+    },
+    "designation": "Weekday / feria"
+   },
+   "options": [
+    {
+     "key": "memorial-of-the-blessed-virgin-mary-on-saturday",
+     "title": {
+      "en": "The Memorial of the Blessed Virgin Mary on Saturday",
+      "tl": "Paggunita sa Mahal na Birheng Maria tuwing Sabado"
+     },
+     "designation": "Optional Memorial"
+    }
+   ]
+  },
+  {
+   "date": "2027-01-17",
+   "season": "ordinary_time",
+   "celebration": {
+    "key": "santo-nino",
+    "title": {
+     "en": "The Santo Niño (Holy Child Jesus)",
+     "tl": "Santo Niño (Banal na Sanggol)"
+    },
+    "designation": "Privileged Feast"
+   },
+   "options": []
+  },
+  {
+   "date": "2027-01-18",
+   "season": "ordinary_time",
+   "celebration": {
+    "key": "monday-in-ordinary-time-2027-01-18",
+    "title": {
+     "en": "Monday of the 2nd Week in Ordinary Time",
+     "tl": "Lunes sa Ikalawang Linggo sa Karaniwang Panahon"
+    },
+    "designation": "Weekday / feria"
+   },
+   "options": []
+  },
+  {
+   "date": "2027-01-19",
+   "season": "ordinary_time",
+   "celebration": {
+    "key": "tuesday-in-ordinary-time-2027-01-19",
+    "title": {
+     "en": "Tuesday of the 2nd Week in Ordinary Time",
+     "tl": "Martes sa Ikalawang Linggo sa Karaniwang Panahon"
+    },
+    "designation": "Weekday / feria"
+   },
+   "options": []
+  },
+  {
+   "date": "2027-01-20",
+   "season": "ordinary_time",
+   "celebration": {
+    "key": "wednesday-in-ordinary-time-2027-01-20",
+    "title": {
+     "en": "Wednesday of the 2nd Week in Ordinary Time",
+     "tl": "Miyerkules sa Ikalawang Linggo sa Karaniwang Panahon"
+    },
+    "designation": "Weekday / feria"
+   },
+   "options": [
+    {
+     "key": "saint-fabian-pope-and-martyr",
+     "title": {
+      "en": "Saint Fabian, pope and martyr",
+      "tl": "San Fabian, papa at martir"
+     },
+     "designation": "Optional Memorial"
+    },
+    {
+     "key": "saint-sebastian-martyr",
+     "title": {
+      "en": "Saint Sebastian, martyr",
+      "tl": "San Sebastian, martir"
+     },
+     "designation": "Optional Memorial"
+    }
+   ]
+  },
+  {
+   "date": "2027-01-21",
+   "season": "ordinary_time",
+   "celebration": {
+    "key": "saint-agnes-virgin-and-martyr",
+    "title": {
+     "en": "Saint Agnes, virgin and martyr",
+     "tl": "Santa Agnes, dalaga at martir"
+    },
+    "designation": "Obligatory Memorial"
+   },
+   "options": []
+  },
+  {
+   "date": "2027-01-22",
+   "season": "ordinary_time",
+   "celebration": {
+    "key": "friday-in-ordinary-time-2027-01-22",
+    "title": {
+     "en": "Friday of the 2nd Week in Ordinary Time",
+     "tl": "Biyernes sa Ikalawang Linggo sa Karaniwang Panahon"
+    },
+    "designation": "Weekday / feria"
+   },
+   "options": [
+    {
+     "key": "saint-vincent-deacon-and-martyr",
+     "title": {
+      "en": "Saint Vincent, deacon and martyr",
+      "tl": "San Vicente, diyakono at martir"
+     },
+     "designation": "Optional Memorial"
+    }
+   ]
+  },
+  {
+   "date": "2027-01-23",
+   "season": "ordinary_time",
+   "celebration": {
+    "key": "saturday-in-ordinary-time-2027-01-23",
+    "title": {
+     "en": "Saturday of the 2nd Week in Ordinary Time",
+     "tl": "Sabado sa Ikalawang Linggo sa Karaniwang Panahon"
+    },
+    "designation": "Weekday / feria"
+   },
+   "options": [
+    {
+     "key": "memorial-of-the-blessed-virgin-mary-on-saturday",
+     "title": {
+      "en": "The Memorial of the Blessed Virgin Mary on Saturday",
+      "tl": "Paggunita sa Mahal na Birheng Maria tuwing Sabado"
+     },
+     "designation": "Optional Memorial"
+    }
+   ]
+  },
+  {
+   "date": "2027-01-24",
+   "season": "ordinary_time",
+   "celebration": {
+    "key": "sunday-in-ordinary-time",
+    "title": {
+     "en": "3rd Sunday in Ordinary Time",
+     "tl": "Ikatlong Linggo sa Karaniwang Panahon"
+    },
+    "designation": "Sunday"
+   },
+   "options": []
+  },
+  {
+   "date": "2027-01-25",
+   "season": "ordinary_time",
+   "celebration": {
+    "key": "the-conversion-of-saint-paul-the-apostle",
+    "title": {
+     "en": "The Conversion of Saint Paul the Apostle",
+     "tl": "Pagbabalik-loob ni San Pablo Apostol"
+    },
+    "designation": "Feast"
+   },
+   "options": []
+  },
+  {
+   "date": "2027-01-26",
+   "season": "ordinary_time",
+   "celebration": {
+    "key": "saints-timothy-and-titus-bishops",
+    "title": {
+     "en": "Saints Timothy and Titus, bishops",
+     "tl": "San Timoteo at San Tito, mga obispo"
+    },
+    "designation": "Obligatory Memorial"
+   },
+   "options": []
+  },
+  {
+   "date": "2027-01-27",
+   "season": "ordinary_time",
+   "celebration": {
+    "key": "wednesday-in-ordinary-time-2027-01-27",
+    "title": {
+     "en": "Wednesday of the 3rd Week in Ordinary Time",
+     "tl": "Miyerkules sa Ikatlong Linggo sa Karaniwang Panahon"
+    },
+    "designation": "Weekday / feria"
+   },
+   "options": [
+    {
+     "key": "saint-angela-merici-virgin",
+     "title": {
+      "en": "Saint Angela Merici, virgin",
+      "tl": "Santa Angela Merici, dalaga"
+     },
+     "designation": "Optional Memorial"
+    }
+   ]
+  },
+  {
+   "date": "2027-01-28",
+   "season": "ordinary_time",
+   "celebration": {
+    "key": "saint-thomas-aquinas-priest-and-doctor",
+    "title": {
+     "en": "Saint Thomas Aquinas, priest and doctor",
+     "tl": "Santo Tomas de Aquino, pari at pantas ng Simbahan"
+    },
+    "designation": "Obligatory Memorial"
+   },
+   "options": []
+  },
+  {
+   "date": "2027-01-29",
+   "season": "ordinary_time",
+   "celebration": {
+    "key": "friday-in-ordinary-time-2027-01-29",
+    "title": {
+     "en": "Friday of the 3rd Week in Ordinary Time",
+     "tl": "Biyernes sa Ikatlong Linggo sa Karaniwang Panahon"
+    },
+    "designation": "Weekday / feria"
+   },
+   "options": []
+  },
+  {
+   "date": "2027-01-30",
+   "season": "ordinary_time",
+   "celebration": {
+    "key": "saturday-in-ordinary-time-2027-01-30",
+    "title": {
+     "en": "Saturday of the 3rd Week in Ordinary Time",
+     "tl": "Sabado sa Ikatlong Linggo sa Karaniwang Panahon"
+    },
+    "designation": "Weekday / feria"
+   },
+   "options": [
+    {
+     "key": "memorial-of-the-blessed-virgin-mary-on-saturday",
+     "title": {
+      "en": "The Memorial of the Blessed Virgin Mary on Saturday",
+      "tl": "Paggunita sa Mahal na Birheng Maria tuwing Sabado"
+     },
+     "designation": "Optional Memorial"
+    }
+   ]
+  },
+  {
+   "date": "2027-01-31",
+   "season": "ordinary_time",
+   "celebration": {
+    "key": "sunday-in-ordinary-time",
+    "title": {
+     "en": "4th Sunday in Ordinary Time",
+     "tl": "Ikaapat na Linggo sa Karaniwang Panahon"
+    },
+    "designation": "Sunday"
+   },
+   "options": []
+  },
+  {
+   "date": "2027-02-01",
+   "season": "ordinary_time",
+   "celebration": {
+    "key": "monday-in-ordinary-time-2027-02-01",
+    "title": {
+     "en": "Monday of the 4th Week in Ordinary Time",
+     "tl": "Lunes sa Ikaapat na Linggo sa Karaniwang Panahon"
+    },
+    "designation": "Weekday / feria"
+   },
+   "options": []
+  },
+  {
+   "date": "2027-02-02",
+   "season": "ordinary_time",
+   "celebration": {
+    "key": "the-presentation-of-the-lord",
+    "title": {
+     "en": "The Presentation of the Lord",
+     "tl": "Pagdadala sa Panginoon sa Templo"
+    },
+    "designation": "Feast of the Lord"
+   },
+   "options": []
+  },
+  {
+   "date": "2027-02-03",
+   "season": "ordinary_time",
+   "celebration": {
+    "key": "wednesday-in-ordinary-time-2027-02-03",
+    "title": {
+     "en": "Wednesday of the 4th Week in Ordinary Time",
+     "tl": "Miyerkules sa Ikaapat na Linggo sa Karaniwang Panahon"
+    },
+    "designation": "Weekday / feria"
+   },
+   "options": [
+    {
+     "key": "saint-ansgar-bishop",
+     "title": {
+      "en": "Saint Ansgar, bishop",
+      "tl": "San Anscar (Oscar), martir"
+     },
+     "designation": "Optional Memorial"
+    },
+    {
+     "key": "saint-blase-bishop-and-martyr",
+     "title": {
+      "en": "Saint Blase, bishop and martyr",
+      "tl": "San Blas, obispo at martir"
+     },
+     "designation": "Optional Memorial"
+    }
+   ]
+  },
+  {
+   "date": "2027-02-04",
+   "season": "ordinary_time",
+   "celebration": {
+    "key": "thursday-in-ordinary-time-2027-02-04",
+    "title": {
+     "en": "Thursday of the 4th Week in Ordinary Time",
+     "tl": "Huwebes sa Ikaapat na Linggo sa Karaniwang Panahon"
+    },
+    "designation": "Weekday / feria"
+   },
+   "options": []
+  },
+  {
+   "date": "2027-02-05",
+   "season": "ordinary_time",
+   "celebration": {
+    "key": "saint-agatha-virgin-and-martyr",
+    "title": {
+     "en": "Saint Agatha, virgin and martyr",
+     "tl": "Santa Agata (Agueda), dalaga at martir"
+    },
+    "designation": "Obligatory Memorial"
+   },
+   "options": []
+  },
+  {
+   "date": "2027-02-06",
+   "season": "ordinary_time",
+   "celebration": {
+    "key": "ss-pedro-bautista-paul-miki",
+    "title": {
+     "en": "Saints Pedro Bautista, Paul Miki, and Companions, Martyrs",
+     "tl": "Mga Banal na sina Pedro Bautista, Pablo Miki, at mga Kasama, mga Martir"
+    },
+    "designation": "Obligatory Memorial"
+   },
+   "options": [
+    {
+     "key": "saints-paul-miki-and-companions-martyrs",
+     "title": {
+      "en": "Saints Paul Miki and companions, martyrs",
+      "tl": "San Pedro Bautista, San Pablo Miki at mga Kasama, mga martir"
+     },
+     "designation": "Memorial"
+    }
+   ]
+  },
+  {
+   "date": "2027-02-07",
+   "season": "ordinary_time",
+   "celebration": {
+    "key": "sunday-in-ordinary-time",
+    "title": {
+     "en": "5th Sunday in Ordinary Time",
+     "tl": "Ikalimang Linggo sa Karaniwang Panahon"
+    },
+    "designation": "Sunday"
+   },
+   "options": []
+  },
+  {
+   "date": "2027-02-08",
+   "season": "ordinary_time",
+   "celebration": {
+    "key": "monday-in-ordinary-time-2027-02-08",
+    "title": {
+     "en": "Monday of the 5th Week in Ordinary Time",
+     "tl": "Lunes sa Ikalimang Linggo sa Karaniwang Panahon"
+    },
+    "designation": "Weekday / feria"
+   },
+   "options": [
+    {
+     "key": "saint-jerome-emiliani-priest",
+     "title": {
+      "en": "Saint Jerome Emiliani, priest",
+      "tl": "Paggunita ka San Jeronimo Emiliano"
+     },
+     "designation": "Optional Memorial"
+    },
+    {
+     "key": "saint-josephine-bakhita-virgin",
+     "title": {
+      "en": "Saint Josephine Bakhita, virgin",
+      "tl": "Santa Josefina Bakhita, dalaga"
+     },
+     "designation": "Optional Memorial"
+    }
+   ]
+  },
+  {
+   "date": "2027-02-09",
+   "season": "ordinary_time",
+   "celebration": {
+    "key": "tuesday-in-ordinary-time-2027-02-09",
+    "title": {
+     "en": "Tuesday of the 5th Week in Ordinary Time",
+     "tl": "Martes sa Ikalimang Linggo sa Karaniwang Panahon"
+    },
+    "designation": "Weekday / feria"
+   },
+   "options": []
+  },
+  {
+   "date": "2027-02-10",
+   "season": "lent",
+   "celebration": {
+    "key": "ash-wednesday",
+    "title": {
+     "en": "Ash Wednesday",
+     "tl": "Miyerkules ng Abo"
+    },
+    "designation": "Privileged Lenten weekday / feria"
+   },
+   "options": []
+  },
+  {
+   "date": "2027-02-11",
+   "season": "lent",
+   "celebration": {
+    "key": "thursday-after-ash-wednesday-2027-02-11",
+    "title": {
+     "en": "Thursday after Ash Wednesday",
+     "tl": "Huwebes kasunod ng Miyerkules ng Abo"
+    },
+    "designation": "Privileged weekday / feria"
+   },
+   "options": [
+    {
+     "key": "our-lady-of-lourdes",
+     "title": {
+      "en": "Our Lady of Lourdes",
+      "tl": "Mahal na Birheng Maria ng Lourdes"
+     },
+     "designation": "Optional Memorial"
+    }
+   ]
+  },
+  {
+   "date": "2027-02-12",
+   "season": "lent",
+   "celebration": {
+    "key": "friday-after-ash-wednesday-2027-02-12",
+    "title": {
+     "en": "Friday after Ash Wednesday",
+     "tl": "Biyernes kasunod ng Miyerkules ng Abo"
+    },
+    "designation": "Privileged weekday / feria"
+   },
+   "options": []
+  },
+  {
+   "date": "2027-02-13",
+   "season": "lent",
+   "celebration": {
+    "key": "saturday-after-ash-wednesday-2027-02-13",
+    "title": {
+     "en": "Saturday after Ash Wednesday",
+     "tl": "Sabado kasunod ng Miyerkules ng Abo"
+    },
+    "designation": "Privileged weekday / feria"
+   },
+   "options": []
+  },
+  {
+   "date": "2027-02-14",
+   "season": "lent",
+   "celebration": {
+    "key": "first-sunday-of-lent",
+    "title": {
+     "en": "1st Sunday of Lent",
+     "tl": "Unang Linggo ng Apatnapung Araw na Paghahanda"
+    },
+    "designation": "Sunday of Lent"
+   },
+   "options": []
+  },
+  {
+   "date": "2027-02-15",
+   "season": "lent",
+   "celebration": {
+    "key": "monday-of-the-first-week-of-lent-2027-02-15",
+    "title": {
+     "en": "Monday of the 1st Week of Lent",
+     "tl": "Lunes sa Unang Linggo ng Apatnapung Araw na Paghahanda"
+    },
+    "designation": "Privileged weekday / feria"
+   },
+   "options": []
+  },
+  {
+   "date": "2027-02-16",
+   "season": "lent",
+   "celebration": {
+    "key": "tuesday-of-the-first-week-of-lent-2027-02-16",
+    "title": {
+     "en": "Tuesday of the 1st Week of Lent",
+     "tl": "Martes sa Unang Linggo ng Apatnapung Araw na Paghahanda"
+    },
+    "designation": "Privileged weekday / feria"
+   },
+   "options": []
+  },
+  {
+   "date": "2027-02-17",
+   "season": "lent",
+   "celebration": {
+    "key": "wednesday-of-the-first-week-of-lent-2027-02-17",
+    "title": {
+     "en": "Wednesday of the 1st Week of Lent",
+     "tl": "Miyerkules sa Unang Linggo ng Apatnapung Araw na Paghahanda"
+    },
+    "designation": "Privileged weekday / feria"
+   },
+   "options": [
+    {
+     "key": "seven-holy-founders-of-the-servite-order",
+     "title": {
+      "en": "Seven Holy Founders of the Servite Order",
+      "tl": "Pitong Tagapagtatag ng Orden ng mga Lingkod ng Mahal na Birheng Maria"
+     },
+     "designation": "Optional Memorial"
+    }
+   ]
+  },
+  {
+   "date": "2027-02-18",
+   "season": "lent",
+   "celebration": {
+    "key": "thursday-of-the-first-week-of-lent-2027-02-18",
+    "title": {
+     "en": "Thursday of the 1st Week of Lent",
+     "tl": "Huwebes sa Unang Linggo ng Apatnapung Araw na Paghahanda"
+    },
+    "designation": "Privileged weekday / feria"
+   },
+   "options": []
+  },
+  {
+   "date": "2027-02-19",
+   "season": "lent",
+   "celebration": {
+    "key": "friday-of-the-first-week-of-lent-2027-02-19",
+    "title": {
+     "en": "Friday of the 1st Week of Lent",
+     "tl": "Biyernes sa Unang Linggo ng Apatnapung Araw na Paghahanda"
+    },
+    "designation": "Privileged weekday / feria"
+   },
+   "options": []
+  },
+  {
+   "date": "2027-02-20",
+   "season": "lent",
+   "celebration": {
+    "key": "saturday-of-the-first-week-of-lent-2027-02-20",
+    "title": {
+     "en": "Saturday of the 1st Week of Lent",
+     "tl": "Sabado sa Unang Linggo ng Apatnapung Araw na Paghahanda"
+    },
+    "designation": "Privileged weekday / feria"
+   },
+   "options": []
+  },
+  {
+   "date": "2027-02-21",
+   "season": "lent",
+   "celebration": {
+    "key": "second-sunday-of-lent",
+    "title": {
+     "en": "2nd Sunday of Lent",
+     "tl": "Ikalawang Linggo ng Apatnapung Araw na Paghahanda"
+    },
+    "designation": "Sunday of Lent"
+   },
+   "options": []
+  },
+  {
+   "date": "2027-02-22",
+   "season": "lent",
+   "celebration": {
+    "key": "the-chair-of-saint-peter-the-apostle",
+    "title": {
+     "en": "The Chair of Saint Peter the Apostle",
+     "tl": "Luklukan ni San Pedro Apostol"
+    },
+    "designation": "Feast"
+   },
+   "options": []
+  },
+  {
+   "date": "2027-02-23",
+   "season": "lent",
+   "celebration": {
+    "key": "tuesday-of-the-second-week-of-lent-2027-02-23",
+    "title": {
+     "en": "Tuesday of the 2nd Week of Lent",
+     "tl": "Martes sa Ikalawang Linggo ng Apatnapung Araw na Paghahanda"
+    },
+    "designation": "Privileged weekday / feria"
+   },
+   "options": [
+    {
+     "key": "saint-polycarp-bishop-and-martyr",
+     "title": {
+      "en": "Saint Polycarp, bishop and martyr",
+      "tl": "San Policarpio, obispo at martir"
+     },
+     "designation": "Optional Memorial"
+    }
+   ]
+  },
+  {
+   "date": "2027-02-24",
+   "season": "lent",
+   "celebration": {
+    "key": "wednesday-of-the-second-week-of-lent-2027-02-24",
+    "title": {
+     "en": "Wednesday of the 2nd Week of Lent",
+     "tl": "Miyerkules sa Ikalawang Linggo ng Apatnapung Araw na Paghahanda"
+    },
+    "designation": "Privileged weekday / feria"
+   },
+   "options": []
+  },
+  {
+   "date": "2027-02-25",
+   "season": "lent",
+   "celebration": {
+    "key": "thursday-of-the-second-week-of-lent-2027-02-25",
+    "title": {
+     "en": "Thursday of the 2nd Week of Lent",
+     "tl": "Huwebes sa Ikalawang Linggo ng Apatnapung Araw na Paghahanda"
+    },
+    "designation": "Privileged weekday / feria"
+   },
+   "options": []
+  },
+  {
+   "date": "2027-02-26",
+   "season": "lent",
+   "celebration": {
+    "key": "friday-of-the-second-week-of-lent-2027-02-26",
+    "title": {
+     "en": "Friday of the 2nd Week of Lent",
+     "tl": "Biyernes sa Ikalawang Linggo ng Apatnapung Araw na Paghahanda"
+    },
+    "designation": "Privileged weekday / feria"
+   },
+   "options": []
+  },
+  {
+   "date": "2027-02-27",
+   "season": "lent",
+   "celebration": {
+    "key": "saturday-of-the-second-week-of-lent-2027-02-27",
+    "title": {
+     "en": "Saturday of the 2nd Week of Lent",
+     "tl": "Sabado sa Ikalawang Linggo ng Apatnapung Araw na Paghahanda"
+    },
+    "designation": "Privileged weekday / feria"
+   },
+   "options": []
+  },
+  {
+   "date": "2027-02-28",
+   "season": "lent",
+   "celebration": {
+    "key": "third-sunday-of-lent",
+    "title": {
+     "en": "3rd Sunday of Lent",
+     "tl": "Ikatlong Linggo ng Apatnapung Araw na Paghahanda"
+    },
+    "designation": "Sunday of Lent"
+   },
+   "options": []
+  },
+  {
+   "date": "2027-03-01",
+   "season": "lent",
+   "celebration": {
+    "key": "monday-of-the-third-week-of-lent-2027-03-01",
+    "title": {
+     "en": "Monday of the 3rd Week of Lent",
+     "tl": "Lunes sa Ikatlong Linggo ng Apatnapung Araw na Paghahanda"
+    },
+    "designation": "Privileged weekday / feria"
+   },
+   "options": []
+  },
+  {
+   "date": "2027-03-02",
+   "season": "lent",
+   "celebration": {
+    "key": "tuesday-of-the-third-week-of-lent-2027-03-02",
+    "title": {
+     "en": "Tuesday of the 3rd Week of Lent",
+     "tl": "Martes sa Ikatlong Linggo ng Apatnapung Araw na Paghahanda"
+    },
+    "designation": "Privileged weekday / feria"
+   },
+   "options": []
+  },
+  {
+   "date": "2027-03-03",
+   "season": "lent",
+   "celebration": {
+    "key": "wednesday-of-the-third-week-of-lent-2027-03-03",
+    "title": {
+     "en": "Wednesday of the 3rd Week of Lent",
+     "tl": "Miyerkules sa Ikatlong Linggo ng Apatnapung Araw na Paghahanda"
+    },
+    "designation": "Privileged weekday / feria"
+   },
+   "options": []
+  },
+  {
+   "date": "2027-03-04",
+   "season": "lent",
+   "celebration": {
+    "key": "thursday-of-the-third-week-of-lent-2027-03-04",
+    "title": {
+     "en": "Thursday of the 3rd Week of Lent",
+     "tl": "Huwebes sa Ikatlong Linggo ng Apatnapung Araw na Paghahanda"
+    },
+    "designation": "Privileged weekday / feria"
+   },
+   "options": [
+    {
+     "key": "saint-casimir",
+     "title": {
+      "en": "Saint Casimir",
+      "tl": "San Casimiro"
+     },
+     "designation": "Optional Memorial"
+    }
+   ]
+  },
+  {
+   "date": "2027-03-05",
+   "season": "lent",
+   "celebration": {
+    "key": "friday-of-the-third-week-of-lent-2027-03-05",
+    "title": {
+     "en": "Friday of the 3rd Week of Lent",
+     "tl": "Biyernes sa Ikatlong Linggo ng Apatnapung Araw na Paghahanda"
+    },
+    "designation": "Privileged weekday / feria"
+   },
+   "options": []
+  },
+  {
+   "date": "2027-03-06",
+   "season": "lent",
+   "celebration": {
+    "key": "saturday-of-the-third-week-of-lent-2027-03-06",
+    "title": {
+     "en": "Saturday of the 3rd Week of Lent",
+     "tl": "Sabado sa Ikatlong Linggo ng Apatnapung Araw na Paghahanda"
+    },
+    "designation": "Privileged weekday / feria"
+   },
+   "options": []
+  },
+  {
+   "date": "2027-03-07",
+   "season": "lent",
+   "celebration": {
+    "key": "fourth-sunday-of-lent",
+    "title": {
+     "en": "4th Sunday of Lent (Laetare Sunday)",
+     "tl": "Ikaapat na Linggo ng Apatnapung Araw na Paghahanda (Linggo ng Laetare)"
+    },
+    "designation": "Sunday of Lent"
+   },
+   "options": []
+  },
+  {
+   "date": "2027-03-08",
+   "season": "lent",
+   "celebration": {
+    "key": "monday-of-the-fourth-week-of-lent-2027-03-08",
+    "title": {
+     "en": "Monday of the 4th Week of Lent",
+     "tl": "Lunes sa Ikaapat na Linggo ng Apatnapung Araw na Paghahanda"
+    },
+    "designation": "Privileged weekday / feria"
+   },
+   "options": [
+    {
+     "key": "saint-john-of-god-religious",
+     "title": {
+      "en": "Saint John of God, religious",
+      "tl": "San Juan de Dios, namanata sa Diyos"
+     },
+     "designation": "Optional Memorial"
+    }
+   ]
+  },
+  {
+   "date": "2027-03-09",
+   "season": "lent",
+   "celebration": {
+    "key": "tuesday-of-the-fourth-week-of-lent-2027-03-09",
+    "title": {
+     "en": "Tuesday of the 4th Week of Lent",
+     "tl": "Martes sa Ikaapat na Linggo ng Apatnapung Araw na Paghahanda"
+    },
+    "designation": "Privileged weekday / feria"
+   },
+   "options": [
+    {
+     "key": "saint-frances-of-rome-religious",
+     "title": {
+      "en": "Saint Frances of Rome, religious",
+      "tl": "Santa Francisca na taga-Roma, namanata sa Diyos"
+     },
+     "designation": "Optional Memorial"
+    }
+   ]
+  },
+  {
+   "date": "2027-03-10",
+   "season": "lent",
+   "celebration": {
+    "key": "wednesday-of-the-fourth-week-of-lent-2027-03-10",
+    "title": {
+     "en": "Wednesday of the 4th Week of Lent",
+     "tl": "Miyerkules sa Ikaapat na Linggo ng Apatnapung Araw na Paghahanda"
+    },
+    "designation": "Privileged weekday / feria"
+   },
+   "options": []
+  },
+  {
+   "date": "2027-03-11",
+   "season": "lent",
+   "celebration": {
+    "key": "thursday-of-the-fourth-week-of-lent-2027-03-11",
+    "title": {
+     "en": "Thursday of the 4th Week of Lent",
+     "tl": "Huwebes sa Ikaapat na Linggo ng Apatnapung Araw na Paghahanda"
+    },
+    "designation": "Privileged weekday / feria"
+   },
+   "options": []
+  },
+  {
+   "date": "2027-03-12",
+   "season": "lent",
+   "celebration": {
+    "key": "friday-of-the-fourth-week-of-lent-2027-03-12",
+    "title": {
+     "en": "Friday of the 4th Week of Lent",
+     "tl": "Biyernes sa Ikaapat na Linggo ng Apatnapung Araw na Paghahanda"
+    },
+    "designation": "Privileged weekday / feria"
+   },
+   "options": []
+  },
+  {
+   "date": "2027-03-13",
+   "season": "lent",
+   "celebration": {
+    "key": "saturday-of-the-fourth-week-of-lent-2027-03-13",
+    "title": {
+     "en": "Saturday of the 4th Week of Lent",
+     "tl": "Sabado sa Ikaapat na Linggo ng Apatnapung Araw na Paghahanda"
+    },
+    "designation": "Privileged weekday / feria"
+   },
+   "options": []
+  },
+  {
+   "date": "2027-03-14",
+   "season": "lent",
+   "celebration": {
+    "key": "fifth-sunday-of-lent",
+    "title": {
+     "en": "5th Sunday of Lent",
+     "tl": "Ikalimang Linggo ng Apatnapung Araw na Paghahanda"
+    },
+    "designation": "Sunday of Lent"
+   },
+   "options": []
+  },
+  {
+   "date": "2027-03-15",
+   "season": "lent",
+   "celebration": {
+    "key": "monday-of-the-fifth-week-of-lent-2027-03-15",
+    "title": {
+     "en": "Monday of the 5th Week of Lent",
+     "tl": "Lunes sa Ikalimang Linggo ng Apatnapung Araw na Paghahanda"
+    },
+    "designation": "Privileged weekday / feria"
+   },
+   "options": []
+  },
+  {
+   "date": "2027-03-16",
+   "season": "lent",
+   "celebration": {
+    "key": "tuesday-of-the-fifth-week-of-lent-2027-03-16",
+    "title": {
+     "en": "Tuesday of the 5th Week of Lent",
+     "tl": "Martes sa Ikalimang Linggo ng Apatnapung Araw na Paghahanda"
+    },
+    "designation": "Privileged weekday / feria"
+   },
+   "options": []
+  },
+  {
+   "date": "2027-03-17",
+   "season": "lent",
+   "celebration": {
+    "key": "wednesday-of-the-fifth-week-of-lent-2027-03-17",
+    "title": {
+     "en": "Wednesday of the 5th Week of Lent",
+     "tl": "Miyerkules sa Ikalimang Linggo ng Apatnapung Araw na Paghahanda"
+    },
+    "designation": "Privileged weekday / feria"
+   },
+   "options": [
+    {
+     "key": "saint-patrick-bishop",
+     "title": {
+      "en": "Saint Patrick, bishop",
+      "tl": "San Patricio, obispo"
+     },
+     "designation": "Optional Memorial"
+    }
+   ]
+  },
+  {
+   "date": "2027-03-18",
+   "season": "lent",
+   "celebration": {
+    "key": "thursday-of-the-fifth-week-of-lent-2027-03-18",
+    "title": {
+     "en": "Thursday of the 5th Week of Lent",
+     "tl": "Huwebes sa Ikalimang Linggo ng Apatnapung Araw na Paghahanda"
+    },
+    "designation": "Privileged weekday / feria"
+   },
+   "options": [
+    {
+     "key": "saint-cyril-of-jerusalem-bishop-and-doctor-of-the-church",
+     "title": {
+      "en": "Saint Cyril of Jerusalem, bishop and doctor of the Church",
+      "tl": "San Cirilo ng Jerusalem, obispo at pantas ng Simbahan"
+     },
+     "designation": "Optional Memorial"
+    }
+   ]
+  },
+  {
+   "date": "2027-03-19",
+   "season": "lent",
+   "celebration": {
+    "key": "saint-joseph-spouse-of-the-blessed-virgin-mary",
+    "title": {
+     "en": "Saint Joseph, Spouse of the Blessed Virgin Mary",
+     "tl": "San Jose, Kabiyak ng Puso ng Mahal na Birhen"
+    },
+    "designation": "Solemnity"
+   },
+   "options": []
+  },
+  {
+   "date": "2027-03-20",
+   "season": "lent",
+   "celebration": {
+    "key": "saturday-of-the-fifth-week-of-lent-2027-03-20",
+    "title": {
+     "en": "Saturday of the 5th Week of Lent",
+     "tl": "Sabado sa Ikalimang Linggo ng Apatnapung Araw na Paghahanda"
+    },
+    "designation": "Privileged weekday / feria"
+   },
+   "options": []
+  },
+  {
+   "date": "2027-03-21",
+   "season": "lent",
+   "celebration": {
+    "key": "palm-sunday",
+    "title": {
+     "en": "Palm Sunday of the Passion of the Lord",
+     "tl": "Linggo ng Palaspas sa Pagpapakasakit ng Panginoon"
+    },
+    "designation": "Sunday of Lent / Palm Sunday of the Passion of the Lord"
+   },
+   "options": []
+  },
+  {
+   "date": "2027-03-22",
+   "season": "lent",
+   "celebration": {
+    "key": "monday-of-holy-week-2027-03-22",
+    "title": {
+     "en": "Monday of Holy Week",
+     "tl": "Lunes Santo"
+    },
+    "designation": "Privileged weekday of Holy Week / feria"
+   },
+   "options": []
+  },
+  {
+   "date": "2027-03-23",
+   "season": "lent",
+   "celebration": {
+    "key": "tuesday-of-holy-week-2027-03-23",
+    "title": {
+     "en": "Tuesday of Holy Week",
+     "tl": "Martes Santo"
+    },
+    "designation": "Privileged weekday of Holy Week / feria"
+   },
+   "options": []
+  },
+  {
+   "date": "2027-03-24",
+   "season": "lent",
+   "celebration": {
+    "key": "wednesday-of-holy-week-2027-03-24",
+    "title": {
+     "en": "Wednesday of Holy Week",
+     "tl": "Miyerkules Santo"
+    },
+    "designation": "Privileged weekday of Holy Week / feria"
+   },
+   "options": []
+  },
+  {
+   "date": "2027-03-25",
+   "season": "paschal_triduum",
+   "celebration": {
+    "key": "the-annunciation-of-the-lord",
+    "title": {
+     "en": "The Annunciation of the Lord",
+     "tl": "Pagpapahayag ng Magandang Balita sa Panginoon"
+    },
+    "designation": "Paschal Triduum"
+   },
+   "options": []
+  },
+  {
+   "date": "2027-03-26",
+   "season": "paschal_triduum",
+   "celebration": {
+    "key": "good-friday",
+    "title": {
+     "en": "Good Friday of the Passion of the Lord",
+     "tl": "Biyernes Santo"
+    },
+    "designation": "Paschal Triduum"
+   },
+   "options": []
+  },
+  {
+   "date": "2027-03-27",
+   "season": "paschal_triduum",
+   "celebration": {
+    "key": "holy-saturday",
+    "title": {
+     "en": "Holy Saturday",
+     "tl": "Sabado Santo"
+    },
+    "designation": "Paschal Triduum"
+   },
+   "options": []
+  },
+  {
+   "date": "2027-03-28",
+   "season": "easter",
+   "celebration": {
+    "key": "easter-sunday",
+    "title": {
+     "en": "Easter Sunday of the Resurrection of the Lord",
+     "tl": "Linggo ng Pagkabuhay ng Panginoon"
+    },
+    "designation": "Solemnity of the Lord"
+   },
+   "options": []
+  },
+  {
+   "date": "2027-03-29",
+   "season": "easter",
+   "celebration": {
+    "key": "monday-of-the-first-week-of-easter-2027-03-29",
+    "title": {
+     "en": "Monday within the Octave of Easter",
+     "tl": "Lunes sa loob ng Walong Araw ng Pagdiriwang ng Pasko ng Pagkabuhay"
+    },
+    "designation": "Privileged weekday within the Octave of Easter"
+   },
+   "options": []
+  },
+  {
+   "date": "2027-03-30",
+   "season": "easter",
+   "celebration": {
+    "key": "tuesday-of-the-first-week-of-easter-2027-03-30",
+    "title": {
+     "en": "Tuesday within the Octave of Easter",
+     "tl": "Martes sa loob ng Walong Araw ng Pagdiriwang ng Pasko ng Pagkabuhay"
+    },
+    "designation": "Privileged weekday within the Octave of Easter"
+   },
+   "options": []
+  },
+  {
+   "date": "2027-03-31",
+   "season": "easter",
+   "celebration": {
+    "key": "wednesday-of-the-first-week-of-easter-2027-03-31",
+    "title": {
+     "en": "Wednesday within the Octave of Easter",
+     "tl": "Miyerkules sa loob ng Walong Araw ng Pagdiriwang ng Pasko ng Pagkabuhay"
+    },
+    "designation": "Privileged weekday within the Octave of Easter"
+   },
+   "options": []
+  },
+  {
+   "date": "2027-04-01",
+   "season": "easter",
+   "celebration": {
+    "key": "thursday-of-the-first-week-of-easter-2027-04-01",
+    "title": {
+     "en": "Thursday within the Octave of Easter",
+     "tl": "Huwebes sa loob ng Walong Araw ng Pagdiriwang ng Pasko ng Pagkabuhay"
+    },
+    "designation": "Privileged weekday within the Octave of Easter"
+   },
+   "options": []
+  },
+  {
+   "date": "2027-04-02",
+   "season": "easter",
+   "celebration": {
+    "key": "friday-of-the-first-week-of-easter-2027-04-02",
+    "title": {
+     "en": "Friday within the Octave of Easter",
+     "tl": "Biyernes sa loob ng Walong Araw ng Pagdiriwang ng Pasko ng Pagkabuhay"
+    },
+    "designation": "Privileged weekday within the Octave of Easter"
+   },
+   "options": []
+  },
+  {
+   "date": "2027-04-03",
+   "season": "easter",
+   "celebration": {
+    "key": "saturday-of-the-first-week-of-easter-2027-04-03",
+    "title": {
+     "en": "Saturday within the Octave of Easter",
+     "tl": "Sabado sa loob ng Walong Araw ng Pagdiriwang ng Pasko ng Pagkabuhay"
+    },
+    "designation": "Privileged weekday within the Octave of Easter"
+   },
+   "options": []
+  },
+  {
+   "date": "2027-04-04",
+   "season": "easter",
+   "celebration": {
+    "key": "second-sunday-of-easter",
+    "title": {
+     "en": "2nd Sunday of Easter",
+     "tl": "Ikalawang Linggo ng Pasko ng Pagkabuhay"
+    },
+    "designation": "Sunday of Easter"
+   },
+   "options": []
+  },
+  {
+   "date": "2027-04-05",
+   "season": "easter",
+   "celebration": {
+    "key": "monday-of-the-second-week-of-easter-2027-04-05",
+    "title": {
+     "en": "Monday of the 2nd Week of Easter",
+     "tl": "Lunes sa Ikalawang Linggo ng Pasko ng Pagkabuhay"
+    },
+    "designation": "Weekday / feria"
+   },
+   "options": [
+    {
+     "key": "saint-vincent-ferrer-priest",
+     "title": {
+      "en": "Saint Vincent Ferrer, priest",
+      "tl": "San Vicente Ferrer, pari"
+     },
+     "designation": "Optional Memorial"
+    }
+   ]
+  },
+  {
+   "date": "2027-04-06",
+   "season": "easter",
+   "celebration": {
+    "key": "tuesday-of-the-second-week-of-easter-2027-04-06",
+    "title": {
+     "en": "Tuesday of the 2nd Week of Easter",
+     "tl": "Martes sa Ikalawang Linggo ng Pasko ng Pagkabuhay"
+    },
+    "designation": "Weekday / feria"
+   },
+   "options": []
+  },
+  {
+   "date": "2027-04-07",
+   "season": "easter",
+   "celebration": {
+    "key": "saint-john-baptist-de-la-salle-priest",
+    "title": {
+     "en": "Saint John Baptist de la Salle, priest",
+     "tl": "San Juan Bautista de la Salle, pari"
+    },
+    "designation": "Obligatory Memorial"
+   },
+   "options": []
+  },
+  {
+   "date": "2027-04-08",
+   "season": "easter",
+   "celebration": {
+    "key": "thursday-of-the-second-week-of-easter-2027-04-08",
+    "title": {
+     "en": "Thursday of the 2nd Week of Easter",
+     "tl": "Huwebes sa Ikalawang Linggo ng Pasko ng Pagkabuhay"
+    },
+    "designation": "Weekday / feria"
+   },
+   "options": []
+  },
+  {
+   "date": "2027-04-09",
+   "season": "easter",
+   "celebration": {
+    "key": "friday-of-the-second-week-of-easter-2027-04-09",
+    "title": {
+     "en": "Friday of the 2nd Week of Easter",
+     "tl": "Biyernes sa Ikalawang Linggo ng Pasko ng Pagkabuhay"
+    },
+    "designation": "Weekday / feria"
+   },
+   "options": []
+  },
+  {
+   "date": "2027-04-10",
+   "season": "easter",
+   "celebration": {
+    "key": "saturday-of-the-second-week-of-easter-2027-04-10",
+    "title": {
+     "en": "Saturday of the 2nd Week of Easter",
+     "tl": "Sabado sa Ikalawang Linggo ng Pasko ng Pagkabuhay"
+    },
+    "designation": "Weekday / feria"
+   },
+   "options": [
+    {
+     "key": "memorial-of-the-blessed-virgin-mary-on-saturday",
+     "title": {
+      "en": "The Memorial of the Blessed Virgin Mary on Saturday",
+      "tl": "Paggunita sa Mahal na Birheng Maria tuwing Sabado"
+     },
+     "designation": "Optional Memorial"
+    }
+   ]
+  },
+  {
+   "date": "2027-04-11",
+   "season": "easter",
+   "celebration": {
+    "key": "third-sunday-of-easter",
+    "title": {
+     "en": "3rd Sunday of Easter",
+     "tl": "Ikatlong Linggo ng Pasko ng Pagkabuhay"
+    },
+    "designation": "Sunday of Easter"
+   },
+   "options": []
+  },
+  {
+   "date": "2027-04-12",
+   "season": "easter",
+   "celebration": {
+    "key": "monday-of-the-third-week-of-easter-2027-04-12",
+    "title": {
+     "en": "Monday of the 3rd Week of Easter",
+     "tl": "Lunes sa Ikatlong Linggo ng Pasko ng Pagkabuhay"
+    },
+    "designation": "Weekday / feria"
+   },
+   "options": []
+  },
+  {
+   "date": "2027-04-13",
+   "season": "easter",
+   "celebration": {
+    "key": "tuesday-of-the-third-week-of-easter-2027-04-13",
+    "title": {
+     "en": "Tuesday of the 3rd Week of Easter",
+     "tl": "Martes sa Ikatlong Linggo ng Pasko ng Pagkabuhay"
+    },
+    "designation": "Weekday / feria"
+   },
+   "options": [
+    {
+     "key": "saint-martin-i-pope-and-martyr",
+     "title": {
+      "en": "Saint Martin I, pope and martyr",
+      "tl": "San Martin I, papa at martir"
+     },
+     "designation": "Optional Memorial"
+    }
+   ]
+  },
+  {
+   "date": "2027-04-14",
+   "season": "easter",
+   "celebration": {
+    "key": "wednesday-of-the-third-week-of-easter-2027-04-14",
+    "title": {
+     "en": "Wednesday of the 3rd Week of Easter",
+     "tl": "Miyerkules sa Ikatlong Linggo ng Pasko ng Pagkabuhay"
+    },
+    "designation": "Weekday / feria"
+   },
+   "options": []
+  },
+  {
+   "date": "2027-04-15",
+   "season": "easter",
+   "celebration": {
+    "key": "thursday-of-the-third-week-of-easter-2027-04-15",
+    "title": {
+     "en": "Thursday of the 3rd Week of Easter",
+     "tl": "Huwebes sa Ikatlong Linggo ng Pasko ng Pagkabuhay"
+    },
+    "designation": "Weekday / feria"
+   },
+   "options": []
+  },
+  {
+   "date": "2027-04-16",
+   "season": "easter",
+   "celebration": {
+    "key": "friday-of-the-third-week-of-easter-2027-04-16",
+    "title": {
+     "en": "Friday of the 3rd Week of Easter",
+     "tl": "Biyernes sa Ikatlong Linggo ng Pasko ng Pagkabuhay"
+    },
+    "designation": "Weekday / feria"
+   },
+   "options": []
+  },
+  {
+   "date": "2027-04-17",
+   "season": "easter",
+   "celebration": {
+    "key": "saturday-of-the-third-week-of-easter-2027-04-17",
+    "title": {
+     "en": "Saturday of the 3rd Week of Easter",
+     "tl": "Sabado sa Ikatlong Linggo ng Pasko ng Pagkabuhay"
+    },
+    "designation": "Weekday / feria"
+   },
+   "options": [
+    {
+     "key": "memorial-of-the-blessed-virgin-mary-on-saturday",
+     "title": {
+      "en": "The Memorial of the Blessed Virgin Mary on Saturday",
+      "tl": "Paggunita sa Mahal na Birheng Maria tuwing Sabado"
+     },
+     "designation": "Optional Memorial"
+    }
+   ]
+  },
+  {
+   "date": "2027-04-18",
+   "season": "easter",
+   "celebration": {
+    "key": "fourth-sunday-of-easter",
+    "title": {
+     "en": "4th Sunday of Easter",
+     "tl": "Ikaapat na Linggo ng Pasko ng Pagkabuhay"
+    },
+    "designation": "Sunday of Easter"
+   },
+   "options": []
+  },
+  {
+   "date": "2027-04-19",
+   "season": "easter",
+   "celebration": {
+    "key": "monday-of-the-fourth-week-of-easter-2027-04-19",
+    "title": {
+     "en": "Monday of the 4th Week of Easter",
+     "tl": "Lunes sa Ikaapat na Linggo ng Pasko ng Pagkabuhay"
+    },
+    "designation": "Weekday / feria"
+   },
+   "options": []
+  },
+  {
+   "date": "2027-04-20",
+   "season": "easter",
+   "celebration": {
+    "key": "tuesday-of-the-fourth-week-of-easter-2027-04-20",
+    "title": {
+     "en": "Tuesday of the 4th Week of Easter",
+     "tl": "Martes sa Ikaapat na Linggo ng Pasko ng Pagkabuhay"
+    },
+    "designation": "Weekday / feria"
+   },
+   "options": []
+  },
+  {
+   "date": "2027-04-21",
+   "season": "easter",
+   "celebration": {
+    "key": "wednesday-of-the-fourth-week-of-easter-2027-04-21",
+    "title": {
+     "en": "Wednesday of the 4th Week of Easter",
+     "tl": "Miyerkules sa Ikaapat na Linggo ng Pasko ng Pagkabuhay"
+    },
+    "designation": "Weekday / feria"
+   },
+   "options": [
+    {
+     "key": "saint-anselm-of-canterbury-bishop-and-doctor-of-the-church",
+     "title": {
+      "en": "Saint Anselm of Canterbury, bishop and doctor of the Church",
+      "tl": "San Anselmo, obispo at pantas ng Simbahan"
+     },
+     "designation": "Optional Memorial"
+    }
+   ]
+  },
+  {
+   "date": "2027-04-22",
+   "season": "easter",
+   "celebration": {
+    "key": "thursday-of-the-fourth-week-of-easter-2027-04-22",
+    "title": {
+     "en": "Thursday of the 4th Week of Easter",
+     "tl": "Huwebes sa Ikaapat na Linggo ng Pasko ng Pagkabuhay"
+    },
+    "designation": "Weekday / feria"
+   },
+   "options": []
+  },
+  {
+   "date": "2027-04-23",
+   "season": "easter",
+   "celebration": {
+    "key": "friday-of-the-fourth-week-of-easter-2027-04-23",
+    "title": {
+     "en": "Friday of the 4th Week of Easter",
+     "tl": "Biyernes sa Ikaapat na Linggo ng Pasko ng Pagkabuhay"
+    },
+    "designation": "Weekday / feria"
+   },
+   "options": [
+    {
+     "key": "saint-adalbert-bishop-and-martyr",
+     "title": {
+      "en": "Saint Adalbert, bishop and martyr",
+      "tl": "San Adalberto, obispo at martir"
+     },
+     "designation": "Optional Memorial"
+    },
+    {
+     "key": "saint-george-martyr",
+     "title": {
+      "en": "Saint George, martyr",
+      "tl": "San Jorge, martir"
+     },
+     "designation": "Optional Memorial"
+    }
+   ]
+  },
+  {
+   "date": "2027-04-24",
+   "season": "easter",
+   "celebration": {
+    "key": "saturday-of-the-fourth-week-of-easter-2027-04-24",
+    "title": {
+     "en": "Saturday of the 4th Week of Easter",
+     "tl": "Sabado sa Ikaapat na Linggo ng Pasko ng Pagkabuhay"
+    },
+    "designation": "Weekday / feria"
+   },
+   "options": [
+    {
+     "key": "saint-fidelis-of-sigmaringen-priest-and-martyr",
+     "title": {
+      "en": "Saint Fidelis of Sigmaringen, priest and martyr",
+      "tl": "San Fidel ng Sigmaringen, pari at martir"
+     },
+     "designation": "Optional Memorial"
+    },
+    {
+     "key": "memorial-of-the-blessed-virgin-mary-on-saturday",
+     "title": {
+      "en": "The Memorial of the Blessed Virgin Mary on Saturday",
+      "tl": "Paggunita sa Mahal na Birheng Maria tuwing Sabado"
+     },
+     "designation": "Optional Memorial"
+    }
+   ]
+  },
+  {
+   "date": "2027-04-25",
+   "season": "easter",
+   "celebration": {
+    "key": "fifth-sunday-of-easter",
+    "title": {
+     "en": "5th Sunday of Easter",
+     "tl": "Ikalimang Linggo ng Pasko ng Pagkabuhay"
+    },
+    "designation": "Sunday of Easter"
+   },
+   "options": []
+  },
+  {
+   "date": "2027-04-26",
+   "season": "easter",
+   "celebration": {
+    "key": "monday-of-the-fifth-week-of-easter-2027-04-26",
+    "title": {
+     "en": "Monday of the 5th Week of Easter",
+     "tl": "Lunes sa Ikalimang Linggo ng Pasko ng Pagkabuhay"
+    },
+    "designation": "Weekday / feria"
+   },
+   "options": []
+  },
+  {
+   "date": "2027-04-27",
+   "season": "easter",
+   "celebration": {
+    "key": "tuesday-of-the-fifth-week-of-easter-2027-04-27",
+    "title": {
+     "en": "Tuesday of the 5th Week of Easter",
+     "tl": "Martes sa Ikalimang Linggo ng Pasko ng Pagkabuhay"
+    },
+    "designation": "Weekday / feria"
+   },
+   "options": []
+  },
+  {
+   "date": "2027-04-28",
+   "season": "easter",
+   "celebration": {
+    "key": "wednesday-of-the-fifth-week-of-easter-2027-04-28",
+    "title": {
+     "en": "Wednesday of the 5th Week of Easter",
+     "tl": "Miyerkules sa Ikalimang Linggo ng Pasko ng Pagkabuhay"
+    },
+    "designation": "Weekday / feria"
+   },
+   "options": [
+    {
+     "key": "saint-louis-grignon-de-montfort-priest",
+     "title": {
+      "en": "Saint Louis Grignon de Montfort, priest",
+      "tl": "San Luis Maria ng Montfort"
+     },
+     "designation": "Optional Memorial"
+    },
+    {
+     "key": "saint-peter-chanel-priest-and-martyr",
+     "title": {
+      "en": "Saint Peter Chanel, priest and martyr",
+      "tl": "San Pedro Chanel, pari at martir"
+     },
+     "designation": "Optional Memorial"
+    }
+   ]
+  },
+  {
+   "date": "2027-04-29",
+   "season": "easter",
+   "celebration": {
+    "key": "saint-catherine-of-siena-virgin-and-doctor-of-the-church",
+    "title": {
+     "en": "Saint Catherine of Siena, virgin and doctor of the Church",
+     "tl": "Santa Catalina de Siena, dalaga at pantas ng Simbahan"
+    },
+    "designation": "Obligatory Memorial"
+   },
+   "options": []
+  },
+  {
+   "date": "2027-04-30",
+   "season": "easter",
+   "celebration": {
+    "key": "friday-of-the-fifth-week-of-easter-2027-04-30",
+    "title": {
+     "en": "Friday of the 5th Week of Easter",
+     "tl": "Biyernes sa Ikalimang Linggo ng Pasko ng Pagkabuhay"
+    },
+    "designation": "Weekday / feria"
+   },
+   "options": [
+    {
+     "key": "saint-pius-v-pope",
+     "title": {
+      "en": "Saint Pius V, pope",
+      "tl": "San Pio V, papa"
+     },
+     "designation": "Optional Memorial"
+    }
+   ]
+  },
+  {
+   "date": "2027-05-01",
+   "season": "easter",
+   "celebration": {
+    "key": "saturday-of-the-fifth-week-of-easter-2027-05-01",
+    "title": {
+     "en": "Saturday of the 5th Week of Easter",
+     "tl": "Sabado sa Ikalimang Linggo ng Pasko ng Pagkabuhay"
+    },
+    "designation": "Weekday / feria"
+   },
+   "options": [
+    {
+     "key": "saint-joseph-the-worker",
+     "title": {
+      "en": "Saint Joseph the Worker",
+      "tl": "San Jose, Manggagawa"
+     },
+     "designation": "Optional Memorial"
+    },
+    {
+     "key": "memorial-of-the-blessed-virgin-mary-on-saturday",
+     "title": {
+      "en": "The Memorial of the Blessed Virgin Mary on Saturday",
+      "tl": "Paggunita sa Mahal na Birheng Maria tuwing Sabado"
+     },
+     "designation": "Optional Memorial"
+    }
+   ]
+  },
+  {
+   "date": "2027-05-02",
+   "season": "easter",
+   "celebration": {
+    "key": "sixth-sunday-of-easter",
+    "title": {
+     "en": "6th Sunday of Easter",
+     "tl": "Ikaanim na Linggo ng Pasko ng Pagkabuhay"
+    },
+    "designation": "Sunday of Easter"
+   },
+   "options": []
+  },
+  {
+   "date": "2027-05-03",
+   "season": "easter",
+   "celebration": {
+    "key": "saints-philip-and-james-apostles",
+    "title": {
+     "en": "Saints Philip and James, Apostles",
+     "tl": "Mga San Felipe at Santiago, mga Apostol"
+    },
+    "designation": "Feast"
+   },
+   "options": []
+  },
+  {
+   "date": "2027-05-04",
+   "season": "easter",
+   "celebration": {
+    "key": "tuesday-of-the-sixth-week-of-easter-2027-05-04",
+    "title": {
+     "en": "Tuesday of the 6th Week of Easter",
+     "tl": "Martes sa Ikaanim na Linggo ng Pasko ng Pagkabuhay"
+    },
+    "designation": "Weekday / feria"
+   },
+   "options": []
+  },
+  {
+   "date": "2027-05-05",
+   "season": "easter",
+   "celebration": {
+    "key": "wednesday-of-the-sixth-week-of-easter-2027-05-05",
+    "title": {
+     "en": "Wednesday of the 6th Week of Easter",
+     "tl": "Miyerkules sa Ikaanim na Linggo ng Pasko ng Pagkabuhay"
+    },
+    "designation": "Weekday / feria"
+   },
+   "options": []
+  },
+  {
+   "date": "2027-05-06",
+   "season": "easter",
+   "celebration": {
+    "key": "thursday-of-the-sixth-week-of-easter-2027-05-06",
+    "title": {
+     "en": "Thursday of the 6th Week of Easter",
+     "tl": "Huwebes sa Ikaanim na Linggo ng Pasko ng Pagkabuhay"
+    },
+    "designation": "Weekday / feria"
+   },
+   "options": []
+  },
+  {
+   "date": "2027-05-07",
+   "season": "easter",
+   "celebration": {
+    "key": "friday-of-the-sixth-week-of-easter-2027-05-07",
+    "title": {
+     "en": "Friday of the 6th Week of Easter",
+     "tl": "Biyernes sa Ikaanim na Linggo ng Pasko ng Pagkabuhay"
+    },
+    "designation": "Weekday / feria"
+   },
+   "options": []
+  },
+  {
+   "date": "2027-05-08",
+   "season": "easter",
+   "celebration": {
+    "key": "saturday-of-the-sixth-week-of-easter-2027-05-08",
+    "title": {
+     "en": "Saturday of the 6th Week of Easter",
+     "tl": "Sabado sa Ikaanim na Linggo ng Pasko ng Pagkabuhay"
+    },
+    "designation": "Weekday / feria"
+   },
+   "options": [
+    {
+     "key": "memorial-of-the-blessed-virgin-mary-on-saturday",
+     "title": {
+      "en": "The Memorial of the Blessed Virgin Mary on Saturday",
+      "tl": "Paggunita sa Mahal na Birheng Maria tuwing Sabado"
+     },
+     "designation": "Optional Memorial"
+    }
+   ]
+  },
+  {
+   "date": "2027-05-09",
+   "season": "easter",
+   "celebration": {
+    "key": "ascension",
+    "title": {
+     "en": "The Ascension of the Lord",
+     "tl": "Pag-akyat sa Langit ng Panginoon"
+    },
+    "designation": "Solemnity of the Lord"
+   },
+   "options": []
+  },
+  {
+   "date": "2027-05-10",
+   "season": "easter",
+   "celebration": {
+    "key": "monday-of-the-seventh-week-of-easter-2027-05-10",
+    "title": {
+     "en": "Monday of the 7th Week of Easter",
+     "tl": "Lunes sa Ikapitong Linggo ng Pasko ng Pagkabuhay"
+    },
+    "designation": "Weekday / feria"
+   },
+   "options": []
+  },
+  {
+   "date": "2027-05-11",
+   "season": "easter",
+   "celebration": {
+    "key": "tuesday-of-the-seventh-week-of-easter-2027-05-11",
+    "title": {
+     "en": "Tuesday of the 7th Week of Easter",
+     "tl": "Martes sa Ikapitong Linggo ng Pasko ng Pagkabuhay"
+    },
+    "designation": "Weekday / feria"
+   },
+   "options": []
+  },
+  {
+   "date": "2027-05-12",
+   "season": "easter",
+   "celebration": {
+    "key": "wednesday-of-the-seventh-week-of-easter-2027-05-12",
+    "title": {
+     "en": "Wednesday of the 7th Week of Easter",
+     "tl": "Miyerkules sa Ikapitong Linggo ng Pasko ng Pagkabuhay"
+    },
+    "designation": "Weekday / feria"
+   },
+   "options": [
+    {
+     "key": "saint-pancras-martyr",
+     "title": {
+      "en": "Saint Pancras, martyr",
+      "tl": "San Pancrasio, martir"
+     },
+     "designation": "Optional Memorial"
+    },
+    {
+     "key": "saints-nereus-and-achilleus-martyrs",
+     "title": {
+      "en": "Saints Nereus and Achilleus, martyrs",
+      "tl": "San Nereo at San Achiles, mga martir"
+     },
+     "designation": "Optional Memorial"
+    }
+   ]
+  },
+  {
+   "date": "2027-05-13",
+   "season": "easter",
+   "celebration": {
+    "key": "thursday-of-the-seventh-week-of-easter-2027-05-13",
+    "title": {
+     "en": "Thursday of the 7th Week of Easter",
+     "tl": "Huwebes sa Ikapitong Linggo ng Pasko ng Pagkabuhay"
+    },
+    "designation": "Weekday / feria"
+   },
+   "options": [
+    {
+     "key": "our-lady-of-fatima",
+     "title": {
+      "en": "Our Lady of Fatima",
+      "tl": "Mahal na Birhen ng Fatima"
+     },
+     "designation": "Optional Memorial"
+    }
+   ]
+  },
+  {
+   "date": "2027-05-14",
+   "season": "easter",
+   "celebration": {
+    "key": "saint-matthias-the-apostle",
+    "title": {
+     "en": "Saint Matthias the Apostle",
+     "tl": "San Matias, Apostol"
+    },
+    "designation": "Feast"
+   },
+   "options": []
+  },
+  {
+   "date": "2027-05-15",
+   "season": "easter",
+   "celebration": {
+    "key": "st-isidore-the-laborer",
+    "title": {
+     "en": "Saint Isidore the Farmer",
+     "tl": "San Isidro, magsasaka"
+    },
+    "designation": "Obligatory Memorial"
+   },
+   "options": []
+  },
+  {
+   "date": "2027-05-16",
+   "season": "easter",
+   "celebration": {
+    "key": "pentecost",
+    "title": {
+     "en": "Pentecost Sunday",
+     "tl": "Linggo ng Pentekostes"
+    },
+    "designation": "Solemnity of the Lord"
+   },
+   "options": []
+  },
+  {
+   "date": "2027-05-17",
+   "season": "ordinary_time",
+   "celebration": {
+    "key": "mary-mother-of-the-church",
+    "title": {
+     "en": "Blessed Virgin Mary, Mother of the Church",
+     "tl": "Mahal na Birheng Maria, Ina ng Sambayanan"
+    },
+    "designation": "Obligatory Memorial"
+   },
+   "options": []
+  },
+  {
+   "date": "2027-05-18",
+   "season": "ordinary_time",
+   "celebration": {
+    "key": "tuesday-in-ordinary-time-2027-05-18",
+    "title": {
+     "en": "Tuesday of the 7th Week in Ordinary Time",
+     "tl": "Martes sa Ikapitong Linggo sa Karaniwang Panahon"
+    },
+    "designation": "Weekday / feria"
+   },
+   "options": [
+    {
+     "key": "saint-john-i-pope-and-martyr",
+     "title": {
+      "en": "Saint John I, pope and martyr",
+      "tl": "San Juan I, papa at martir"
+     },
+     "designation": "Optional Memorial"
+    }
+   ]
+  },
+  {
+   "date": "2027-05-19",
+   "season": "ordinary_time",
+   "celebration": {
+    "key": "wednesday-in-ordinary-time-2027-05-19",
+    "title": {
+     "en": "Wednesday of the 7th Week in Ordinary Time",
+     "tl": "Miyerkules sa Ikapitong Linggo sa Karaniwang Panahon"
+    },
+    "designation": "Weekday / feria"
+   },
+   "options": []
+  },
+  {
+   "date": "2027-05-20",
+   "season": "ordinary_time",
+   "celebration": {
+    "key": "eternal-high-priest",
+    "title": {
+     "en": "Our Lord Jesus Christ, the Eternal High Priest",
+     "tl": "Kapistahan ng Panginoong Hesukristo, Walang Hanggang at Dakilang Pari"
+    },
+    "designation": "Proper Feast"
+   },
+   "options": []
+  },
+  {
+   "date": "2027-05-21",
+   "season": "ordinary_time",
+   "celebration": {
+    "key": "friday-in-ordinary-time-2027-05-21",
+    "title": {
+     "en": "Friday of the 7th Week in Ordinary Time",
+     "tl": "Biyernes sa Ikapitong Linggo sa Karaniwang Panahon"
+    },
+    "designation": "Weekday / feria"
+   },
+   "options": [
+    {
+     "key": "saint-christopher-magallanes-and-companions-martyrs",
+     "title": {
+      "en": "Saint Christopher Magallanes and companions, martyrs",
+      "tl": "San Kristofero Magallanes, pari at martir, at mga Kasama, mga martir"
+     },
+     "designation": "Optional Memorial"
+    }
+   ]
+  },
+  {
+   "date": "2027-05-22",
+   "season": "ordinary_time",
+   "celebration": {
+    "key": "saturday-in-ordinary-time-2027-05-22",
+    "title": {
+     "en": "Saturday of the 7th Week in Ordinary Time",
+     "tl": "Sabado sa Ikapitong Linggo sa Karaniwang Panahon"
+    },
+    "designation": "Weekday / feria"
+   },
+   "options": [
+    {
+     "key": "saint-rita-of-cascia",
+     "title": {
+      "en": "Saint Rita of Cascia",
+      "tl": "Santa Rita ng Cascia, namanata sa Diyos"
+     },
+     "designation": "Optional Memorial"
+    },
+    {
+     "key": "memorial-of-the-blessed-virgin-mary-on-saturday",
+     "title": {
+      "en": "The Memorial of the Blessed Virgin Mary on Saturday",
+      "tl": "Paggunita sa Mahal na Birheng Maria tuwing Sabado"
+     },
+     "designation": "Optional Memorial"
+    }
+   ]
+  },
+  {
+   "date": "2027-05-23",
+   "season": "ordinary_time",
+   "celebration": {
+    "key": "holy-trinity",
+    "title": {
+     "en": "The Most Holy Trinity",
+     "tl": "Tatlong Persona sa Isang Diyos"
+    },
+    "designation": "Solemnity"
+   },
+   "options": []
+  },
+  {
+   "date": "2027-05-24",
+   "season": "ordinary_time",
+   "celebration": {
+    "key": "monday-in-ordinary-time-2027-05-24",
+    "title": {
+     "en": "Monday of the 8th Week in Ordinary Time",
+     "tl": "Lunes sa Ikawalong Linggo sa Karaniwang Panahon"
+    },
+    "designation": "Weekday / feria"
+   },
+   "options": []
+  },
+  {
+   "date": "2027-05-25",
+   "season": "ordinary_time",
+   "celebration": {
+    "key": "tuesday-in-ordinary-time-2027-05-25",
+    "title": {
+     "en": "Tuesday of the 8th Week in Ordinary Time",
+     "tl": "Martes sa Ikawalong Linggo sa Karaniwang Panahon"
+    },
+    "designation": "Weekday / feria"
+   },
+   "options": [
+    {
+     "key": "saint-bede-the-venerable-priest-and-doctor",
+     "title": {
+      "en": "Saint Bede the Venerable, priest and doctor",
+      "tl": "Saint Bede the Venerable, priest and doctor"
+     },
+     "designation": "Optional Memorial"
+    },
+    {
+     "key": "saint-gregory-vii-pope",
+     "title": {
+      "en": "Saint Gregory VII, pope",
+      "tl": "Saint Gregory VII, pope"
+     },
+     "designation": "Optional Memorial"
+    },
+    {
+     "key": "saint-mary-magdalene-de-pazzi-virgin",
+     "title": {
+      "en": "Saint Mary Magdalene de Pazzi, virgin",
+      "tl": "Saint Mary Magdalene de Pazzi, virgin"
+     },
+     "designation": "Optional Memorial"
+    }
+   ]
+  },
+  {
+   "date": "2027-05-26",
+   "season": "ordinary_time",
+   "celebration": {
+    "key": "saint-philip-neri-priest",
+    "title": {
+     "en": "Saint Philip Neri, priest",
+     "tl": "San Felipe Neri, pari"
+    },
+    "designation": "Obligatory Memorial"
+   },
+   "options": []
+  },
+  {
+   "date": "2027-05-27",
+   "season": "ordinary_time",
+   "celebration": {
+    "key": "thursday-in-ordinary-time-2027-05-27",
+    "title": {
+     "en": "Thursday of the 8th Week in Ordinary Time",
+     "tl": "Huwebes sa Ikawalong Linggo sa Karaniwang Panahon"
+    },
+    "designation": "Weekday / feria"
+   },
+   "options": [
+    {
+     "key": "saint-augustine-austin-of-canterbury-bishop",
+     "title": {
+      "en": "Saint Augustine (Austin) of Canterbury, bishop",
+      "tl": "San Agustin ng Kanterberi, obispo"
+     },
+     "designation": "Optional Memorial"
+    }
+   ]
+  },
+  {
+   "date": "2027-05-28",
+   "season": "ordinary_time",
+   "celebration": {
+    "key": "friday-in-ordinary-time-2027-05-28",
+    "title": {
+     "en": "Friday of the 8th Week in Ordinary Time",
+     "tl": "Biyernes sa Ikawalong Linggo sa Karaniwang Panahon"
+    },
+    "designation": "Weekday / feria"
+   },
+   "options": []
+  },
+  {
+   "date": "2027-05-29",
+   "season": "ordinary_time",
+   "celebration": {
+    "key": "saturday-in-ordinary-time-2027-05-29",
+    "title": {
+     "en": "Saturday of the 8th Week in Ordinary Time",
+     "tl": "Sabado sa Ikawalong Linggo sa Karaniwang Panahon"
+    },
+    "designation": "Weekday / feria"
+   },
+   "options": [
+    {
+     "key": "memorial-of-the-blessed-virgin-mary-on-saturday",
+     "title": {
+      "en": "The Memorial of the Blessed Virgin Mary on Saturday",
+      "tl": "Paggunita sa Mahal na Birheng Maria tuwing Sabado"
+     },
+     "designation": "Optional Memorial"
+    }
+   ]
+  },
+  {
+   "date": "2027-05-30",
+   "season": "ordinary_time",
+   "celebration": {
+    "key": "corpus-christi",
+    "title": {
+     "en": "The Most Holy Body and Blood of Christ",
+     "tl": "Kabanal-banalang Katawan at Dugo ni Kristo"
+    },
+    "designation": "Solemnity"
+   },
+   "options": []
+  },
+  {
+   "date": "2027-05-31",
+   "season": "ordinary_time",
+   "celebration": {
+    "key": "the-visitation-of-the-blessed-virgin-mary",
+    "title": {
+     "en": "The Visitation of the Blessed Virgin Mary",
+     "tl": "Pagdalaw ng Mahal na Birheng Maria"
+    },
+    "designation": "Feast"
+   },
+   "options": []
+  },
+  {
+   "date": "2027-06-01",
+   "season": "ordinary_time",
+   "celebration": {
+    "key": "saint-justin-martyr",
+    "title": {
+     "en": "Saint Justin Martyr",
+     "tl": "San Justino, martir"
+    },
+    "designation": "Obligatory Memorial"
+   },
+   "options": []
+  },
+  {
+   "date": "2027-06-02",
+   "season": "ordinary_time",
+   "celebration": {
+    "key": "wednesday-in-ordinary-time-2027-06-02",
+    "title": {
+     "en": "Wednesday of the 9th Week in Ordinary Time",
+     "tl": "Miyerkules sa Ikasiyam na Linggo sa Karaniwang Panahon"
+    },
+    "designation": "Weekday / feria"
+   },
+   "options": [
+    {
+     "key": "saints-marcellinus-and-peter-martyrs",
+     "title": {
+      "en": "Saints Marcellinus and Peter, martyrs",
+      "tl": "San Marcelino at San Pedro, mga martir"
+     },
+     "designation": "Optional Memorial"
+    }
+   ]
+  },
+  {
+   "date": "2027-06-03",
+   "season": "ordinary_time",
+   "celebration": {
+    "key": "saints-charles-lwanga-and-companions-martyrs",
+    "title": {
+     "en": "Saints Charles Lwanga and companions, martyrs",
+     "tl": "San Carlos Lwanga at mga Kasama, mga martir"
+    },
+    "designation": "Obligatory Memorial"
+   },
+   "options": []
+  },
+  {
+   "date": "2027-06-04",
+   "season": "ordinary_time",
+   "celebration": {
+    "key": "sacred-heart",
+    "title": {
+     "en": "The Most Sacred Heart of Jesus",
+     "tl": "Kabanal-banalang Puso ni Hesus"
+    },
+    "designation": "Solemnity"
+   },
+   "options": []
+  },
+  {
+   "date": "2027-06-05",
+   "season": "ordinary_time",
+   "celebration": {
+    "key": "immaculate-heart-of-mary",
+    "title": {
+     "en": "The Immaculate Heart of the Blessed Virgin Mary",
+     "tl": "Kalinis-linisang Puso ni Maria"
+    },
+    "designation": "Obligatory Memorial"
+   },
+   "options": [
+    {
+     "key": "saint-boniface-bishop-and-martyr",
+     "title": {
+      "en": "Saint Boniface, bishop and martyr",
+      "tl": "San Bonifacio, obispo at martir"
+     },
+     "designation": "Memorial"
+    }
+   ]
+  },
+  {
+   "date": "2027-06-06",
+   "season": "ordinary_time",
+   "celebration": {
+    "key": "sunday-in-ordinary-time",
+    "title": {
+     "en": "10th Sunday in Ordinary Time",
+     "tl": "Ikasampung Linggo sa Karaniwang Panahon"
+    },
+    "designation": "Sunday"
+   },
+   "options": []
+  },
+  {
+   "date": "2027-06-07",
+   "season": "ordinary_time",
+   "celebration": {
+    "key": "monday-in-ordinary-time-2027-06-07",
+    "title": {
+     "en": "Monday of the 10th Week in Ordinary Time",
+     "tl": "Lunes sa Ikasampung Linggo sa Karaniwang Panahon"
+    },
+    "designation": "Weekday / feria"
+   },
+   "options": []
+  },
+  {
+   "date": "2027-06-08",
+   "season": "ordinary_time",
+   "celebration": {
+    "key": "tuesday-in-ordinary-time-2027-06-08",
+    "title": {
+     "en": "Tuesday of the 10th Week in Ordinary Time",
+     "tl": "Martes sa Ikasampung Linggo sa Karaniwang Panahon"
+    },
+    "designation": "Weekday / feria"
+   },
+   "options": []
+  },
+  {
+   "date": "2027-06-09",
+   "season": "ordinary_time",
+   "celebration": {
+    "key": "wednesday-in-ordinary-time-2027-06-09",
+    "title": {
+     "en": "Wednesday of the 10th Week in Ordinary Time",
+     "tl": "Miyerkules sa Ikasampung Linggo sa Karaniwang Panahon"
+    },
+    "designation": "Weekday / feria"
+   },
+   "options": [
+    {
+     "key": "saint-ephrem-deacon-and-doctor",
+     "title": {
+      "en": "Saint Ephrem, deacon and doctor",
+      "tl": "San Efren, diyakono at pantas ng Simbahan"
+     },
+     "designation": "Optional Memorial"
+    }
+   ]
+  },
+  {
+   "date": "2027-06-10",
+   "season": "ordinary_time",
+   "celebration": {
+    "key": "thursday-in-ordinary-time-2027-06-10",
+    "title": {
+     "en": "Thursday of the 10th Week in Ordinary Time",
+     "tl": "Huwebes sa Ikasampung Linggo sa Karaniwang Panahon"
+    },
+    "designation": "Weekday / feria"
+   },
+   "options": []
+  },
+  {
+   "date": "2027-06-11",
+   "season": "ordinary_time",
+   "celebration": {
+    "key": "saint-barnabas-the-apostle",
+    "title": {
+     "en": "Saint Barnabas the Apostle",
+     "tl": "San Bernabe, apostol"
+    },
+    "designation": "Obligatory Memorial"
+   },
+   "options": []
+  },
+  {
+   "date": "2027-06-12",
+   "season": "ordinary_time",
+   "celebration": {
+    "key": "saturday-in-ordinary-time-2027-06-12",
+    "title": {
+     "en": "Saturday of the 10th Week in Ordinary Time",
+     "tl": "Sabado sa Ikasampung Linggo sa Karaniwang Panahon"
+    },
+    "designation": "Weekday / feria"
+   },
+   "options": [
+    {
+     "key": "memorial-of-the-blessed-virgin-mary-on-saturday",
+     "title": {
+      "en": "The Memorial of the Blessed Virgin Mary on Saturday",
+      "tl": "Paggunita sa Mahal na Birheng Maria tuwing Sabado"
+     },
+     "designation": "Optional Memorial"
+    }
+   ]
+  },
+  {
+   "date": "2027-06-13",
+   "season": "ordinary_time",
+   "celebration": {
+    "key": "sunday-in-ordinary-time",
+    "title": {
+     "en": "11th Sunday in Ordinary Time",
+     "tl": "Ikalabing-isang Linggo sa Karaniwang Panahon"
+    },
+    "designation": "Sunday"
+   },
+   "options": []
+  },
+  {
+   "date": "2027-06-14",
+   "season": "ordinary_time",
+   "celebration": {
+    "key": "monday-in-ordinary-time-2027-06-14",
+    "title": {
+     "en": "Monday of the 11th Week in Ordinary Time",
+     "tl": "Lunes sa Ikalabing-isang Linggo sa Karaniwang Panahon"
+    },
+    "designation": "Weekday / feria"
+   },
+   "options": []
+  },
+  {
+   "date": "2027-06-15",
+   "season": "ordinary_time",
+   "celebration": {
+    "key": "tuesday-in-ordinary-time-2027-06-15",
+    "title": {
+     "en": "Tuesday of the 11th Week in Ordinary Time",
+     "tl": "Martes sa Ikalabing-isang Linggo sa Karaniwang Panahon"
+    },
+    "designation": "Weekday / feria"
+   },
+   "options": []
+  },
+  {
+   "date": "2027-06-16",
+   "season": "ordinary_time",
+   "celebration": {
+    "key": "wednesday-in-ordinary-time-2027-06-16",
+    "title": {
+     "en": "Wednesday of the 11th Week in Ordinary Time",
+     "tl": "Miyerkules sa Ikalabing-isang Linggo sa Karaniwang Panahon"
+    },
+    "designation": "Weekday / feria"
+   },
+   "options": []
+  },
+  {
+   "date": "2027-06-17",
+   "season": "ordinary_time",
+   "celebration": {
+    "key": "thursday-in-ordinary-time-2027-06-17",
+    "title": {
+     "en": "Thursday of the 11th Week in Ordinary Time",
+     "tl": "Huwebes sa Ikalabing-isang Linggo sa Karaniwang Panahon"
+    },
+    "designation": "Weekday / feria"
+   },
+   "options": []
+  },
+  {
+   "date": "2027-06-18",
+   "season": "ordinary_time",
+   "celebration": {
+    "key": "friday-in-ordinary-time-2027-06-18",
+    "title": {
+     "en": "Friday of the 11th Week in Ordinary Time",
+     "tl": "Biyernes sa Ikalabing-isang Linggo sa Karaniwang Panahon"
+    },
+    "designation": "Weekday / feria"
+   },
+   "options": []
+  },
+  {
+   "date": "2027-06-19",
+   "season": "ordinary_time",
+   "celebration": {
+    "key": "saturday-in-ordinary-time-2027-06-19",
+    "title": {
+     "en": "Saturday of the 11th Week in Ordinary Time",
+     "tl": "Sabado sa Ikalabing-isang Linggo sa Karaniwang Panahon"
+    },
+    "designation": "Weekday / feria"
+   },
+   "options": [
+    {
+     "key": "saint-romuald-abbot",
+     "title": {
+      "en": "Saint Romuald, abbot",
+      "tl": "San Romualdo, abad"
+     },
+     "designation": "Optional Memorial"
+    },
+    {
+     "key": "memorial-of-the-blessed-virgin-mary-on-saturday",
+     "title": {
+      "en": "The Memorial of the Blessed Virgin Mary on Saturday",
+      "tl": "Paggunita sa Mahal na Birheng Maria tuwing Sabado"
+     },
+     "designation": "Optional Memorial"
+    }
+   ]
+  },
+  {
+   "date": "2027-06-20",
+   "season": "ordinary_time",
+   "celebration": {
+    "key": "sunday-in-ordinary-time",
+    "title": {
+     "en": "12th Sunday in Ordinary Time",
+     "tl": "Ikalabindalawang Linggo sa Karaniwang Panahon"
+    },
+    "designation": "Sunday"
+   },
+   "options": []
+  },
+  {
+   "date": "2027-06-21",
+   "season": "ordinary_time",
+   "celebration": {
+    "key": "saint-aloysius-gonzaga-religious",
+    "title": {
+     "en": "Saint Aloysius Gonzaga, religious",
+     "tl": "San Luis Gonzaga, namanata sa Diyos"
+    },
+    "designation": "Obligatory Memorial"
+   },
+   "options": []
+  },
+  {
+   "date": "2027-06-22",
+   "season": "ordinary_time",
+   "celebration": {
+    "key": "tuesday-in-ordinary-time-2027-06-22",
+    "title": {
+     "en": "Tuesday of the 12th Week in Ordinary Time",
+     "tl": "Martes sa Ikalabindalawang Linggo sa Karaniwang Panahon"
+    },
+    "designation": "Weekday / feria"
+   },
+   "options": [
+    {
+     "key": "saint-paulinus-of-nola-bishop",
+     "title": {
+      "en": "Saint Paulinus of Nola, bishop",
+      "tl": "San Paulino ng Nola, obispo"
+     },
+     "designation": "Optional Memorial"
+    },
+    {
+     "key": "saints-john-fisher-bishop-and-martyr-and-thomas-more-martyr",
+     "title": {
+      "en": "Saints John Fisher, bishop and martyr and Thomas More, martyr",
+      "tl": "San Juan Fisher, obispo, at Santo Tomas More, mga martir"
+     },
+     "designation": "Optional Memorial"
+    }
+   ]
+  },
+  {
+   "date": "2027-06-23",
+   "season": "ordinary_time",
+   "celebration": {
+    "key": "wednesday-in-ordinary-time-2027-06-23",
+    "title": {
+     "en": "Wednesday of the 12th Week in Ordinary Time",
+     "tl": "Miyerkules sa Ikalabindalawang Linggo sa Karaniwang Panahon"
+    },
+    "designation": "Weekday / feria"
+   },
+   "options": []
+  },
+  {
+   "date": "2027-06-24",
+   "season": "ordinary_time",
+   "celebration": {
+    "key": "the-nativity-of-saint-john-the-baptist",
+    "title": {
+     "en": "The Nativity of Saint John the Baptist",
+     "tl": "Pagsilang ni San Juan, ang Tagapagbinyag"
+    },
+    "designation": "Solemnity"
+   },
+   "options": []
+  },
+  {
+   "date": "2027-06-25",
+   "season": "ordinary_time",
+   "celebration": {
+    "key": "friday-in-ordinary-time-2027-06-25",
+    "title": {
+     "en": "Friday of the 12th Week in Ordinary Time",
+     "tl": "Biyernes sa Ikalabindalawang Linggo sa Karaniwang Panahon"
+    },
+    "designation": "Weekday / feria"
+   },
+   "options": []
+  },
+  {
+   "date": "2027-06-26",
+   "season": "ordinary_time",
+   "celebration": {
+    "key": "saturday-in-ordinary-time-2027-06-26",
+    "title": {
+     "en": "Saturday of the 12th Week in Ordinary Time",
+     "tl": "Sabado sa Ikalabindalawang Linggo sa Karaniwang Panahon"
+    },
+    "designation": "Weekday / feria"
+   },
+   "options": [
+    {
+     "key": "memorial-of-the-blessed-virgin-mary-on-saturday",
+     "title": {
+      "en": "The Memorial of the Blessed Virgin Mary on Saturday",
+      "tl": "Paggunita sa Mahal na Birheng Maria tuwing Sabado"
+     },
+     "designation": "Optional Memorial"
+    }
+   ]
+  },
+  {
+   "date": "2027-06-27",
+   "season": "ordinary_time",
+   "celebration": {
+    "key": "sunday-in-ordinary-time",
+    "title": {
+     "en": "13th Sunday in Ordinary Time",
+     "tl": "Ikalabintatlong Linggo sa Karaniwang Panahon"
+    },
+    "designation": "Sunday"
+   },
+   "options": []
+  },
+  {
+   "date": "2027-06-28",
+   "season": "ordinary_time",
+   "celebration": {
+    "key": "saint-irenaeus-bishop-and-martyr",
+    "title": {
+     "en": "Saint Irenaeus, bishop and martyr",
+     "tl": "San Ireneo, obispo at martir"
+    },
+    "designation": "Obligatory Memorial"
+   },
+   "options": []
+  },
+  {
+   "date": "2027-06-29",
+   "season": "ordinary_time",
+   "celebration": {
+    "key": "saints-peter-and-paul-apostles",
+    "title": {
+     "en": "Saints Peter and Paul, Apostles",
+     "tl": "San Pedro at San Pablo, mga Apostol"
+    },
+    "designation": "Solemnity"
+   },
+   "options": []
+  },
+  {
+   "date": "2027-06-30",
+   "season": "ordinary_time",
+   "celebration": {
+    "key": "wednesday-in-ordinary-time-2027-06-30",
+    "title": {
+     "en": "Wednesday of the 13th Week in Ordinary Time",
+     "tl": "Miyerkules sa Ikalabintatlong Linggo sa Karaniwang Panahon"
+    },
+    "designation": "Weekday / feria"
+   },
+   "options": [
+    {
+     "key": "first-martyrs-of-the-church-of-rome",
+     "title": {
+      "en": "First Martyrs of the Church of Rome",
+      "tl": "Mga Unang Martir ng Banal na Sambayanan ng Diyos sa Roma"
+     },
+     "designation": "Optional Memorial"
+    }
+   ]
+  },
+  {
+   "date": "2027-07-01",
+   "season": "ordinary_time",
+   "celebration": {
+    "key": "thursday-in-ordinary-time-2027-07-01",
+    "title": {
+     "en": "Thursday of the 13th Week in Ordinary Time",
+     "tl": "Huwebes sa Ikalabintatlong Linggo sa Karaniwang Panahon"
+    },
+    "designation": "Weekday / feria"
+   },
+   "options": []
+  },
+  {
+   "date": "2027-07-02",
+   "season": "ordinary_time",
+   "celebration": {
+    "key": "friday-in-ordinary-time-2027-07-02",
+    "title": {
+     "en": "Friday of the 13th Week in Ordinary Time",
+     "tl": "Biyernes sa Ikalabintatlong Linggo sa Karaniwang Panahon"
+    },
+    "designation": "Weekday / feria"
+   },
+   "options": []
+  },
+  {
+   "date": "2027-07-03",
+   "season": "ordinary_time",
+   "celebration": {
+    "key": "saint-thomas-the-apostle",
+    "title": {
+     "en": "Saint Thomas the Apostle",
+     "tl": "Santo Tomas, Apostol"
+    },
+    "designation": "Feast"
+   },
+   "options": []
+  },
+  {
+   "date": "2027-07-04",
+   "season": "ordinary_time",
+   "celebration": {
+    "key": "sunday-in-ordinary-time",
+    "title": {
+     "en": "14th Sunday in Ordinary Time",
+     "tl": "Ikalabing-apat na Linggo sa Karaniwang Panahon"
+    },
+    "designation": "Sunday"
+   },
+   "options": []
+  },
+  {
+   "date": "2027-07-05",
+   "season": "ordinary_time",
+   "celebration": {
+    "key": "monday-in-ordinary-time-2027-07-05",
+    "title": {
+     "en": "Monday of the 14th Week in Ordinary Time",
+     "tl": "Lunes sa Ikalabing-apat na Linggo sa Karaniwang Panahon"
+    },
+    "designation": "Weekday / feria"
+   },
+   "options": [
+    {
+     "key": "saint-anthony-zaccaria-priest",
+     "title": {
+      "en": "Saint Anthony Zaccaria, priest",
+      "tl": "San Antonio Maria Zaccaria, pari"
+     },
+     "designation": "Optional Memorial"
+    }
+   ]
+  },
+  {
+   "date": "2027-07-06",
+   "season": "ordinary_time",
+   "celebration": {
+    "key": "tuesday-in-ordinary-time-2027-07-06",
+    "title": {
+     "en": "Tuesday of the 14th Week in Ordinary Time",
+     "tl": "Martes sa Ikalabing-apat na Linggo sa Karaniwang Panahon"
+    },
+    "designation": "Weekday / feria"
+   },
+   "options": [
+    {
+     "key": "saint-maria-goretti-virgin-and-martyr",
+     "title": {
+      "en": "Saint Maria Goretti, virgin and martyr",
+      "tl": "Santa Maria Goretti, dalaga at martir"
+     },
+     "designation": "Optional Memorial"
+    }
+   ]
+  },
+  {
+   "date": "2027-07-07",
+   "season": "ordinary_time",
+   "celebration": {
+    "key": "wednesday-in-ordinary-time-2027-07-07",
+    "title": {
+     "en": "Wednesday of the 14th Week in Ordinary Time",
+     "tl": "Miyerkules sa Ikalabing-apat na Linggo sa Karaniwang Panahon"
+    },
+    "designation": "Weekday / feria"
+   },
+   "options": []
+  },
+  {
+   "date": "2027-07-08",
+   "season": "ordinary_time",
+   "celebration": {
+    "key": "thursday-in-ordinary-time-2027-07-08",
+    "title": {
+     "en": "Thursday of the 14th Week in Ordinary Time",
+     "tl": "Huwebes sa Ikalabing-apat na Linggo sa Karaniwang Panahon"
+    },
+    "designation": "Weekday / feria"
+   },
+   "options": []
+  },
+  {
+   "date": "2027-07-09",
+   "season": "ordinary_time",
+   "celebration": {
+    "key": "friday-in-ordinary-time-2027-07-09",
+    "title": {
+     "en": "Friday of the 14th Week in Ordinary Time",
+     "tl": "Biyernes sa Ikalabing-apat na Linggo sa Karaniwang Panahon"
+    },
+    "designation": "Weekday / feria"
+   },
+   "options": [
+    {
+     "key": "saint-augustine-zhao-rong-and-companions-martyrs",
+     "title": {
+      "en": "Saint Augustine Zhao Rong and companions, martyrs",
+      "tl": "San Agustin Zhao Rong, pari at martir, at mga Kasama, mga martir"
+     },
+     "designation": "Optional Memorial"
+    }
+   ]
+  },
+  {
+   "date": "2027-07-10",
+   "season": "ordinary_time",
+   "celebration": {
+    "key": "saturday-in-ordinary-time-2027-07-10",
+    "title": {
+     "en": "Saturday of the 14th Week in Ordinary Time",
+     "tl": "Sabado sa Ikalabing-apat na Linggo sa Karaniwang Panahon"
+    },
+    "designation": "Weekday / feria"
+   },
+   "options": [
+    {
+     "key": "memorial-of-the-blessed-virgin-mary-on-saturday",
+     "title": {
+      "en": "The Memorial of the Blessed Virgin Mary on Saturday",
+      "tl": "Paggunita sa Mahal na Birheng Maria tuwing Sabado"
+     },
+     "designation": "Optional Memorial"
+    }
+   ]
+  },
+  {
+   "date": "2027-07-11",
+   "season": "ordinary_time",
+   "celebration": {
+    "key": "sunday-in-ordinary-time",
+    "title": {
+     "en": "15th Sunday in Ordinary Time",
+     "tl": "Ikalabinlimang Linggo sa Karaniwang Panahon"
+    },
+    "designation": "Sunday"
+   },
+   "options": []
+  },
+  {
+   "date": "2027-07-12",
+   "season": "ordinary_time",
+   "celebration": {
+    "key": "monday-in-ordinary-time-2027-07-12",
+    "title": {
+     "en": "Monday of the 15th Week in Ordinary Time",
+     "tl": "Lunes sa Ikalabinlimang Linggo sa Karaniwang Panahon"
+    },
+    "designation": "Weekday / feria"
+   },
+   "options": []
+  },
+  {
+   "date": "2027-07-13",
+   "season": "ordinary_time",
+   "celebration": {
+    "key": "tuesday-in-ordinary-time-2027-07-13",
+    "title": {
+     "en": "Tuesday of the 15th Week in Ordinary Time",
+     "tl": "Martes sa Ikalabinlimang Linggo sa Karaniwang Panahon"
+    },
+    "designation": "Weekday / feria"
+   },
+   "options": [
+    {
+     "key": "saint-henry",
+     "title": {
+      "en": "Saint Henry",
+      "tl": "San Enrico"
+     },
+     "designation": "Optional Memorial"
+    }
+   ]
+  },
+  {
+   "date": "2027-07-14",
+   "season": "ordinary_time",
+   "celebration": {
+    "key": "wednesday-in-ordinary-time-2027-07-14",
+    "title": {
+     "en": "Wednesday of the 15th Week in Ordinary Time",
+     "tl": "Miyerkules sa Ikalabinlimang Linggo sa Karaniwang Panahon"
+    },
+    "designation": "Weekday / feria"
+   },
+   "options": [
+    {
+     "key": "saint-camillus-de-lellis-priest",
+     "title": {
+      "en": "Saint Camillus de Lellis, priest",
+      "tl": "San Camilo ng Lellis, pari"
+     },
+     "designation": "Optional Memorial"
+    }
+   ]
+  },
+  {
+   "date": "2027-07-15",
+   "season": "ordinary_time",
+   "celebration": {
+    "key": "saint-bonaventure-bishop-and-doctor",
+    "title": {
+     "en": "Saint Bonaventure, bishop and doctor",
+     "tl": "San Buenaventura, obispo at pantas ng Simbahan"
+    },
+    "designation": "Obligatory Memorial"
+   },
+   "options": []
+  },
+  {
+   "date": "2027-07-16",
+   "season": "ordinary_time",
+   "celebration": {
+    "key": "friday-in-ordinary-time-2027-07-16",
+    "title": {
+     "en": "Friday of the 15th Week in Ordinary Time",
+     "tl": "Biyernes sa Ikalabinlimang Linggo sa Karaniwang Panahon"
+    },
+    "designation": "Weekday / feria"
+   },
+   "options": [
+    {
+     "key": "our-lady-of-mount-carmel",
+     "title": {
+      "en": "Our Lady of Mount Carmel",
+      "tl": "Mahal na Birheng Maria ng Bundok del Carmen"
+     },
+     "designation": "Optional Memorial"
+    }
+   ]
+  },
+  {
+   "date": "2027-07-17",
+   "season": "ordinary_time",
+   "celebration": {
+    "key": "saturday-in-ordinary-time-2027-07-17",
+    "title": {
+     "en": "Saturday of the 15th Week in Ordinary Time",
+     "tl": "Sabado sa Ikalabinlimang Linggo sa Karaniwang Panahon"
+    },
+    "designation": "Weekday / feria"
+   },
+   "options": [
+    {
+     "key": "memorial-of-the-blessed-virgin-mary-on-saturday",
+     "title": {
+      "en": "The Memorial of the Blessed Virgin Mary on Saturday",
+      "tl": "Paggunita sa Mahal na Birheng Maria tuwing Sabado"
+     },
+     "designation": "Optional Memorial"
+    }
+   ]
+  },
+  {
+   "date": "2027-07-18",
+   "season": "ordinary_time",
+   "celebration": {
+    "key": "sunday-in-ordinary-time",
+    "title": {
+     "en": "16th Sunday in Ordinary Time",
+     "tl": "Ikalabing-anim na Linggo sa Karaniwang Panahon"
+    },
+    "designation": "Sunday"
+   },
+   "options": []
+  },
+  {
+   "date": "2027-07-19",
+   "season": "ordinary_time",
+   "celebration": {
+    "key": "monday-in-ordinary-time-2027-07-19",
+    "title": {
+     "en": "Monday of the 16th Week in Ordinary Time",
+     "tl": "Lunes sa Ikalabing-anim na Linggo sa Karaniwang Panahon"
+    },
+    "designation": "Weekday / feria"
+   },
+   "options": []
+  },
+  {
+   "date": "2027-07-20",
+   "season": "ordinary_time",
+   "celebration": {
+    "key": "tuesday-in-ordinary-time-2027-07-20",
+    "title": {
+     "en": "Tuesday of the 16th Week in Ordinary Time",
+     "tl": "Martes sa Ikalabing-anim na Linggo sa Karaniwang Panahon"
+    },
+    "designation": "Weekday / feria"
+   },
+   "options": [
+    {
+     "key": "saint-apollinaris-bishop-and-martyr",
+     "title": {
+      "en": "Saint Apollinaris, bishop and martyr",
+      "tl": "San Apolinar, obispo at martir"
+     },
+     "designation": "Optional Memorial"
+    }
+   ]
+  },
+  {
+   "date": "2027-07-21",
+   "season": "ordinary_time",
+   "celebration": {
+    "key": "wednesday-in-ordinary-time-2027-07-21",
+    "title": {
+     "en": "Wednesday of the 16th Week in Ordinary Time",
+     "tl": "Miyerkules sa Ikalabing-anim na Linggo sa Karaniwang Panahon"
+    },
+    "designation": "Weekday / feria"
+   },
+   "options": [
+    {
+     "key": "saint-lawrence-of-brindisi-priest-and-doctor",
+     "title": {
+      "en": "Saint Lawrence of Brindisi, priest and doctor",
+      "tl": "San Lorenzo ng Brindisi, pari at pantas ng Simbahan"
+     },
+     "designation": "Optional Memorial"
+    }
+   ]
+  },
+  {
+   "date": "2027-07-22",
+   "season": "ordinary_time",
+   "celebration": {
+    "key": "saint-mary-magdalene",
+    "title": {
+     "en": "Saint Mary Magdalene",
+     "tl": "Santa Maria Magdalena"
+    },
+    "designation": "Feast"
+   },
+   "options": []
+  },
+  {
+   "date": "2027-07-23",
+   "season": "ordinary_time",
+   "celebration": {
+    "key": "friday-in-ordinary-time-2027-07-23",
+    "title": {
+     "en": "Friday of the 16th Week in Ordinary Time",
+     "tl": "Biyernes sa Ikalabing-anim na Linggo sa Karaniwang Panahon"
+    },
+    "designation": "Weekday / feria"
+   },
+   "options": [
+    {
+     "key": "saint-birgitta-religious",
+     "title": {
+      "en": "Saint Birgitta, religious",
+      "tl": "Santa Brigida ng Sweden, namanata sa Diyos"
+     },
+     "designation": "Optional Memorial"
+    }
+   ]
+  },
+  {
+   "date": "2027-07-24",
+   "season": "ordinary_time",
+   "celebration": {
+    "key": "saturday-in-ordinary-time-2027-07-24",
+    "title": {
+     "en": "Saturday of the 16th Week in Ordinary Time",
+     "tl": "Sabado sa Ikalabing-anim na Linggo sa Karaniwang Panahon"
+    },
+    "designation": "Weekday / feria"
+   },
+   "options": [
+    {
+     "key": "saint-sharbel-makhluf-hermit",
+     "title": {
+      "en": "Saint Sharbel Makhluf, hermit",
+      "tl": "San Sharbel Makhluf, pari"
+     },
+     "designation": "Optional Memorial"
+    },
+    {
+     "key": "memorial-of-the-blessed-virgin-mary-on-saturday",
+     "title": {
+      "en": "The Memorial of the Blessed Virgin Mary on Saturday",
+      "tl": "Paggunita sa Mahal na Birheng Maria tuwing Sabado"
+     },
+     "designation": "Optional Memorial"
+    }
+   ]
+  },
+  {
+   "date": "2027-07-25",
+   "season": "ordinary_time",
+   "celebration": {
+    "key": "sunday-in-ordinary-time",
+    "title": {
+     "en": "17th Sunday in Ordinary Time",
+     "tl": "Ikalabimpitong Linggo sa Karaniwang Panahon"
+    },
+    "designation": "Sunday"
+   },
+   "options": []
+  },
+  {
+   "date": "2027-07-26",
+   "season": "ordinary_time",
+   "celebration": {
+    "key": "saints-joachim-and-anne",
+    "title": {
+     "en": "Saints Joachim and Anne",
+     "tl": "San Joaquin at Santa Ana, mga magulang ng Mahal na Birheng Maria"
+    },
+    "designation": "Obligatory Memorial"
+   },
+   "options": []
+  },
+  {
+   "date": "2027-07-27",
+   "season": "ordinary_time",
+   "celebration": {
+    "key": "tuesday-in-ordinary-time-2027-07-27",
+    "title": {
+     "en": "Tuesday of the 17th Week in Ordinary Time",
+     "tl": "Martes sa Ikalabimpitong Linggo sa Karaniwang Panahon"
+    },
+    "designation": "Weekday / feria"
+   },
+   "options": []
+  },
+  {
+   "date": "2027-07-28",
+   "season": "ordinary_time",
+   "celebration": {
+    "key": "wednesday-in-ordinary-time-2027-07-28",
+    "title": {
+     "en": "Wednesday of the 17th Week in Ordinary Time",
+     "tl": "Miyerkules sa Ikalabimpitong Linggo sa Karaniwang Panahon"
+    },
+    "designation": "Weekday / feria"
+   },
+   "options": []
+  },
+  {
+   "date": "2027-07-29",
+   "season": "ordinary_time",
+   "celebration": {
+    "key": "saint-martha",
+    "title": {
+     "en": "Saint Martha, Saint Mary and Saint Lazarus, the siblings from Bethany",
+     "tl": "Santa Marta, Santa Maria at San Lazaro, mga magkakapatid mula sa Betania"
+    },
+    "designation": "Obligatory Memorial"
+   },
+   "options": []
+  },
+  {
+   "date": "2027-07-30",
+   "season": "ordinary_time",
+   "celebration": {
+    "key": "friday-in-ordinary-time-2027-07-30",
+    "title": {
+     "en": "Friday of the 17th Week in Ordinary Time",
+     "tl": "Biyernes sa Ikalabimpitong Linggo sa Karaniwang Panahon"
+    },
+    "designation": "Weekday / feria"
+   },
+   "options": [
+    {
+     "key": "saint-peter-chrysologus-bishop-and-doctor",
+     "title": {
+      "en": "Saint Peter Chrysologus, bishop and doctor",
+      "tl": "San Pedro Crisologo, obispo at pantas ng Simbahan"
+     },
+     "designation": "Optional Memorial"
+    }
+   ]
+  },
+  {
+   "date": "2027-07-31",
+   "season": "ordinary_time",
+   "celebration": {
+    "key": "saint-ignatius-of-loyola-priest",
+    "title": {
+     "en": "Saint Ignatius of Loyola, priest",
+     "tl": "San Ignacio ng Loyola, pari"
+    },
+    "designation": "Obligatory Memorial"
+   },
+   "options": []
+  },
+  {
+   "date": "2027-08-01",
+   "season": "ordinary_time",
+   "celebration": {
+    "key": "sunday-in-ordinary-time",
+    "title": {
+     "en": "18th Sunday in Ordinary Time",
+     "tl": "Ikalabingwalong Linggo sa Karaniwang Panahon"
+    },
+    "designation": "Sunday"
+   },
+   "options": []
+  },
+  {
+   "date": "2027-08-02",
+   "season": "ordinary_time",
+   "celebration": {
+    "key": "monday-in-ordinary-time-2027-08-02",
+    "title": {
+     "en": "Monday of the 18th Week in Ordinary Time",
+     "tl": "Lunes sa Ikalabingwalong Linggo sa Karaniwang Panahon"
+    },
+    "designation": "Weekday / feria"
+   },
+   "options": [
+    {
+     "key": "saint-eusebius-of-vercelli-bishop",
+     "title": {
+      "en": "Saint Eusebius of Vercelli, bishop",
+      "tl": "San Eusebio ng Vercelli, obispo"
+     },
+     "designation": "Optional Memorial"
+    },
+    {
+     "key": "saint-peter-julian-eymard-priest",
+     "title": {
+      "en": "Saint Peter Julian Eymard, priest",
+      "tl": "San Pedro Julian Eymard, pari"
+     },
+     "designation": "Optional Memorial"
+    }
+   ]
+  },
+  {
+   "date": "2027-08-03",
+   "season": "ordinary_time",
+   "celebration": {
+    "key": "tuesday-in-ordinary-time-2027-08-03",
+    "title": {
+     "en": "Tuesday of the 18th Week in Ordinary Time",
+     "tl": "Martes sa Ikalabingwalong Linggo sa Karaniwang Panahon"
+    },
+    "designation": "Weekday / feria"
+   },
+   "options": []
+  },
+  {
+   "date": "2027-08-04",
+   "season": "ordinary_time",
+   "celebration": {
+    "key": "saint-jean-vianney-the-cur-of-ars-priest",
+    "title": {
+     "en": "Saint John Vianney (the Curé of Ars), priest",
+     "tl": "San Juan Maria Vianney, pari"
+    },
+    "designation": "Obligatory Memorial"
+   },
+   "options": []
+  },
+  {
+   "date": "2027-08-05",
+   "season": "ordinary_time",
+   "celebration": {
+    "key": "thursday-in-ordinary-time-2027-08-05",
+    "title": {
+     "en": "Thursday of the 18th Week in Ordinary Time",
+     "tl": "Huwebes sa Ikalabingwalong Linggo sa Karaniwang Panahon"
+    },
+    "designation": "Weekday / feria"
+   },
+   "options": [
+    {
+     "key": "dedication-of-the-basilica-of-saint-mary-major",
+     "title": {
+      "en": "Dedication of the Basilica of Saint Mary Major",
+      "tl": "Pagtatalaga sa Palasyong Simbahan ng Mahal na Birheng Maria sa Roma"
+     },
+     "designation": "Optional Memorial"
+    }
+   ]
+  },
+  {
+   "date": "2027-08-06",
+   "season": "ordinary_time",
+   "celebration": {
+    "key": "the-transfiguration-of-the-lord",
+    "title": {
+     "en": "The Transfiguration of the Lord",
+     "tl": "Pagliliwanag sa Bagong Anyo ng Panginoon"
+    },
+    "designation": "Feast of the Lord"
+   },
+   "options": []
+  },
+  {
+   "date": "2027-08-07",
+   "season": "ordinary_time",
+   "celebration": {
+    "key": "saturday-in-ordinary-time-2027-08-07",
+    "title": {
+     "en": "Saturday of the 18th Week in Ordinary Time",
+     "tl": "Sabado sa Ikalabingwalong Linggo sa Karaniwang Panahon"
+    },
+    "designation": "Weekday / feria"
+   },
+   "options": [
+    {
+     "key": "saint-cajetan-priest",
+     "title": {
+      "en": "Saint Cajetan, priest",
+      "tl": "San Cayetano, pari"
+     },
+     "designation": "Optional Memorial"
+    },
+    {
+     "key": "saint-sixtus-ii-pope-and-companions-martyrs",
+     "title": {
+      "en": "Saint Sixtus II, pope, and companions, martyrs",
+      "tl": "San Sixto II, papa, at mga kasama, mga martir"
+     },
+     "designation": "Optional Memorial"
+    },
+    {
+     "key": "memorial-of-the-blessed-virgin-mary-on-saturday",
+     "title": {
+      "en": "The Memorial of the Blessed Virgin Mary on Saturday",
+      "tl": "Paggunita sa Mahal na Birheng Maria tuwing Sabado"
+     },
+     "designation": "Optional Memorial"
+    }
+   ]
+  },
+  {
+   "date": "2027-08-08",
+   "season": "ordinary_time",
+   "celebration": {
+    "key": "sunday-in-ordinary-time",
+    "title": {
+     "en": "19th Sunday in Ordinary Time",
+     "tl": "Ikalabinsiyam na Linggo sa Karaniwang Panahon"
+    },
+    "designation": "Sunday"
+   },
+   "options": []
+  },
+  {
+   "date": "2027-08-09",
+   "season": "ordinary_time",
+   "celebration": {
+    "key": "monday-in-ordinary-time-2027-08-09",
+    "title": {
+     "en": "Monday of the 19th Week in Ordinary Time",
+     "tl": "Lunes sa Ikalabinsiyam na Linggo sa Karaniwang Panahon"
+    },
+    "designation": "Weekday / feria"
+   },
+   "options": [
+    {
+     "key": "saint-teresa-benedicta-of-the-cross-edith-stein-virgin-and-martyr",
+     "title": {
+      "en": "Saint Teresa Benedicta of the Cross (Edith Stein), virgin and martyr",
+      "tl": "Santa Teresa Benedicta dela Cruz, dalaga at martir"
+     },
+     "designation": "Optional Memorial"
+    }
+   ]
+  },
+  {
+   "date": "2027-08-10",
+   "season": "ordinary_time",
+   "celebration": {
+    "key": "saint-lawrence-deacon-and-martyr",
+    "title": {
+     "en": "Saint Lawrence, Deacon and Martyr",
+     "tl": "San Lorenzo, diyakono at martir"
+    },
+    "designation": "Feast"
+   },
+   "options": []
+  },
+  {
+   "date": "2027-08-11",
+   "season": "ordinary_time",
+   "celebration": {
+    "key": "saint-clare-virgin",
+    "title": {
+     "en": "Saint Clare, virgin",
+     "tl": "Santa Clara ng Assisi, dalaga"
+    },
+    "designation": "Obligatory Memorial"
+   },
+   "options": []
+  },
+  {
+   "date": "2027-08-12",
+   "season": "ordinary_time",
+   "celebration": {
+    "key": "thursday-in-ordinary-time-2027-08-12",
+    "title": {
+     "en": "Thursday of the 19th Week in Ordinary Time",
+     "tl": "Huwebes sa Ikalabinsiyam na Linggo sa Karaniwang Panahon"
+    },
+    "designation": "Weekday / feria"
+   },
+   "options": [
+    {
+     "key": "saint-jane-frances-de-chantal-religious",
+     "title": {
+      "en": "Saint Jane Frances de Chantal, religious",
+      "tl": "Santa Juana Francisca de Chantal, namanata sa Diyos"
+     },
+     "designation": "Optional Memorial"
+    }
+   ]
+  },
+  {
+   "date": "2027-08-13",
+   "season": "ordinary_time",
+   "celebration": {
+    "key": "friday-in-ordinary-time-2027-08-13",
+    "title": {
+     "en": "Friday of the 19th Week in Ordinary Time",
+     "tl": "Biyernes sa Ikalabinsiyam na Linggo sa Karaniwang Panahon"
+    },
+    "designation": "Weekday / feria"
+   },
+   "options": [
+    {
+     "key": "saints-pontian-pope-and-hippolytus-priest-martyrs",
+     "title": {
+      "en": "Saints Pontian, pope, and Hippolytus, priest, martyrs",
+      "tl": "San Ponciano, papa, at San Hipolito, pari, mga martir"
+     },
+     "designation": "Optional Memorial"
+    }
+   ]
+  },
+  {
+   "date": "2027-08-14",
+   "season": "ordinary_time",
+   "celebration": {
+    "key": "saint-maximilian-mary-kolbe-priest-and-martyr",
+    "title": {
+     "en": "Saint Maximilian Mary Kolbe, priest and martyr",
+     "tl": "Dakilang Kapistahan ng Pag-aakyat sa Langit sa Mahal na Birheng Maria"
+    },
+    "designation": "Obligatory Memorial"
+   },
+   "options": []
+  },
+  {
+   "date": "2027-08-15",
+   "season": "ordinary_time",
+   "celebration": {
+    "key": "the-assumption-of-the-blessed-virgin-mary",
+    "title": {
+     "en": "The Assumption of the Blessed Virgin Mary",
+     "tl": "Pag-aakyat sa Langit ng Mahal na Birheng Maria"
+    },
+    "designation": "Solemnity"
+   },
+   "options": []
+  },
+  {
+   "date": "2027-08-16",
+   "season": "ordinary_time",
+   "celebration": {
+    "key": "monday-in-ordinary-time-2027-08-16",
+    "title": {
+     "en": "Monday of the 20th Week in Ordinary Time",
+     "tl": "Lunes sa Ikadalawampung Linggo sa Karaniwang Panahon"
+    },
+    "designation": "Weekday / feria"
+   },
+   "options": [
+    {
+     "key": "saint-stephen-of-hungary",
+     "title": {
+      "en": "Saint Stephen of Hungary",
+      "tl": "San Esteban ng Unggaria"
+     },
+     "designation": "Optional Memorial"
+    }
+   ]
+  },
+  {
+   "date": "2027-08-17",
+   "season": "ordinary_time",
+   "celebration": {
+    "key": "tuesday-in-ordinary-time-2027-08-17",
+    "title": {
+     "en": "Tuesday of the 20th Week in Ordinary Time",
+     "tl": "Martes sa Ikadalawampung Linggo sa Karaniwang Panahon"
+    },
+    "designation": "Weekday / feria"
+   },
+   "options": []
+  },
+  {
+   "date": "2027-08-18",
+   "season": "ordinary_time",
+   "celebration": {
+    "key": "wednesday-in-ordinary-time-2027-08-18",
+    "title": {
+     "en": "Wednesday of the 20th Week in Ordinary Time",
+     "tl": "Miyerkules sa Ikadalawampung Linggo sa Karaniwang Panahon"
+    },
+    "designation": "Weekday / feria"
+   },
+   "options": []
+  },
+  {
+   "date": "2027-08-19",
+   "season": "ordinary_time",
+   "celebration": {
+    "key": "st-ezequiel-moreno",
+    "title": {
+     "en": "Saint Ezequiel Moreno, Bishop",
+     "tl": "San Ezequiel Moreno, obispo"
+    },
+    "designation": "Obligatory Memorial"
+   },
+   "options": []
+  },
+  {
+   "date": "2027-08-20",
+   "season": "ordinary_time",
+   "celebration": {
+    "key": "saint-bernard-of-clairvaux-abbot-and-doctor-of-the-church",
+    "title": {
+     "en": "Saint Bernard of Clairvaux, abbot and doctor of the Church",
+     "tl": "San Bernardo, abad at pantas ng Simbahan"
+    },
+    "designation": "Obligatory Memorial"
+   },
+   "options": []
+  },
+  {
+   "date": "2027-08-21",
+   "season": "ordinary_time",
+   "celebration": {
+    "key": "saint-pius-x-pope",
+    "title": {
+     "en": "Saint Pius X, pope",
+     "tl": "San Pio X, papa"
+    },
+    "designation": "Obligatory Memorial"
+   },
+   "options": []
+  },
+  {
+   "date": "2027-08-22",
+   "season": "ordinary_time",
+   "celebration": {
+    "key": "sunday-in-ordinary-time",
+    "title": {
+     "en": "21st Sunday in Ordinary Time",
+     "tl": "Ikadalawampu't isang Linggo sa Karaniwang Panahon"
+    },
+    "designation": "Sunday"
+   },
+   "options": []
+  },
+  {
+   "date": "2027-08-23",
+   "season": "ordinary_time",
+   "celebration": {
+    "key": "st-rose-of-lima",
+    "title": {
+     "en": "Saint Rose of Lima, Virgin, Secondary Patroness of the Philippines",
+     "tl": "Santa Rosa ng Lima, Birhen"
+    },
+    "designation": "Obligatory Memorial"
+   },
+   "options": []
+  },
+  {
+   "date": "2027-08-24",
+   "season": "ordinary_time",
+   "celebration": {
+    "key": "saint-bartholomew-the-apostle",
+    "title": {
+     "en": "Saint Bartholomew the Apostle",
+     "tl": "San Bartolome, Apostol"
+    },
+    "designation": "Feast"
+   },
+   "options": []
+  },
+  {
+   "date": "2027-08-25",
+   "season": "ordinary_time",
+   "celebration": {
+    "key": "wednesday-in-ordinary-time-2027-08-25",
+    "title": {
+     "en": "Wednesday of the 21st Week in Ordinary Time",
+     "tl": "Miyerkules sa Ikadalawampu't isang Linggo sa Karaniwang Panahon"
+    },
+    "designation": "Weekday / feria"
+   },
+   "options": [
+    {
+     "key": "saint-joseph-of-calasanz-priest",
+     "title": {
+      "en": "Saint Joseph of Calasanz, priest",
+      "tl": "San Jose de Calasanz, pari"
+     },
+     "designation": "Optional Memorial"
+    },
+    {
+     "key": "saint-louis",
+     "title": {
+      "en": "Saint Louis",
+      "tl": "San Luis"
+     },
+     "designation": "Optional Memorial"
+    }
+   ]
+  },
+  {
+   "date": "2027-08-26",
+   "season": "ordinary_time",
+   "celebration": {
+    "key": "thursday-in-ordinary-time-2027-08-26",
+    "title": {
+     "en": "Thursday of the 21st Week in Ordinary Time",
+     "tl": "Huwebes sa Ikadalawampu't isang Linggo sa Karaniwang Panahon"
+    },
+    "designation": "Weekday / feria"
+   },
+   "options": []
+  },
+  {
+   "date": "2027-08-27",
+   "season": "ordinary_time",
+   "celebration": {
+    "key": "saint-monica",
+    "title": {
+     "en": "Saint Monica",
+     "tl": "Santa Monica"
+    },
+    "designation": "Obligatory Memorial"
+   },
+   "options": []
+  },
+  {
+   "date": "2027-08-28",
+   "season": "ordinary_time",
+   "celebration": {
+    "key": "saint-augustine-of-hippo-bishop-and-doctor-of-the-church",
+    "title": {
+     "en": "Saint Augustine of Hippo, bishop and doctor of the Church",
+     "tl": "San Agustin, obispo at pantas ng Simbahan"
+    },
+    "designation": "Obligatory Memorial"
+   },
+   "options": []
+  },
+  {
+   "date": "2027-08-29",
+   "season": "ordinary_time",
+   "celebration": {
+    "key": "sunday-in-ordinary-time",
+    "title": {
+     "en": "22nd Sunday in Ordinary Time",
+     "tl": "Ikadalawampu't dalawang Linggo sa Karaniwang Panahon"
+    },
+    "designation": "Sunday"
+   },
+   "options": []
+  },
+  {
+   "date": "2027-08-30",
+   "season": "ordinary_time",
+   "celebration": {
+    "key": "monday-in-ordinary-time-2027-08-30",
+    "title": {
+     "en": "Monday of the 22nd Week in Ordinary Time",
+     "tl": "Lunes sa Ikadalawampu't dalawang Linggo sa Karaniwang Panahon"
+    },
+    "designation": "Weekday / feria"
+   },
+   "options": []
+  },
+  {
+   "date": "2027-08-31",
+   "season": "ordinary_time",
+   "celebration": {
+    "key": "tuesday-in-ordinary-time-2027-08-31",
+    "title": {
+     "en": "Tuesday of the 22nd Week in Ordinary Time",
+     "tl": "Martes sa Ikadalawampu't dalawang Linggo sa Karaniwang Panahon"
+    },
+    "designation": "Weekday / feria"
+   },
+   "options": []
+  },
+  {
+   "date": "2027-09-01",
+   "season": "ordinary_time",
+   "celebration": {
+    "key": "wednesday-in-ordinary-time-2027-09-01",
+    "title": {
+     "en": "Wednesday of the 22nd Week in Ordinary Time",
+     "tl": "Miyerkules sa Ikadalawampu't dalawang Linggo sa Karaniwang Panahon"
+    },
+    "designation": "Weekday / feria"
+   },
+   "options": []
+  },
+  {
+   "date": "2027-09-02",
+   "season": "ordinary_time",
+   "celebration": {
+    "key": "thursday-in-ordinary-time-2027-09-02",
+    "title": {
+     "en": "Thursday of the 22nd Week in Ordinary Time",
+     "tl": "Huwebes sa Ikadalawampu't dalawang Linggo sa Karaniwang Panahon"
+    },
+    "designation": "Weekday / feria"
+   },
+   "options": []
+  },
+  {
+   "date": "2027-09-03",
+   "season": "ordinary_time",
+   "celebration": {
+    "key": "saint-gregory-the-great-pope-and-doctor",
+    "title": {
+     "en": "Saint Gregory the Great, pope and doctor",
+     "tl": "Dakilang Papa San Gregorio, pantas ng Simbahan"
+    },
+    "designation": "Obligatory Memorial"
+   },
+   "options": []
+  },
+  {
+   "date": "2027-09-04",
+   "season": "ordinary_time",
+   "celebration": {
+    "key": "saturday-in-ordinary-time-2027-09-04",
+    "title": {
+     "en": "Saturday of the 22nd Week in Ordinary Time",
+     "tl": "Sabado sa Ikadalawampu't dalawang Linggo sa Karaniwang Panahon"
+    },
+    "designation": "Weekday / feria"
+   },
+   "options": [
+    {
+     "key": "memorial-of-the-blessed-virgin-mary-on-saturday",
+     "title": {
+      "en": "The Memorial of the Blessed Virgin Mary on Saturday",
+      "tl": "Paggunita sa Mahal na Birheng Maria tuwing Sabado"
+     },
+     "designation": "Optional Memorial"
+    }
+   ]
+  },
+  {
+   "date": "2027-09-05",
+   "season": "ordinary_time",
+   "celebration": {
+    "key": "sunday-in-ordinary-time",
+    "title": {
+     "en": "23rd Sunday in Ordinary Time",
+     "tl": "Ikadalawampu't tatlong Linggo sa Karaniwang Panahon"
+    },
+    "designation": "Sunday"
+   },
+   "options": []
+  },
+  {
+   "date": "2027-09-06",
+   "season": "ordinary_time",
+   "celebration": {
+    "key": "monday-in-ordinary-time-2027-09-06",
+    "title": {
+     "en": "Monday of the 23rd Week in Ordinary Time",
+     "tl": "Lunes sa Ikadalawampu't tatlong Linggo sa Karaniwang Panahon"
+    },
+    "designation": "Weekday / feria"
+   },
+   "options": []
+  },
+  {
+   "date": "2027-09-07",
+   "season": "ordinary_time",
+   "celebration": {
+    "key": "tuesday-in-ordinary-time-2027-09-07",
+    "title": {
+     "en": "Tuesday of the 23rd Week in Ordinary Time",
+     "tl": "Martes sa Ikadalawampu't tatlong Linggo sa Karaniwang Panahon"
+    },
+    "designation": "Weekday / feria"
+   },
+   "options": []
+  },
+  {
+   "date": "2027-09-08",
+   "season": "ordinary_time",
+   "celebration": {
+    "key": "the-nativity-of-the-blessed-virgin-mary",
+    "title": {
+     "en": "The Nativity of the Blessed Virgin Mary",
+     "tl": "Pagsilang ng Mahal na Birheng Maria"
+    },
+    "designation": "Feast"
+   },
+   "options": []
+  },
+  {
+   "date": "2027-09-09",
+   "season": "ordinary_time",
+   "celebration": {
+    "key": "thursday-in-ordinary-time-2027-09-09",
+    "title": {
+     "en": "Thursday of the 23rd Week in Ordinary Time",
+     "tl": "Huwebes sa Ikadalawampu't tatlong Linggo sa Karaniwang Panahon"
+    },
+    "designation": "Weekday / feria"
+   },
+   "options": [
+    {
+     "key": "saint-peter-claver-priest",
+     "title": {
+      "en": "Saint Peter Claver, priest",
+      "tl": "San Pedro Claver, pari"
+     },
+     "designation": "Optional Memorial"
+    }
+   ]
+  },
+  {
+   "date": "2027-09-10",
+   "season": "ordinary_time",
+   "celebration": {
+    "key": "friday-in-ordinary-time-2027-09-10",
+    "title": {
+     "en": "Friday of the 23rd Week in Ordinary Time",
+     "tl": "Biyernes sa Ikadalawampu't tatlong Linggo sa Karaniwang Panahon"
+    },
+    "designation": "Weekday / feria"
+   },
+   "options": []
+  },
+  {
+   "date": "2027-09-11",
+   "season": "ordinary_time",
+   "celebration": {
+    "key": "saturday-in-ordinary-time-2027-09-11",
+    "title": {
+     "en": "Saturday of the 23rd Week in Ordinary Time",
+     "tl": "Sabado sa Ikadalawampu't tatlong Linggo sa Karaniwang Panahon"
+    },
+    "designation": "Weekday / feria"
+   },
+   "options": [
+    {
+     "key": "memorial-of-the-blessed-virgin-mary-on-saturday",
+     "title": {
+      "en": "The Memorial of the Blessed Virgin Mary on Saturday",
+      "tl": "Paggunita sa Mahal na Birheng Maria tuwing Sabado"
+     },
+     "designation": "Optional Memorial"
+    }
+   ]
+  },
+  {
+   "date": "2027-09-12",
+   "season": "ordinary_time",
+   "celebration": {
+    "key": "sunday-in-ordinary-time",
+    "title": {
+     "en": "24th Sunday in Ordinary Time",
+     "tl": "Ikadalawampu't apat na Linggo sa Karaniwang Panahon"
+    },
+    "designation": "Sunday"
+   },
+   "options": []
+  },
+  {
+   "date": "2027-09-13",
+   "season": "ordinary_time",
+   "celebration": {
+    "key": "saint-john-chrysostom-bishop-and-doctor",
+    "title": {
+     "en": "Saint John Chrysostom, bishop and doctor",
+     "tl": "San Juan Crisostomo, obispo at pantas ng Simbahan"
+    },
+    "designation": "Obligatory Memorial"
+   },
+   "options": []
+  },
+  {
+   "date": "2027-09-14",
+   "season": "ordinary_time",
+   "celebration": {
+    "key": "the-exaltation-of-the-holy-cross",
+    "title": {
+     "en": "The Exaltation of the Holy Cross",
+     "tl": "Pagtataas ng Banal na Krus"
+    },
+    "designation": "Feast of the Lord"
+   },
+   "options": []
+  },
+  {
+   "date": "2027-09-15",
+   "season": "ordinary_time",
+   "celebration": {
+    "key": "our-lady-of-sorrows",
+    "title": {
+     "en": "Our Lady of Sorrows",
+     "tl": "Mahal na Birheng Maria na Nagdadalamhati"
+    },
+    "designation": "Obligatory Memorial"
+   },
+   "options": []
+  },
+  {
+   "date": "2027-09-16",
+   "season": "ordinary_time",
+   "celebration": {
+    "key": "saints-cornelius-pope-and-cyprian-bishop-martyrs",
+    "title": {
+     "en": "Saints Cornelius, pope, and Cyprian, bishop, martyrs",
+     "tl": "San Cornelio, papa, at San Cipriano, obispo, mga martir"
+    },
+    "designation": "Obligatory Memorial"
+   },
+   "options": []
+  },
+  {
+   "date": "2027-09-17",
+   "season": "ordinary_time",
+   "celebration": {
+    "key": "friday-in-ordinary-time-2027-09-17",
+    "title": {
+     "en": "Friday of the 24th Week in Ordinary Time",
+     "tl": "Biyernes sa Ikadalawampu't apat na Linggo sa Karaniwang Panahon"
+    },
+    "designation": "Weekday / feria"
+   },
+   "options": [
+    {
+     "key": "saint-robert-bellarmine-bishop-and-doctor",
+     "title": {
+      "en": "Saint Robert Bellarmine, bishop and doctor",
+      "tl": "San Roberto Belarmino, obispo at pantas ng Simbahan"
+     },
+     "designation": "Optional Memorial"
+    }
+   ]
+  },
+  {
+   "date": "2027-09-18",
+   "season": "ordinary_time",
+   "celebration": {
+    "key": "saturday-in-ordinary-time-2027-09-18",
+    "title": {
+     "en": "Saturday of the 24th Week in Ordinary Time",
+     "tl": "Sabado sa Ikadalawampu't apat na Linggo sa Karaniwang Panahon"
+    },
+    "designation": "Weekday / feria"
+   },
+   "options": [
+    {
+     "key": "memorial-of-the-blessed-virgin-mary-on-saturday",
+     "title": {
+      "en": "The Memorial of the Blessed Virgin Mary on Saturday",
+      "tl": "Paggunita sa Mahal na Birheng Maria tuwing Sabado"
+     },
+     "designation": "Optional Memorial"
+    }
+   ]
+  },
+  {
+   "date": "2027-09-19",
+   "season": "ordinary_time",
+   "celebration": {
+    "key": "sunday-in-ordinary-time",
+    "title": {
+     "en": "25th Sunday in Ordinary Time",
+     "tl": "Ikadalawampu't limang Linggo sa Karaniwang Panahon"
+    },
+    "designation": "Sunday"
+   },
+   "options": []
+  },
+  {
+   "date": "2027-09-20",
+   "season": "ordinary_time",
+   "celebration": {
+    "key": "saint-andrew-kim-taegon-priest-and-paul-chong-hasang-and-companions-martyrs",
+    "title": {
+     "en": "Saint Andrew Kim Taegon, priest, and Paul Chong Hasang and companions, martyrs",
+     "tl": "San Andres Kim Taegon, pari, at mga Kasama, mga martir"
+    },
+    "designation": "Obligatory Memorial"
+   },
+   "options": []
+  },
+  {
+   "date": "2027-09-21",
+   "season": "ordinary_time",
+   "celebration": {
+    "key": "saint-matthew-apostle-and-evangelist",
+    "title": {
+     "en": "Saint Matthew, Apostle and Evangelist",
+     "tl": "San Mateo, Apostol at Manunulat ng Mabuting Balita"
+    },
+    "designation": "Feast"
+   },
+   "options": []
+  },
+  {
+   "date": "2027-09-22",
+   "season": "ordinary_time",
+   "celebration": {
+    "key": "wednesday-in-ordinary-time-2027-09-22",
+    "title": {
+     "en": "Wednesday of the 25th Week in Ordinary Time",
+     "tl": "Miyerkules sa Ikadalawampu't limang Linggo sa Karaniwang Panahon"
+    },
+    "designation": "Weekday / feria"
+   },
+   "options": []
+  },
+  {
+   "date": "2027-09-23",
+   "season": "ordinary_time",
+   "celebration": {
+    "key": "saint-pio-of-pietrelcina-padre-pio-priest",
+    "title": {
+     "en": "Saint Pius of Pietrelcina (Padre Pio), priest",
+     "tl": "San Pio ng Pietrelcina, pari"
+    },
+    "designation": "Obligatory Memorial"
+   },
+   "options": []
+  },
+  {
+   "date": "2027-09-24",
+   "season": "ordinary_time",
+   "celebration": {
+    "key": "friday-in-ordinary-time-2027-09-24",
+    "title": {
+     "en": "Friday of the 25th Week in Ordinary Time",
+     "tl": "Biyernes sa Ikadalawampu't limang Linggo sa Karaniwang Panahon"
+    },
+    "designation": "Weekday / feria"
+   },
+   "options": []
+  },
+  {
+   "date": "2027-09-25",
+   "season": "ordinary_time",
+   "celebration": {
+    "key": "saturday-in-ordinary-time-2027-09-25",
+    "title": {
+     "en": "Saturday of the 25th Week in Ordinary Time",
+     "tl": "Sabado sa Ikadalawampu't limang Linggo sa Karaniwang Panahon"
+    },
+    "designation": "Weekday / feria"
+   },
+   "options": [
+    {
+     "key": "memorial-of-the-blessed-virgin-mary-on-saturday",
+     "title": {
+      "en": "The Memorial of the Blessed Virgin Mary on Saturday",
+      "tl": "Paggunita sa Mahal na Birheng Maria tuwing Sabado"
+     },
+     "designation": "Optional Memorial"
+    }
+   ]
+  },
+  {
+   "date": "2027-09-26",
+   "season": "ordinary_time",
+   "celebration": {
+    "key": "sunday-in-ordinary-time",
+    "title": {
+     "en": "26th Sunday in Ordinary Time",
+     "tl": "Ikadalawampu't anim na Linggo sa Karaniwang Panahon"
+    },
+    "designation": "Sunday"
+   },
+   "options": []
+  },
+  {
+   "date": "2027-09-27",
+   "season": "ordinary_time",
+   "celebration": {
+    "key": "saint-vincent-de-paul-priest",
+    "title": {
+     "en": "Saint Vincent de Paul, priest",
+     "tl": "San Vicente de Paul, pari"
+    },
+    "designation": "Obligatory Memorial"
+   },
+   "options": []
+  },
+  {
+   "date": "2027-09-28",
+   "season": "ordinary_time",
+   "celebration": {
+    "key": "san-lorenzo-ruiz-and-companions",
+    "title": {
+     "en": "Saint Lorenzo Ruiz and Companions, Martyrs",
+     "tl": "San Lorenzo Ruiz at mga Kasama, mga Martir"
+    },
+    "designation": "Proper Feast"
+   },
+   "options": []
+  },
+  {
+   "date": "2027-09-29",
+   "season": "ordinary_time",
+   "celebration": {
+    "key": "saints-michael-gabriel-and-raphael-archangels",
+    "title": {
+     "en": "Saints Michael, Gabriel and Raphael, Archangels",
+     "tl": "Mga Arkanghel San Miguel, San Gabriel at San Rafael"
+    },
+    "designation": "Feast"
+   },
+   "options": []
+  },
+  {
+   "date": "2027-09-30",
+   "season": "ordinary_time",
+   "celebration": {
+    "key": "saint-jerome-priest-and-doctor",
+    "title": {
+     "en": "Saint Jerome, priest and doctor",
+     "tl": "San Jeronimo, pari at pantas ng Simbahan"
+    },
+    "designation": "Obligatory Memorial"
+   },
+   "options": []
+  },
+  {
+   "date": "2027-10-01",
+   "season": "ordinary_time",
+   "celebration": {
+    "key": "saint-th-r-se-of-the-child-jesus-virgin-and-doctor",
+    "title": {
+     "en": "Saint Thérèse of the Child Jesus, virgin and doctor",
+     "tl": "Santa Teresita ng Sanggol na si Hesus, dalaga at pantas ng Simbahan"
+    },
+    "designation": "Obligatory Memorial"
+   },
+   "options": []
+  },
+  {
+   "date": "2027-10-02",
+   "season": "ordinary_time",
+   "celebration": {
+    "key": "guardian-angels",
+    "title": {
+     "en": "Guardian Angels",
+     "tl": "Mga Banal na Anghel na Tagatanod"
+    },
+    "designation": "Obligatory Memorial"
+   },
+   "options": []
+  },
+  {
+   "date": "2027-10-03",
+   "season": "ordinary_time",
+   "celebration": {
+    "key": "sunday-in-ordinary-time",
+    "title": {
+     "en": "27th Sunday in Ordinary Time",
+     "tl": "Ikadalawampu't pitong Linggo sa Karaniwang Panahon"
+    },
+    "designation": "Sunday"
+   },
+   "options": []
+  },
+  {
+   "date": "2027-10-04",
+   "season": "ordinary_time",
+   "celebration": {
+    "key": "saint-francis-of-assisi",
+    "title": {
+     "en": "Saint Francis of Assisi",
+     "tl": "San Francisco de Asis"
+    },
+    "designation": "Obligatory Memorial"
+   },
+   "options": []
+  },
+  {
+   "date": "2027-10-05",
+   "season": "ordinary_time",
+   "celebration": {
+    "key": "tuesday-in-ordinary-time-2027-10-05",
+    "title": {
+     "en": "Tuesday of the 27th Week in Ordinary Time",
+     "tl": "Martes sa Ikadalawampu't pitong Linggo sa Karaniwang Panahon"
+    },
+    "designation": "Weekday / feria"
+   },
+   "options": []
+  },
+  {
+   "date": "2027-10-06",
+   "season": "ordinary_time",
+   "celebration": {
+    "key": "wednesday-in-ordinary-time-2027-10-06",
+    "title": {
+     "en": "Wednesday of the 27th Week in Ordinary Time",
+     "tl": "Miyerkules sa Ikadalawampu't pitong Linggo sa Karaniwang Panahon"
+    },
+    "designation": "Weekday / feria"
+   },
+   "options": [
+    {
+     "key": "saint-bruno-priest",
+     "title": {
+      "en": "Saint Bruno, priest",
+      "tl": "San Bruno, pari"
+     },
+     "designation": "Optional Memorial"
+    }
+   ]
+  },
+  {
+   "date": "2027-10-07",
+   "season": "ordinary_time",
+   "celebration": {
+    "key": "our-lady-of-the-rosary",
+    "title": {
+     "en": "Our Lady of the Rosary",
+     "tl": "Mahal na Birheng Maria ng Rosario"
+    },
+    "designation": "Obligatory Memorial"
+   },
+   "options": []
+  },
+  {
+   "date": "2027-10-08",
+   "season": "ordinary_time",
+   "celebration": {
+    "key": "friday-in-ordinary-time-2027-10-08",
+    "title": {
+     "en": "Friday of the 27th Week in Ordinary Time",
+     "tl": "Biyernes sa Ikadalawampu't pitong Linggo sa Karaniwang Panahon"
+    },
+    "designation": "Weekday / feria"
+   },
+   "options": []
+  },
+  {
+   "date": "2027-10-09",
+   "season": "ordinary_time",
+   "celebration": {
+    "key": "saturday-in-ordinary-time-2027-10-09",
+    "title": {
+     "en": "Saturday of the 27th Week in Ordinary Time",
+     "tl": "Sabado sa Ikadalawampu't pitong Linggo sa Karaniwang Panahon"
+    },
+    "designation": "Weekday / feria"
+   },
+   "options": [
+    {
+     "key": "saint-denis-and-companions-martyrs",
+     "title": {
+      "en": "Saint Denis and companions, martyrs",
+      "tl": "San Dionisio, obispo, at mga Kasama, mga martir"
+     },
+     "designation": "Optional Memorial"
+    },
+    {
+     "key": "saint-john-leonardi-priest",
+     "title": {
+      "en": "Saint John Leonardi, priest",
+      "tl": "San Juan Leonardo, pari"
+     },
+     "designation": "Optional Memorial"
+    },
+    {
+     "key": "memorial-of-the-blessed-virgin-mary-on-saturday",
+     "title": {
+      "en": "The Memorial of the Blessed Virgin Mary on Saturday",
+      "tl": "Paggunita sa Mahal na Birheng Maria tuwing Sabado"
+     },
+     "designation": "Optional Memorial"
+    }
+   ]
+  },
+  {
+   "date": "2027-10-10",
+   "season": "ordinary_time",
+   "celebration": {
+    "key": "sunday-in-ordinary-time",
+    "title": {
+     "en": "28th Sunday in Ordinary Time",
+     "tl": "Ikadalawampu't walong Linggo sa Karaniwang Panahon"
+    },
+    "designation": "Sunday"
+   },
+   "options": []
+  },
+  {
+   "date": "2027-10-11",
+   "season": "ordinary_time",
+   "celebration": {
+    "key": "monday-in-ordinary-time-2027-10-11",
+    "title": {
+     "en": "Monday of the 28th Week in Ordinary Time",
+     "tl": "Lunes sa Ikadalawampu't walong Linggo sa Karaniwang Panahon"
+    },
+    "designation": "Weekday / feria"
+   },
+   "options": [
+    {
+     "key": "saint-john-xxiii-pope",
+     "title": {
+      "en": "Saint John XXIII, pope",
+      "tl": "Papa San Juan XXIII"
+     },
+     "designation": "Optional Memorial"
+    }
+   ]
+  },
+  {
+   "date": "2027-10-12",
+   "season": "ordinary_time",
+   "celebration": {
+    "key": "tuesday-in-ordinary-time-2027-10-12",
+    "title": {
+     "en": "Tuesday of the 28th Week in Ordinary Time",
+     "tl": "Martes sa Ikadalawampu't walong Linggo sa Karaniwang Panahon"
+    },
+    "designation": "Weekday / feria"
+   },
+   "options": []
+  },
+  {
+   "date": "2027-10-13",
+   "season": "ordinary_time",
+   "celebration": {
+    "key": "wednesday-in-ordinary-time-2027-10-13",
+    "title": {
+     "en": "Wednesday of the 28th Week in Ordinary Time",
+     "tl": "Miyerkules sa Ikadalawampu't walong Linggo sa Karaniwang Panahon"
+    },
+    "designation": "Weekday / feria"
+   },
+   "options": []
+  },
+  {
+   "date": "2027-10-14",
+   "season": "ordinary_time",
+   "celebration": {
+    "key": "thursday-in-ordinary-time-2027-10-14",
+    "title": {
+     "en": "Thursday of the 28th Week in Ordinary Time",
+     "tl": "Huwebes sa Ikadalawampu't walong Linggo sa Karaniwang Panahon"
+    },
+    "designation": "Weekday / feria"
+   },
+   "options": [
+    {
+     "key": "saint-callistus-i-pope-and-martyr",
+     "title": {
+      "en": "Saint Callistus I, pope and martyr",
+      "tl": "San Calixto I, papa at martir"
+     },
+     "designation": "Optional Memorial"
+    }
+   ]
+  },
+  {
+   "date": "2027-10-15",
+   "season": "ordinary_time",
+   "celebration": {
+    "key": "saint-teresa-of-jesus-virgin-and-doctor",
+    "title": {
+     "en": "Saint Teresa of Jesus, virgin and doctor",
+     "tl": "Santa Teresa ng Avila, dalaga at pantas ng Simbahan"
+    },
+    "designation": "Obligatory Memorial"
+   },
+   "options": []
+  },
+  {
+   "date": "2027-10-16",
+   "season": "ordinary_time",
+   "celebration": {
+    "key": "saturday-in-ordinary-time-2027-10-16",
+    "title": {
+     "en": "Saturday of the 28th Week in Ordinary Time",
+     "tl": "Sabado sa Ikadalawampu't walong Linggo sa Karaniwang Panahon"
+    },
+    "designation": "Weekday / feria"
+   },
+   "options": [
+    {
+     "key": "saint-hedwig-religious",
+     "title": {
+      "en": "Saint Hedwig, religious",
+      "tl": "San Eduvigis (Heidi), namanata sa Diyos"
+     },
+     "designation": "Optional Memorial"
+    },
+    {
+     "key": "saint-margaret-mary-alacoque-virgin",
+     "title": {
+      "en": "Saint Margaret Mary Alacoque, virgin",
+      "tl": "Santa Margarita Maria Alacoque, dalaga"
+     },
+     "designation": "Optional Memorial"
+    },
+    {
+     "key": "memorial-of-the-blessed-virgin-mary-on-saturday",
+     "title": {
+      "en": "The Memorial of the Blessed Virgin Mary on Saturday",
+      "tl": "Paggunita sa Mahal na Birheng Maria tuwing Sabado"
+     },
+     "designation": "Optional Memorial"
+    }
+   ]
+  },
+  {
+   "date": "2027-10-17",
+   "season": "ordinary_time",
+   "celebration": {
+    "key": "sunday-in-ordinary-time",
+    "title": {
+     "en": "29th Sunday in Ordinary Time",
+     "tl": "Ikadalawampu't siyam na Linggo sa Karaniwang Panahon"
+    },
+    "designation": "Sunday"
+   },
+   "options": []
+  },
+  {
+   "date": "2027-10-18",
+   "season": "ordinary_time",
+   "celebration": {
+    "key": "saint-luke-evangelist",
+    "title": {
+     "en": "Saint Luke, Evangelist",
+     "tl": "San Lucas, Manunulat ng Mabuting Balita"
+    },
+    "designation": "Feast"
+   },
+   "options": []
+  },
+  {
+   "date": "2027-10-19",
+   "season": "ordinary_time",
+   "celebration": {
+    "key": "tuesday-in-ordinary-time-2027-10-19",
+    "title": {
+     "en": "Tuesday of the 29th Week in Ordinary Time",
+     "tl": "Martes sa Ikadalawampu't siyam na Linggo sa Karaniwang Panahon"
+    },
+    "designation": "Weekday / feria"
+   },
+   "options": [
+    {
+     "key": "saint-paul-of-the-cross-priest",
+     "title": {
+      "en": "Saint Paul of the Cross, priest",
+      "tl": "San Pablo de la Cruz, pari"
+     },
+     "designation": "Optional Memorial"
+    },
+    {
+     "key": "saints-jean-de-br-beuf-isaac-jogues-priests-and-martyrs-and-their-companions-martyrs",
+     "title": {
+      "en": "Saints Jean de Brébeuf, Isaac Jogues, priests and martyrs; and their companions, martyrs",
+      "tl": "San Juan de Brebeuf at Isaac Jogues, mga pari"
+     },
+     "designation": "Optional Memorial"
+    }
+   ]
+  },
+  {
+   "date": "2027-10-20",
+   "season": "ordinary_time",
+   "celebration": {
+    "key": "wednesday-in-ordinary-time-2027-10-20",
+    "title": {
+     "en": "Wednesday of the 29th Week in Ordinary Time",
+     "tl": "Miyerkules sa Ikadalawampu't siyam na Linggo sa Karaniwang Panahon"
+    },
+    "designation": "Weekday / feria"
+   },
+   "options": []
+  },
+  {
+   "date": "2027-10-21",
+   "season": "ordinary_time",
+   "celebration": {
+    "key": "st-pedro-calungsod",
+    "title": {
+     "en": "Saint Pedro Calungsod, Martyr",
+     "tl": "San Pedro Calungsod, Martir"
+    },
+    "designation": "Proper Feast"
+   },
+   "options": []
+  },
+  {
+   "date": "2027-10-22",
+   "season": "ordinary_time",
+   "celebration": {
+    "key": "friday-in-ordinary-time-2027-10-22",
+    "title": {
+     "en": "Friday of the 29th Week in Ordinary Time",
+     "tl": "Biyernes sa Ikadalawampu't siyam na Linggo sa Karaniwang Panahon"
+    },
+    "designation": "Weekday / feria"
+   },
+   "options": [
+    {
+     "key": "saint-john-paul-ii-pope",
+     "title": {
+      "en": "Saint John Paul II, pope",
+      "tl": "San Juan Pablo II, papa"
+     },
+     "designation": "Optional Memorial"
+    }
+   ]
+  },
+  {
+   "date": "2027-10-23",
+   "season": "ordinary_time",
+   "celebration": {
+    "key": "saturday-in-ordinary-time-2027-10-23",
+    "title": {
+     "en": "Saturday of the 29th Week in Ordinary Time",
+     "tl": "Sabado sa Ikadalawampu't siyam na Linggo sa Karaniwang Panahon"
+    },
+    "designation": "Weekday / feria"
+   },
+   "options": [
+    {
+     "key": "saint-john-of-capistrano-priest",
+     "title": {
+      "en": "Saint John of Capistrano, priest",
+      "tl": "San Juan Capistrano, pari"
+     },
+     "designation": "Optional Memorial"
+    },
+    {
+     "key": "memorial-of-the-blessed-virgin-mary-on-saturday",
+     "title": {
+      "en": "The Memorial of the Blessed Virgin Mary on Saturday",
+      "tl": "Paggunita sa Mahal na Birheng Maria tuwing Sabado"
+     },
+     "designation": "Optional Memorial"
+    }
+   ]
+  },
+  {
+   "date": "2027-10-24",
+   "season": "ordinary_time",
+   "celebration": {
+    "key": "sunday-in-ordinary-time",
+    "title": {
+     "en": "30th Sunday in Ordinary Time",
+     "tl": "Ikatatlumpung Linggo sa Karaniwang Panahon"
+    },
+    "designation": "Sunday"
+   },
+   "options": []
+  },
+  {
+   "date": "2027-10-25",
+   "season": "ordinary_time",
+   "celebration": {
+    "key": "monday-in-ordinary-time-2027-10-25",
+    "title": {
+     "en": "Monday of the 30th Week in Ordinary Time",
+     "tl": "Lunes sa Ikatatlumpung Linggo sa Karaniwang Panahon"
+    },
+    "designation": "Weekday / feria"
+   },
+   "options": []
+  },
+  {
+   "date": "2027-10-26",
+   "season": "ordinary_time",
+   "celebration": {
+    "key": "tuesday-in-ordinary-time-2027-10-26",
+    "title": {
+     "en": "Tuesday of the 30th Week in Ordinary Time",
+     "tl": "Martes sa Ikatatlumpung Linggo sa Karaniwang Panahon"
+    },
+    "designation": "Weekday / feria"
+   },
+   "options": []
+  },
+  {
+   "date": "2027-10-27",
+   "season": "ordinary_time",
+   "celebration": {
+    "key": "wednesday-in-ordinary-time-2027-10-27",
+    "title": {
+     "en": "Wednesday of the 30th Week in Ordinary Time",
+     "tl": "Miyerkules sa Ikatatlumpung Linggo sa Karaniwang Panahon"
+    },
+    "designation": "Weekday / feria"
+   },
+   "options": []
+  },
+  {
+   "date": "2027-10-28",
+   "season": "ordinary_time",
+   "celebration": {
+    "key": "saints-simon-and-jude-apostles",
+    "title": {
+     "en": "Saints Simon and Jude, Apostles",
+     "tl": "Mga San Simon at Judas, mga Apostol"
+    },
+    "designation": "Feast"
+   },
+   "options": []
+  },
+  {
+   "date": "2027-10-29",
+   "season": "ordinary_time",
+   "celebration": {
+    "key": "friday-in-ordinary-time-2027-10-29",
+    "title": {
+     "en": "Friday of the 30th Week in Ordinary Time",
+     "tl": "Biyernes sa Ikatatlumpung Linggo sa Karaniwang Panahon"
+    },
+    "designation": "Weekday / feria"
+   },
+   "options": []
+  },
+  {
+   "date": "2027-10-30",
+   "season": "ordinary_time",
+   "celebration": {
+    "key": "saturday-in-ordinary-time-2027-10-30",
+    "title": {
+     "en": "Saturday of the 30th Week in Ordinary Time",
+     "tl": "Sabado sa Ikatatlumpung Linggo sa Karaniwang Panahon"
+    },
+    "designation": "Weekday / feria"
+   },
+   "options": [
+    {
+     "key": "memorial-of-the-blessed-virgin-mary-on-saturday",
+     "title": {
+      "en": "The Memorial of the Blessed Virgin Mary on Saturday",
+      "tl": "Paggunita sa Mahal na Birheng Maria tuwing Sabado"
+     },
+     "designation": "Optional Memorial"
+    }
+   ]
+  },
+  {
+   "date": "2027-10-31",
+   "season": "ordinary_time",
+   "celebration": {
+    "key": "sunday-in-ordinary-time",
+    "title": {
+     "en": "31st Sunday in Ordinary Time",
+     "tl": "Ikatatlumpu't isang Linggo sa Karaniwang Panahon"
+    },
+    "designation": "Sunday"
+   },
+   "options": []
+  },
+  {
+   "date": "2027-11-01",
+   "season": "ordinary_time",
+   "celebration": {
+    "key": "all-saints",
+    "title": {
+     "en": "All Saints",
+     "tl": "Lahat ng mga Banal"
+    },
+    "designation": "Solemnity"
+   },
+   "options": []
+  },
+  {
+   "date": "2027-11-02",
+   "season": "ordinary_time",
+   "celebration": {
+    "key": "the-commemoration-of-all-the-faithful-departed-all-souls",
+    "title": {
+     "en": "The Commemoration of All the Faithful Departed (All Souls)",
+     "tl": "Paggunita sa Lahat ng mga Yumaong Kristiyano"
+    },
+    "designation": "Commemoration of All the Faithful Departed"
+   },
+   "options": []
+  },
+  {
+   "date": "2027-11-03",
+   "season": "ordinary_time",
+   "celebration": {
+    "key": "wednesday-in-ordinary-time-2027-11-03",
+    "title": {
+     "en": "Wednesday of the 31st Week in Ordinary Time",
+     "tl": "Miyerkules sa Ikatatlumpu't isang Linggo sa Karaniwang Panahon"
+    },
+    "designation": "Weekday / feria"
+   },
+   "options": [
+    {
+     "key": "saint-martin-de-porres-religious",
+     "title": {
+      "en": "Saint Martin de Porres, religious",
+      "tl": "San Martin de Porres, namanata sa Diyos"
+     },
+     "designation": "Optional Memorial"
+    }
+   ]
+  },
+  {
+   "date": "2027-11-04",
+   "season": "ordinary_time",
+   "celebration": {
+    "key": "saint-charles-borromeo-bishop",
+    "title": {
+     "en": "Saint Charles Borromeo, bishop",
+     "tl": "San Carlos Borromeo, obispo"
+    },
+    "designation": "Obligatory Memorial"
+   },
+   "options": []
+  },
+  {
+   "date": "2027-11-05",
+   "season": "ordinary_time",
+   "celebration": {
+    "key": "friday-in-ordinary-time-2027-11-05",
+    "title": {
+     "en": "Friday of the 31st Week in Ordinary Time",
+     "tl": "Biyernes sa Ikatatlumpu't isang Linggo sa Karaniwang Panahon"
+    },
+    "designation": "Weekday / feria"
+   },
+   "options": []
+  },
+  {
+   "date": "2027-11-06",
+   "season": "ordinary_time",
+   "celebration": {
+    "key": "saturday-in-ordinary-time-2027-11-06",
+    "title": {
+     "en": "Saturday of the 31st Week in Ordinary Time",
+     "tl": "Sabado sa Ikatatlumpu't isang Linggo sa Karaniwang Panahon"
+    },
+    "designation": "Weekday / feria"
+   },
+   "options": [
+    {
+     "key": "memorial-of-the-blessed-virgin-mary-on-saturday",
+     "title": {
+      "en": "The Memorial of the Blessed Virgin Mary on Saturday",
+      "tl": "Paggunita sa Mahal na Birheng Maria tuwing Sabado"
+     },
+     "designation": "Optional Memorial"
+    }
+   ]
+  },
+  {
+   "date": "2027-11-07",
+   "season": "ordinary_time",
+   "celebration": {
+    "key": "sunday-in-ordinary-time",
+    "title": {
+     "en": "32nd Sunday in Ordinary Time",
+     "tl": "Ikatatlumpu't dalawang Linggo sa Karaniwang Panahon"
+    },
+    "designation": "Sunday"
+   },
+   "options": []
+  },
+  {
+   "date": "2027-11-08",
+   "season": "ordinary_time",
+   "celebration": {
+    "key": "monday-in-ordinary-time-2027-11-08",
+    "title": {
+     "en": "Monday of the 32nd Week in Ordinary Time",
+     "tl": "Lunes sa Ikatatlumpu't dalawang Linggo sa Karaniwang Panahon"
+    },
+    "designation": "Weekday / feria"
+   },
+   "options": []
+  },
+  {
+   "date": "2027-11-09",
+   "season": "ordinary_time",
+   "celebration": {
+    "key": "the-dedication-of-the-lateran-basilica",
+    "title": {
+     "en": "The Dedication of the Lateran Basilica",
+     "tl": "Pagtatalaga sa Palasyong Simbahan sa Laterano, Roma"
+    },
+    "designation": "Feast of the Lord"
+   },
+   "options": []
+  },
+  {
+   "date": "2027-11-10",
+   "season": "ordinary_time",
+   "celebration": {
+    "key": "saint-leo-the-great-pope-and-doctor",
+    "title": {
+     "en": "Saint Leo the Great, pope and doctor",
+     "tl": "Dakilang Papa San Leon, pantas ng Simbahan"
+    },
+    "designation": "Obligatory Memorial"
+   },
+   "options": []
+  },
+  {
+   "date": "2027-11-11",
+   "season": "ordinary_time",
+   "celebration": {
+    "key": "saint-martin-of-tours-bishop",
+    "title": {
+     "en": "Saint Martin of Tours, bishop",
+     "tl": "San Martin ng Tours, obispo"
+    },
+    "designation": "Obligatory Memorial"
+   },
+   "options": []
+  },
+  {
+   "date": "2027-11-12",
+   "season": "ordinary_time",
+   "celebration": {
+    "key": "saint-josaphat-bishop-and-martyr",
+    "title": {
+     "en": "Saint Josaphat, bishop and martyr",
+     "tl": "San Josafat, obispo at martir"
+    },
+    "designation": "Obligatory Memorial"
+   },
+   "options": []
+  },
+  {
+   "date": "2027-11-13",
+   "season": "ordinary_time",
+   "celebration": {
+    "key": "saturday-in-ordinary-time-2027-11-13",
+    "title": {
+     "en": "Saturday of the 32nd Week in Ordinary Time",
+     "tl": "Sabado sa Ikatatlumpu't dalawang Linggo sa Karaniwang Panahon"
+    },
+    "designation": "Weekday / feria"
+   },
+   "options": [
+    {
+     "key": "memorial-of-the-blessed-virgin-mary-on-saturday",
+     "title": {
+      "en": "The Memorial of the Blessed Virgin Mary on Saturday",
+      "tl": "Paggunita sa Mahal na Birheng Maria tuwing Sabado"
+     },
+     "designation": "Optional Memorial"
+    }
+   ]
+  },
+  {
+   "date": "2027-11-14",
+   "season": "ordinary_time",
+   "celebration": {
+    "key": "sunday-in-ordinary-time",
+    "title": {
+     "en": "33rd Sunday in Ordinary Time",
+     "tl": "Ikatatlumpu't tatlong Linggo sa Karaniwang Panahon"
+    },
+    "designation": "Sunday"
+   },
+   "options": []
+  },
+  {
+   "date": "2027-11-15",
+   "season": "ordinary_time",
+   "celebration": {
+    "key": "monday-in-ordinary-time-2027-11-15",
+    "title": {
+     "en": "Monday of the 33rd Week in Ordinary Time",
+     "tl": "Lunes sa Ikatatlumpu't tatlong Linggo sa Karaniwang Panahon"
+    },
+    "designation": "Weekday / feria"
+   },
+   "options": [
+    {
+     "key": "saint-albert-the-great-bishop-and-doctor",
+     "title": {
+      "en": "Saint Albert the Great, bishop and doctor",
+      "tl": "Dakilang San Alberto, obispo at pantas ng Simbahan"
+     },
+     "designation": "Optional Memorial"
+    }
+   ]
+  },
+  {
+   "date": "2027-11-16",
+   "season": "ordinary_time",
+   "celebration": {
+    "key": "tuesday-in-ordinary-time-2027-11-16",
+    "title": {
+     "en": "Tuesday of the 33rd Week in Ordinary Time",
+     "tl": "Martes sa Ikatatlumpu't tatlong Linggo sa Karaniwang Panahon"
+    },
+    "designation": "Weekday / feria"
+   },
+   "options": [
+    {
+     "key": "saint-gertrude-the-great-virgin",
+     "title": {
+      "en": "Saint Gertrude the Great, virgin",
+      "tl": "Santa Gertrudes, dalaga"
+     },
+     "designation": "Optional Memorial"
+    },
+    {
+     "key": "saint-margaret-of-scotland",
+     "title": {
+      "en": "Saint Margaret of Scotland",
+      "tl": "Santa Margarita ng Escocia"
+     },
+     "designation": "Optional Memorial"
+    }
+   ]
+  },
+  {
+   "date": "2027-11-17",
+   "season": "ordinary_time",
+   "celebration": {
+    "key": "saint-elizabeth-of-hungary-religious",
+    "title": {
+     "en": "Saint Elizabeth of Hungary, religious",
+     "tl": "Santa Isabel ng Unggaria, namanata sa Diyos"
+    },
+    "designation": "Obligatory Memorial"
+   },
+   "options": []
+  },
+  {
+   "date": "2027-11-18",
+   "season": "ordinary_time",
+   "celebration": {
+    "key": "thursday-in-ordinary-time-2027-11-18",
+    "title": {
+     "en": "Thursday of the 33rd Week in Ordinary Time",
+     "tl": "Huwebes sa Ikatatlumpu't tatlong Linggo sa Karaniwang Panahon"
+    },
+    "designation": "Weekday / feria"
+   },
+   "options": [
+    {
+     "key": "dedication-of-the-basilicas-of-saints-peter-and-paul-apostles",
+     "title": {
+      "en": "Dedication of the basilicas of Saints Peter and Paul, Apostles",
+      "tl": "Pagtatalaga sa mga Palasyong Simbahan nina"
+     },
+     "designation": "Optional Memorial"
+    }
+   ]
+  },
+  {
+   "date": "2027-11-19",
+   "season": "ordinary_time",
+   "celebration": {
+    "key": "friday-in-ordinary-time-2027-11-19",
+    "title": {
+     "en": "Friday of the 33rd Week in Ordinary Time",
+     "tl": "Biyernes sa Ikatatlumpu't tatlong Linggo sa Karaniwang Panahon"
+    },
+    "designation": "Weekday / feria"
+   },
+   "options": []
+  },
+  {
+   "date": "2027-11-20",
+   "season": "ordinary_time",
+   "celebration": {
+    "key": "saturday-in-ordinary-time-2027-11-20",
+    "title": {
+     "en": "Saturday of the 33rd Week in Ordinary Time",
+     "tl": "Sabado sa Ikatatlumpu't tatlong Linggo sa Karaniwang Panahon"
+    },
+    "designation": "Weekday / feria"
+   },
+   "options": [
+    {
+     "key": "memorial-of-the-blessed-virgin-mary-on-saturday",
+     "title": {
+      "en": "The Memorial of the Blessed Virgin Mary on Saturday",
+      "tl": "Paggunita sa Mahal na Birheng Maria tuwing Sabado"
+     },
+     "designation": "Optional Memorial"
+    }
+   ]
+  },
+  {
+   "date": "2027-11-21",
+   "season": "ordinary_time",
+   "celebration": {
+    "key": "christ-the-king",
+    "title": {
+     "en": "Our Lord Jesus Christ, King of the Universe",
+     "tl": "Kristong Hari ng Sanlibutan"
+    },
+    "designation": "Solemnity"
+   },
+   "options": []
+  },
+  {
+   "date": "2027-11-22",
+   "season": "ordinary_time",
+   "celebration": {
+    "key": "saint-cecilia-virgin-and-martyr",
+    "title": {
+     "en": "Saint Cecilia, virgin and martyr",
+     "tl": "Santa Cecilia, dalaga at martir"
+    },
+    "designation": "Obligatory Memorial"
+   },
+   "options": []
+  },
+  {
+   "date": "2027-11-23",
+   "season": "ordinary_time",
+   "celebration": {
+    "key": "tuesday-in-ordinary-time-2027-11-23",
+    "title": {
+     "en": "Tuesday of the 34th Week in Ordinary Time",
+     "tl": "Martes sa Ikatatlumpu't apat na Linggo sa Karaniwang Panahon"
+    },
+    "designation": "Weekday / feria"
+   },
+   "options": [
+    {
+     "key": "saint-clement-i-pope-and-martyr",
+     "title": {
+      "en": "Saint Clement I, pope and martyr",
+      "tl": "San Clemente I, papa at martir"
+     },
+     "designation": "Optional Memorial"
+    },
+    {
+     "key": "saint-columban-religious",
+     "title": {
+      "en": "Saint Columban, religious",
+      "tl": "San Columbano, abad"
+     },
+     "designation": "Optional Memorial"
+    }
+   ]
+  },
+  {
+   "date": "2027-11-24",
+   "season": "ordinary_time",
+   "celebration": {
+    "key": "saint-andrew-dung-lac-and-his-companions-martyrs",
+    "title": {
+     "en": "Saint Andrew Dung Lac and his companions, martyrs",
+     "tl": "San Andres Dung Lac, pari at martir, at mga Kasama, mga martir"
+    },
+    "designation": "Obligatory Memorial"
+   },
+   "options": []
+  },
+  {
+   "date": "2027-11-25",
+   "season": "ordinary_time",
+   "celebration": {
+    "key": "thursday-in-ordinary-time-2027-11-25",
+    "title": {
+     "en": "Thursday of the 34th Week in Ordinary Time",
+     "tl": "Huwebes sa Ikatatlumpu't apat na Linggo sa Karaniwang Panahon"
+    },
+    "designation": "Weekday / feria"
+   },
+   "options": [
+    {
+     "key": "saint-catherine-of-alexandria",
+     "title": {
+      "en": "Saint Catherine of Alexandria",
+      "tl": "Santa Catalina ng Alejandria, dalaga at martir"
+     },
+     "designation": "Optional Memorial"
+    }
+   ]
+  },
+  {
+   "date": "2027-11-26",
+   "season": "ordinary_time",
+   "celebration": {
+    "key": "friday-in-ordinary-time-2027-11-26",
+    "title": {
+     "en": "Friday of the 34th Week in Ordinary Time",
+     "tl": "Biyernes sa Ikatatlumpu't apat na Linggo sa Karaniwang Panahon"
+    },
+    "designation": "Weekday / feria"
+   },
+   "options": []
+  },
+  {
+   "date": "2027-11-27",
+   "season": "ordinary_time",
+   "celebration": {
+    "key": "saturday-in-ordinary-time-2027-11-27",
+    "title": {
+     "en": "Saturday of the 34th Week in Ordinary Time",
+     "tl": "Sabado sa Ikatatlumpu't apat na Linggo sa Karaniwang Panahon"
+    },
+    "designation": "Weekday / feria"
+   },
+   "options": [
+    {
+     "key": "memorial-of-the-blessed-virgin-mary-on-saturday",
+     "title": {
+      "en": "The Memorial of the Blessed Virgin Mary on Saturday",
+      "tl": "Paggunita sa Mahal na Birheng Maria tuwing Sabado"
+     },
+     "designation": "Optional Memorial"
+    }
+   ]
+  },
+  {
+   "date": "2027-11-28",
+   "season": "advent",
+   "celebration": {
+    "key": "first-sunday-of-advent",
+    "title": {
+     "en": "1st Sunday of Advent",
+     "tl": "Unang Linggo ng Pagdating ng Panginoon"
+    },
+    "designation": "Sunday of Advent"
+   },
+   "options": []
+  },
+  {
+   "date": "2027-11-29",
+   "season": "advent",
+   "celebration": {
+    "key": "monday-of-the-first-week-of-advent-2027-11-29",
+    "title": {
+     "en": "Monday of the 1st Week of Advent",
+     "tl": "Lunes sa Unang Linggo ng Pagdating ng Panginoon"
+    },
+    "designation": "Weekday / feria"
+   },
+   "options": []
+  },
+  {
+   "date": "2027-11-30",
+   "season": "advent",
+   "celebration": {
+    "key": "saint-andrew-the-apostle",
+    "title": {
+     "en": "Saint Andrew the Apostle",
+     "tl": "San Andres, Apostol"
+    },
+    "designation": "Feast"
+   },
+   "options": []
+  },
+  {
+   "date": "2027-12-01",
+   "season": "advent",
+   "celebration": {
+    "key": "wednesday-of-the-first-week-of-advent-2027-12-01",
+    "title": {
+     "en": "Wednesday of the 1st Week of Advent",
+     "tl": "Miyerkules sa Unang Linggo ng Pagdating ng Panginoon"
+    },
+    "designation": "Weekday / feria"
+   },
+   "options": []
+  },
+  {
+   "date": "2027-12-02",
+   "season": "advent",
+   "celebration": {
+    "key": "thursday-of-the-first-week-of-advent-2027-12-02",
+    "title": {
+     "en": "Thursday of the 1st Week of Advent",
+     "tl": "Huwebes sa Unang Linggo ng Pagdating ng Panginoon"
+    },
+    "designation": "Weekday / feria"
+   },
+   "options": []
+  },
+  {
+   "date": "2027-12-03",
+   "season": "advent",
+   "celebration": {
+    "key": "saint-francis-xavier-priest",
+    "title": {
+     "en": "Saint Francis Xavier, priest",
+     "tl": "San Francisco Javier, pari"
+    },
+    "designation": "Obligatory Memorial"
+   },
+   "options": []
+  },
+  {
+   "date": "2027-12-04",
+   "season": "advent",
+   "celebration": {
+    "key": "saturday-of-the-first-week-of-advent-2027-12-04",
+    "title": {
+     "en": "Saturday of the 1st Week of Advent",
+     "tl": "Sabado sa Unang Linggo ng Pagdating ng Panginoon"
+    },
+    "designation": "Weekday / feria"
+   },
+   "options": [
+    {
+     "key": "saint-john-damascene-priest-and-doctor",
+     "title": {
+      "en": "Saint John Damascene, priest and doctor",
+      "tl": "San Juan ng Damasco, pari at pantas ng Simbahan"
+     },
+     "designation": "Optional Memorial"
+    },
+    {
+     "key": "memorial-of-the-blessed-virgin-mary-on-saturday",
+     "title": {
+      "en": "The Memorial of the Blessed Virgin Mary on Saturday",
+      "tl": "Paggunita sa Mahal na Birheng Maria tuwing Sabado"
+     },
+     "designation": "Optional Memorial"
+    }
+   ]
+  },
+  {
+   "date": "2027-12-05",
+   "season": "advent",
+   "celebration": {
+    "key": "second-sunday-of-advent",
+    "title": {
+     "en": "2nd Sunday of Advent",
+     "tl": "Ikalawang Linggo ng Pagdating ng Panginoon"
+    },
+    "designation": "Sunday of Advent"
+   },
+   "options": []
+  },
+  {
+   "date": "2027-12-06",
+   "season": "advent",
+   "celebration": {
+    "key": "monday-of-the-second-week-of-advent-2027-12-06",
+    "title": {
+     "en": "Monday of the 2nd Week of Advent",
+     "tl": "Lunes sa Ikalawang Linggo ng Pagdating ng Panginoon"
+    },
+    "designation": "Weekday / feria"
+   },
+   "options": [
+    {
+     "key": "saint-nicholas-bishop",
+     "title": {
+      "en": "Saint Nicholas, bishop",
+      "tl": "San Nicolas, obispo"
+     },
+     "designation": "Optional Memorial"
+    }
+   ]
+  },
+  {
+   "date": "2027-12-07",
+   "season": "advent",
+   "celebration": {
+    "key": "saint-ambrose-bishop-and-doctor",
+    "title": {
+     "en": "Saint Ambrose, bishop and doctor",
+     "tl": "San Ambrosio, obispo at pantas ng Simbahan"
+    },
+    "designation": "Obligatory Memorial"
+   },
+   "options": []
+  },
+  {
+   "date": "2027-12-08",
+   "season": "advent",
+   "celebration": {
+    "key": "immaculate-conception-patroness",
+    "title": {
+     "en": "The Immaculate Conception of the Blessed Virgin Mary",
+     "tl": "Kalinis-linisang Paglilihi ng Mahal na Birheng Maria"
+    },
+    "designation": "Proper Solemnity"
+   },
+   "options": []
+  },
+  {
+   "date": "2027-12-09",
+   "season": "advent",
+   "celebration": {
+    "key": "thursday-of-the-second-week-of-advent-2027-12-09",
+    "title": {
+     "en": "Thursday of the 2nd Week of Advent",
+     "tl": "Huwebes sa Ikalawang Linggo ng Pagdating ng Panginoon"
+    },
+    "designation": "Weekday / feria"
+   },
+   "options": [
+    {
+     "key": "saint-juan-diego",
+     "title": {
+      "en": "Saint Juan Diego",
+      "tl": "San Juan Diego, ermitanyo"
+     },
+     "designation": "Optional Memorial"
+    }
+   ]
+  },
+  {
+   "date": "2027-12-10",
+   "season": "advent",
+   "celebration": {
+    "key": "friday-of-the-second-week-of-advent-2027-12-10",
+    "title": {
+     "en": "Friday of the 2nd Week of Advent",
+     "tl": "Biyernes sa Ikalawang Linggo ng Pagdating ng Panginoon"
+    },
+    "designation": "Weekday / feria"
+   },
+   "options": []
+  },
+  {
+   "date": "2027-12-11",
+   "season": "advent",
+   "celebration": {
+    "key": "saturday-of-the-second-week-of-advent-2027-12-11",
+    "title": {
+     "en": "Saturday of the 2nd Week of Advent",
+     "tl": "Sabado sa Ikalawang Linggo ng Pagdating ng Panginoon"
+    },
+    "designation": "Weekday / feria"
+   },
+   "options": [
+    {
+     "key": "saint-damasus-i-pope",
+     "title": {
+      "en": "Saint Damasus I, pope",
+      "tl": "San Damaso I, papa"
+     },
+     "designation": "Optional Memorial"
+    },
+    {
+     "key": "memorial-of-the-blessed-virgin-mary-on-saturday",
+     "title": {
+      "en": "The Memorial of the Blessed Virgin Mary on Saturday",
+      "tl": "Paggunita sa Mahal na Birheng Maria tuwing Sabado"
+     },
+     "designation": "Optional Memorial"
+    }
+   ]
+  },
+  {
+   "date": "2027-12-12",
+   "season": "advent",
+   "celebration": {
+    "key": "third-sunday-of-advent",
+    "title": {
+     "en": "3rd Sunday of Advent (Gaudete Sunday)",
+     "tl": "Ikatlong Linggo ng Pagdating ng Panginoon (Linggo ng Gaudete)"
+    },
+    "designation": "Sunday of Advent"
+   },
+   "options": []
+  },
+  {
+   "date": "2027-12-13",
+   "season": "advent",
+   "celebration": {
+    "key": "saint-lucy-of-syracuse-virgin-and-martyr",
+    "title": {
+     "en": "Saint Lucy of Syracuse, virgin and martyr",
+     "tl": "Santa Lucia, dalaga at martir"
+    },
+    "designation": "Obligatory Memorial"
+   },
+   "options": []
+  },
+  {
+   "date": "2027-12-14",
+   "season": "advent",
+   "celebration": {
+    "key": "saint-john-of-the-cross-priest-and-doctor",
+    "title": {
+     "en": "Saint John of the Cross, priest and doctor",
+     "tl": "San Juan de la Cruz, pari at pantas ng Simbahan"
+    },
+    "designation": "Obligatory Memorial"
+   },
+   "options": []
+  },
+  {
+   "date": "2027-12-15",
+   "season": "advent",
+   "celebration": {
+    "key": "wednesday-of-the-third-week-of-advent-2027-12-15",
+    "title": {
+     "en": "Wednesday of the 3rd Week of Advent",
+     "tl": "Miyerkules sa Ikatlong Linggo ng Pagdating ng Panginoon"
+    },
+    "designation": "Weekday / feria"
+   },
+   "options": []
+  },
+  {
+   "date": "2027-12-16",
+   "season": "advent",
+   "celebration": {
+    "key": "misa-de-aguinaldo",
+    "title": {
+     "en": "Misa de Aguinaldo (Simbang Gabi)",
+     "tl": "Misa de Aguinaldo (Simbang Gabi)"
+    },
+    "designation": "Votive Mass of the Blessed Virgin Mary"
+   },
+   "options": [
+    {
+     "key": "thursday-of-the-third-week-of-advent-2027-12-16",
+     "title": {
+      "en": "Thursday of the 3rd Week of Advent",
+      "tl": "Huwebes sa Ikatlong Linggo ng Pagdating ng Panginoon"
+     },
+     "designation": "Weekday"
+    }
+   ]
+  },
+  {
+   "date": "2027-12-17",
+   "season": "advent",
+   "celebration": {
+    "key": "misa-de-aguinaldo",
+    "title": {
+     "en": "Misa de Aguinaldo (Simbang Gabi)",
+     "tl": "Misa de Aguinaldo (Simbang Gabi)"
+    },
+    "designation": "Votive Mass of the Blessed Virgin Mary"
+   },
+   "options": [
+    {
+     "key": "friday-of-the-third-week-of-advent-2027-12-17",
+     "title": {
+      "en": "Friday of the 3rd Week of Advent",
+      "tl": "Biyernes sa Ikatlong Linggo ng Pagdating ng Panginoon"
+     },
+     "designation": "Weekday"
+    }
+   ]
+  },
+  {
+   "date": "2027-12-18",
+   "season": "advent",
+   "celebration": {
+    "key": "misa-de-aguinaldo",
+    "title": {
+     "en": "Misa de Aguinaldo (Simbang Gabi)",
+     "tl": "Misa de Aguinaldo (Simbang Gabi)"
+    },
+    "designation": "Votive Mass of the Blessed Virgin Mary"
+   },
+   "options": [
+    {
+     "key": "saturday-of-the-third-week-of-advent-2027-12-18",
+     "title": {
+      "en": "Saturday of the 3rd Week of Advent",
+      "tl": "Sabado sa Ikatlong Linggo ng Pagdating ng Panginoon"
+     },
+     "designation": "Weekday"
+    }
+   ]
+  },
+  {
+   "date": "2027-12-19",
+   "season": "advent",
+   "celebration": {
+    "key": "fourth-sunday-of-advent",
+    "title": {
+     "en": "4th Sunday of Advent",
+     "tl": "Ikaapat na Linggo ng Pagdating ng Panginoon"
+    },
+    "designation": "Sunday of Advent"
+   },
+   "options": []
+  },
+  {
+   "date": "2027-12-20",
+   "season": "advent",
+   "celebration": {
+    "key": "misa-de-aguinaldo",
+    "title": {
+     "en": "Misa de Aguinaldo (Simbang Gabi)",
+     "tl": "Misa de Aguinaldo (Simbang Gabi)"
+    },
+    "designation": "Votive Mass of the Blessed Virgin Mary"
+   },
+   "options": [
+    {
+     "key": "monday-of-the-fourth-week-of-advent-2027-12-20",
+     "title": {
+      "en": "Monday of the 4th Week of Advent",
+      "tl": "Lunes sa Ikaapat na Linggo ng Pagdating ng Panginoon"
+     },
+     "designation": "Weekday"
+    }
+   ]
+  },
+  {
+   "date": "2027-12-21",
+   "season": "advent",
+   "celebration": {
+    "key": "misa-de-aguinaldo",
+    "title": {
+     "en": "Misa de Aguinaldo (Simbang Gabi)",
+     "tl": "Misa de Aguinaldo (Simbang Gabi)"
+    },
+    "designation": "Votive Mass of the Blessed Virgin Mary"
+   },
+   "options": [
+    {
+     "key": "tuesday-of-the-fourth-week-of-advent-2027-12-21",
+     "title": {
+      "en": "Tuesday of the 4th Week of Advent",
+      "tl": "Martes sa Ikaapat na Linggo ng Pagdating ng Panginoon"
+     },
+     "designation": "Weekday"
+    },
+    {
+     "key": "saint-peter-canisius-priest-and-doctor-of-the-church",
+     "title": {
+      "en": "Saint Peter Canisius, priest and doctor of the Church",
+      "tl": "San Pedro Canisio, pari at pantas ng Simbahan"
+     },
+     "designation": "Optional Memorial"
+    }
+   ]
+  },
+  {
+   "date": "2027-12-22",
+   "season": "advent",
+   "celebration": {
+    "key": "misa-de-aguinaldo",
+    "title": {
+     "en": "Misa de Aguinaldo (Simbang Gabi)",
+     "tl": "Misa de Aguinaldo (Simbang Gabi)"
+    },
+    "designation": "Votive Mass of the Blessed Virgin Mary"
+   },
+   "options": [
+    {
+     "key": "wednesday-of-the-fourth-week-of-advent-2027-12-22",
+     "title": {
+      "en": "Wednesday of the 4th Week of Advent",
+      "tl": "Miyerkules sa Ikaapat na Linggo ng Pagdating ng Panginoon"
+     },
+     "designation": "Weekday"
+    }
+   ]
+  },
+  {
+   "date": "2027-12-23",
+   "season": "advent",
+   "celebration": {
+    "key": "misa-de-aguinaldo",
+    "title": {
+     "en": "Misa de Aguinaldo (Simbang Gabi)",
+     "tl": "Misa de Aguinaldo (Simbang Gabi)"
+    },
+    "designation": "Votive Mass of the Blessed Virgin Mary"
+   },
+   "options": [
+    {
+     "key": "thursday-of-the-fourth-week-of-advent-2027-12-23",
+     "title": {
+      "en": "Thursday of the 4th Week of Advent",
+      "tl": "Huwebes sa Ikaapat na Linggo ng Pagdating ng Panginoon"
+     },
+     "designation": "Weekday"
+    },
+    {
+     "key": "saint-john-of-kanty-priest",
+     "title": {
+      "en": "Saint John of Kanty, priest",
+      "tl": "San Juan ng Kety, pari"
+     },
+     "designation": "Optional Memorial"
+    }
+   ]
+  },
+  {
+   "date": "2027-12-24",
+   "season": "advent",
+   "celebration": {
+    "key": "misa-de-aguinaldo",
+    "title": {
+     "en": "Misa de Aguinaldo (Simbang Gabi)",
+     "tl": "Misa de Aguinaldo (Simbang Gabi)"
+    },
+    "designation": "Votive Mass of the Blessed Virgin Mary"
+   },
+   "options": [
+    {
+     "key": "friday-of-the-fourth-week-of-advent-2027-12-24",
+     "title": {
+      "en": "Friday of the 4th Week of Advent",
+      "tl": "Biyernes sa Ikaapat na Linggo ng Pagdating ng Panginoon"
+     },
+     "designation": "Weekday"
+    }
+   ]
+  },
+  {
+   "date": "2027-12-25",
+   "season": "christmas",
+   "celebration": {
+    "key": "nativity-of-the-lord",
+    "title": {
+     "en": "The Nativity of the Lord",
+     "tl": "Pasko ng Pagsilang ng Panginoon"
+    },
+    "designation": "Solemnity of the Lord"
+   },
+   "options": []
+  },
+  {
+   "date": "2027-12-26",
+   "season": "christmas",
+   "celebration": {
+    "key": "holy-family",
+    "title": {
+     "en": "The Holy Family of Jesus, Mary and Joseph",
+     "tl": "Banal na Mag-anak, Hesus, Maria at Jose"
+    },
+    "designation": "Feast of the Lord"
+   },
+   "options": []
+  },
+  {
+   "date": "2027-12-27",
+   "season": "christmas",
+   "celebration": {
+    "key": "saint-john-apostle-and-evangelist",
+    "title": {
+     "en": "Saint John, Apostle and Evangelist",
+     "tl": "San Juan, Apostol at Manunulat ng Mabuting Balita"
+    },
+    "designation": "Feast"
+   },
+   "options": []
+  },
+  {
+   "date": "2027-12-28",
+   "season": "christmas",
+   "celebration": {
+    "key": "the-holy-innocents-martyrs",
+    "title": {
+     "en": "The Holy Innocents, Martyrs",
+     "tl": "Mga Banal na Sanggol na Walang Kamalayan, Mga Martir"
+    },
+    "designation": "Feast"
+   },
+   "options": []
+  },
+  {
+   "date": "2027-12-29",
+   "season": "christmas",
+   "celebration": {
+    "key": "wednesday-of-christmas-time-2027-12-29",
+    "title": {
+     "en": "The Fifth Day within the Octave of the Nativity of the Lord",
+     "tl": "Ikalimang Araw ng Pagdiriwang ng Pasko ng Pagsilang"
+    },
+    "designation": "Privileged weekday / feria"
+   },
+   "options": [
+    {
+     "key": "saint-thomas-becket-bishop-and-martyr",
+     "title": {
+      "en": "Saint Thomas Becket, bishop and martyr",
+      "tl": "Santo Tomas Becket, obispo at martir"
+     },
+     "designation": "Optional Memorial"
+    }
+   ]
+  },
+  {
+   "date": "2027-12-30",
+   "season": "christmas",
+   "celebration": {
+    "key": "thursday-of-christmas-time-2027-12-30",
+    "title": {
+     "en": "The Sixth Day within the Octave of the Nativity of the Lord",
+     "tl": "Ikaanim na Araw ng Pagdiriwang ng Pasko ng Pagsilang"
+    },
+    "designation": "Privileged weekday / feria"
+   },
+   "options": []
+  },
+  {
+   "date": "2027-12-31",
+   "season": "christmas",
+   "celebration": {
+    "key": "friday-of-christmas-time-2027-12-31",
+    "title": {
+     "en": "The Seventh Day within the Octave of the Nativity of the Lord",
+     "tl": "Ikapitong Araw ng Pagdiriwang ng Pasko ng Pagsilang"
+    },
+    "designation": "Privileged weekday / feria"
+   },
+   "options": [
+    {
+     "key": "saint-sylvester-i-pope",
+     "title": {
+      "en": "Saint Sylvester I, pope",
+      "tl": "San Silvester, papa"
+     },
+     "designation": "Optional Memorial"
+    }
+   ]
+  }
+ ]
+}

@@ -12,6 +12,7 @@ import {
   ChevronRight,
   Loader2,
   AlertTriangle,
+  Info,
 } from 'lucide-react';
 import { apiClient } from '../../lib/api-client';
 import { auth } from '../../firebase';
@@ -27,6 +28,14 @@ interface LiturgicalRecord {
   rank?: string;
   liturgical_season?: string;
   source_name: string;
+  validation_status?: string;
+  validation_reason?: string;
+  gcatholic_match_status?: string;
+  romcal_match_status?: string;
+  litcal_match_status?: string;
+  gcatholic_celebration_name?: string;
+  romcal_celebration_name?: string;
+  litcal_celebration_name?: string;
   review_status: 'pending' | 'approved' | 'approved_with_revisions' | 'rejected';
   reviewed_by?: string;
   reviewed_at?: string;
@@ -36,6 +45,12 @@ interface LiturgicalRecord {
 const PAGE_SIZE = 20;
 
 const SEASONS = ['Advent', 'Christmas', 'Ordinary Time', 'Lent', 'Paschal Triduum', 'Easter'];
+
+const VALIDATION_FILTER_OPTIONS = [
+  { value: 'all', label: 'All' },
+  { value: 'matched', label: 'Matched' },
+  { value: 'mismatched', label: 'Mismatched' },
+];
 
 const MONTHS = [
   'January',
@@ -67,8 +82,78 @@ const STATUS_BADGES: Record<LiturgicalRecord['review_status'], { label: string; 
   rejected: { label: 'Rejected', className: 'bg-rose-100 text-rose-700' },
 };
 
+const MATCH_BADGES: Record<string, { label: string; className: string; dotClassName: string }> = {
+  matched: {
+    label: 'Matched',
+    className: 'text-emerald-700',
+    dotClassName: 'bg-emerald-500 ring-emerald-100',
+  },
+  mismatched: {
+    label: 'Mismatch',
+    className: 'text-rose-700',
+    dotClassName: 'bg-rose-500 ring-rose-100',
+  },
+  missing: {
+    label: 'Missing',
+    className: 'text-gray-500',
+    dotClassName: 'bg-gray-300 ring-gray-100',
+  },
+  not_applied: {
+    label: 'Not used',
+    className: 'text-slate-500',
+    dotClassName: 'bg-slate-300 ring-slate-100',
+  },
+};
+
 const formatDisplayDate = (iso: string) =>
   new Date(`${iso}T00:00:00`).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' });
+
+const matchBadge = (status?: string) => MATCH_BADGES[status || 'missing'] || MATCH_BADGES.missing;
+
+const sourceLabel = (record: LiturgicalRecord) =>
+  record.source_name === 'liturgical_calendar_sources' ? 'Source of truth' : record.source_name;
+
+const getValidationState = (record: LiturgicalRecord): 'matched' | 'mismatched' => {
+  if (record.validation_status === 'mismatched_all' || record.validation_status === 'validator_missing') {
+    return 'mismatched';
+  }
+
+  if (
+    record.validation_status === 'matched_both' ||
+    record.validation_status === 'matched_gcatholic_only' ||
+    record.validation_status === 'matched_romcal_only' ||
+    record.validation_status === 'matched_litcal_only' ||
+    record.validation_status === 'source_of_truth_only'
+  ) {
+    return 'matched';
+  }
+
+  const validatorStatuses = [record.romcal_match_status, record.gcatholic_match_status, record.litcal_match_status];
+  return validatorStatuses.some((status) => status === 'matched') ? 'matched' : 'mismatched';
+};
+
+const getNameOptions = (record: LiturgicalRecord) =>
+  [
+    { key: 'source', label: sourceLabel(record), value: record.celebration_name, status: 'source' },
+    {
+      key: 'romcal',
+      label: 'Romcal',
+      value: record.romcal_celebration_name,
+      status: record.romcal_match_status,
+    },
+    {
+      key: 'gcatholic',
+      label: 'GCatholic',
+      value: record.gcatholic_celebration_name,
+      status: record.gcatholic_match_status,
+    },
+    {
+      key: 'litcal',
+      label: 'LitCal',
+      value: record.litcal_celebration_name,
+      status: record.litcal_match_status,
+    },
+  ].filter((option) => Boolean(option.value));
 
 export function LiturgicalValidatorControl() {
   const [records, setRecords] = useState<LiturgicalRecord[]>([]);
@@ -82,16 +167,21 @@ export function LiturgicalValidatorControl() {
   const [seasonFilter, setSeasonFilter] = useState('all');
   const [monthFilter, setMonthFilter] = useState(0);
   const [yearFilter, setYearFilter] = useState(0);
-  const [reasonQuery, setReasonQuery] = useState('');
-  const [debouncedReason, setDebouncedReason] = useState('');
+  const [celebrationQuery, setCelebrationQuery] = useState('');
+  const [debouncedCelebration, setDebouncedCelebration] = useState('');
+  const [validationFilter, setValidationFilter] = useState<'all' | 'matched' | 'mismatched'>('all');
 
   const [busyId, setBusyId] = useState<string | null>(null);
   const [editTarget, setEditTarget] = useState<LiturgicalRecord | null>(null);
   const [editDate, setEditDate] = useState('');
   const [editName, setEditName] = useState('');
+  const [editNameSource, setEditNameSource] = useState('source');
   const [rejectTarget, setRejectTarget] = useState<LiturgicalRecord | null>(null);
   const [rejectReason, setRejectReason] = useState('');
   const [showApproveAll, setShowApproveAll] = useState(false);
+  const [showMismatchBlock, setShowMismatchBlock] = useState(false);
+  const [mismatchBlockCount, setMismatchBlockCount] = useState(0);
+  const [isCheckingApproveAll, setIsCheckingApproveAll] = useState(false);
   const [isApprovingAll, setIsApprovingAll] = useState(false);
   const [actionError, setActionError] = useState('');
   const [successMessage, setSuccessMessage] = useState('');
@@ -99,9 +189,9 @@ export function LiturgicalValidatorControl() {
   const reviewedBy = auth.currentUser?.email || auth.currentUser?.displayName || 'liturgical_validator';
 
   useEffect(() => {
-    const timer = window.setTimeout(() => setDebouncedReason(reasonQuery.trim()), 400);
+    const timer = window.setTimeout(() => setDebouncedCelebration(celebrationQuery.trim()), 400);
     return () => window.clearTimeout(timer);
-  }, [reasonQuery]);
+  }, [celebrationQuery]);
 
   const fetchRecords = useCallback(async () => {
     setIsLoading(true);
@@ -112,7 +202,8 @@ export function LiturgicalValidatorControl() {
         season: seasonFilter,
         month: monthFilter || undefined,
         year: yearFilter || undefined,
-        reason: debouncedReason || undefined,
+        celebration: debouncedCelebration || undefined,
+        validation: validationFilter,
         page,
         pageSize: PAGE_SIZE,
       });
@@ -126,7 +217,7 @@ export function LiturgicalValidatorControl() {
     } finally {
       setIsLoading(false);
     }
-  }, [statusFilter, seasonFilter, monthFilter, yearFilter, debouncedReason, page]);
+  }, [statusFilter, seasonFilter, monthFilter, yearFilter, debouncedCelebration, validationFilter, page]);
 
   useEffect(() => {
     fetchRecords();
@@ -135,7 +226,7 @@ export function LiturgicalValidatorControl() {
   // Reset to page 1 whenever a filter changes
   useEffect(() => {
     setPage(1);
-  }, [statusFilter, seasonFilter, monthFilter, yearFilter, debouncedReason]);
+  }, [statusFilter, seasonFilter, monthFilter, yearFilter, debouncedCelebration, validationFilter]);
 
   const flashSuccess = (message: string) => {
     setSuccessMessage(message);
@@ -160,7 +251,13 @@ export function LiturgicalValidatorControl() {
     setEditTarget(record);
     setEditDate(record.date);
     setEditName(record.celebration_name);
+    setEditNameSource('source');
     setActionError('');
+  };
+
+  const chooseEditName = (source: string, value: string) => {
+    setEditNameSource(source);
+    setEditName(value);
   };
 
   const handleEditApprove = async () => {
@@ -172,13 +269,22 @@ export function LiturgicalValidatorControl() {
     setBusyId(editTarget.id);
     setActionError('');
     try {
-      await apiClient.reviewLiturgicalRecord(editTarget.id, {
-        action: 'approve_with_revisions',
-        reviewedBy,
-        date: editDate,
-        celebration_name: editName.trim(),
-      });
-      flashSuccess(`Approved "${editName.trim()}" with revisions.`);
+      const revisedName = editName.trim();
+      const isUnchanged = editDate === editTarget.date && revisedName === editTarget.celebration_name;
+
+      if (isUnchanged) {
+        await apiClient.reviewLiturgicalRecord(editTarget.id, { action: 'approve', reviewedBy });
+        flashSuccess(`Approved "${revisedName}".`);
+      } else {
+        await apiClient.reviewLiturgicalRecord(editTarget.id, {
+          action: 'approve_with_revisions',
+          reviewedBy,
+          date: editDate,
+          celebration_name: revisedName,
+          name_source: editNameSource,
+        });
+        flashSuccess(`Approved "${revisedName}" with revisions.`);
+      }
       setEditTarget(null);
       await fetchRecords();
     } catch (error) {
@@ -220,16 +326,52 @@ export function LiturgicalValidatorControl() {
     }
   };
 
+  const currentApprovalFilters = () => ({
+    season: seasonFilter !== 'all' ? seasonFilter : undefined,
+    month: monthFilter || undefined,
+    year: yearFilter || undefined,
+    celebration: debouncedCelebration || undefined,
+  });
+
+  const handleApproveAllClick = async () => {
+    if (statusFilter !== 'pending' || total <= 0 || isLoading) return;
+
+    setIsCheckingApproveAll(true);
+    setActionError('');
+    try {
+      const mismatchResult =
+        validationFilter === 'mismatched'
+          ? { total }
+          : await apiClient.getLiturgicalCalendar({
+              status: 'pending',
+              ...currentApprovalFilters(),
+              validation: 'mismatched',
+              page: 1,
+              pageSize: 1,
+            });
+
+      if (mismatchResult.total > 0) {
+        setMismatchBlockCount(mismatchResult.total);
+        setShowMismatchBlock(true);
+        return;
+      }
+
+      setShowApproveAll(true);
+    } catch {
+      setActionError('Failed to check mismatched records before bulk approval. Please try again.');
+    } finally {
+      setIsCheckingApproveAll(false);
+    }
+  };
+
   const handleApproveAll = async () => {
     setIsApprovingAll(true);
     setActionError('');
     try {
       const result = await apiClient.approveAllLiturgicalRecords(
         {
-          season: seasonFilter !== 'all' ? seasonFilter : undefined,
-          month: monthFilter || undefined,
-          year: yearFilter || undefined,
-          reason: debouncedReason || undefined,
+          ...currentApprovalFilters(),
+          validation: validationFilter !== 'all' ? validationFilter : undefined,
         },
         reviewedBy,
       );
@@ -244,7 +386,13 @@ export function LiturgicalValidatorControl() {
   };
 
   const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
-  const canApproveAll = statusFilter === 'pending' && total > 0 && !isLoading;
+  const canApproveAll = statusFilter === 'pending' && total > 0 && !isLoading && !isCheckingApproveAll;
+  const totalLabel =
+    validationFilter === 'all'
+      ? `record${total === 1 ? '' : 's'}`
+      : `${validationFilter} record${total === 1 ? '' : 's'}`;
+  const visibleRecords =
+    validationFilter === 'all' ? records : records.filter((record) => getValidationState(record) === validationFilter);
 
   return (
     <div className="bg-white rounded-[32px] shadow-sm border border-gray-100 p-10">
@@ -260,7 +408,7 @@ export function LiturgicalValidatorControl() {
           </p>
         </div>
         <button
-          onClick={() => setShowApproveAll(true)}
+          onClick={handleApproveAllClick}
           disabled={!canApproveAll}
           title={
             statusFilter === 'pending'
@@ -269,7 +417,7 @@ export function LiturgicalValidatorControl() {
           }
           className="inline-flex items-center gap-2 px-6 py-3 rounded-2xl text-sm font-bold transition-all active:scale-95 disabled:opacity-40 disabled:cursor-not-allowed bg-emerald-500 text-white hover:bg-emerald-600 shadow-lg shadow-emerald-500/20"
         >
-          <CheckCheck className="w-4 h-4" />
+          {isCheckingApproveAll ? <Loader2 className="w-4 h-4 animate-spin" /> : <CheckCheck className="w-4 h-4" />}
           Approve All ({statusFilter === 'pending' ? total : 0})
         </button>
       </div>
@@ -289,7 +437,7 @@ export function LiturgicalValidatorControl() {
       )}
 
       {/* Filter bar — Approve All is scoped to whatever matches these filters */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3 mb-8">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-3 mb-8">
         <div className="space-y-1.5">
           <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest ml-1">Status</label>
           <select
@@ -298,6 +446,21 @@ export function LiturgicalValidatorControl() {
             className="w-full px-4 py-3 bg-gray-50 border border-gray-100 rounded-2xl text-sm font-medium text-gray-900 focus:outline-none focus:border-[#D4AF37] focus:ring-4 focus:ring-[#D4AF37]/10 transition-all"
           >
             {STATUS_OPTIONS.map((opt) => (
+              <option key={opt.value} value={opt.value}>
+                {opt.label}
+              </option>
+            ))}
+          </select>
+        </div>
+
+        <div className="space-y-1.5">
+          <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest ml-1">Validation</label>
+          <select
+            value={validationFilter}
+            onChange={(e) => setValidationFilter(e.target.value as typeof validationFilter)}
+            className="w-full px-4 py-3 bg-gray-50 border border-gray-100 rounded-2xl text-sm font-medium text-gray-900 focus:outline-none focus:border-[#D4AF37] focus:ring-4 focus:ring-[#D4AF37]/10 transition-all"
+          >
+            {VALIDATION_FILTER_OPTIONS.map((opt) => (
               <option key={opt.value} value={opt.value}>
                 {opt.label}
               </option>
@@ -345,7 +508,7 @@ export function LiturgicalValidatorControl() {
             className="w-full px-4 py-3 bg-gray-50 border border-gray-100 rounded-2xl text-sm font-medium text-gray-900 focus:outline-none focus:border-[#D4AF37] focus:ring-4 focus:ring-[#D4AF37]/10 transition-all"
           >
             <option value={0}>All Years</option>
-            {[2023, 2024, 2025, 2026].map((year) => (
+            {[2023, 2024, 2025, 2026, 2027, 2028, 2029, 2030, 2031, 2032].map((year) => (
               <option key={year} value={year}>
                 {year}
               </option>
@@ -354,14 +517,14 @@ export function LiturgicalValidatorControl() {
         </div>
 
         <div className="space-y-1.5">
-          <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest ml-1">Reason</label>
+          <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest ml-1">Celebration</label>
           <div className="relative">
             <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-300" />
             <input
               type="text"
-              placeholder="Search review reasons..."
-              value={reasonQuery}
-              onChange={(e) => setReasonQuery(e.target.value)}
+              placeholder="Search celebrations..."
+              value={celebrationQuery}
+              onChange={(e) => setCelebrationQuery(e.target.value)}
               className="w-full pl-11 pr-4 py-3 bg-gray-50 border border-gray-100 rounded-2xl text-sm font-medium text-gray-900 focus:outline-none focus:border-[#D4AF37] focus:ring-4 focus:ring-[#D4AF37]/10 transition-all placeholder:text-gray-300"
             />
           </div>
@@ -374,13 +537,11 @@ export function LiturgicalValidatorControl() {
           <thead>
             <tr className="border-b border-gray-100">
               <th className="pb-3.5 pr-4 font-bold text-gray-400 text-[10px] uppercase tracking-widest">Date</th>
-              <th className="pb-3.5 pr-4 font-bold text-gray-400 text-[10px] uppercase tracking-widest">
-                Celebration
-              </th>
+              <th className="pb-3.5 pr-4 font-bold text-gray-400 text-[10px] uppercase tracking-widest">Celebration</th>
               <th className="pb-3.5 pr-4 font-bold text-gray-400 text-[10px] uppercase tracking-widest">Season</th>
               <th className="pb-3.5 pr-4 font-bold text-gray-400 text-[10px] uppercase tracking-widest">Rank</th>
-              <th className="pb-3.5 pr-4 font-bold text-gray-400 text-[10px] uppercase tracking-widest w-1/4">
-                Reason
+              <th className="pb-3.5 pr-4 font-bold text-gray-400 text-[10px] uppercase tracking-widest w-[150px]">
+                Validation
               </th>
               <th className="pb-3.5 pr-4 font-bold text-gray-400 text-[10px] uppercase tracking-widest">Status</th>
               <th className="pb-3.5 font-bold text-gray-400 text-[10px] uppercase tracking-widest text-right">
@@ -395,10 +556,17 @@ export function LiturgicalValidatorControl() {
                   <Loader2 className="w-8 h-8 text-[#D4AF37] animate-spin mx-auto" />
                 </td>
               </tr>
-            ) : records.length > 0 ? (
-              records.map((record) => {
+            ) : visibleRecords.length > 0 ? (
+              visibleRecords.map((record) => {
                 const badge = STATUS_BADGES[record.review_status];
                 const isBusy = busyId === record.id;
+                const validationState = getValidationState(record);
+                const validationLabel = validationState === 'matched' ? 'Matched' : 'Mismatched';
+                const validationClassName =
+                  validationState === 'matched'
+                    ? 'border-emerald-100 bg-emerald-50 text-emerald-700'
+                    : 'border-rose-100 bg-rose-50 text-rose-700';
+                const validationDot = validationState === 'matched' ? 'bg-emerald-500' : 'bg-rose-500';
                 return (
                   <tr key={record.id} className="group hover:bg-gray-50/50 transition-colors">
                     <td className="py-4 pr-4 whitespace-nowrap">
@@ -416,10 +584,20 @@ export function LiturgicalValidatorControl() {
                         {record.rank || '—'}
                       </span>
                     </td>
-                    <td className="py-4 pr-4">
-                      <p className="text-xs text-gray-500 font-medium line-clamp-2" title={record.review_notes || ''}>
-                        {record.review_notes || '—'}
-                      </p>
+                    <td className="py-4 pr-4 whitespace-nowrap">
+                      <button
+                        type="button"
+                        onClick={() => openEdit(record)}
+                        className="inline-flex rounded-full transition-all hover:shadow-sm active:scale-95"
+                        title="Open review details"
+                      >
+                        <span
+                          className={`inline-flex items-center gap-2 rounded-full border px-3 py-1.5 text-[11px] font-bold uppercase tracking-wider ${validationClassName}`}
+                        >
+                          <span className={`h-2 w-2 rounded-full ${validationDot}`} />
+                          {validationLabel}
+                        </span>
+                      </button>
                     </td>
                     <td className="py-4 pr-4">
                       <span
@@ -435,19 +613,22 @@ export function LiturgicalValidatorControl() {
                           <Loader2 className="w-4 h-4 text-[#D4AF37] animate-spin" />
                         ) : (
                           <>
-                            {record.review_status !== 'approved' && record.review_status !== 'approved_with_revisions' && (
-                              <button
-                                onClick={() => handleApprove(record)}
-                                className="p-2 text-gray-400 hover:text-emerald-600 hover:bg-emerald-50 rounded-lg transition-all"
-                                title={record.review_status === 'rejected' ? 'Approve (restore rejected event)' : 'Approve'}
-                              >
-                                <Check className="w-4 h-4" />
-                              </button>
-                            )}
+                            {record.review_status !== 'approved' &&
+                              record.review_status !== 'approved_with_revisions' && (
+                                <button
+                                  onClick={() => handleApprove(record)}
+                                  className="p-2 text-gray-400 hover:text-emerald-600 hover:bg-emerald-50 rounded-lg transition-all"
+                                  title={
+                                    record.review_status === 'rejected' ? 'Approve (restore rejected event)' : 'Approve'
+                                  }
+                                >
+                                  <Check className="w-4 h-4" />
+                                </button>
+                              )}
                             <button
                               onClick={() => openEdit(record)}
                               className="p-2 text-gray-400 hover:text-[#D4AF37] hover:bg-[#D4AF37]/10 rounded-lg transition-all"
-                              title="Edit date or name, then approve"
+                              title="Review details and choose final name"
                             >
                               <Pencil className="w-4 h-4" />
                             </button>
@@ -486,7 +667,7 @@ export function LiturgicalValidatorControl() {
       {/* Pagination */}
       <div className="flex items-center justify-between mt-8 pt-6 border-t border-gray-100">
         <p className="text-xs text-gray-400 font-medium">
-          {total} record{total === 1 ? '' : 's'} • Page {page} of {totalPages}
+          {total} {totalLabel} • Page {page} of {totalPages}
         </p>
         <div className="flex items-center gap-2">
           <button
@@ -506,15 +687,92 @@ export function LiturgicalValidatorControl() {
         </div>
       </div>
 
-      {/* Edit & Approve modal */}
+      {/* Review details modal */}
       {editTarget && (
         <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-[80] flex items-center justify-center p-6">
-          <div className="bg-white rounded-[32px] shadow-2xl border border-gray-100 p-10 w-full max-w-lg">
-            <h4 className="text-xl font-bold text-gray-900 mb-2">Edit &amp; Approve</h4>
-            <p className="text-sm text-gray-500 font-medium mb-8">
-              Correct the date or celebration name. The record will be approved with your revisions and the original
-              values kept for audit.
-            </p>
+          <div className="bg-white rounded-[24px] shadow-2xl border border-gray-100 p-8 w-full max-w-3xl max-h-[90vh] overflow-y-auto">
+            <div className="flex items-start justify-between gap-6 mb-6">
+              <div>
+                <h4 className="text-xl font-bold text-gray-900 mb-2">Review Liturgical Event</h4>
+                <p className="text-sm text-gray-500 font-medium">
+                  Compare validator names, choose the final celebration name, then approve the record.
+                </p>
+              </div>
+              <button
+                onClick={() => setEditTarget(null)}
+                className="p-2 text-gray-400 hover:text-gray-700 hover:bg-gray-100 rounded-xl transition-all"
+                title="Close"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-6">
+              <div className="rounded-2xl bg-gray-50 border border-gray-100 p-4">
+                <div className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">Date</div>
+                <div className="text-sm font-bold text-gray-900">{formatDisplayDate(editTarget.date)}</div>
+                <div className="text-xs font-medium text-gray-400">{editTarget.weekday}</div>
+              </div>
+              <div className="rounded-2xl bg-gray-50 border border-gray-100 p-4">
+                <div className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">Season</div>
+                <div className="text-sm font-bold text-gray-900">{editTarget.liturgical_season || 'Not set'}</div>
+              </div>
+              <div className="rounded-2xl bg-gray-50 border border-gray-100 p-4">
+                <div className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">Rank</div>
+                <div className="text-sm font-bold text-gray-900">{editTarget.rank || 'Not set'}</div>
+              </div>
+            </div>
+
+            <div className="mb-6">
+              <div className="flex items-center gap-2 mb-3">
+                <Info className="w-4 h-4 text-[#D4AF37]" />
+                <h5 className="text-sm font-bold text-gray-900">Validator Summary</h5>
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                {getNameOptions(editTarget).map((option) => {
+                  const badge =
+                    option.status === 'source'
+                      ? { label: 'Source', className: 'bg-[#D4AF37]/10 text-[#8B6F16] border-[#D4AF37]/20' }
+                      : matchBadge(option.status);
+                  return (
+                    <button
+                      key={option.key}
+                      type="button"
+                      onClick={() => chooseEditName(option.key, option.value || '')}
+                      className={`text-left rounded-2xl border p-4 transition-all ${
+                        editNameSource === option.key
+                          ? 'border-[#D4AF37] bg-[#D4AF37]/10 shadow-sm'
+                          : 'border-gray-100 bg-white hover:border-gray-200 hover:bg-gray-50'
+                      }`}
+                    >
+                      <div className="flex items-center justify-between gap-3 mb-2">
+                        <span className="text-xs font-bold uppercase tracking-widest text-gray-400">
+                          {option.label}
+                        </span>
+                        <span
+                          className={`rounded-full border px-2 py-1 text-[9px] font-bold uppercase tracking-wider ${badge.className}`}
+                        >
+                          {badge.label}
+                        </span>
+                      </div>
+                      <div className="text-sm font-semibold text-gray-900">{option.value}</div>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
+            {(editTarget.validation_reason || editTarget.review_notes) && (
+              <div className="mb-6 rounded-2xl border border-gray-100 bg-gray-50 p-4">
+                <div className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-2">
+                  Full Validation Reason
+                </div>
+                <p className="text-sm text-gray-600 font-medium leading-relaxed">
+                  {editTarget.validation_reason || editTarget.review_notes}
+                </p>
+              </div>
+            )}
+
             <div className="space-y-5 mb-8">
               <div className="space-y-2">
                 <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest ml-1">Date</label>
@@ -527,14 +785,20 @@ export function LiturgicalValidatorControl() {
               </div>
               <div className="space-y-2">
                 <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest ml-1">
-                  Celebration Name
+                  Final Celebration Name
                 </label>
                 <input
                   type="text"
                   value={editName}
-                  onChange={(e) => setEditName(e.target.value)}
+                  onChange={(e) => {
+                    setEditNameSource('custom');
+                    setEditName(e.target.value);
+                  }}
                   className="w-full px-5 py-3.5 bg-gray-50 border border-gray-100 rounded-2xl text-sm font-medium text-gray-900 focus:outline-none focus:border-[#D4AF37] focus:ring-4 focus:ring-[#D4AF37]/10 transition-all"
                 />
+                <p className="text-xs font-medium text-gray-400">
+                  Editing this field marks the selected name as custom.
+                </p>
               </div>
             </div>
             <div className="flex items-center justify-end gap-3">
@@ -550,7 +814,7 @@ export function LiturgicalValidatorControl() {
                 className="px-6 py-2.5 bg-emerald-500 text-white rounded-xl text-sm font-bold hover:bg-emerald-600 transition-all shadow-lg shadow-emerald-500/20 active:scale-95 disabled:opacity-50 inline-flex items-center gap-2"
               >
                 {busyId === editTarget.id && <Loader2 className="w-4 h-4 animate-spin" />}
-                Approve with Revisions
+                Approve Selection
               </button>
             </div>
           </div>
@@ -563,8 +827,8 @@ export function LiturgicalValidatorControl() {
           <div className="bg-white rounded-[32px] shadow-2xl border border-gray-100 p-10 w-full max-w-lg">
             <h4 className="text-xl font-bold text-gray-900 mb-2">Reject Event</h4>
             <p className="text-sm text-gray-500 font-medium mb-8">
-              Rejecting &quot;{rejectTarget.celebration_name}&quot; ({formatDisplayDate(rejectTarget.date)}). The
-              record is kept for audit but hidden from the pending queue. A reason is required.
+              Rejecting &quot;{rejectTarget.celebration_name}&quot; ({formatDisplayDate(rejectTarget.date)}). The record
+              is kept for audit but hidden from the pending queue. A reason is required.
             </p>
             <div className="space-y-2 mb-8">
               <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest ml-1">
@@ -598,6 +862,42 @@ export function LiturgicalValidatorControl() {
         </div>
       )}
 
+      {/* Mismatch blocker modal */}
+      {showMismatchBlock && (
+        <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-[80] flex items-center justify-center p-6">
+          <div className="bg-white rounded-[32px] shadow-2xl border border-gray-100 p-10 w-full max-w-lg">
+            <div className="w-12 h-12 rounded-2xl bg-rose-50 text-rose-600 flex items-center justify-center mb-5">
+              <AlertTriangle className="w-6 h-6" />
+            </div>
+            <h4 className="text-xl font-bold text-gray-900 mb-2">Resolve Mismatched Records First</h4>
+            <p className="text-sm text-gray-500 font-medium mb-8 leading-relaxed">
+              There {mismatchBlockCount === 1 ? 'is' : 'are'}{' '}
+              <span className="font-bold text-gray-900">{mismatchBlockCount}</span> pending mismatched record
+              {mismatchBlockCount === 1 ? '' : 's'} in the current filter scope. Review and approve or reject those
+              records before using bulk approval.
+            </p>
+            <div className="flex items-center justify-end gap-3">
+              <button
+                onClick={() => setShowMismatchBlock(false)}
+                className="px-5 py-2.5 bg-gray-100 text-gray-600 rounded-xl text-sm font-bold hover:bg-gray-200 transition-all active:scale-95"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={() => {
+                  setValidationFilter('mismatched');
+                  setPage(1);
+                  setShowMismatchBlock(false);
+                }}
+                className="px-6 py-2.5 bg-rose-500 text-white rounded-xl text-sm font-bold hover:bg-rose-600 transition-all shadow-lg shadow-rose-500/20 active:scale-95"
+              >
+                View Mismatched
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Approve All confirmation */}
       {showApproveAll && (
         <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-[80] flex items-center justify-center p-6">
@@ -605,8 +905,8 @@ export function LiturgicalValidatorControl() {
             <h4 className="text-xl font-bold text-gray-900 mb-2">Approve All Pending Events</h4>
             <p className="text-sm text-gray-500 font-medium mb-8">
               This will approve all <span className="font-bold text-gray-900">{total}</span> pending event
-              {total === 1 ? '' : 's'} matching the current filters — use it for events already verified by the
-              cross-validation pipeline that only need a final human double-check. This cannot be undone in bulk.
+              {total === 1 ? '' : 's'} matching the current filters. Mismatched validation results are excluded from
+              bulk approval and should be reviewed one by one. This cannot be undone in bulk.
             </p>
             <div className="flex items-center justify-end gap-3">
               <button
