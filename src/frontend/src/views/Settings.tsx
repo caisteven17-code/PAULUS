@@ -1445,7 +1445,7 @@ export function Settings({ onBack, onLogout, onNavigate, role = 'bishop', initia
                             value={passwords.current}
                             onChange={(event) => setPasswords((prev) => ({ ...prev, current: event.target.value }))}
                             placeholder="••••••••"
-                            className="w-full px-5 py-4 pr-12 rounded-2xl border border-white/10 bg-white/8 text-white focus:outline-none focus:border-[#D4AF37] focus:ring-4 focus:ring-[#D4AF37]/15 transition-all font-medium placeholder:text-white/30"
+                            className="w-full px-5 py-4 pr-12 rounded-2xl border border-white/10 bg-slate-900 text-white focus:outline-none focus:border-[#D4AF37] focus:ring-4 focus:ring-[#D4AF37]/15 transition-all font-medium placeholder:text-white/30"
                           />
                           <button
                             type="button"
@@ -1468,7 +1468,7 @@ export function Settings({ onBack, onLogout, onNavigate, role = 'bishop', initia
                             value={passwords.new}
                             onChange={(event) => setPasswords((prev) => ({ ...prev, new: event.target.value }))}
                             placeholder="••••••••"
-                            className="w-full px-5 py-4 pr-12 rounded-2xl border border-white/10 bg-white/8 text-white focus:outline-none focus:border-[#D4AF37] focus:ring-4 focus:ring-[#D4AF37]/15 transition-all font-medium placeholder:text-white/30"
+                            className="w-full px-5 py-4 pr-12 rounded-2xl border border-white/10 bg-slate-900 text-white focus:outline-none focus:border-[#D4AF37] focus:ring-4 focus:ring-[#D4AF37]/15 transition-all font-medium placeholder:text-white/30"
                           />
                           <button
                             type="button"

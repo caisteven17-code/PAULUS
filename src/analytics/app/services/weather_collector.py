@@ -201,24 +201,28 @@ def _fetch_json(url: str, max_retries: int = 4, base_delay: float = 2.0) -> Opti
 def _parse_open_meteo_daily(data: dict) -> list[dict]:
     """Parse Open-Meteo archive JSON into a list of daily dicts."""
     daily = data["daily"]
-    dates = daily.get("time", [])
-    temp_mean = daily.get("temperature_2m_mean", [None] * len(dates))
-    temp_max  = daily.get("temperature_2m_max",  [None] * len(dates))
-    temp_min  = daily.get("temperature_2m_min",  [None] * len(dates))
-    rain      = daily.get("precipitation_sum",    [None] * len(dates))
-    wind      = daily.get("windspeed_10m_max",    [None] * len(dates))
+    dates    = daily.get("time", [])
+    temp_mean = daily.get("temperature_2m_mean",     [None] * len(dates))
+    temp_max  = daily.get("temperature_2m_max",      [None] * len(dates))
+    temp_min  = daily.get("temperature_2m_min",      [None] * len(dates))
+    rain      = daily.get("precipitation_sum",        [None] * len(dates))
+    wind      = daily.get("windspeed_10m_max",        [None] * len(dates))
+    wcode     = daily.get("weather_code",              [None] * len(dates))
+    rh        = daily.get("relative_humidity_2m_mean", [None] * len(dates))
     records = []
     for i, d in enumerate(dates):
         t_avg = temp_mean[i]
         if t_avg is None and temp_max[i] is not None and temp_min[i] is not None:
             t_avg = (temp_max[i] + temp_min[i]) / 2
         records.append({
-            "date": d,
-            "temp_avg_c": t_avg,
-            "temp_max_c": temp_max[i],
-            "temp_min_c": temp_min[i],
-            "rainfall_mm": rain[i],
-            "wind_ms": wind[i],
+            "date":                 d,
+            "temp_avg_c":           t_avg,
+            "temp_max_c":           temp_max[i],
+            "temp_min_c":           temp_min[i],
+            "rainfall_mm":          rain[i],
+            "wind_ms":              wind[i],
+            "weathercode":          int(wcode[i]) if wcode[i] is not None else None,
+            "relativehumidity_pct": rh[i],
         })
     return records
 
@@ -229,7 +233,7 @@ def _open_meteo_params(lat, lon, start, end, model=None):
         "longitude": lon,
         "start_date": start.isoformat(),
         "end_date": end.isoformat(),
-        "daily": "temperature_2m_max,temperature_2m_min,temperature_2m_mean,precipitation_sum,windspeed_10m_max",
+        "daily": "temperature_2m_max,temperature_2m_min,temperature_2m_mean,precipitation_sum,windspeed_10m_max,weather_code,relative_humidity_2m_mean",
         "timezone": "Asia/Manila",
         "wind_speed_unit": "ms",
     }
@@ -618,6 +622,7 @@ def collect(
     champion_map: dict[str, str] = {}
     daily_rain_rows: list[dict] = []
     daily_temp_rows: list[dict] = []
+    daily_wind_rows: list[dict] = []
 
     for i, muni in enumerate(munis):
         name = muni["name"]
@@ -671,9 +676,8 @@ def collect(
             _run_chirps_and_validators()
         )
 
-        # Classify each day for the split daily tables: NASA POWER AG is the
-        # source of truth; 5 validators each for rainfall and temperature.
-        muni_rain_rows, muni_temp_rows = build_daily_rows(
+        # Classify each day for the split daily tables.
+        muni_rain_rows, muni_temp_rows, muni_wind_rows = build_daily_rows(
             name,
             start,
             end,
@@ -684,14 +688,17 @@ def collect(
             era5_records=era5_records,
             ecmwf_ifs_records=ecmwf_ifs_records,
             ukmo_records=ukmo_records,
+            typhoon_flags=typhoon_flags,
         )
         daily_rain_rows.extend(muni_rain_rows)
         daily_temp_rows.extend(muni_temp_rows)
+        daily_wind_rows.extend(muni_wind_rows)
         logger.info(
-            "  Daily classification: %d rain rows, %d temp rows "
+            "  Daily classification: %d rain rows, %d temp rows, %d wind rows "
             "(CHIRPS %d days, GSMaP %d days, ERA5 %d days, ECMWF IFS %d days, UKMO %d days)",
             len(muni_rain_rows),
             len(muni_temp_rows),
+            len(muni_wind_rows),
             len(chirps_daily_cache),
             len(gsmap_daily_cache),
             len(era5_records),
@@ -812,16 +819,19 @@ def collect(
     )
 
     # Confidence scoring across all municipalities
-    confidence = compute_confidence_scores(daily_rain_rows, daily_temp_rows)
+    confidence = compute_confidence_scores(daily_rain_rows, daily_temp_rows, daily_wind_rows)
     logger.info(
-        "Confidence scores — Fleiss kappa overall: %s (%s) | "
-        "rainfall kappa: %s WCI: %.1f%% | temperature kappa: %s WCI: %.1f%%",
+        "Confidence scores — overall WCI: %.1f%% | Fleiss kappa: %s (%s) | "
+        "rain WCI: %.1f%% | severe WCI: %.1f%% | temp WCI: %.1f%% | "
+        "wind WCI: %.1f%% | humidity WCI: %.1f%%",
+        confidence["overall_wci_pct"],
         confidence["overall_fleiss_kappa"],
         confidence["overall_fleiss_strength"],
-        confidence["rainfall"]["fleiss_kappa"],
         confidence["rainfall"]["weighted_confidence_index_pct"],
-        confidence["temperature"]["fleiss_kappa"],
+        confidence["severe_weather"]["weighted_confidence_index_pct"],
         confidence["temperature"]["weighted_confidence_index_pct"],
+        confidence["wind"]["weighted_confidence_index_pct"],
+        confidence["humidity"]["weighted_confidence_index_pct"],
     )
     (out_dir / "laguna_weather_confidence.json").write_text(
         json.dumps(confidence, indent=2)
@@ -837,9 +847,11 @@ def collect(
                 "period_end": end.isoformat(),
                 "rain_row_count": len(daily_rain_rows),
                 "temp_row_count": len(daily_temp_rows),
+                "wind_row_count": len(daily_wind_rows),
                 "confidence": confidence,
                 "rain_rows": daily_rain_rows,
                 "temp_rows": daily_temp_rows,
+                "wind_rows": daily_wind_rows,
             }
         )
     )
@@ -857,15 +869,17 @@ def collect(
                 upsert_monthly_fleiss_kappa,
                 upsert_weather_rainfall_daily,
                 upsert_weather_temperature_daily,
+                upsert_weather_wind_daily,
             )
 
-            # New pipeline: split daily tables → monthly WCI (SQL) → monthly Fleiss Kappa (Python)
-            daily_rows_loaded = upsert_weather_rainfall_daily(daily_rain_rows)
+            # Pipeline: daily tables → monthly WCI (SQL) → monthly Fleiss Kappa (Python)
+            daily_rows_loaded  = upsert_weather_rainfall_daily(daily_rain_rows)
             daily_rows_loaded += upsert_weather_temperature_daily(daily_temp_rows)
+            daily_rows_loaded += upsert_weather_wind_daily(daily_wind_rows)
             rebuild_monthly_summary(start.isoformat(), end.isoformat())
-            upsert_monthly_fleiss_kappa(daily_rain_rows, daily_temp_rows)
+            upsert_monthly_fleiss_kappa(daily_rain_rows, daily_temp_rows, daily_wind_rows)
             logger.info(
-                "Loaded %d rows into reference.weather_rainfall_daily + reference.weather_temperature_daily",
+                "Loaded %d rows into rainfall + temperature + wind daily tables",
                 daily_rows_loaded,
             )
 

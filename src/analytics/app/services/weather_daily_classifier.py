@@ -124,10 +124,23 @@ TEMP_EXTREME_CAUTION_MIN_C = 33.0
 TEMP_DANGER_MIN_C = 42.0
 TEMP_EXTREME_DANGER_MIN_C = 52.0
 
+# Wind: PAGASA-aligned thresholds (m/s)
+WIND_LIGHT_MIN_MS    = 3.0
+WIND_MODERATE_MIN_MS = 7.0
+WIND_STRONG_MIN_MS   = 14.0
+WIND_STORM_MIN_MS    = 24.0
+
+# Humidity: standard comfort scale (% RH)
+HUMIDITY_LOW_MAX_PCT         = 40.0
+HUMIDITY_COMFORTABLE_MAX_PCT = 60.0
+HUMIDITY_HIGH_MAX_PCT        = 80.0
+
 # ── Source agreement tolerances (daily) ───────────────────────────────────────
 
-RAIN_AGREE_TOLERANCE_MM = 10.0   # NASA POWER AG vs each rainfall validator (per-row agreement gate)
-TEMP_AGREE_TOLERANCE_C = 3.0     # NASA POWER AG vs each temperature validator (per-row agreement gate)
+RAIN_AGREE_TOLERANCE_MM  = 10.0  # NASA POWER AG vs each rainfall validator
+TEMP_AGREE_TOLERANCE_C   = 3.0   # NASA POWER AG vs each temperature validator
+WIND_AGREE_TOLERANCE_MS  = 2.0   # NASA POWER AG vs each wind validator
+HUMID_AGREE_TOLERANCE_PCT = 10.0  # NASA POWER AG vs each humidity validator
 
 # Both dimensions use absolute MedAE for confidence scoring at the daily level.
 # Relative MedAE (used by weather_validator.py) is reserved for monthly
@@ -256,6 +269,73 @@ def compute_heat_index(temp_max_c: Optional[float], rh_pct: Optional[float]) -> 
         HI += ((RH - 85) / 10) * ((87 - T) / 5)
 
     return round((HI - 32) * 5 / 9, 2)  # back to °C
+
+
+def classify_severe(weathercode: Optional[int]) -> Optional[str]:
+    """
+    Classify a WMO weathercode (0-99) into a severe weather category.
+    Source: Open-Meteo WMO Weather Interpretation Codes.
+      no_severe       → 0-3   (clear, mainly clear, partly cloudy, overcast)
+      light_weather   → 45-61 (fog, drizzle, light rain)
+      moderate_weather→ 63-65, 80-81 (moderate/heavy rain, rain showers)
+      severe_weather  → 82, 95 (violent showers, thunderstorm)
+      extreme_weather → 96-99 (thunderstorm with hail)
+    """
+    if weathercode is None:
+        return None
+    c = int(weathercode)
+    if c <= 3:
+        return "no_severe"
+    if c <= 61:
+        return "light_weather"
+    if c <= 65 or 80 <= c <= 81:
+        return "moderate_weather"
+    if c == 82 or c == 95:
+        return "severe_weather"
+    if 96 <= c <= 99:
+        return "extreme_weather"
+    return "light_weather"
+
+
+def classify_wind(wind_ms: Optional[float]) -> Optional[str]:
+    """
+    Classify daily wind speed (m/s) per PAGASA-aligned thresholds.
+      calm     < 3 m/s
+      light    3–7 m/s
+      moderate 7–14 m/s
+      strong   14–24 m/s
+      storm    ≥ 24 m/s
+    """
+    if wind_ms is None:
+        return None
+    if wind_ms < WIND_LIGHT_MIN_MS:
+        return "calm"
+    if wind_ms < WIND_MODERATE_MIN_MS:
+        return "light"
+    if wind_ms < WIND_STRONG_MIN_MS:
+        return "moderate"
+    if wind_ms < WIND_STORM_MIN_MS:
+        return "strong"
+    return "storm"
+
+
+def classify_humidity(rh_pct: Optional[float]) -> Optional[str]:
+    """
+    Classify relative humidity (%) into comfort categories.
+      low         < 40%
+      comfortable 40–60%
+      high        60–80%
+      very_high   > 80%
+    """
+    if rh_pct is None:
+        return None
+    if rh_pct < HUMIDITY_LOW_MAX_PCT:
+        return "low"
+    if rh_pct < HUMIDITY_COMFORTABLE_MAX_PCT:
+        return "comfortable"
+    if rh_pct < HUMIDITY_HIGH_MAX_PCT:
+        return "high"
+    return "very_high"
 
 
 def _diff(truth: Optional[float], validator: Optional[float]) -> Optional[float]:
@@ -430,24 +510,44 @@ def classify_day(
     gsmap_nrt_rainfall_mm: Optional[float],
     era5_rainfall_mm: Optional[float],
     ukmo_rainfall_mm: Optional[float],
+    # Severe weather — source of truth (Open-Meteo ERA5-Land) + 3 validators
+    open_meteo_weathercode: Optional[int] = None,
+    era5_weathercode: Optional[int] = None,
+    ecmwf_ifs_weathercode: Optional[int] = None,
+    ukmo_weathercode: Optional[int] = None,
+    # IBTrACS typhoon flags (supplementary — not a validator)
+    typhoon_flag: bool = False,
+    typhoon_signal: int = 0,
     # Temperature — source of truth (raw + heat index) + 4 validators
-    nasa_temp_c: Optional[float],        # raw temp_max_c for validator comparison
-    nasa_heat_index_c: Optional[float],  # computed heat index for PAGASA classification
+    nasa_temp_c: Optional[float] = None,
+    nasa_heat_index_c: Optional[float] = None,
     nasa_rh_pct: Optional[float] = None,
     open_meteo_temp_c: Optional[float] = None,
     era5_temp_c: Optional[float] = None,
     ecmwf_ifs_temp_c: Optional[float] = None,
     ukmo_temp_c: Optional[float] = None,
-) -> tuple[Optional[dict], Optional[dict]]:
+    # Humidity validators (source of truth = nasa_rh_pct above)
+    open_meteo_rh_pct: Optional[float] = None,
+    era5_rh_pct: Optional[float] = None,
+    # Wind — source of truth (NASA POWER AG WS10M) + 4 validators
+    nasa_wind_ms: Optional[float] = None,
+    open_meteo_wind_ms: Optional[float] = None,
+    era5_wind_ms: Optional[float] = None,
+    ecmwf_ifs_wind_ms: Optional[float] = None,
+    ukmo_wind_ms: Optional[float] = None,
+) -> tuple[Optional[dict], Optional[dict], Optional[dict]]:
     """
-    Build reference.weather_rainfall_daily and reference.weather_temperature_daily
-    rows for one (date, municipality).
+    Build rainfall, temperature, and wind daily rows for one (date, municipality).
 
-    Rainfall validators (n=5): CHIRPS, Open-Meteo ERA5-Land, GSMaP NRT, ERA5, UKMO.
-    Temperature validators (n=4): Open-Meteo ERA5-Land, ERA5 Full, ECMWF IFS, UKMO.
+    Rainfall  validators (n=5): CHIRPS, Open-Meteo ERA5-Land, GSMaP NRT, ERA5, UKMO.
+    Severe    validators (n=3): ERA5, ECMWF IFS, UKMO weathercode.
+    Temperature validators (n=4): Open-Meteo ERA5-Land, ERA5, ECMWF IFS, UKMO.
+    Humidity  validators (n=2): Open-Meteo ERA5-Land, ERA5.
+    Wind      validators (n=4): Open-Meteo ERA5-Land, ERA5, ECMWF IFS, UKMO.
 
-    Returns (rain_row, temp_row); either is None when all sources are missing.
+    Returns (rain_row, temp_row, wind_row); any may be None when all sources missing.
     """
+    # ── Rainfall ─────────────────────────────────────────────────────────────
     rain = _validate_dimension(
         nasa_rainfall_mm,
         [
@@ -462,7 +562,21 @@ def classify_day(
         "mm",
     )
 
-    # Validate raw temperature; classify using heat index
+    # ── Severe weather (weathercode — integer agreement, no numeric tolerance) ─
+    # Use _validate_dimension with tolerance=0; category match is sufficient.
+    severe = _validate_dimension(
+        open_meteo_weathercode,
+        [
+            ("ERA5",      era5_weathercode),
+            ("ECMWF IFS", ecmwf_ifs_weathercode),
+            ("UKMO",      ukmo_weathercode),
+        ],
+        classify_severe,
+        0,   # tolerance=0 — agreement is purely by category, not numeric diff
+        "code",
+    )
+
+    # ── Temperature (validate raw; classify via heat index) ───────────────────
     temp = _validate_dimension(
         nasa_temp_c,
         [
@@ -477,51 +591,125 @@ def classify_day(
         classification_value=nasa_heat_index_c,
     )
 
+    # ── Humidity ──────────────────────────────────────────────────────────────
+    humidity = _validate_dimension(
+        nasa_rh_pct,
+        [
+            ("Open-Meteo ERA5-Land", open_meteo_rh_pct),
+            ("ERA5 (Full)",          era5_rh_pct),
+        ],
+        classify_humidity,
+        HUMID_AGREE_TOLERANCE_PCT,
+        "%",
+    )
+
+    # ── Wind ──────────────────────────────────────────────────────────────────
+    wind = _validate_dimension(
+        nasa_wind_ms,
+        [
+            ("Open-Meteo ERA5-Land", open_meteo_wind_ms),
+            ("ERA5 (Full)",          era5_wind_ms),
+            ("ECMWF IFS",            ecmwf_ifs_wind_ms),
+            ("UKMO",                 ukmo_wind_ms),
+        ],
+        classify_wind,
+        WIND_AGREE_TOLERANCE_MS,
+        "m/s",
+    )
+
+    # ── Build rain row ────────────────────────────────────────────────────────
     rain_row = None
     if rain is not None:
+        sev = severe or {}
         rain_row = {
-            "date":                   date_iso,
-            "municipality":           municipality,
-            "nasa_power_rainfall_mm": round(nasa_rainfall_mm, 2) if nasa_rainfall_mm is not None else None,
-            "chirps_rainfall_mm":     round(chirps_rainfall_mm, 2) if chirps_rainfall_mm is not None else None,
-            "open_meteo_rainfall_mm": round(open_meteo_rainfall_mm, 2) if open_meteo_rainfall_mm is not None else None,
-            "gsmap_nrt_rainfall_mm":  round(gsmap_nrt_rainfall_mm, 2) if gsmap_nrt_rainfall_mm is not None else None,
-            "era5_rainfall_mm":       round(era5_rainfall_mm, 2) if era5_rainfall_mm is not None else None,
-            "ukmo_rainfall_mm":       round(ukmo_rainfall_mm, 2) if ukmo_rainfall_mm is not None else None,
-            "diff_nasa_chirps_mm":    _diff(nasa_rainfall_mm, chirps_rainfall_mm),
-            "diff_nasa_open_meteo_mm":_diff(nasa_rainfall_mm, open_meteo_rainfall_mm),
-            "diff_nasa_gsmap_mm":     _diff(nasa_rainfall_mm, gsmap_nrt_rainfall_mm),
-            "diff_nasa_era5_mm":      _diff(nasa_rainfall_mm, era5_rainfall_mm),
-            "diff_nasa_ukmo_mm":      _diff(nasa_rainfall_mm, ukmo_rainfall_mm),
-            "rain_classification":    rain["classification"],
-            "validators_agreed":      rain["validators_agreed"],
-            "wmo_quality_flag":       rain["wmo_quality_flag"],
-            "reason":                 rain["reason"],
+            "date":                      date_iso,
+            "municipality":              municipality,
+            # Rainfall
+            "nasa_power_rainfall_mm":    round(nasa_rainfall_mm, 2) if nasa_rainfall_mm is not None else None,
+            "chirps_rainfall_mm":        round(chirps_rainfall_mm, 2) if chirps_rainfall_mm is not None else None,
+            "open_meteo_rainfall_mm":    round(open_meteo_rainfall_mm, 2) if open_meteo_rainfall_mm is not None else None,
+            "gsmap_nrt_rainfall_mm":     round(gsmap_nrt_rainfall_mm, 2) if gsmap_nrt_rainfall_mm is not None else None,
+            "era5_rainfall_mm":          round(era5_rainfall_mm, 2) if era5_rainfall_mm is not None else None,
+            "ukmo_rainfall_mm":          round(ukmo_rainfall_mm, 2) if ukmo_rainfall_mm is not None else None,
+            "diff_nasa_chirps_mm":       _diff(nasa_rainfall_mm, chirps_rainfall_mm),
+            "diff_nasa_open_meteo_mm":   _diff(nasa_rainfall_mm, open_meteo_rainfall_mm),
+            "diff_nasa_gsmap_mm":        _diff(nasa_rainfall_mm, gsmap_nrt_rainfall_mm),
+            "diff_nasa_era5_mm":         _diff(nasa_rainfall_mm, era5_rainfall_mm),
+            "diff_nasa_ukmo_mm":         _diff(nasa_rainfall_mm, ukmo_rainfall_mm),
+            "rain_classification":       rain["classification"],
+            "validators_agreed":         rain["validators_agreed"],
+            "wmo_quality_flag":          rain["wmo_quality_flag"],
+            "reason":                    rain["reason"],
+            # Severe weather
+            "open_meteo_weathercode":    open_meteo_weathercode,
+            "era5_weathercode":          era5_weathercode,
+            "ecmwf_ifs_weathercode":     ecmwf_ifs_weathercode,
+            "ukmo_weathercode":          ukmo_weathercode,
+            "severe_classification":     sev.get("classification"),
+            "severe_validators_agreed":  sev.get("validators_agreed", 0),
+            "severe_wmo_quality_flag":   sev.get("wmo_quality_flag"),
+            "severe_reason":             sev.get("reason"),
+            # IBTrACS
+            "typhoon_flag":              typhoon_flag,
+            "typhoon_signal":            typhoon_signal,
         }
 
+    # ── Build temp row ────────────────────────────────────────────────────────
     temp_row = None
     if temp is not None:
+        hum = humidity or {}
         temp_row = {
-            "date":                   date_iso,
-            "municipality":           municipality,
-            "nasa_power_temp_c":      round(nasa_temp_c, 2) if nasa_temp_c is not None else None,
-            "nasa_power_heat_index_c":round(nasa_heat_index_c, 2) if nasa_heat_index_c is not None else None,
-            "nasa_power_rh_pct":      round(nasa_rh_pct, 2) if nasa_rh_pct is not None else None,
-            "open_meteo_temp_c":      round(open_meteo_temp_c, 2) if open_meteo_temp_c is not None else None,
-            "era5_temp_c":            round(era5_temp_c, 2) if era5_temp_c is not None else None,
-            "ecmwf_ifs_temp_c":       round(ecmwf_ifs_temp_c, 2) if ecmwf_ifs_temp_c is not None else None,
-            "ukmo_temp_c":            round(ukmo_temp_c, 2) if ukmo_temp_c is not None else None,
-            "diff_nasa_open_meteo_c": _diff(nasa_temp_c, open_meteo_temp_c),
-            "diff_nasa_era5_c":       _diff(nasa_temp_c, era5_temp_c),
-            "diff_nasa_ecmwf_ifs_c":  _diff(nasa_temp_c, ecmwf_ifs_temp_c),
-            "diff_nasa_ukmo_c":       _diff(nasa_temp_c, ukmo_temp_c),
-            "temp_classification":    temp["classification"],
-            "validators_agreed":      temp["validators_agreed"],
-            "wmo_quality_flag":       temp["wmo_quality_flag"],
-            "reason":                 temp["reason"],
+            "date":                        date_iso,
+            "municipality":                municipality,
+            # Temperature
+            "nasa_power_temp_c":           round(nasa_temp_c, 2) if nasa_temp_c is not None else None,
+            "nasa_power_heat_index_c":     round(nasa_heat_index_c, 2) if nasa_heat_index_c is not None else None,
+            "nasa_power_rh_pct":           round(nasa_rh_pct, 2) if nasa_rh_pct is not None else None,
+            "open_meteo_temp_c":           round(open_meteo_temp_c, 2) if open_meteo_temp_c is not None else None,
+            "era5_temp_c":                 round(era5_temp_c, 2) if era5_temp_c is not None else None,
+            "ecmwf_ifs_temp_c":            round(ecmwf_ifs_temp_c, 2) if ecmwf_ifs_temp_c is not None else None,
+            "ukmo_temp_c":                 round(ukmo_temp_c, 2) if ukmo_temp_c is not None else None,
+            "diff_nasa_open_meteo_c":      _diff(nasa_temp_c, open_meteo_temp_c),
+            "diff_nasa_era5_c":            _diff(nasa_temp_c, era5_temp_c),
+            "diff_nasa_ecmwf_ifs_c":       _diff(nasa_temp_c, ecmwf_ifs_temp_c),
+            "diff_nasa_ukmo_c":            _diff(nasa_temp_c, ukmo_temp_c),
+            "temp_classification":         temp["classification"],
+            "validators_agreed":           temp["validators_agreed"],
+            "wmo_quality_flag":            temp["wmo_quality_flag"],
+            "reason":                      temp["reason"],
+            # Humidity
+            "open_meteo_rh_pct":           round(open_meteo_rh_pct, 2) if open_meteo_rh_pct is not None else None,
+            "era5_rh_pct":                 round(era5_rh_pct, 2) if era5_rh_pct is not None else None,
+            "diff_nasa_open_meteo_rh_pct": _diff(nasa_rh_pct, open_meteo_rh_pct),
+            "diff_nasa_era5_rh_pct":       _diff(nasa_rh_pct, era5_rh_pct),
+            "humidity_classification":     hum.get("classification"),
+            "humidity_validators_agreed":  hum.get("validators_agreed", 0),
+            "humidity_wmo_quality_flag":   hum.get("wmo_quality_flag"),
+            "humidity_reason":             hum.get("reason"),
         }
 
-    return rain_row, temp_row
+    # ── Build wind row ────────────────────────────────────────────────────────
+    wind_row = None
+    if wind is not None:
+        wind_row = {
+            "date":                       date_iso,
+            "municipality":               municipality,
+            "nasa_power_wind_ms":         round(nasa_wind_ms, 2) if nasa_wind_ms is not None else None,
+            "open_meteo_wind_ms":         round(open_meteo_wind_ms, 2) if open_meteo_wind_ms is not None else None,
+            "era5_wind_ms":               round(era5_wind_ms, 2) if era5_wind_ms is not None else None,
+            "ecmwf_ifs_wind_ms":          round(ecmwf_ifs_wind_ms, 2) if ecmwf_ifs_wind_ms is not None else None,
+            "ukmo_wind_ms":               round(ukmo_wind_ms, 2) if ukmo_wind_ms is not None else None,
+            "diff_nasa_open_meteo_wind_ms": _diff(nasa_wind_ms, open_meteo_wind_ms),
+            "diff_nasa_era5_wind_ms":     _diff(nasa_wind_ms, era5_wind_ms),
+            "diff_nasa_ecmwf_ifs_wind_ms": _diff(nasa_wind_ms, ecmwf_ifs_wind_ms),
+            "diff_nasa_ukmo_wind_ms":     _diff(nasa_wind_ms, ukmo_wind_ms),
+            "wind_classification":        wind["classification"],
+            "validators_agreed":          wind["validators_agreed"],
+            "wmo_quality_flag":           wind["wmo_quality_flag"],
+            "reason":                     wind["reason"],
+        }
+
+    return rain_row, temp_row, wind_row
 
 
 def build_daily_rows(
@@ -535,19 +723,21 @@ def build_daily_rows(
     era5_records: Optional[list[dict]] = None,
     ecmwf_ifs_records: Optional[list[dict]] = None,
     ukmo_records: Optional[list[dict]] = None,
-) -> tuple[list[dict], list[dict]]:
+    typhoon_flags: Optional[dict[str, dict]] = None,
+) -> tuple[list[dict], list[dict], list[dict]]:
     """
     Classify every day in [start, end] for one municipality.
 
-    nasa_records        : daily dicts from weather_collector (include RH2M field).
-    chirps_cache        : {iso_date: rainfall_mm}
-    open_meteo_records  : daily dicts from fetch_open_meteo ERA5-Land (temp_max_c + rainfall_mm).
-    gsmap_cache         : {iso_date: rainfall_mm}  ← JAXA GSMaP NRT rainfall validator
-    era5_records        : daily dicts from fetch_open_meteo_era5 (rainfall + temp validator).
-    ecmwf_ifs_records   : daily dicts from fetch_open_meteo_ecmwf_ifs (temp validator).
-    ukmo_records        : daily dicts from fetch_open_meteo_ukmo (rainfall + temp validator).
+    nasa_records      : daily dicts from NASA POWER AG (rainfall, temp, wind, rh).
+    chirps_cache      : {iso_date: rainfall_mm}
+    open_meteo_records: ERA5-Land daily dicts (temp, rain, wind, weathercode, rh).
+    gsmap_cache       : {iso_date: rainfall_mm}
+    era5_records      : ERA5 daily dicts (temp, rain, wind, weathercode, rh).
+    ecmwf_ifs_records : ECMWF IFS daily dicts (temp, wind, weathercode).
+    ukmo_records      : UKMO daily dicts (temp, rain, wind, weathercode).
+    typhoon_flags     : {iso_date: {signal, intensity_class}} from IBTrACS.
 
-    Returns (rain_rows, temp_rows).
+    Returns (rain_rows, temp_rows, wind_rows).
     """
     nasa_by_date      = {r["date"]: r for r in nasa_records}
     open_by_date      = {r["date"]: r for r in (open_meteo_records or [])}
@@ -555,52 +745,90 @@ def build_daily_rows(
     ecmwf_ifs_by_date = {r["date"]: r for r in (ecmwf_ifs_records or [])}
     ukmo_by_date      = {r["date"]: r for r in (ukmo_records or [])}
     gsmap_cache       = gsmap_cache or {}
+    typhoon_flags     = typhoon_flags or {}
 
     rain_rows: list[dict] = []
     temp_rows: list[dict] = []
+    wind_rows: list[dict] = []
+
     day = start
     while day <= end:
         d = day.isoformat()
         nasa = nasa_by_date.get(d)
 
+        # NASA POWER AG values
         nasa_rain = nasa.get("rainfall_mm") if nasa else None
-        nasa_rh   = nasa.get("rh_pct") if nasa else None
-
+        nasa_rh   = nasa.get("rh_pct")      if nasa else None
+        nasa_wind = nasa.get("wind_ms")      if nasa else None
         nasa_temp = None
         if nasa:
-            nasa_temp = nasa.get("temp_max_c")
-            if nasa_temp is None:
-                nasa_temp = nasa.get("temp_avg_c")
-
+            nasa_temp = nasa.get("temp_max_c") or nasa.get("temp_avg_c")
         nasa_hi = compute_heat_index(nasa_temp, nasa_rh)
 
-        open_meteo      = open_by_date.get(d)
-        open_meteo_rain = open_meteo.get("rainfall_mm") if open_meteo else None
-        open_meteo_temp = open_meteo.get("temp_max_c") if open_meteo else None
+        # Open-Meteo ERA5-Land
+        open_meteo           = open_by_date.get(d)
+        open_meteo_rain      = open_meteo.get("rainfall_mm")          if open_meteo else None
+        open_meteo_temp      = open_meteo.get("temp_max_c")           if open_meteo else None
+        open_meteo_wind      = open_meteo.get("wind_ms")              if open_meteo else None
+        open_meteo_wcode     = open_meteo.get("weathercode")          if open_meteo else None
+        open_meteo_rh        = open_meteo.get("relativehumidity_pct") if open_meteo else None
 
-        era5      = era5_by_date.get(d)
-        era5_rain = era5.get("rainfall_mm") if era5 else None
-        era5_temp = era5.get("temp_max_c") if era5 else None
+        # ERA5
+        era5           = era5_by_date.get(d)
+        era5_rain      = era5.get("rainfall_mm")          if era5 else None
+        era5_temp      = era5.get("temp_max_c")           if era5 else None
+        era5_wind      = era5.get("wind_ms")              if era5 else None
+        era5_wcode     = era5.get("weathercode")          if era5 else None
+        era5_rh        = era5.get("relativehumidity_pct") if era5 else None
 
+        # ECMWF IFS
         ecmwf_ifs      = ecmwf_ifs_by_date.get(d)
-        ecmwf_ifs_temp = ecmwf_ifs.get("temp_max_c") if ecmwf_ifs else None
+        ecmwf_ifs_temp = ecmwf_ifs.get("temp_max_c")  if ecmwf_ifs else None
+        ecmwf_ifs_wind = ecmwf_ifs.get("wind_ms")     if ecmwf_ifs else None
+        ecmwf_ifs_wcode= ecmwf_ifs.get("weathercode") if ecmwf_ifs else None
 
-        ukmo      = ukmo_by_date.get(d)
-        ukmo_rain = ukmo.get("rainfall_mm") if ukmo else None
-        ukmo_temp = ukmo.get("temp_max_c") if ukmo else None
+        # UKMO
+        ukmo       = ukmo_by_date.get(d)
+        ukmo_rain  = ukmo.get("rainfall_mm") if ukmo else None
+        ukmo_temp  = ukmo.get("temp_max_c")  if ukmo else None
+        ukmo_wind  = ukmo.get("wind_ms")     if ukmo else None
+        ukmo_wcode = ukmo.get("weathercode") if ukmo else None
 
+        # CHIRPS + GSMaP
         chirps_rain = chirps_cache.get(d)
         gsmap_rain  = gsmap_cache.get(d)
 
-        rain_row, temp_row = classify_day(
-            d,
-            municipality,
+        # IBTrACS typhoon flag
+        typhoon = typhoon_flags.get(d)
+        t_flag   = typhoon is not None
+        t_signal = 0
+        if typhoon:
+            wind_kt = typhoon.get("max_wind_kt") or 0
+            if wind_kt >= 100:
+                t_signal = 5
+            elif wind_kt >= 64:
+                t_signal = 4
+            elif wind_kt >= 48:
+                t_signal = 3
+            elif wind_kt >= 34:
+                t_signal = 2
+            elif wind_kt >= 25:
+                t_signal = 1
+
+        rain_row, temp_row, wind_row = classify_day(
+            d, municipality,
             nasa_rainfall_mm=nasa_rain,
             chirps_rainfall_mm=chirps_rain,
             open_meteo_rainfall_mm=open_meteo_rain,
             gsmap_nrt_rainfall_mm=gsmap_rain,
             era5_rainfall_mm=era5_rain,
             ukmo_rainfall_mm=ukmo_rain,
+            open_meteo_weathercode=open_meteo_wcode,
+            era5_weathercode=era5_wcode,
+            ecmwf_ifs_weathercode=ecmwf_ifs_wcode,
+            ukmo_weathercode=ukmo_wcode,
+            typhoon_flag=t_flag,
+            typhoon_signal=t_signal,
             nasa_temp_c=nasa_temp,
             nasa_heat_index_c=nasa_hi,
             nasa_rh_pct=nasa_rh,
@@ -608,14 +836,23 @@ def build_daily_rows(
             era5_temp_c=era5_temp,
             ecmwf_ifs_temp_c=ecmwf_ifs_temp,
             ukmo_temp_c=ukmo_temp,
+            open_meteo_rh_pct=open_meteo_rh,
+            era5_rh_pct=era5_rh,
+            nasa_wind_ms=nasa_wind,
+            open_meteo_wind_ms=open_meteo_wind,
+            era5_wind_ms=era5_wind,
+            ecmwf_ifs_wind_ms=ecmwf_ifs_wind,
+            ukmo_wind_ms=ukmo_wind,
         )
         if rain_row is not None:
             rain_rows.append(rain_row)
         if temp_row is not None:
             temp_rows.append(temp_row)
+        if wind_row is not None:
+            wind_rows.append(wind_row)
         day += timedelta(days=1)
 
-    return rain_rows, temp_rows
+    return rain_rows, temp_rows, wind_rows
 
 
 # ── Daily validator caches ────────────────────────────────────────────────────
@@ -1030,6 +1267,7 @@ def build_chirps_daily_cache(lat: float, lon: float, start: date, end: date) -> 
 def compute_confidence_scores(
     rain_rows: list[dict],
     temp_rows: list[dict],
+    wind_rows: Optional[list[dict]] = None,
 ) -> dict:
     """
     Compute dataset-level confidence scores for both weather dimensions.
@@ -1121,10 +1359,10 @@ def compute_confidence_scores(
             return "Substantial"
         return "Almost Perfect"
 
-    def _wci(rows: list[dict], n_validators: int) -> float:
+    def _wci(rows: list[dict], n_validators: int, agreed_col: str = "validators_agreed") -> float:
         if not rows or n_validators == 0:
             return 0.0
-        weights = [r.get("validators_agreed", 0) / n_validators for r in rows]
+        weights = [r.get(agreed_col, 0) / n_validators for r in rows]
         return round(sum(weights) / len(weights) * 100, 2)
 
     def _build_items(rows: list[dict], col_map: dict[str, str], classify_fn) -> list[dict]:
@@ -1140,7 +1378,7 @@ def compute_confidence_scores(
                 items.append(item)
         return items
 
-    # ── Rainfall — Fleiss' Kappa ──────────────────────────────────────────────
+    # ── Rainfall ─────────────────────────────────────────────────────────────
     rain_col_map = {
         "NASA POWER AG":        "nasa_power_rainfall_mm",
         "CHIRPS":               "chirps_rainfall_mm",
@@ -1149,12 +1387,22 @@ def compute_confidence_scores(
         "ERA5 (Full)":          "era5_rainfall_mm",
         "UKMO":                 "ukmo_rainfall_mm",
     }
-    rain_items        = _build_items(rain_rows, rain_col_map, classify_rain)
-    rain_fk           = _fleiss_kappa(rain_items)
-    rain_n_validators = len(rain_col_map) - 1  # exclude NASA POWER AG (source of truth) → 5
-    rain_wci          = _wci(rain_rows, rain_n_validators)
+    rain_items = _build_items(rain_rows, rain_col_map, classify_rain)
+    rain_fk    = _fleiss_kappa(rain_items)
+    rain_wci   = _wci(rain_rows, len(rain_col_map) - 1)  # n=5
 
-    # ── Temperature — Fleiss' Kappa ───────────────────────────────────────────
+    # ── Severe weather ────────────────────────────────────────────────────────
+    severe_col_map = {
+        "Open-Meteo ERA5-Land": "open_meteo_weathercode",
+        "ERA5 (Full)":          "era5_weathercode",
+        "ECMWF IFS":            "ecmwf_ifs_weathercode",
+        "UKMO":                 "ukmo_weathercode",
+    }
+    severe_items = _build_items(rain_rows, severe_col_map, lambda c: classify_severe(int(c)) if c is not None else None)
+    severe_fk    = _fleiss_kappa(severe_items)
+    severe_wci   = _wci(rain_rows, 3, agreed_col="severe_validators_agreed")
+
+    # ── Temperature ───────────────────────────────────────────────────────────
     temp_col_map = {
         "NASA POWER AG":        "nasa_power_temp_c",
         "Open-Meteo ERA5-Land": "open_meteo_temp_c",
@@ -1162,33 +1410,78 @@ def compute_confidence_scores(
         "ECMWF IFS":            "ecmwf_ifs_temp_c",
         "UKMO":                 "ukmo_temp_c",
     }
-    temp_items        = _build_items(temp_rows, temp_col_map, classify_temp)
-    temp_fk           = _fleiss_kappa(temp_items)
-    temp_n_validators = len(temp_col_map) - 1  # exclude NASA POWER AG (source of truth) → 4
-    temp_wci          = _wci(temp_rows, temp_n_validators)
+    temp_items = _build_items(temp_rows, temp_col_map, classify_temp)
+    temp_fk    = _fleiss_kappa(temp_items)
+    temp_wci   = _wci(temp_rows, len(temp_col_map) - 1)  # n=4
 
-    # ── Aggregates ────────────────────────────────────────────────────────────
-    overall_wci = round((rain_wci + temp_wci) / 2, 2)
-    fk_scores   = [k for k in [rain_fk, temp_fk] if k is not None]
-    overall_fk  = round(sum(fk_scores) / len(fk_scores), 4) if fk_scores else None
+    # ── Humidity ──────────────────────────────────────────────────────────────
+    humidity_col_map = {
+        "NASA POWER AG":        "nasa_power_rh_pct",
+        "Open-Meteo ERA5-Land": "open_meteo_rh_pct",
+        "ERA5 (Full)":          "era5_rh_pct",
+    }
+    humidity_items = _build_items(temp_rows, humidity_col_map, classify_humidity)
+    humidity_fk    = _fleiss_kappa(humidity_items)
+    humidity_wci   = _wci(temp_rows, 2, agreed_col="humidity_validators_agreed")
+
+    # ── Wind ──────────────────────────────────────────────────────────────────
+    wind_rows = wind_rows or []
+    wind_col_map = {
+        "NASA POWER AG":        "nasa_power_wind_ms",
+        "Open-Meteo ERA5-Land": "open_meteo_wind_ms",
+        "ERA5 (Full)":          "era5_wind_ms",
+        "ECMWF IFS":            "ecmwf_ifs_wind_ms",
+        "UKMO":                 "ukmo_wind_ms",
+    }
+    wind_items = _build_items(wind_rows, wind_col_map, classify_wind)
+    wind_fk    = _fleiss_kappa(wind_items)
+    wind_wci   = _wci(wind_rows, len(wind_col_map) - 1)  # n=4
+
+    # ── Overall WCI (Option 2: primary×2, secondary×1) / 8 ───────────────────
+    overall_wci = round(
+        (rain_wci * 2 + severe_wci * 2 + temp_wci * 2 + wind_wci + humidity_wci) / 8, 2
+    )
+    fk_scores  = [k for k in [rain_fk, severe_fk, temp_fk, wind_fk, humidity_fk] if k is not None]
+    overall_fk = round(sum(fk_scores) / len(fk_scores), 4) if fk_scores else None
 
     return {
         "overall_fleiss_kappa":    overall_fk,
         "overall_fleiss_strength": _fk_label(overall_fk),
         "overall_wci_pct":         overall_wci,
         "rainfall": {
-            "total_rows":                   len(rain_rows),
-            "n_items_for_kappa":            len(rain_items),
-            "fleiss_kappa":                 rain_fk,
-            "fleiss_strength":              _fk_label(rain_fk),
+            "total_rows":                    len(rain_rows),
+            "n_items_for_kappa":             len(rain_items),
+            "fleiss_kappa":                  rain_fk,
+            "fleiss_strength":               _fk_label(rain_fk),
             "weighted_confidence_index_pct": rain_wci,
         },
+        "severe_weather": {
+            "total_rows":                    len(rain_rows),
+            "n_items_for_kappa":             len(severe_items),
+            "fleiss_kappa":                  severe_fk,
+            "fleiss_strength":               _fk_label(severe_fk),
+            "weighted_confidence_index_pct": severe_wci,
+        },
         "temperature": {
-            "total_rows":                   len(temp_rows),
-            "n_items_for_kappa":            len(temp_items),
-            "note": "Validation bins raw temp_c; classification display uses Rothfusz heat index.",
-            "fleiss_kappa":                 temp_fk,
-            "fleiss_strength":              _fk_label(temp_fk),
+            "total_rows":                    len(temp_rows),
+            "n_items_for_kappa":             len(temp_items),
+            "note": "Validation bins raw temp_c; classification uses Rothfusz heat index.",
+            "fleiss_kappa":                  temp_fk,
+            "fleiss_strength":               _fk_label(temp_fk),
             "weighted_confidence_index_pct": temp_wci,
+        },
+        "humidity": {
+            "total_rows":                    len(temp_rows),
+            "n_items_for_kappa":             len(humidity_items),
+            "fleiss_kappa":                  humidity_fk,
+            "fleiss_strength":               _fk_label(humidity_fk),
+            "weighted_confidence_index_pct": humidity_wci,
+        },
+        "wind": {
+            "total_rows":                    len(wind_rows),
+            "n_items_for_kappa":             len(wind_items),
+            "fleiss_kappa":                  wind_fk,
+            "fleiss_strength":               _fk_label(wind_fk),
+            "weighted_confidence_index_pct": wind_wci,
         },
     }
