@@ -1254,16 +1254,21 @@ export function Settings({ onBack, onLogout, onNavigate, role = 'bishop', initia
               <div className="grid grid-cols-1 xl:grid-cols-3 gap-8">
                 <form
                   onSubmit={handleProfileSave}
-                  className="xl:col-span-2 bg-white rounded-[32px] shadow-sm border border-gray-100 p-10"
+                  className="xl:col-span-2 overflow-hidden rounded-[32px] border border-slate-200 bg-white shadow-[0_18px_55px_rgba(15,23,42,0.08)]"
                 >
-                  <div className="flex items-start justify-between gap-6 mb-10">
+                  <div className="relative flex items-start justify-between gap-6 overflow-hidden bg-slate-950 p-8 text-white sm:p-10">
+                    <div className="pointer-events-none absolute -right-16 -top-16 h-44 w-44 rounded-full bg-[#D4AF37]/15 blur-3xl" />
+                    <div className="pointer-events-none absolute bottom-0 left-0 h-px w-full bg-gradient-to-r from-transparent via-[#D4AF37]/60 to-transparent" />
                     <div className="flex items-center gap-4">
-                      <div className="w-16 h-16 rounded-2xl bg-gold-500 text-black flex items-center justify-center text-2xl font-black shadow-lg shadow-gold-500/20 shrink-0">
+                      <div className="w-16 h-16 rounded-2xl bg-[#D4AF37] text-black flex items-center justify-center text-2xl font-black shadow-lg shadow-[#D4AF37]/25 shrink-0">
                         {(profileForm.firstName || profileForm.email || 'U').charAt(0).toUpperCase()}
                       </div>
                       <div>
-                        <h3 className="text-3xl font-serif font-bold text-gray-900">My Profile</h3>
-                        <p className="text-sm text-gray-500 mt-1">
+                        <p className="text-[10px] font-black uppercase tracking-[0.22em] text-[#D4AF37]">
+                          Personnel Record
+                        </p>
+                        <h3 className="mt-1 text-3xl font-serif font-bold text-white">My Profile</h3>
+                        <p className="text-sm text-white/55 mt-1">
                           {isEditingProfile
                             ? 'Update your personal information and contact details.'
                             : 'Your personal information and contact details.'}
@@ -1274,7 +1279,7 @@ export function Settings({ onBack, onLogout, onNavigate, role = 'bishop', initia
                       <button
                         type="button"
                         onClick={() => setIsEditingProfile(true)}
-                        className="inline-flex items-center gap-2 rounded-2xl bg-gray-900 px-5 py-3 text-sm font-bold text-white transition-all hover:bg-black active:scale-[0.98]"
+                        className="relative z-10 inline-flex items-center gap-2 rounded-2xl bg-white px-5 py-3 text-sm font-bold text-slate-950 transition-all hover:bg-[#F5D98A] active:scale-[0.98]"
                       >
                         <Pencil className="w-4 h-4" />
                         Edit Profile
@@ -1287,7 +1292,7 @@ export function Settings({ onBack, onLogout, onNavigate, role = 'bishop', initia
                             resetProfileForm();
                             setIsEditingProfile(false);
                           }}
-                          className="rounded-2xl border border-gray-200 px-5 py-3 text-sm font-bold text-gray-500 transition-all hover:bg-gray-50"
+                          className="rounded-2xl border border-white/15 bg-white/10 px-5 py-3 text-sm font-bold text-white/70 transition-all hover:bg-white hover:text-slate-950"
                         >
                           Cancel
                         </button>
@@ -1302,6 +1307,7 @@ export function Settings({ onBack, onLogout, onNavigate, role = 'bishop', initia
                     )}
                   </div>
 
+                  <div className="p-8 sm:p-10">
                   {showProfileSuccess && (
                     <div className="mb-8 p-5 bg-emerald-50 border border-emerald-100 text-emerald-700 rounded-2xl text-sm font-bold animate-in fade-in slide-in-from-top-2 flex items-center gap-3">
                       <div className="w-8 h-8 bg-emerald-100 rounded-full flex items-center justify-center flex-shrink-0">
@@ -1326,7 +1332,7 @@ export function Settings({ onBack, onLogout, onNavigate, role = 'bishop', initia
                       },
                     ].map((field) => (
                       <div key={field.id} className="space-y-2">
-                        <label className="text-[10px] font-bold text-white/45 uppercase tracking-widest ml-1">
+                        <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest ml-1">
                           {field.label}
                           {field.id === 'email' && isEditingProfile && (
                             <span className="ml-1.5 normal-case font-medium text-gray-300">
@@ -1342,8 +1348,8 @@ export function Settings({ onBack, onLogout, onNavigate, role = 'bishop', initia
                           placeholder={field.placeholder}
                           className={`w-full px-5 py-4 rounded-2xl border text-gray-900 transition-all font-medium placeholder:text-gray-300 ${
                             isEditingProfile
-                              ? 'bg-gray-50 border-gray-100 focus:outline-none focus:border-[#D4AF37] focus:ring-4 focus:ring-[#D4AF37]/10'
-                              : 'cursor-default border-transparent bg-gray-50/60 text-gray-700'
+                              ? 'bg-white border-slate-200 shadow-sm focus:outline-none focus:border-[#D4AF37] focus:ring-4 focus:ring-[#D4AF37]/10'
+                              : 'cursor-default border-slate-100 bg-slate-50 text-gray-700'
                           }`}
                         />
                       </div>
@@ -1361,8 +1367,8 @@ export function Settings({ onBack, onLogout, onNavigate, role = 'bishop', initia
                         placeholder="Complete address"
                         className={`w-full px-5 py-4 rounded-2xl border text-gray-900 transition-all font-medium placeholder:text-gray-300 ${
                           isEditingProfile
-                            ? 'bg-gray-50 border-gray-100 focus:outline-none focus:border-[#D4AF37] focus:ring-4 focus:ring-[#D4AF37]/10'
-                            : 'cursor-default border-transparent bg-gray-50/60 text-gray-700'
+                            ? 'bg-white border-slate-200 shadow-sm focus:outline-none focus:border-[#D4AF37] focus:ring-4 focus:ring-[#D4AF37]/10'
+                            : 'cursor-default border-slate-100 bg-slate-50 text-gray-700'
                         }`}
                       />
                     </div>
@@ -1379,19 +1385,25 @@ export function Settings({ onBack, onLogout, onNavigate, role = 'bishop', initia
                         rows={4}
                         className={`w-full px-5 py-4 rounded-2xl border text-gray-900 transition-all font-medium placeholder:text-gray-300 resize-none ${
                           isEditingProfile
-                            ? 'bg-gray-50 border-gray-100 focus:outline-none focus:border-[#D4AF37] focus:ring-4 focus:ring-[#D4AF37]/10'
-                            : 'cursor-default border-transparent bg-gray-50/60 text-gray-700'
+                            ? 'bg-white border-slate-200 shadow-sm focus:outline-none focus:border-[#D4AF37] focus:ring-4 focus:ring-[#D4AF37]/10'
+                            : 'cursor-default border-slate-100 bg-slate-50 text-gray-700'
                         }`}
                       />
                     </div>
+                  </div>
                   </div>
 
                 </form>
 
                 <div className="space-y-8">
-                  <div className="bg-white rounded-[32px] shadow-sm border border-gray-100 p-8">
-                    <h4 className="text-lg font-bold text-gray-900 mb-6">Account Details</h4>
-                    <div className="space-y-4">
+                  <div className="overflow-hidden rounded-[32px] border border-slate-200 bg-white shadow-[0_18px_45px_rgba(15,23,42,0.06)]">
+                    <div className="border-b border-slate-100 bg-gradient-to-br from-[#FFF8E5] to-white p-6">
+                      <p className="text-[10px] font-black uppercase tracking-[0.2em] text-[#B5952F]">
+                        Access Summary
+                      </p>
+                      <h4 className="mt-1 text-xl font-serif font-bold text-gray-900">Account Details</h4>
+                    </div>
+                    <div className="space-y-4 p-6">
                       <div>
                         <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Access Role</p>
                         <p className="text-sm font-bold text-gray-900 mt-1">

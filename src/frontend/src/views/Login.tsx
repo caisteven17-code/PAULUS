@@ -197,7 +197,13 @@ export function Login({ onLogin }: LoginProps) {
             </div>
 
             {step === 'credentials' ? (
-              <div className="rounded-[32px] border border-white/10 bg-white/[0.055] p-6 shadow-[0_28px_80px_rgba(0,0,0,0.35)] backdrop-blur-xl sm:p-8">
+              <div
+                className="rounded-[32px] border border-white/10 p-6 shadow-[0_28px_80px_rgba(0,0,0,0.35)] backdrop-blur-xl sm:p-8"
+                style={{
+                  background:
+                    'linear-gradient(135deg, rgba(255,255,255,0.13) 0%, rgba(255,255,255,0.06) 38%, rgba(255,255,255,0.025) 100%)',
+                }}
+              >
                 {/* Heading */}
                 <div className="mb-7 text-center">
                   <div className="mx-auto mb-4 h-px w-20 bg-gradient-to-r from-transparent via-[#D4AF37]/70 to-transparent" />
@@ -285,7 +291,13 @@ export function Login({ onLogin }: LoginProps) {
                 </form>
               </div>
             ) : (
-              <div className="rounded-[32px] border border-white/10 bg-white/[0.055] p-6 shadow-[0_28px_80px_rgba(0,0,0,0.35)] backdrop-blur-xl sm:p-8">
+              <div
+                className="rounded-[32px] border border-white/10 p-6 shadow-[0_28px_80px_rgba(0,0,0,0.35)] backdrop-blur-xl sm:p-8"
+                style={{
+                  background:
+                    'linear-gradient(135deg, rgba(255,255,255,0.13) 0%, rgba(255,255,255,0.06) 38%, rgba(255,255,255,0.025) 100%)',
+                }}
+              >
                 <div className="mb-8">
                   <h2 className="text-2xl font-bold text-white mb-1">Two-factor verification</h2>
                   <p className="text-sm" style={{ color: 'rgba(255,255,255,0.3)' }}>
