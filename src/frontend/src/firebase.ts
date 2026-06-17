@@ -126,7 +126,6 @@ export const auth = {
     localStorage.removeItem(STORAGE_KEY);
     // Sign out of Supabase (ignore errors — may not have a live session)
     await supabaseBrowser.auth.signOut().catch(() => {});
-    if (typeof window !== 'undefined') window.location.reload();
   },
 };
 

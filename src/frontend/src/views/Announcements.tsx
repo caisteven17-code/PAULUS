@@ -33,6 +33,7 @@ import { motion, AnimatePresence } from 'motion/react';
 import { useAuth } from '../firebase';
 import { formatDate } from '../lib/format';
 import { usePermissions } from '../hooks/usePermissions';
+import { InlineLoader } from '../components/ui/LoadingScreen';
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -54,7 +55,7 @@ interface Announcement {
   createdAt: number;
 }
 
-type Tab = 'active' | 'scheduled' | 'drafts' | 'past' | 'archived';
+type Tab = 'active' | 'scheduled' | 'drafts' | 'past';
 type SortMode = 'newest' | 'oldest' | 'priority';
 
 // ── Static maps ──────────────────────────────────────────────────────────────
@@ -269,7 +270,6 @@ export function Announcements() {
     if (tab === 'scheduled') fetchScheduled();
     else if (tab === 'drafts') fetchDrafts();
     else if (tab === 'past') fetchPast();
-    else if (tab === 'archived') fetchArchived();
   }, [tab, canManage, fetchScheduled, fetchDrafts, fetchPast, fetchArchived]);
 
   // ── Toast helper ───────────────────────────────────────────────────────────
@@ -436,7 +436,7 @@ export function Announcements() {
     });
 
     if (res.ok) {
-      showToast(`"${a.title}" moved to the Archive tab.`);
+      showToast(`"${a.title}" moved to Archives.`);
       fetchArchived();
     } else {
       // Restore on failure
@@ -449,7 +449,7 @@ export function Announcements() {
   const requestArchive = useCallback((a: Announcement) => {
     setConfirmState({
       title: 'Move to the Archive?',
-      message: `"${a.title}" will leave the board and be stored in the Archive tab. You can restore it anytime.`,
+      message: `"${a.title}" will leave the board and be stored in the dedicated Archives page. You can restore it anytime.`,
       confirmLabel: 'Archive',
       tone: 'warning',
       action: () => performArchive(a),
@@ -572,7 +572,7 @@ export function Announcements() {
     tab === 'active'    ? activeList    :
     tab === 'scheduled' ? scheduledList :
     tab === 'drafts'    ? draftList     :
-    tab === 'past'      ? pastList      : archivedList;
+    tab === 'past'      ? pastList      : activeList;
 
   const hasActiveFilters =
     filters.search.trim() !== '' || filters.category !== 'all' || filters.priority !== 'all';
@@ -622,7 +622,7 @@ export function Announcements() {
     );
   }
 
-  const TAB_ORDER: Tab[] = ['active', 'scheduled', 'drafts', 'past', 'archived'];
+  const TAB_ORDER: Tab[] = ['active', 'scheduled', 'drafts', 'past'];
 
   const TAB_META: Record<Tab, { label: string; icon: React.ElementType; count: number; description: string }> = {
     active: {
@@ -649,12 +649,6 @@ export function Announcements() {
       count: pastList.length,
       description: 'Announcements that reached their end date and left the board. They move to the Archive automatically after 1 year.',
     },
-    archived: {
-      label: 'Archive',
-      icon: Archive,
-      count: archivedList.length,
-      description: 'Long-term records. Restoring a post sends it back to the Active Board.',
-    },
   };
 
   const summaryCards = [
@@ -668,7 +662,6 @@ export function Announcements() {
     scheduled: { message: 'Nothing scheduled',       sub: 'Posts with a future start date wait here until they go live.' },
     drafts:    { message: 'No drafts',               sub: 'Announcements you save as drafts will appear here.' },
     past:      { message: 'No past announcements',   sub: 'Posts whose end date has passed will appear here.' },
-    archived:  { message: 'Archive is empty',        sub: 'Archived announcements are stored here.' },
   };
   const EmptyIcon = TAB_META[tab].icon;
 
@@ -832,9 +825,8 @@ export function Announcements() {
 
         {/* ── List ── */}
         {loading ? (
-          <div className="flex flex-col items-center justify-center gap-4 rounded-3xl border border-slate-200 bg-white py-24">
-            <div className="h-10 w-10 animate-spin rounded-full border-4 border-slate-200 border-t-black" />
-            <p className="text-slate-400 font-medium">Loading announcements…</p>
+          <div className="rounded-3xl border border-slate-200 bg-white">
+            <InlineLoader label="Loading announcements" />
           </div>
         ) : displayed.length === 0 ? (
           <div className="flex flex-col items-center justify-center gap-5 rounded-3xl border border-dashed border-slate-300 bg-white py-24">
@@ -1245,7 +1237,7 @@ function AnnouncementRow({
   const priority = PRIORITY_STYLES[a.priority];
   const category = CATEGORY_META[a.category];
   const tile = dateTileParts(a.startDate);
-  const muted = tab === 'past' || tab === 'archived';
+  const muted = tab === 'past';
   const inGrace = canManage && (tab === 'active' || tab === 'scheduled') && withinGracePeriod(a.publishedAt);
   const secsLeft = inGrace ? gracePeriodSecondsLeft(a.publishedAt) : 0;
   void tick; // consumed so the countdown re-renders every second
@@ -1267,8 +1259,6 @@ function AnnouncementRow({
   } else if (tab === 'past') {
     if (a.endDate) metaParts.push(`Ended ${formatDate(new Date(a.endDate))}`);
     metaParts.push('Auto-archives after 1 year');
-  } else if (tab === 'archived' && a.archivedAt) {
-    metaParts.push(`Archived ${formatDate(new Date(a.archivedAt))}${a.archivedBy ? ` by ${a.archivedBy}` : ''}`);
   }
 
   return (
@@ -1344,12 +1334,6 @@ function AnnouncementRow({
                     <RowButton icon={Archive} label="Archive" tone="warning" onClick={onArchive} />
                   </>
                 )}
-                {tab === 'archived' && (
-                  <>
-                    <IconRowButton icon={Copy} title="Duplicate" onClick={onDuplicate} />
-                    <RowButton icon={RotateCcw} label="Restore" tone="primary" onClick={onRestore} />
-                  </>
-                )}
               </div>
             )}
           </div>
@@ -1379,11 +1363,6 @@ function AnnouncementRow({
             {tab === 'past' && (
               <span className="inline-flex items-center rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-[10px] font-black uppercase tracking-[0.12em] text-slate-400">
                 Ended — no longer on the board
-              </span>
-            )}
-            {tab === 'archived' && (
-              <span className="inline-flex items-center rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-[10px] font-black uppercase tracking-[0.12em] text-slate-400">
-                Archived record
               </span>
             )}
             <span className={`inline-flex items-center rounded-full border px-3 py-1 text-[10px] font-black uppercase tracking-[0.12em] ${priority.badge}`}>

@@ -558,13 +558,22 @@ def collect(
     end: Optional[date] = None,
     out_dir: Path = DEFAULT_OUT_DIR,
     load: bool = False,
+    municipalities: Optional[list[str]] = None,
 ) -> dict:
     """
-    Run full collection for all 30 municipalities.
+    Run full collection for all 30 municipalities (or a filtered subset).
     Returns the master output dict (also saved to JSON files).
     """
     start = start or _default_start()
     end = end or _default_end()
+
+    if municipalities:
+        munis = [m for m in MUNICIPALITIES if m["name"] in municipalities]
+        unknown = set(municipalities) - {m["name"] for m in munis}
+        if unknown:
+            logger.warning("Unknown municipality names (ignored): %s", unknown)
+    else:
+        munis = MUNICIPALITIES
 
     run_id = _create_run_record(start, end)
 
@@ -576,7 +585,7 @@ def collect(
         "Collecting weather %s → %s for %d municipalities",
         start,
         end,
-        len(MUNICIPALITIES),
+        len(munis),
     )
 
     # Load IBTrACS typhoon flags once for the full date range
@@ -595,18 +604,12 @@ def collect(
     from app.services.weather_daily_classifier import (
         build_chirps_daily_cache,
         build_daily_rows,
-        build_gpm_imerg_daily_cache,
         build_gsmap_nrt_daily_cache,
-        build_noaa_gsod_station_caches,
         compute_confidence_scores,
     )
 
-    gsod_station_caches = build_noaa_gsod_station_caches(start, end)
-
-    # GPM IMERG and GSMaP NRT are gridded satellite products covering Laguna
-    # uniformly — fetch once for the Province bbox rather than per-municipality.
-    imerg_daily_cache = build_gpm_imerg_daily_cache(start, end)
-    logger.info("GPM IMERG cache ready: %d days", len(imerg_daily_cache))
+    # GSMaP NRT is a gridded satellite product covering Laguna uniformly —
+    # fetch once for the Province bbox rather than per-municipality.
     gsmap_daily_cache = build_gsmap_nrt_daily_cache(start, end)
     logger.info("GSMaP NRT cache ready: %d days", len(gsmap_daily_cache))
 
@@ -616,11 +619,11 @@ def collect(
     daily_rain_rows: list[dict] = []
     daily_temp_rows: list[dict] = []
 
-    for i, muni in enumerate(MUNICIPALITIES):
+    for i, muni in enumerate(munis):
         name = muni["name"]
         lat = muni["lat"]
         lon = muni["lon"]
-        logger.info("[%d/%d] %s", i + 1, len(MUNICIPALITIES), name)
+        logger.info("[%d/%d] %s", i + 1, len(munis), name)
 
         # Parallel group 1: NASA POWER servers + Open-Meteo base — independent
         # CDNs, so concurrent I/O is safe and cuts per-municipality latency by
@@ -677,24 +680,20 @@ def collect(
             sources["nasa_power_ag"],
             chirps_daily_cache,
             open_meteo_records=sources["open_meteo"],
-            gsod_station_caches=gsod_station_caches,
-            imerg_cache=imerg_daily_cache,
             gsmap_cache=gsmap_daily_cache,
             era5_records=era5_records,
             ecmwf_ifs_records=ecmwf_ifs_records,
             ukmo_records=ukmo_records,
-            lat=lat,
-            lon=lon,
         )
         daily_rain_rows.extend(muni_rain_rows)
         daily_temp_rows.extend(muni_temp_rows)
         logger.info(
             "  Daily classification: %d rain rows, %d temp rows "
-            "(CHIRPS %d days, IMERG %d days, ERA5 %d days, ECMWF IFS %d days, UKMO %d days)",
+            "(CHIRPS %d days, GSMaP %d days, ERA5 %d days, ECMWF IFS %d days, UKMO %d days)",
             len(muni_rain_rows),
             len(muni_temp_rows),
             len(chirps_daily_cache),
-            len(imerg_daily_cache),
+            len(gsmap_daily_cache),
             len(era5_records),
             len(ecmwf_ifs_records),
             len(ukmo_records),
@@ -855,14 +854,16 @@ def collect(
             from app.services.weather_loader import (
                 load_from_file,
                 rebuild_monthly_summary,
+                upsert_monthly_fleiss_kappa,
                 upsert_weather_rainfall_daily,
                 upsert_weather_temperature_daily,
             )
 
-            # New pipeline first: split daily tables + monthly summary
+            # New pipeline: split daily tables → monthly WCI (SQL) → monthly Fleiss Kappa (Python)
             daily_rows_loaded = upsert_weather_rainfall_daily(daily_rain_rows)
             daily_rows_loaded += upsert_weather_temperature_daily(daily_temp_rows)
             rebuild_monthly_summary(start.isoformat(), end.isoformat())
+            upsert_monthly_fleiss_kappa(daily_rain_rows, daily_temp_rows)
             logger.info(
                 "Loaded %d rows into reference.weather_rainfall_daily + reference.weather_temperature_daily",
                 daily_rows_loaded,
@@ -922,12 +923,24 @@ if __name__ == "__main__":
         action="store_true",
         help="Also load results into Supabase after collecting",
     )
+    parser.add_argument(
+        "--municipality",
+        nargs="+",
+        metavar="NAME",
+        help="Only collect for these municipalities (e.g. --municipality Alaminos Kalayaan)",
+    )
     args = parser.parse_args()
 
     start = date.fromisoformat(args.start) if args.start else None
     end = date.fromisoformat(args.end) if args.end else None
 
-    result = collect(start=start, end=end, out_dir=Path(args.out), load=args.load)
+    result = collect(
+        start=start,
+        end=end,
+        out_dir=Path(args.out),
+        load=args.load,
+        municipalities=args.municipality,
+    )
     print(f"Collected {len(result['master'])} municipalities.")
     print(
         f"Classified {result['daily_rows_classified']} daily rows for "

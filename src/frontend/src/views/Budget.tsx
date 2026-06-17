@@ -18,6 +18,7 @@ import {
 } from 'lucide-react';
 import { usePermissions } from '../hooks/usePermissions';
 import { apiClient } from '../lib/api-client';
+import { InlineLoader } from '../components/ui/LoadingScreen';
 
 interface BudgetRow {
   id: string;
@@ -266,9 +267,8 @@ function InstitutionBudget({
 
       {/* Month grid */}
       {loading ? (
-        <div className="flex flex-col items-center justify-center py-24 gap-4">
-          <div className="w-10 h-10 border-4 border-gray-200 border-t-church-black rounded-full animate-spin" />
-          <p className="text-gray-400 font-medium">Loading budget…</p>
+        <div className="py-10">
+          <InlineLoader label="Loading budget" />
         </div>
       ) : (
         <>
@@ -504,9 +504,8 @@ function DioceseBudgetOverview() {
 
       {/* Institution list */}
       {loading ? (
-        <div className="flex flex-col items-center justify-center py-24 gap-4">
-          <div className="w-10 h-10 border-4 border-gray-200 border-t-church-black rounded-full animate-spin" />
-          <p className="text-gray-400 font-medium">Loading budgets…</p>
+        <div className="py-10">
+          <InlineLoader label="Loading budgets" />
         </div>
       ) : filtered.length === 0 ? (
         <div className="flex flex-col items-center justify-center py-24 gap-5 bg-white rounded-3xl border border-gray-100">

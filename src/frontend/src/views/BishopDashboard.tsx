@@ -36,7 +36,7 @@ const GeospatialHeatMap = dynamic(
   () => import('../components/ui/GeospatialHeatMap').then((mod) => ({ default: mod.GeospatialHeatMap })),
   {
     ssr: false,
-    loading: () => <div className="flex items-center justify-center h-64 text-gray-400 text-sm">Loading map...</div>,
+    loading: () => <InlineLoader label="Loading map" className="h-64 py-0" />,
   },
 );
 import { dataService } from '../services/dataService';
@@ -47,6 +47,7 @@ import { FinancialHealthGauge } from '../components/ui/FinancialHealthGauge';
 import { HealthDimensionBar } from '../components/ui/HealthDimensionBar';
 import { DiagnosticCard } from '../components/ui/DiagnosticCard';
 import { StewardChatbot } from '../components/ui/StewardChatbot';
+import { InlineLoader } from '../components/ui/LoadingScreen';
 import { motion, AnimatePresence } from 'motion/react';
 import { formatCurrency, formatNumber } from '../lib/format';
 import SeminaryAnalyticsDashboard from '../components/analytics/SeminaryAnalyticsDashboard';
@@ -1493,7 +1494,7 @@ export function BishopDashboard({
   if (isLoading) {
     return (
       <div className="flex items-center justify-center h-[calc(100vh-80px)]">
-        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-church-green"></div>
+        <InlineLoader label="Loading dashboard" />
       </div>
     );
   }

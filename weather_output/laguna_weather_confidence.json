@@ -1,20 +1,20 @@
 {
-  "overall_fleiss_kappa": 0.3738,
-  "overall_fleiss_strength": "Fair",
-  "overall_wci_pct": 78.18,
+  "overall_fleiss_kappa": 0.4215,
+  "overall_fleiss_strength": "Moderate",
+  "overall_wci_pct": 92.34,
   "rainfall": {
-    "total_rows": 37680,
-    "n_items_for_kappa": 37680,
-    "fleiss_kappa": 0.3041,
+    "total_rows": 2514,
+    "n_items_for_kappa": 2514,
+    "fleiss_kappa": 0.2898,
     "fleiss_strength": "Fair",
-    "weighted_confidence_index_pct": 87.3
+    "weighted_confidence_index_pct": 98.57
   },
   "temperature": {
-    "total_rows": 37680,
-    "n_items_for_kappa": 37680,
+    "total_rows": 2514,
+    "n_items_for_kappa": 2514,
     "note": "Validation bins raw temp_c; classification display uses Rothfusz heat index.",
-    "fleiss_kappa": 0.4434,
+    "fleiss_kappa": 0.5533,
     "fleiss_strength": "Moderate",
-    "weighted_confidence_index_pct": 69.06
+    "weighted_confidence_index_pct": 86.11
   }
 }

@@ -1,13 +1,14 @@
 'use client';
 
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { Heart, Plus, Trash2, Edit2, X, Calendar, Users, Cake, Stethoscope, Search, Lock, Upload, FileText } from 'lucide-react';
+import { Heart, Plus, Edit2, X, Calendar, Users, Cake, Stethoscope, Search, Lock, Upload, FileText, Archive, RotateCcw, ChevronLeft, ChevronRight, ChevronDown } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { useAuth } from '../firebase';
 import { formatDate } from '../lib/format';
 import { usePermissions } from '../hooks/usePermissions';
 import { apiClient } from '../lib/api-client';
 import { getAccessRoleLabel } from '../lib/access';
+import { InlineLoader } from '../components/ui/LoadingScreen';
 
 interface PriestRecord {
   id: string;
@@ -25,11 +26,38 @@ interface PriestRecord {
   documentUrl?: string;
 }
 
+// Neutral, restrained palette — a small status dot carries the colour, not the whole chip.
 const HEALTH_STATUS_COLORS = {
-  good: 'bg-emerald-500/10 text-emerald-700 border-emerald-200',
-  fair: 'bg-amber-500/10 text-amber-700 border-amber-200',
-  'needs-attention': 'bg-rose-500/10 text-rose-700 border-rose-200',
+  good: 'bg-slate-100 text-slate-700 border-slate-200',
+  fair: 'bg-slate-100 text-slate-700 border-slate-200',
+  'needs-attention': 'bg-slate-100 text-slate-700 border-slate-200',
 };
+
+const HEALTH_STATUS_DOT = {
+  good: 'bg-emerald-500',
+  fair: 'bg-amber-500',
+  'needs-attention': 'bg-rose-500',
+};
+
+const HEALTH_STATUS_LABEL = {
+  good: 'Good',
+  fair: 'Fair',
+  'needs-attention': 'Needs attention',
+};
+
+// One priest, with their full check-up history.
+interface PriestGroup {
+  key: string;
+  name: string;
+  position: string;
+  parish: string;
+  email: string;
+  phone: string;
+  birthDate: string;
+  latest: PriestRecord;
+  records: PriestRecord[]; // full history, newest first
+  matchedIds: string[]; // ids matching the active filter
+}
 
 const HEALTH_STATUS_ICONS = {
   good: '✓',
@@ -45,8 +73,38 @@ export function HealthTracker() {
   const [showForm, setShowForm] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [selectedPriest, setSelectedPriest] = useState<PriestRecord | null>(null);
+  const [selectedGroup, setSelectedGroup] = useState<PriestGroup | null>(null);
   const [filter, setFilter] = useState<'all' | 'birthdays' | 'checkups'>('all');
   const [search, setSearch] = useState('');
+  const [statusFilter, setStatusFilter] = useState<'all' | 'good' | 'fair' | 'needs-attention'>('all');
+  const [page, setPage] = useState(1);
+  const PAGE_SIZE = 9;
+  // Soft-archive is kept client-side (no archive column on health_records yet),
+  // persisted so the archived view survives reloads.
+  const [archivedIds, setArchivedIds] = useState<string[]>(() => {
+    if (typeof window === 'undefined') return [];
+    try {
+      return JSON.parse(localStorage.getItem('priest_health_archived') || '[]');
+    } catch {
+      return [];
+    }
+  });
+  const persistArchived = useCallback((ids: string[]) => {
+    setArchivedIds(ids);
+    try {
+      localStorage.setItem('priest_health_archived', JSON.stringify(ids));
+    } catch {
+      /* ignore */
+    }
+  }, []);
+  const archiveRecord = useCallback(
+    (id: string) => persistArchived(Array.from(new Set([...archivedIds, id]))),
+    [archivedIds, persistArchived],
+  );
+  const restoreRecord = useCallback(
+    (id: string) => persistArchived(archivedIds.filter((x) => x !== id)),
+    [archivedIds, persistArchived],
+  );
   const [apiHealthScore, setApiHealthScore] = useState<number | null>(null);
   const [healthScoreLoading, setHealthScoreLoading] = useState(false);
 
@@ -369,16 +427,16 @@ export function HealthTracker() {
     setShowForm(false);
   };
 
-  const handleDelete = useCallback(async (id: string) => {
-    if (confirm('Delete this record?')) {
-      try {
-        await apiClient.deleteHealthRecord(id);
-      } catch {
-        /* fallback: delete locally */
-      }
-      setPriests((prev) => prev.filter((p) => p.id !== id));
+  // Reset to the first page whenever the result set changes
+  useEffect(() => {
+    setPage(1);
+  }, [filter, statusFilter, search]);
+
+  const handleArchive = useCallback((id: string) => {
+    if (confirm('Archive this health record? You can restore it from the dedicated Archives page.')) {
+      archiveRecord(id);
     }
-  }, []);
+  }, [archiveRecord]);
 
   const handleEdit = useCallback(
     (priest: PriestRecord) => {
@@ -400,7 +458,7 @@ export function HealthTracker() {
     [],
   );
 
-  // ─── PRIEST SELF-VIEW ────────────────────────────────────────────────────────
+  // --------- PRIEST SELF-VIEW ------------------------------------------------------------------------------------------------------------------------------------------------------------------------
   if (isPriestView) {
     const priestName =
       (user as any)?.displayName || (user as any)?.email?.split('@')[0] || 'Priest';
@@ -433,7 +491,7 @@ export function HealthTracker() {
                 <h1 className="text-2xl font-bold text-slate-900">{priestName}</h1>
                 <p className="text-slate-500 text-sm">
                   {priestRole}
-                  {priestParish ? ` · ${priestParish}` : ''}
+                  {priestParish ? ` • ${priestParish}` : ''}
                 </p>
               </div>
             </div>
@@ -468,7 +526,7 @@ export function HealthTracker() {
           </h2>
 
           {recordsLoading ? (
-            <div className="text-center py-16 text-slate-400 text-sm">Loading records…</div>
+            <div className="text-center py-16 text-slate-400 text-sm">Loading records...</div>
           ) : myRecords.length === 0 ? (
             <div className="bg-white rounded-xl border border-slate-200 p-12 text-center">
               <Heart className="w-10 h-10 text-slate-200 mx-auto mb-3" />
@@ -492,7 +550,7 @@ export function HealthTracker() {
                         <p className="font-semibold text-slate-900">
                           {record.lastCheckup
                             ? formatDate(new Date(record.lastCheckup))
-                            : '—'}
+                            : '-'}
                         </p>
                         <p className="text-xs text-slate-400 mt-0.5">Date of Checkup</p>
                       </div>
@@ -505,10 +563,11 @@ export function HealthTracker() {
                         <Edit2 className="w-4 h-4 text-blue-500" />
                       </button>
                       <button
-                        onClick={() => handleDelete(record.id)}
-                        className="p-1.5 hover:bg-rose-50 rounded-lg transition-colors"
+                        onClick={() => handleArchive(record.id)}
+                        className="p-1.5 hover:bg-amber-50 rounded-lg transition-colors"
+                        title="Archive"
                       >
-                        <Trash2 className="w-4 h-4 text-rose-500" />
+                        <Archive className="w-4 h-4 text-amber-600" />
                       </button>
                     </div>
                   </div>
@@ -547,7 +606,7 @@ export function HealthTracker() {
             </div>
           )}
 
-          {/* Simplified Add/Edit Modal — priest self-view */}
+          {/* Simplified Add/Edit Modal - priest self-view */}
           <AnimatePresence>
             {showForm && (
               <motion.div
@@ -600,7 +659,7 @@ export function HealthTracker() {
                       <textarea
                         value={formData.notes}
                         onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
-                        placeholder="Enter any additional notes…"
+                        placeholder="Enter any additional notes..."
                         rows={4}
                         className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-rose-500 focus:border-transparent outline-none resize-none"
                       />
@@ -673,15 +732,23 @@ export function HealthTracker() {
     );
   }
 
-  // ─── ADMIN / BISHOP FULL VIEW ────────────────────────────────────────────────
+  // --------- ADMIN / BISHOP FULL VIEW ------------------------------------------------------------------------------------------------------------------------------------------------
   const upcomingBirthdays = getUpcomingBirthdays();
   const priestsNeedingCheckup = priests.filter((p) => needsCheckup(p.lastCheckup));
-  // Age stored in the DB may be stale/missing — always derive it from birthDate
+  // Age stored in the DB may be stale/missing - always derive it from birthDate
   const displayAge = (p: PriestRecord) => calculateAge(p.birthDate) || p.age || 0;
 
-  let filteredPriests = priests;
-  if (filter === 'birthdays') filteredPriests = upcomingBirthdays;
-  else if (filter === 'checkups') filteredPriests = priestsNeedingCheckup;
+  const isArchived = (p: PriestRecord) => archivedIds.includes(p.id);
+  const activePriests = priests.filter((p) => !isArchived(p));
+
+  let filteredPriests: PriestRecord[];
+  if (filter === 'birthdays') filteredPriests = upcomingBirthdays.filter((p) => !isArchived(p));
+  else if (filter === 'checkups') filteredPriests = priestsNeedingCheckup.filter((p) => !isArchived(p));
+  else filteredPriests = activePriests;
+
+  if (statusFilter !== 'all') {
+    filteredPriests = filteredPriests.filter((p) => p.healthStatus === statusFilter);
+  }
   if (search.trim()) {
     const q = search.toLowerCase();
     filteredPriests = filteredPriests.filter(
@@ -692,170 +759,181 @@ export function HealthTracker() {
     );
   }
 
+  // Submission status from the priest's most recent check-up.
+  const submissionStatus = (latest?: PriestRecord): { label: string; dot: string; tone: string } => {
+    if (!latest || !latest.lastCheckup) return { label: 'No record', dot: 'bg-rose-500', tone: 'text-rose-600' };
+    if (needsCheckup(latest.lastCheckup)) return { label: 'Overdue', dot: 'bg-amber-500', tone: 'text-amber-600' };
+    return { label: 'Up to date', dot: 'bg-emerald-500', tone: 'text-emerald-600' };
+  };
+
+  // ── Group records by priest so each card represents one person with history ──
+  const groupKey = (p: PriestRecord) =>
+    p.email?.trim().toLowerCase() || p.name?.trim().toLowerCase() || p.id;
+
+  const historyByKey = new Map<string, PriestRecord[]>();
+  for (const p of priests) {
+    const k = groupKey(p);
+    if (!historyByKey.has(k)) historyByKey.set(k, []);
+    historyByKey.get(k)!.push(p);
+  }
+
+  const groupMap = new Map<string, PriestGroup>();
+  for (const p of filteredPriests) {
+    const k = groupKey(p);
+    if (!groupMap.has(k)) {
+      const records = (historyByKey.get(k) || [p])
+        .slice()
+        .sort((a, b) => new Date(b.lastCheckup || 0).getTime() - new Date(a.lastCheckup || 0).getTime());
+      const latest = records[0] || p;
+      const withBirth = records.find((r) => r.birthDate) || latest;
+      groupMap.set(k, {
+        key: k,
+        name: latest.name,
+        position: latest.position,
+        parish: latest.parish,
+        email: latest.email,
+        phone: latest.phone,
+        birthDate: withBirth.birthDate,
+        latest,
+        records,
+        matchedIds: [],
+      });
+    }
+    groupMap.get(k)!.matchedIds.push(p.id);
+  }
+  const priestGroups = Array.from(groupMap.values());
+
+  const totalPages = Math.max(1, Math.ceil(priestGroups.length / PAGE_SIZE));
+  const safePage = Math.min(page, totalPages);
+  const pagedGroups = priestGroups.slice((safePage - 1) * PAGE_SIZE, safePage * PAGE_SIZE);
+
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 pt-6 pb-20 px-4 md:px-6">
+    <div className="min-h-screen bg-[#f5f5f5] pt-8 pb-20 px-4 sm:px-6 lg:px-8">
       <div className="max-w-6xl mx-auto">
-        {/* Header */}
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-8">
-          <div className="flex items-center gap-3.5">
-            <div className="p-3 bg-gradient-to-br from-rose-500 to-rose-600 rounded-xl shadow-lg shadow-rose-500/20">
-              <Heart className="w-6 h-6 text-white" />
+        {/* ------ Header ------ */}
+        <div className="mb-6 overflow-hidden rounded-3xl border border-black/10 bg-black text-white shadow-[0_18px_48px_rgba(15,23,42,0.12)]">
+          <div className="flex flex-col gap-6 p-6 md:p-8 lg:flex-row lg:items-center lg:justify-between">
+            <div className="flex min-w-0 items-center gap-4">
+              <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl border border-gold-500/25 bg-white/5">
+                <Heart className="h-5 w-5 text-gold-400" />
+              </div>
+              <div className="min-w-0">
+                <p className="text-[10px] font-black uppercase tracking-[0.28em] text-gold-400">Clergy Wellbeing</p>
+                <h1 className="mt-1 font-serif text-3xl font-bold leading-none text-white md:text-4xl">Health Tracker</h1>
+                <p className="mt-2 max-w-2xl text-sm font-medium leading-relaxed text-white/55">
+                  Monitor priest health check-ups, upcoming birthdays, and wellbeing records.
+                </p>
+              </div>
             </div>
-            <div>
-              <h1 className="text-2xl sm:text-3xl font-bold text-slate-900">Executive Health Tracker</h1>
-              <p className="text-slate-500 text-sm sm:text-base">Manage priest health check-ups and birthdays</p>
-            </div>
-          </div>
-          {canManageRecords && (
-            <button
-              onClick={() => {
-                setEditingId(null);
-                setFormData({
-                  name: '',
-                  position: '',
-                  parish: '',
-                  birthDate: '',
-                  lastCheckup: new Date().toISOString().split('T')[0],
-                  healthStatus: 'good',
-                  notes: '',
-                  email: '',
-                  phone: '',
-                });
-                setShowForm(true);
-              }}
-              className="flex items-center justify-center gap-2 bg-rose-500 hover:bg-rose-600 text-white px-4 py-2.5 rounded-xl transition-colors font-medium shadow-lg shadow-rose-500/20 active:scale-[0.98]"
-            >
-              <Plus className="w-5 h-5" />
-              Add Record
-            </button>
-          )}
-        </div>
 
-        {/* Stats Cards */}
-        <div
-          className={`grid grid-cols-1 sm:grid-cols-2 gap-4 mb-8 ${apiHealthScore !== null || healthScoreLoading ? 'lg:grid-cols-4' : 'lg:grid-cols-3'}`}
-        >
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            className="bg-white rounded-xl border border-slate-200 p-5 hover:shadow-md transition-shadow"
-          >
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-slate-500 text-xs font-bold uppercase tracking-wider">Total Priests</p>
-                <p className="text-3xl font-bold text-slate-900 mt-2">{priests.length}</p>
+            <div className="flex items-center gap-3">
+              <div className="grid grid-cols-3 gap-2 sm:min-w-[300px]">
+                {[
+                  { label: 'Priests', value: activePriests.length, Icon: Users },
+                  { label: 'Birthdays', value: upcomingBirthdays.filter((p) => !isArchived(p)).length, Icon: Cake },
+                  { label: 'Check-ups', value: priestsNeedingCheckup.filter((p) => !isArchived(p)).length, Icon: Stethoscope },
+                ].map(({ label, value, Icon }) => (
+                  <div key={label} className="rounded-2xl border border-white/10 bg-white/[0.06] p-3">
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="text-[10px] font-black uppercase tracking-[0.14em] text-white/35">{label}</span>
+                      <Icon className="h-3.5 w-3.5 text-gold-400" />
+                    </div>
+                    <p className="mt-2 text-2xl font-black leading-none text-white">{value}</p>
+                  </div>
+                ))}
               </div>
-              <div className="w-12 h-12 bg-blue-50 rounded-xl flex items-center justify-center shrink-0">
-                <Users className="w-6 h-6 text-blue-500" />
-              </div>
-            </div>
-          </motion.div>
-
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.1 }}
-            className="bg-white rounded-xl border border-slate-200 p-5 hover:shadow-md transition-shadow"
-          >
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-slate-500 text-xs font-bold uppercase tracking-wider">Birthdays (30d)</p>
-                <p className="text-3xl font-bold text-emerald-600 mt-2">{upcomingBirthdays.length}</p>
-              </div>
-              <div className="w-12 h-12 bg-emerald-50 rounded-xl flex items-center justify-center shrink-0">
-                <Cake className="w-6 h-6 text-emerald-500" />
-              </div>
-            </div>
-          </motion.div>
-
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.2 }}
-            className="bg-white rounded-xl border border-slate-200 p-5 hover:shadow-md transition-shadow"
-          >
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-slate-500 text-xs font-bold uppercase tracking-wider">Need Check-up</p>
-                <p className="text-3xl font-bold text-amber-600 mt-2">{priestsNeedingCheckup.length}</p>
-              </div>
-              <div className="w-12 h-12 bg-amber-50 rounded-xl flex items-center justify-center shrink-0">
-                <Stethoscope className="w-6 h-6 text-amber-500" />
-              </div>
-            </div>
-          </motion.div>
-
-          {apiHealthScore !== null && (
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.3 }}
-              className="bg-white rounded-xl border border-slate-200 p-5 hover:shadow-md transition-shadow"
-            >
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-slate-500 text-xs font-bold uppercase tracking-wider">Financial Health</p>
-                  <p
-                    className={`text-3xl font-bold mt-2 ${apiHealthScore >= 70 ? 'text-emerald-600' : apiHealthScore >= 40 ? 'text-amber-600' : 'text-rose-600'}`}
-                  >
-                    {apiHealthScore.toFixed(1)}
-                  </p>
-                </div>
-                <div
-                  className={`w-12 h-12 rounded-xl flex items-center justify-center shrink-0 ${apiHealthScore >= 70 ? 'bg-emerald-50' : apiHealthScore >= 40 ? 'bg-amber-50' : 'bg-rose-50'}`}
+              {canManageRecords && (
+                <button
+                  onClick={() => {
+                    setEditingId(null);
+                    setFormData({
+                      name: '',
+                      position: '',
+                      parish: '',
+                      birthDate: '',
+                      lastCheckup: new Date().toISOString().split('T')[0],
+                      healthStatus: 'good',
+                      notes: '',
+                      email: '',
+                      phone: '',
+                    });
+                    setShowForm(true);
+                  }}
+                  className="inline-flex h-11 shrink-0 items-center justify-center gap-2 rounded-2xl bg-gold-500 px-5 text-[11px] font-black uppercase tracking-[0.18em] text-black shadow-lg shadow-gold-500/20 transition-all hover:bg-gold-400"
                 >
-                  <Heart
-                    className={`w-6 h-6 ${apiHealthScore >= 70 ? 'text-emerald-500' : apiHealthScore >= 40 ? 'text-amber-500' : 'text-rose-500'}`}
-                  />
-                </div>
-              </div>
-            </motion.div>
-          )}
-
-          {healthScoreLoading && apiHealthScore === null && (
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.3 }}
-              className="bg-white rounded-xl border border-slate-200 p-5 animate-pulse"
-            >
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-slate-500 text-xs font-bold uppercase tracking-wider">Financial Health</p>
-                  <div className="h-9 w-20 bg-slate-200 rounded mt-2" />
-                </div>
-                <div className="w-12 h-12 bg-slate-200 rounded-xl" />
-              </div>
-            </motion.div>
-          )}
+                  <Plus className="h-4 w-4" />
+                  Add Record
+                </button>
+              )}
+            </div>
+          </div>
         </div>
 
-        {/* Filters + Search */}
-        <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3 mb-6">
-          <div className="flex gap-2">
-            {(['all', 'birthdays', 'checkups'] as const).map((cat) => (
-              <button
-                key={cat}
-                onClick={() => setFilter(cat)}
-                className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${
-                  filter === cat
-                    ? 'bg-rose-500 text-white'
-                    : 'bg-white text-slate-700 border border-slate-200 hover:border-slate-300'
-                }`}
-              >
-                {cat === 'all' ? '👥 All' : cat === 'birthdays' ? '🎂 Birthdays' : '⚕️ Check-ups'}
-              </button>
-            ))}
-          </div>
-          <div className="relative flex-1 sm:max-w-xs">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-            <input
-              type="text"
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              placeholder="Search by name, position, parish..."
-              className="w-full pl-9 pr-4 py-2 border border-slate-200 rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-rose-400 focus:border-transparent"
-            />
+        {/* ------ Filter / search bar ------ */}
+        <div className="mb-6 rounded-3xl border border-slate-200 bg-white p-3 shadow-[0_12px_32px_rgba(15,23,42,0.06)]">
+          <div className="flex flex-col gap-3 lg:flex-row lg:items-center">
+            <div className="flex flex-wrap gap-2">
+              {([
+                { id: 'all', label: 'All', Icon: Users },
+                { id: 'birthdays', label: 'Birthdays', Icon: Cake },
+                { id: 'checkups', label: 'Check-ups', Icon: Stethoscope },
+              ] as const).map(({ id, label, Icon }) => {
+                const count =
+                  id === 'birthdays'
+                      ? upcomingBirthdays.filter((p) => !isArchived(p)).length
+                      : id === 'checkups'
+                        ? priestsNeedingCheckup.filter((p) => !isArchived(p)).length
+                        : activePriests.length;
+                const active = filter === id;
+                return (
+                  <button
+                    key={id}
+                    onClick={() => setFilter(id)}
+                    className={`inline-flex h-11 items-center gap-2 rounded-2xl px-4 text-[11px] font-black uppercase tracking-[0.12em] transition-all ${
+                      active
+                        ? 'bg-black text-white shadow-lg shadow-black/10'
+                        : 'border border-transparent text-slate-500 hover:border-slate-200 hover:bg-slate-50 hover:text-slate-800'
+                    }`}
+                  >
+                    <Icon className={`h-4 w-4 ${active ? 'text-gold-400' : 'text-slate-400'}`} />
+                    {label}
+                    <span
+                      className={`rounded-full px-2 py-0.5 text-[9px] font-black tabular-nums ${
+                        active ? 'bg-white/20 text-white' : 'bg-slate-100 text-slate-500'
+                      }`}
+                    >
+                      {count}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+
+            <div className="flex flex-1 flex-col gap-2 sm:flex-row sm:items-center sm:justify-end">
+              <div className="relative w-full sm:w-44">
+                <select
+                  value={statusFilter}
+                  onChange={(e) => setStatusFilter(e.target.value as any)}
+                  className="h-11 w-full cursor-pointer appearance-none rounded-2xl border border-slate-200 bg-slate-50 px-4 pr-10 text-sm font-bold text-slate-700 transition-all focus:border-rose-400 focus:bg-white focus:outline-none focus:ring-4 focus:ring-rose-400/10"
+                >
+                  <option value="all">All statuses</option>
+                  <option value="good">Good</option>
+                  <option value="fair">Fair</option>
+                  <option value="needs-attention">Needs attention</option>
+                </select>
+                <ChevronDown className="pointer-events-none absolute right-4 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+              </div>
+              <div className="relative w-full sm:max-w-xs sm:flex-1">
+                <Search className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+                <input
+                  type="text"
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                  placeholder="Search name, position, parish..."
+                  className="h-11 w-full rounded-2xl border border-slate-200 bg-slate-50 pl-11 pr-4 text-sm font-semibold text-slate-800 transition-all placeholder:text-slate-400 focus:border-rose-400 focus:bg-white focus:outline-none focus:ring-4 focus:ring-rose-400/10"
+                />
+              </div>
+            </div>
           </div>
         </div>
 
@@ -924,7 +1002,7 @@ export function HealthTracker() {
                               </p>
                               <p className="text-xs text-slate-500">
                                 {getAccessRoleLabel(profile.roleId || profile.role)}
-                                {profile.entityName ? ` · ${profile.entityName}` : ''}
+                                {profile.entityName ? ` • ${profile.entityName}` : ''}
                               </p>
                             </button>
                           ))}
@@ -932,7 +1010,7 @@ export function HealthTracker() {
                       )}
                     </div>
 
-                    {/* Position — auto-filled, read-only */}
+                    {/* Position - auto-filled, read-only */}
                     <div className="relative">
                       <input
                         type="text"
@@ -945,7 +1023,7 @@ export function HealthTracker() {
                     </div>
                   </div>
 
-                  {/* Parish + Email — auto-filled, read-only */}
+                  {/* Parish + Email - auto-filled, read-only */}
                   <div className="grid grid-cols-2 gap-4">
                     <div className="relative">
                       <input
@@ -1045,330 +1123,311 @@ export function HealthTracker() {
           )}
         </AnimatePresence>
 
-        {/* Records Table */}
-        <div className="bg-white rounded-xl border border-slate-200 overflow-hidden">
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="bg-slate-50 border-b border-slate-200">
-                  <th className="text-left px-4 py-3 text-xs font-bold text-slate-500 uppercase tracking-wider">
-                    Name
-                  </th>
-                  <th className="text-left px-4 py-3 text-xs font-bold text-slate-500 uppercase tracking-wider">
-                    Position
-                  </th>
-                  <th className="text-left px-4 py-3 text-xs font-bold text-slate-500 uppercase tracking-wider hidden md:table-cell">
-                    Parish
-                  </th>
-                  <th className="text-left px-4 py-3 text-xs font-bold text-slate-500 uppercase tracking-wider hidden md:table-cell">
-                    Birthday
-                  </th>
-                  <th className="text-left px-4 py-3 text-xs font-bold text-slate-500 uppercase tracking-wider hidden sm:table-cell">
-                    Age
-                  </th>
-                  <th className="text-left px-4 py-3 text-xs font-bold text-slate-500 uppercase tracking-wider hidden lg:table-cell">
-                    Last Check-up
-                  </th>
-                  <th className="text-left px-4 py-3 text-xs font-bold text-slate-500 uppercase tracking-wider hidden lg:table-cell">
-                    Document
-                  </th>
-                  <th className="text-left px-4 py-3 text-xs font-bold text-slate-500 uppercase tracking-wider">
-                    Status
-                  </th>
-                  {canManageRecords && (
-                    <th className="text-right px-4 py-3 text-xs font-bold text-slate-500 uppercase tracking-wider">
-                      Actions
-                    </th>
-                  )}
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100">
-                {recordsLoading ? (
-                  <tr>
-                    <td colSpan={canManageRecords ? 9 : 8} className="text-center py-12">
-                      <div className="w-8 h-8 border-2 border-rose-200 border-t-rose-500 rounded-full animate-spin mx-auto mb-3" />
-                      <p className="text-slate-400 text-sm">Loading records…</p>
-                    </td>
-                  </tr>
-                ) : filteredPriests.length === 0 ? (
-                  <tr>
-                    <td colSpan={canManageRecords ? 9 : 8} className="text-center py-12">
-                      <Heart className="w-10 h-10 text-slate-200 mx-auto mb-3" />
-                      <p className="text-slate-400 text-sm">
-                        {search ? 'No results found for your search.' : 'No records to display.'}
-                      </p>
-                    </td>
-                  </tr>
-                ) : (
-                  filteredPriests.map((priest) => {
-                    const age = displayAge(priest);
-                    const daysToBirthday = priest.birthDate ? getDaysUntilBirthday(priest.birthDate) : 999;
-                    return (
-                    <tr
-                      key={priest.id}
-                      onClick={() => setSelectedPriest(priest)}
-                      className="hover:bg-slate-50 cursor-pointer transition-colors"
-                    >
-                      <td className="px-4 py-3">
-                        <p className="font-semibold text-slate-900">{priest.name}</p>
-                        <p className="text-xs text-slate-500 md:hidden">{priest.parish}</p>
-                      </td>
-                      <td className="px-4 py-3 text-slate-600">{priest.position || '—'}</td>
-                      <td className="px-4 py-3 text-slate-600 hidden md:table-cell">
-                        {priest.parish || '—'}
-                      </td>
-                      <td className="px-4 py-3 hidden md:table-cell">
-                        {priest.birthDate ? (
-                          <div className="flex items-center gap-1.5">
-                            <Cake className="w-3.5 h-3.5 text-slate-300 shrink-0" />
-                            <span className="text-slate-600">{formatDate(new Date(priest.birthDate))}</span>
-                            {daysToBirthday <= 30 && (
-                              <span className="text-[10px] bg-emerald-100 text-emerald-700 px-1.5 py-0.5 rounded font-bold whitespace-nowrap">
-                                {daysToBirthday === 0 ? 'Today! 🎉' : `in ${daysToBirthday}d`}
-                              </span>
-                            )}
-                          </div>
-                        ) : (
-                          <span className="text-slate-300">—</span>
-                        )}
-                      </td>
-                      <td className="px-4 py-3 text-slate-600 hidden sm:table-cell">
-                        {age ? `${age} yrs` : '—'}
-                      </td>
-                      <td className="px-4 py-3 hidden lg:table-cell">
-                        {priest.lastCheckup ? (
-                          <>
-                            <span className="text-slate-600">
-                              {formatDate(new Date(priest.lastCheckup))}
-                            </span>
-                            {needsCheckup(priest.lastCheckup) && (
-                              <span className="ml-2 text-[10px] bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded font-bold">
-                                Overdue
-                              </span>
-                            )}
-                          </>
-                        ) : (
-                          '—'
-                        )}
-                      </td>
-                      <td className="px-4 py-3 hidden lg:table-cell">
-                        {priest.documentName ? (
-                          priest.documentUrl ? (
-                            <a
-                              href={priest.documentUrl}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              onClick={(e) => e.stopPropagation()}
-                              className="inline-flex max-w-[180px] items-center gap-1.5 rounded-lg border border-slate-200 px-2 py-1 text-xs font-semibold text-blue-600 hover:border-blue-200 hover:bg-blue-50"
-                              title={priest.documentName}
-                            >
-                              <FileText className="h-3.5 w-3.5 shrink-0" />
-                              <span className="truncate">{priest.documentName}</span>
-                            </a>
-                          ) : (
-                            <span
-                              className="inline-flex max-w-[180px] items-center gap-1.5 text-xs font-medium text-slate-500"
-                              title={priest.documentName}
-                            >
-                              <FileText className="h-3.5 w-3.5 shrink-0" />
-                              <span className="truncate">{priest.documentName}</span>
-                            </span>
-                          )
-                        ) : (
-                          <span className="text-slate-300">—</span>
-                        )}
-                      </td>
-                      <td className="px-4 py-3">
-                        <span
-                          className={`inline-flex items-center gap-1 px-2 py-1 rounded-md text-[11px] font-bold border ${HEALTH_STATUS_COLORS[priest.healthStatus]}`}
-                        >
-                          {HEALTH_STATUS_ICONS[priest.healthStatus]}{' '}
-                          {priest.healthStatus.replace('-', ' ')}
-                        </span>
-                      </td>
-                      {canManageRecords && (
-                        <td className="px-4 py-3 text-right">
-                          <div className="flex items-center justify-end gap-1">
-                            {priest.documentUrl && (
-                              <a
-                                href={priest.documentUrl}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                onClick={(e) => e.stopPropagation()}
-                                className="p-1.5 hover:bg-slate-100 rounded-lg transition-colors"
-                                title={priest.documentName || 'Open document'}
-                              >
-                                <FileText className="w-4 h-4 text-slate-500" />
-                              </a>
-                            )}
-                            <button
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                handleEdit(priest);
-                              }}
-                              className="p-1.5 hover:bg-blue-50 rounded-lg transition-colors"
-                            >
-                              <Edit2 className="w-4 h-4 text-blue-500" />
-                            </button>
-                            <button
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                handleDelete(priest.id);
-                              }}
-                              className="p-1.5 hover:bg-rose-50 rounded-lg transition-colors"
-                            >
-                              <Trash2 className="w-4 h-4 text-rose-500" />
-                            </button>
-                          </div>
-                        </td>
-                      )}
-                    </tr>
-                    );
-                  })
-                )}
-              </tbody>
-            </table>
+        {/* ------ Records card grid ------ */}
+        {recordsLoading ? (
+          <div className="rounded-3xl border border-slate-200 bg-white">
+            <InlineLoader label="Loading records" />
           </div>
-          {filteredPriests.length > 0 && (
-            <div className="px-4 py-3 border-t border-slate-100 bg-slate-50">
-              <p className="text-xs text-slate-400 font-medium">
-                Showing {filteredPriests.length} of {priests.length} record
-                {priests.length !== 1 ? 's' : ''}
-                {search && ` matching "${search}"`}
+        ) : filteredPriests.length === 0 ? (
+          <div className="flex flex-col items-center justify-center gap-4 rounded-3xl border border-dashed border-slate-300 bg-white py-24 text-center">
+            <div className="flex h-20 w-20 items-center justify-center rounded-3xl border border-dashed border-slate-200 bg-slate-50">
+              <Heart className="h-9 w-9 text-slate-300" />
+            </div>
+            <div className="space-y-1">
+              <p className="font-serif text-xl font-bold text-slate-900">
+                No records to display
+              </p>
+              <p className="text-sm text-slate-400">
+                {search ? 'No results found for your search.' : 'Records will appear here once added.'}
               </p>
             </div>
-          )}
-        </div>
+          </div>
+        ) : (
+          <>
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+              {pagedGroups.map((group) => {
+                const age = group.birthDate ? calculateAge(group.birthDate) : 0;
+                const daysToBirthday = group.birthDate ? getDaysUntilBirthday(group.birthDate) : 999;
+                const sub = submissionStatus(group.latest);
+                const archived = group.matchedIds.every((id) => archivedIds.includes(id));
+                return (
+                  <motion.div
+                    key={group.key}
+                    initial={{ opacity: 0, y: 12 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    className={`group relative flex flex-col rounded-3xl border border-slate-200 bg-white p-5 shadow-[0_4px_18px_rgba(15,23,42,0.04)] transition-all hover:-translate-y-0.5 hover:border-slate-300 hover:shadow-[0_14px_36px_rgba(15,23,42,0.08)] ${archived ? 'opacity-80' : ''}`}
+                  >
+                    <button onClick={() => setSelectedGroup(group)} className="flex w-full items-start gap-3 text-left">
+                      <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-slate-100 font-serif text-lg font-bold text-slate-700">
+                        {group.name?.charAt(0)?.toUpperCase() || '?'}
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <p className="truncate font-serif text-lg font-bold text-slate-900">{group.name}</p>
+                        <p className="truncate text-xs font-semibold text-slate-400">
+                          {[group.position, group.parish].filter(Boolean).join(' - ') || 'No assignment'}
+                        </p>
+                      </div>
+                    </button>
+
+                    <div className="mt-4 space-y-2.5 text-sm">
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-slate-400">
+                          <Cake className="h-3.5 w-3.5" /> Birthday
+                        </span>
+                        <span className="font-semibold text-slate-700">
+                          {group.birthDate ? formatDate(new Date(group.birthDate)) : 'Not set'}
+                          {age > 0 && <span className="ml-1 text-xs font-medium text-slate-400">({age})</span>}
+                        </span>
+                      </div>
+                      {daysToBirthday <= 30 && (
+                        <div className="flex justify-end">
+                          <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-bold text-slate-600">
+                            {daysToBirthday === 0 ? 'Birthday today' : `Birthday in ${daysToBirthday}d`}
+                          </span>
+                        </div>
+                      )}
+                      <div className="flex items-center justify-between gap-2 border-t border-slate-100 pt-2.5">
+                        <span className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-slate-400">
+                          <Stethoscope className="h-3.5 w-3.5" /> Submission
+                        </span>
+                        <span className={`flex items-center gap-1.5 text-sm font-bold ${sub.tone}`}>
+                          <span className={`h-2 w-2 rounded-full ${sub.dot}`} />
+                          {sub.label}
+                        </span>
+                      </div>
+                      <p className="text-right text-[11px] text-slate-400">
+                        {group.latest.lastCheckup ? `Last: ${formatDate(new Date(group.latest.lastCheckup))}` : 'No check-up yet'}
+                        {group.records.length > 1 && ` - ${group.records.length} records`}
+                      </p>
+                    </div>
+
+                    {canManageRecords && (
+                      <div className="mt-4 flex items-center justify-end gap-1 border-t border-slate-100 pt-3">
+                        {archived ? (
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              persistArchived(archivedIds.filter((id) => !group.matchedIds.includes(id)));
+                            }}
+                            className="inline-flex items-center gap-1.5 rounded-xl border border-slate-200 px-3 py-1.5 text-xs font-bold text-slate-600 transition-colors hover:border-emerald-200 hover:bg-emerald-500 hover:text-white"
+                          >
+                            <RotateCcw className="h-3.5 w-3.5" /> Restore
+                          </button>
+                        ) : (
+                          <>
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleEdit(group.latest);
+                              }}
+                              className="rounded-xl p-2 text-slate-400 transition-colors hover:bg-slate-900 hover:text-white"
+                              title="Edit"
+                            >
+                              <Edit2 className="h-4 w-4" />
+                            </button>
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                persistArchived(Array.from(new Set([...archivedIds, ...group.matchedIds])));
+                              }}
+                              className="rounded-xl p-2 text-slate-400 transition-colors hover:bg-rose-500 hover:text-white"
+                              title="Archive"
+                            >
+                              <Archive className="h-4 w-4" />
+                            </button>
+                          </>
+                        )}
+                      </div>
+                    )}
+                  </motion.div>
+                );
+              })}
+            </div>
+
+            {/* Pagination */}
+            <div className="mt-6 flex items-center justify-between rounded-2xl border border-slate-200 bg-white px-5 py-3">
+              <p className="text-xs font-semibold text-slate-400">
+                Showing {(safePage - 1) * PAGE_SIZE + 1}-{Math.min(safePage * PAGE_SIZE, priestGroups.length)} of {priestGroups.length} priest{priestGroups.length === 1 ? '' : 's'}
+                {search && ` matching "${search}"`}
+              </p>
+              {totalPages > 1 && (
+                <div className="flex items-center gap-2">
+                  <button
+                    disabled={safePage <= 1}
+                    onClick={() => setPage((p) => Math.max(1, p - 1))}
+                    className="inline-flex h-9 w-9 items-center justify-center rounded-xl border border-slate-200 text-slate-500 transition-colors hover:bg-slate-50 disabled:opacity-40"
+                  >
+                    <ChevronLeft className="h-4 w-4" />
+                  </button>
+                  <span className="text-xs font-bold text-slate-600">
+                    {safePage} / {totalPages}
+                  </span>
+                  <button
+                    disabled={safePage >= totalPages}
+                    onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+                    className="inline-flex h-9 w-9 items-center justify-center rounded-xl border border-slate-200 text-slate-500 transition-colors hover:bg-slate-50 disabled:opacity-40"
+                  >
+                    <ChevronRight className="h-4 w-4" />
+                  </button>
+                </div>
+              )}
+            </div>
+          </>
+        )}
+
 
         {/* Detail Modal */}
         <AnimatePresence>
-          {selectedPriest && (
+          {selectedGroup && (
             <motion.div
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
-              className="fixed inset-0 bg-black/30 backdrop-blur-sm flex items-center justify-center z-50 p-4"
-              onClick={() => setSelectedPriest(null)}
+              className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4 backdrop-blur-sm"
+              onClick={() => setSelectedGroup(null)}
             >
               <motion.div
-                initial={{ scale: 0.95 }}
-                animate={{ scale: 1 }}
-                exit={{ scale: 0.95 }}
+                initial={{ scale: 0.96, y: 12 }}
+                animate={{ scale: 1, y: 0 }}
+                exit={{ scale: 0.96, y: 12 }}
                 onClick={(e) => e.stopPropagation()}
-                className="bg-white rounded-xl shadow-xl max-w-2xl w-full p-6 max-h-[90vh] overflow-y-auto"
+                className="flex max-h-[88vh] w-full max-w-2xl flex-col overflow-hidden rounded-3xl bg-white shadow-2xl"
               >
-                <div className="flex items-start justify-between mb-5">
-                  <div className="flex items-center gap-3.5">
-                    <div className="w-12 h-12 rounded-full bg-rose-100 flex items-center justify-center shrink-0">
-                      <Heart className="w-6 h-6 text-rose-500" />
+                <div className="flex items-start justify-between gap-4 bg-slate-900 p-6 text-white">
+                  <div className="flex min-w-0 items-center gap-3.5">
+                    <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-white/10 font-serif text-lg font-bold text-white">
+                      {selectedGroup.name?.charAt(0)?.toUpperCase() || '?'}
                     </div>
-                    <div>
-                      <h2 className="text-2xl font-bold text-slate-900">{selectedPriest.name}</h2>
-                      <p className="text-slate-500 text-sm">
-                        {[selectedPriest.position, selectedPriest.parish].filter(Boolean).join(' • ') || '—'}
+                    <div className="min-w-0">
+                      <h2 className="truncate font-serif text-2xl font-bold">{selectedGroup.name}</h2>
+                      <p className="truncate text-sm text-white/55">
+                        {[selectedGroup.position, selectedGroup.parish].filter(Boolean).join(' - ') || 'No assignment'}
                       </p>
                     </div>
                   </div>
-                  <button
-                    onClick={() => setSelectedPriest(null)}
-                    className="p-1 hover:bg-slate-100 rounded-lg transition-colors"
-                  >
-                    <X className="w-6 h-6" />
-                  </button>
+                  <div className="flex shrink-0 items-center gap-1">
+                    {canManageRecords && (
+                      <>
+                        <button
+                          onClick={() => {
+                            const g = selectedGroup;
+                            setSelectedGroup(null);
+                            handleEdit(g.latest);
+                          }}
+                          className="rounded-xl p-2 text-white/60 transition-colors hover:bg-white hover:text-slate-900"
+                          title="Edit"
+                        >
+                          <Edit2 className="h-4 w-4" />
+                        </button>
+                        <button
+                          onClick={() => {
+                            const g = selectedGroup;
+                            if (!confirm(`Archive all ${g.records.length} record(s) for ${g.name}? You can restore them from Archives.`)) return;
+                            persistArchived(Array.from(new Set([...archivedIds, ...g.records.map((r) => r.id)])));
+                            setSelectedGroup(null);
+                          }}
+                          className="rounded-xl p-2 text-white/60 transition-colors hover:bg-amber-500 hover:text-white"
+                          title="Archive"
+                        >
+                          <Archive className="h-4 w-4" />
+                        </button>
+                      </>
+                    )}
+                    <button
+                      onClick={() => setSelectedGroup(null)}
+                      className="rounded-xl p-2 text-white/60 transition-colors hover:bg-white/10 hover:text-white"
+                    >
+                      <X className="h-5 w-5" />
+                    </button>
+                  </div>
                 </div>
 
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <div className="bg-slate-50 rounded-xl p-4">
-                    <p className="text-xs text-slate-500 font-bold uppercase tracking-wider flex items-center gap-1.5">
-                      <Cake className="w-3.5 h-3.5 text-rose-400" />
-                      Birthday
-                    </p>
-                    <p className="text-lg font-semibold text-slate-900 mt-1.5">
-                      {selectedPriest.birthDate
-                        ? formatDate(new Date(selectedPriest.birthDate))
-                        : 'N/A'}
-                    </p>
-                    {displayAge(selectedPriest) > 0 && (
-                      <p className="text-sm font-bold text-rose-600 mt-0.5">
-                        {displayAge(selectedPriest)} years old
+                <div className="flex-1 overflow-y-auto p-6">
+                  <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+                    <div className="rounded-2xl border border-slate-100 bg-slate-50 p-3">
+                      <p className="text-[10px] font-bold uppercase tracking-wide text-slate-400">Birthday</p>
+                      <p className="mt-1 text-sm font-bold text-slate-900">
+                        {selectedGroup.birthDate ? formatDate(new Date(selectedGroup.birthDate)) : 'Not set'}
                       </p>
-                    )}
-                    {selectedPriest.birthDate && getDaysUntilBirthday(selectedPriest.birthDate) <= 30 && (
-                      <p className="text-xs font-bold text-emerald-600 bg-emerald-50 inline-block px-2 py-1 rounded-md mt-2">
-                        🎂{' '}
-                        {getDaysUntilBirthday(selectedPriest.birthDate) === 0
-                          ? 'Birthday is today!'
-                          : `Birthday in ${getDaysUntilBirthday(selectedPriest.birthDate)} day${getDaysUntilBirthday(selectedPriest.birthDate) === 1 ? '' : 's'}`}
-                      </p>
-                    )}
-                  </div>
-                  <div className="bg-slate-50 rounded-xl p-4">
-                    <p className="text-xs text-slate-500 font-bold uppercase tracking-wider">Health Status</p>
-                    <span
-                      className={`inline-flex items-center gap-1 px-2.5 py-1 mt-1.5 rounded-md text-sm font-bold border ${HEALTH_STATUS_COLORS[selectedPriest.healthStatus]}`}
-                    >
-                      {HEALTH_STATUS_ICONS[selectedPriest.healthStatus]}{' '}
-                      {selectedPriest.healthStatus.replace('-', ' ').toUpperCase()}
-                    </span>
-                  </div>
-                  <div className="bg-slate-50 rounded-xl p-4">
-                    <p className="text-xs text-slate-500 font-bold uppercase tracking-wider">Email</p>
-                    <p className="text-sm font-semibold text-slate-900 mt-1.5 break-all">
-                      {selectedPriest.email || 'N/A'}
-                    </p>
-                  </div>
-                  <div className="bg-slate-50 rounded-xl p-4">
-                    <p className="text-xs text-slate-500 font-bold uppercase tracking-wider">Phone</p>
-                    <p className="text-sm font-semibold text-slate-900 mt-1.5">
-                      {selectedPriest.phone || 'N/A'}
-                    </p>
-                  </div>
-                  <div className="sm:col-span-2 bg-slate-50 rounded-xl p-4">
-                    <p className="text-xs text-slate-500 font-bold uppercase tracking-wider">Last Check-up</p>
-                    <p className="text-lg font-semibold text-slate-900 mt-1.5">
-                      {selectedPriest.lastCheckup
-                        ? formatDate(new Date(selectedPriest.lastCheckup))
-                        : 'N/A'}
-                    </p>
-                    {selectedPriest.lastCheckup && needsCheckup(selectedPriest.lastCheckup) && (
-                      <p className="text-sm text-amber-700 bg-amber-50 px-3 py-2 rounded-lg mt-2">
-                        ⚠️ Health check-up is overdue. Please schedule immediately.
-                      </p>
-                    )}
-                  </div>
-                  {selectedPriest.notes && (
-                    <div className="sm:col-span-2 bg-slate-50 rounded-xl p-4">
-                      <p className="text-xs text-slate-500 font-bold uppercase tracking-wider">Notes</p>
-                      <p className="text-sm text-slate-700 mt-2 bg-white border border-slate-100 p-3 rounded-lg whitespace-pre-line">
-                        {selectedPriest.notes}
-                      </p>
-                    </div>
-                  )}
-                  {selectedPriest.documentName && (
-                    <div className="sm:col-span-2 bg-slate-50 rounded-xl p-4">
-                      <p className="text-xs text-slate-500 font-bold uppercase tracking-wider">Document</p>
-                      {selectedPriest.documentUrl ? (
-                        <a
-                          href={selectedPriest.documentUrl}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="mt-2 inline-flex max-w-full items-center gap-2 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm font-semibold text-blue-600 hover:border-blue-200 hover:bg-blue-50"
-                          title={selectedPriest.documentName}
-                        >
-                          <FileText className="h-4 w-4 shrink-0" />
-                          <span className="truncate">{selectedPriest.documentName}</span>
-                        </a>
-                      ) : (
-                        <div
-                          className="mt-2 inline-flex max-w-full items-center gap-2 rounded-lg bg-slate-50 px-3 py-2 text-sm font-medium text-slate-600"
-                          title={selectedPriest.documentName}
-                        >
-                          <FileText className="h-4 w-4 shrink-0" />
-                          <span className="truncate">{selectedPriest.documentName}</span>
-                        </div>
+                      {selectedGroup.birthDate && calculateAge(selectedGroup.birthDate) > 0 && (
+                        <p className="text-xs font-semibold text-slate-400">{calculateAge(selectedGroup.birthDate)} yrs old</p>
                       )}
                     </div>
-                  )}
+                    <div className="rounded-2xl border border-slate-100 bg-slate-50 p-3">
+                      <p className="text-[10px] font-bold uppercase tracking-wide text-slate-400">Submission</p>
+                      {(() => {
+                        const s = submissionStatus(selectedGroup.latest);
+                        return (
+                          <p className={`mt-1 flex items-center gap-1.5 text-sm font-bold ${s.tone}`}>
+                            <span className={`h-2 w-2 rounded-full ${s.dot}`} /> {s.label}
+                          </p>
+                        );
+                      })()}
+                    </div>
+                    <div className="rounded-2xl border border-slate-100 bg-slate-50 p-3">
+                      <p className="text-[10px] font-bold uppercase tracking-wide text-slate-400">Email</p>
+                      <p className="mt-1 break-all text-xs font-semibold text-slate-700">{selectedGroup.email || 'N/A'}</p>
+                    </div>
+                    <div className="rounded-2xl border border-slate-100 bg-slate-50 p-3">
+                      <p className="text-[10px] font-bold uppercase tracking-wide text-slate-400">Phone</p>
+                      <p className="mt-1 text-sm font-semibold text-slate-700">{selectedGroup.phone || 'N/A'}</p>
+                    </div>
+                  </div>
+
+                  <h3 className="mt-6 mb-3 flex items-center gap-2 text-xs font-bold uppercase tracking-widest text-slate-400">
+                    <Stethoscope className="h-4 w-4" /> Check-up history ({selectedGroup.records.length})
+                  </h3>
+                  <div className="space-y-2.5">
+                    {selectedGroup.records.map((rec, i) => {
+                      const overdue = needsCheckup(rec.lastCheckup);
+                      return (
+                        <div key={rec.id} className="rounded-2xl border border-slate-100 bg-white p-4">
+                          <div className="flex items-center justify-between gap-3">
+                            <div className="flex items-center gap-2.5">
+                              <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-slate-100">
+                                <Calendar className="h-4 w-4 text-slate-500" />
+                              </div>
+                              <div>
+                                <p className="text-sm font-bold text-slate-900">
+                                  {rec.lastCheckup ? formatDate(new Date(rec.lastCheckup)) : 'No date'}
+                                </p>
+                                <p className="text-[11px] font-medium text-slate-400">
+                                  {i === 0 ? 'Most recent' : 'Past record'}
+                                </p>
+                              </div>
+                            </div>
+                            <span className={`flex items-center gap-1.5 text-xs font-bold ${overdue ? 'text-amber-600' : 'text-emerald-600'}`}>
+                              <span className={`h-2 w-2 rounded-full ${overdue ? 'bg-amber-500' : 'bg-emerald-500'}`} />
+                              {overdue ? 'Overdue' : 'On time'}
+                            </span>
+                          </div>
+                          {rec.notes && (
+                            <p className="mt-3 whitespace-pre-line rounded-xl bg-slate-50 px-3 py-2 text-sm text-slate-600">
+                              {rec.notes}
+                            </p>
+                          )}
+                          {rec.documentName && (
+                            <div className="mt-2">
+                              {rec.documentUrl ? (
+                                <a
+                                  href={rec.documentUrl}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 px-2.5 py-1.5 text-xs font-semibold text-slate-700 transition-colors hover:bg-slate-50"
+                                >
+                                  <FileText className="h-3.5 w-3.5" /> {rec.documentName}
+                                </a>
+                              ) : (
+                                <span className="inline-flex items-center gap-1.5 text-xs font-medium text-slate-500">
+                                  <FileText className="h-3.5 w-3.5" /> {rec.documentName}
+                                </span>
+                              )}
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
                 </div>
               </motion.div>
             </motion.div>

@@ -2,10 +2,13 @@
 
 import React, { useState } from 'react';
 import { Shield, Eye, EyeOff, LogIn, KeyRound, Mail, Lock, CheckCircle2 } from 'lucide-react';
+import { motion, AnimatePresence } from 'motion/react';
 import { Footer } from '../components/layout/Footer';
 import { ForgotPasswordModal } from '../components/auth/ForgotPasswordModal';
 import { AccessRole, AppRole, getAccessRoleLabel, getAppRole, normalizeAccessRole } from '../lib/access';
 import { supabaseBrowser } from '../lib/supabase';
+import { APP_CONFIG } from '../constants';
+import { clearLoginTransitionPending, markLoginTransitionPending } from '../lib/loginTransition';
 
 interface LoginProps {
   onLogin: (role: AppRole) => void;
@@ -18,6 +21,14 @@ export function Login({ onLogin }: LoginProps) {
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  // Success transition overlay before the dashboard appears
+  const [transitioning, setTransitioning] = useState(false);
+
+  // Fade the black overlay in, then hand off to the app (which fades it out).
+  const completeLogin = (role: AppRole) => {
+    setTransitioning(true);
+    setTimeout(() => onLogin(role), 800);
+  };
 
   // ── Forgot password modal ───────────────────────────────────────────────
   const [showForgotPassword, setShowForgotPassword] = useState(false);
@@ -40,6 +51,7 @@ export function Login({ onLogin }: LoginProps) {
     e.preventDefault();
     setIsLoading(true);
     setError('');
+    markLoginTransitionPending();
 
     const lowerEmail = email.toLowerCase().trim();
 
@@ -94,7 +106,7 @@ export function Login({ onLogin }: LoginProps) {
         }
 
         // No MFA enrolled or already at aal2 — proceed directly
-        onLogin(role);
+        completeLogin(role);
         return;
       }
 
@@ -222,9 +234,10 @@ export function Login({ onLogin }: LoginProps) {
       };
 
       localStorage.setItem('currentUser', JSON.stringify(userData));
-      onLogin(role);
+      completeLogin(role);
     } catch (err: unknown) {
       console.error('Login error:', err);
+      clearLoginTransitionPending();
       setError('Invalid credentials. Please try again.');
     } finally {
       setIsLoading(false);
@@ -245,7 +258,7 @@ export function Login({ onLogin }: LoginProps) {
       });
 
       if (verifyError) throw verifyError;
-      onLogin(pendingRole);
+      completeLogin(pendingRole);
     } catch (err: unknown) {
       console.error('MFA verify error:', err);
       setError('Invalid verification code. Please try again.');
@@ -258,7 +271,7 @@ export function Login({ onLogin }: LoginProps) {
   const credentialsForm = (
     <form onSubmit={handleLogin} className="space-y-4 sm:space-y-5">
       <div className="space-y-3.5 sm:space-y-4">
-        <p className="text-[10px] sm:text-xs font-bold text-slate-400 uppercase tracking-widest">Credentials</p>
+        <p className="text-[10px] sm:text-xs font-bold text-slate-500 uppercase tracking-widest">Credentials</p>
 
         <div className="relative">
           <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-500">
@@ -269,7 +282,7 @@ export function Login({ onLogin }: LoginProps) {
             placeholder="Email Address"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
-            className="w-full bg-slate-900/50 border border-slate-800 rounded-xl pl-11 pr-4 py-2.5 sm:py-3.5 text-sm sm:text-base text-white placeholder-slate-500 focus:outline-none focus:border-[#D4AF37] focus:ring-2 focus:ring-[#D4AF37]/20 transition-all duration-200"
+            className="w-full bg-[#FBFAF6] border border-slate-200 rounded-xl pl-11 pr-4 py-2.5 sm:py-3.5 text-sm sm:text-base text-slate-900 placeholder-slate-400 focus:outline-none focus:border-[#D4AF37] focus:ring-2 focus:ring-[#D4AF37]/20 transition-all duration-200"
             required
             disabled={isLoading}
           />
@@ -284,14 +297,14 @@ export function Login({ onLogin }: LoginProps) {
             placeholder="Password"
             value={password}
             onChange={(e) => setPassword(e.target.value)}
-            className="w-full bg-slate-900/50 border border-slate-800 rounded-xl pl-11 pr-10 py-2.5 sm:py-3.5 text-sm sm:text-base text-white placeholder-slate-500 focus:outline-none focus:border-[#D4AF37] focus:ring-2 focus:ring-[#D4AF37]/20 transition-all duration-200"
+            className="w-full bg-[#FBFAF6] border border-slate-200 rounded-xl pl-11 pr-10 py-2.5 sm:py-3.5 text-sm sm:text-base text-slate-900 placeholder-slate-400 focus:outline-none focus:border-[#D4AF37] focus:ring-2 focus:ring-[#D4AF37]/20 transition-all duration-200"
             required
             disabled={isLoading}
           />
           <button
             type="button"
             onClick={() => setShowPassword(!showPassword)}
-            className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-white transition-colors"
+            className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-700 transition-colors"
           >
             {showPassword ? <EyeOff className="w-4 h-4 sm:w-5 sm:h-5" /> : <Eye className="w-4 h-4 sm:w-5 sm:h-5" />}
           </button>
@@ -301,14 +314,14 @@ export function Login({ onLogin }: LoginProps) {
           <button
             type="button"
             onClick={() => setShowForgotPassword(true)}
-            className="text-xs sm:text-sm text-[#E6C27A] hover:text-[#D4AF37] hover:underline transition-colors font-medium font-sans"
+            className="text-xs sm:text-sm text-[#B5952F] hover:text-[#9c7d22] hover:underline transition-colors font-medium font-sans"
           >
             Forgot Password?
           </button>
         </div>
       </div>
 
-      {error && <p className="text-red-400 text-xs sm:text-sm text-center">{error}</p>}
+      {error && <p className="text-rose-600 text-xs sm:text-sm text-center font-medium">{error}</p>}
 
       <button
         type="submit"
@@ -331,10 +344,10 @@ export function Login({ onLogin }: LoginProps) {
   const mfaForm = (
     <form onSubmit={handleMfaVerify} className="space-y-4 sm:space-y-5">
       <div className="space-y-3">
-        <p className="text-[10px] sm:text-xs font-bold text-slate-400 uppercase tracking-widest">
+        <p className="text-[10px] sm:text-xs font-bold text-slate-500 uppercase tracking-widest">
           Two-Factor Authentication
         </p>
-        <p className="text-slate-300 text-xs sm:text-sm leading-relaxed font-light">
+        <p className="text-slate-500 text-xs sm:text-sm leading-relaxed">
           Enter the 6-digit code from your authenticator app.
         </p>
         <input
@@ -344,14 +357,14 @@ export function Login({ onLogin }: LoginProps) {
           placeholder="000000"
           value={mfaCode}
           onChange={(e) => setMfaCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
-          className="w-full bg-slate-900/50 border border-slate-800 rounded-xl px-3 sm:px-4 py-2.5 sm:py-3.5 text-2xl text-center font-mono text-white tracking-[0.5em] placeholder-slate-600 focus:outline-none focus:border-[#D4AF37] focus:ring-2 focus:ring-[#D4AF37]/20 transition-all duration-200"
+          className="w-full bg-[#FBFAF6] border border-slate-200 rounded-xl px-3 sm:px-4 py-2.5 sm:py-3.5 text-2xl text-center font-mono text-slate-900 tracking-[0.5em] placeholder-slate-300 focus:outline-none focus:border-[#D4AF37] focus:ring-2 focus:ring-[#D4AF37]/20 transition-all duration-200"
           required
           disabled={isLoading}
           autoFocus
         />
       </div>
 
-      {error && <p className="text-red-400 text-xs sm:text-sm text-center">{error}</p>}
+      {error && <p className="text-rose-600 text-xs sm:text-sm text-center font-medium">{error}</p>}
 
       <div className="flex gap-3">
         <button
@@ -362,7 +375,7 @@ export function Login({ onLogin }: LoginProps) {
             setError('');
           }}
           disabled={isLoading}
-          className="flex-1 border border-slate-700 text-slate-300 hover:text-white hover:border-slate-500 font-bold py-2.5 sm:py-3.5 rounded-xl transition-all duration-200 text-sm sm:text-base disabled:opacity-50"
+          className="flex-1 border border-slate-200 text-slate-500 hover:text-slate-900 hover:border-slate-300 font-bold py-2.5 sm:py-3.5 rounded-xl transition-all duration-200 text-sm sm:text-base disabled:opacity-50"
         >
           Back
         </button>
@@ -384,108 +397,124 @@ export function Login({ onLogin }: LoginProps) {
     </form>
   );
 
-  // ── Main render ──────────────────────────────────────────────────────────
+  // -- Main render --
   return (
-    <div className="min-h-screen flex flex-col bg-gradient-to-b from-[#FDFCF7] via-[#FAF9F5] to-[#F5F4EE] font-sans relative overflow-hidden">
-      {/* Decorative blurred lighting blobs */}
-      <div className="absolute top-[-10%] left-[-10%] w-[50%] h-[50%] bg-gradient-to-br from-amber-200/10 to-transparent rounded-full blur-[120px] pointer-events-none" />
-      <div className="absolute bottom-[-10%] right-[-10%] w-[50%] h-[50%] bg-gradient-to-tl from-amber-500/5 to-transparent rounded-full blur-[120px] pointer-events-none" />
+    <>
+      <div className="min-h-screen flex bg-[#FAF9F5] font-sans relative overflow-hidden">
+        {/* Left branding panel -- classy green/gold gradient */}
+        <div className="relative hidden w-[44%] flex-col justify-between overflow-hidden bg-gradient-to-br from-[#1b4332] via-[#13361f] to-[#0a1f13] p-12 text-white xl:p-16 lg:flex">
+          <div className="pointer-events-none absolute -left-[15%] top-[8%] h-[45%] w-[45%] rounded-full bg-gradient-to-br from-[#D4AF37]/20 to-transparent blur-[120px]" />
+          <div className="pointer-events-none absolute -bottom-[15%] -right-[10%] h-[50%] w-[50%] rounded-full bg-gradient-to-tl from-[#E6C27A]/15 to-transparent blur-[120px]" />
+          <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(to_right,#ffffff0a_1px,transparent_1px),linear-gradient(to_bottom,#ffffff0a_1px,transparent_1px)] bg-[size:36px_36px] [mask-image:radial-gradient(ellipse_70%_60%_at_30%_40%,#000_55%,transparent_100%)]" />
 
-      {/* Elegant geometric grid overlay */}
-      <div className="absolute inset-0 bg-[linear-gradient(to_right,#80808008_1px,transparent_1px),linear-gradient(to_bottom,#80808008_1px,transparent_1px)] bg-[size:32px_32px] [mask-image:radial-gradient(ellipse_60%_50%_at_50%_40%,#000_70%,transparent_100%)] pointer-events-none" />
-
-      <div className="flex-1 flex flex-col items-center justify-center px-4 py-12 sm:py-16 overflow-y-auto relative z-10">
-        {/* Header */}
-        <div className="text-center max-w-3xl mx-auto mb-8 sm:mb-10 flex-shrink-0 relative z-10">
-          <h1 className="text-4xl sm:text-5xl md:text-6xl font-serif font-semibold text-slate-900 tracking-tight leading-[1.15] mb-4 sm:mb-5">
-            Legacy of{' '}
-            <span className="text-transparent bg-clip-text bg-gradient-to-r from-[#D4AF37] to-[#B5952F]">Faith</span>,
-            <br />
-            Precision of{' '}
-            <span className="text-transparent bg-clip-text bg-gradient-to-r from-[#D4AF37] to-[#B5952F]">Data</span>.
-          </h1>
-          <div className="flex items-center justify-center gap-3 sm:gap-4 mb-4">
-            <div className="h-[1px] bg-gradient-to-r from-transparent via-slate-300 to-transparent w-16 sm:w-28" />
-            <p className="text-[10px] sm:text-xs font-bold tracking-[0.25em] text-[#B5952F] uppercase whitespace-nowrap">
-              Accountability • Transparency
-            </p>
-            <div className="h-[1px] bg-gradient-to-l from-transparent via-slate-300 to-transparent w-16 sm:w-28" />
+          <div className="relative z-10 flex items-center gap-3">
+            <div className="flex h-12 w-12 items-center justify-center rounded-2xl border border-gold-500/30 bg-white/10 p-1.5">
+              <img src={APP_CONFIG.logoPath} alt="Diocese of San Pablo" className="h-full w-full object-contain" />
+            </div>
+            <div>
+              <p className="text-[9px] font-black uppercase tracking-[0.28em] text-white/50">Diocese of</p>
+              <p className="font-serif text-sm font-bold uppercase tracking-wide text-gold-300">San Pablo</p>
+            </div>
           </div>
-          <p className="text-xs sm:text-sm text-slate-500 leading-relaxed font-semibold tracking-widest uppercase">
-            Diocese Financial Analytics System
+
+          <div className="relative z-10 max-w-xl">
+            <h1 className="font-serif text-5xl font-semibold leading-[1.12] tracking-tight text-white xl:text-6xl">
+              Legacy of{' '}
+              <span className="bg-gradient-to-r from-[#F0D58A] to-[#D4AF37] bg-clip-text text-transparent">Faith</span>,
+              <br />
+              Precision of{' '}
+              <span className="bg-gradient-to-r from-[#F0D58A] to-[#D4AF37] bg-clip-text text-transparent">Data</span>.
+            </h1>
+            <div className="mt-6 flex items-center gap-3">
+              <span className="h-px w-12 bg-gradient-to-r from-gold-400/70 to-transparent" />
+              <div className="flex items-center gap-2.5 text-[11px] font-bold uppercase tracking-[0.25em] text-gold-200/90">
+                <span>Accountability</span>
+                <span className="h-1 w-1 rounded-full bg-gold-400" />
+                <span>Transparency</span>
+              </div>
+            </div>
+            <p className="mt-5 text-sm font-semibold uppercase tracking-[0.2em] text-white/45">
+              Diocese Financial Analytics System
+            </p>
+          </div>
+
+          <p className="relative z-10 text-xs font-medium text-white/35">
+            Stewardship of the temporal goods of the Church.
           </p>
         </div>
 
-        {/* Login Card */}
-        <div className="w-full max-w-md bg-slate-950/95 border border-slate-800/80 rounded-[2rem] p-6 sm:p-8 md:p-10 shadow-[0_25px_60px_-15px_rgba(0,0,0,0.45),0_0_50px_rgba(212,175,55,0.05)] flex-shrink-0 relative z-10 backdrop-blur-md">
-          <div className="flex flex-col items-center mb-6 sm:mb-8">
-            <div className="w-14 h-14 sm:w-16 sm:h-16 bg-[#D4AF37]/10 border border-[#D4AF37]/30 rounded-2xl flex items-center justify-center mb-3 sm:mb-4 shadow-[0_0_20px_rgba(212,175,55,0.15)] transition-all duration-300 hover:scale-105 hover:bg-[#D4AF37]/20">
-              {step === 'mfa' ? (
-                <KeyRound className="w-6 h-6 sm:w-7 sm:h-7 text-[#E6C27A]" />
-              ) : (
-                <Shield className="w-6 h-6 sm:w-7 sm:h-7 text-[#E6C27A]" />
-              )}
+        {/* Right form panel -- light & airy */}
+        <div className="relative flex flex-1 flex-col">
+          <div className="pointer-events-none absolute -right-[8%] -top-[8%] h-[40%] w-[40%] rounded-full bg-gradient-to-br from-amber-200/40 to-transparent blur-[120px]" />
+          <div className="relative z-10 flex flex-1 items-center justify-center overflow-y-auto px-5 py-10 sm:px-8">
+            <div className="w-full max-w-md">
+              {/* Compact branding for small screens */}
+              <div className="mb-8 text-center lg:hidden">
+                <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-2xl border border-gold-500/30 bg-[#1b4332] p-2">
+                  <img src={APP_CONFIG.logoPath} alt="Diocese" className="h-full w-full object-contain" />
+                </div>
+                <h1 className="font-serif text-3xl font-semibold leading-tight text-slate-900">
+                  Legacy of{' '}
+                  <span className="bg-gradient-to-r from-[#D4AF37] to-[#B5952F] bg-clip-text text-transparent">Faith</span>,
+                  Precision of{' '}
+                  <span className="bg-gradient-to-r from-[#D4AF37] to-[#B5952F] bg-clip-text text-transparent">Data</span>.
+                </h1>
+              </div>
+
+              <div className="rounded-[2rem] border border-slate-200/70 bg-white p-6 shadow-[0_30px_70px_-30px_rgba(20,60,40,0.3)] sm:p-8 md:p-10">
+                <div className="mb-7 flex flex-col items-center text-center">
+                  <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-2xl border border-[#D4AF37]/25 bg-gradient-to-br from-[#FBF4E0] to-[#F5E6C0] shadow-[0_8px_24px_rgba(212,175,55,0.18)]">
+                    {step === 'mfa' ? (
+                      <KeyRound className="h-7 w-7 text-[#B5952F]" />
+                    ) : (
+                      <Shield className="h-7 w-7 text-[#B5952F]" />
+                    )}
+                  </div>
+                  <h2 className="font-serif text-2xl font-bold tracking-wide text-slate-900 sm:text-3xl">
+                    {step === 'mfa' ? 'Verify Identity' : 'Ecclesiastical Portal'}
+                  </h2>
+                  <p className="mt-1 text-xs font-medium tracking-wide text-slate-500 sm:text-sm">
+                    The Diocese of San Pablo
+                  </p>
+                </div>
+
+                {step === 'credentials' ? credentialsForm : mfaForm}
+              </div>
+
+              <p className="mt-6 text-center text-[11px] font-medium text-slate-400">
+                Authorized diocesan personnel only.
+              </p>
             </div>
-            <h2 className="text-2xl sm:text-3xl font-serif font-bold text-white tracking-wide mb-1 sm:mb-2">
-              {step === 'mfa' ? 'Verify Identity' : 'Ecclesiastical Portal'}
-            </h2>
-            <p className="text-slate-400 text-xs sm:text-sm tracking-wide font-medium">The Diocese of San Pablo</p>
           </div>
 
-          {step === 'credentials' ? credentialsForm : mfaForm}
-
-          {step === 'credentials' && (
-            <div className="mt-6 sm:mt-8 border-t border-slate-800/80 pt-6">
-              <div className="flex items-center gap-2 mb-3">
-                <CheckCircle2 className="w-4 h-4 text-[#D4AF37]" />
-                <p className="font-semibold text-slate-200 text-xs sm:text-sm tracking-wide">
-                  Demo Accounts (Click to Autofill)
-                </p>
-              </div>
-              <div className="grid grid-cols-1 gap-2.5 text-xs text-slate-300">
-                <button
-                  type="button"
-                  onClick={() => fillDemoCredentials('bishop@gmail.com')}
-                  className="flex flex-col items-start bg-slate-900/40 hover:bg-[#D4AF37]/10 border border-slate-800 hover:border-[#D4AF37]/30 rounded-xl p-3 text-left transition-all duration-200 group"
-                >
-                  <span className="font-bold text-[#E6C27A] group-hover:text-white transition-colors font-sans">
-                    Bishop Access
-                  </span>
-                  <span className="text-[10px] text-slate-400 mt-0.5">bishop@gmail.com Â· password123</span>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => fillDemoCredentials('priest@gmail.com')}
-                  className="flex flex-col items-start bg-slate-900/40 hover:bg-[#D4AF37]/10 border border-slate-800 hover:border-[#D4AF37]/30 rounded-xl p-3 text-left transition-all duration-200 group"
-                >
-                  <span className="font-bold text-[#E6C27A] group-hover:text-white transition-colors font-sans">
-                    Parish Priest Access
-                  </span>
-                  <span className="text-[10px] text-slate-400 mt-0.5">priest@gmail.com · password123</span>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => fillDemoCredentials('parishsecretary@gmail.com')}
-                  className="flex flex-col items-start bg-slate-900/40 hover:bg-[#D4AF37]/10 border border-slate-800 hover:border-[#D4AF37]/30 rounded-xl p-3 text-left transition-all duration-200 group"
-                >
-                  <span className="font-bold text-[#E6C27A] group-hover:text-white transition-colors font-sans">
-                    Parish Secretary Access
-                  </span>
-                  <span className="text-[10px] text-slate-400 mt-0.5">parishsecretary@gmail.com · password123</span>
-                </button>
-              </div>
-            </div>
-          )}
+          <div className="relative z-10 border-t border-slate-200/70 bg-[#FAF9F5]/80 backdrop-blur-md">
+            <Footer />
+          </div>
         </div>
       </div>
 
-      {/* Footer */}
-      <div className="flex-shrink-0 border-t border-slate-200/50 bg-[#FAF9F5]/80 backdrop-blur-md relative z-10">
-        <Footer />
-      </div>
+      {/* Success transition — black fades in with the crest; App fades it back
+          out to reveal the dashboard (see App's login reveal). */}
+      {transitioning && (
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ duration: 0.6, ease: 'easeInOut' }}
+          className="fixed inset-0 z-[200] flex items-center justify-center bg-black"
+        >
+          <motion.img
+            src={APP_CONFIG.logoPath}
+            alt="Diocese of San Pablo"
+            className="h-24 w-24 object-contain drop-shadow-[0_10px_30px_rgba(212,175,55,0.3)]"
+            initial={{ opacity: 0, scale: 0.94 }}
+            animate={{ opacity: 1, scale: 1 }}
+            transition={{ duration: 0.6, ease: 'easeOut' }}
+          />
+        </motion.div>
+      )}
 
       {/* Forgot Password flow */}
       <ForgotPasswordModal open={showForgotPassword} onClose={() => setShowForgotPassword(false)} />
-    </div>
+    </>
   );
 }

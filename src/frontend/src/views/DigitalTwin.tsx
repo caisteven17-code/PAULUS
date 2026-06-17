@@ -4,6 +4,7 @@ import React, { useEffect, useState } from 'react';
 import { ArrowRight, Building2, Database, Landmark, Play, School, ShieldCheck, Sparkles } from 'lucide-react';
 import { ALL_PARISHES, INITIAL_SEMINARIES, INITIAL_SCHOOLS } from '../constants';
 import { apiClient } from '../lib/api-client';
+import { InlineLoader } from '../components/ui/LoadingScreen';
 
 type InstitutionType = 'parish' | 'seminary' | 'school';
 
@@ -455,9 +456,7 @@ export function DigitalTwin({ onLaunch }: DigitalTwinProps) {
           <div className="space-y-6">
             {isLaunching ? (
               <div className="rounded-[32px] border border-black/5 bg-white px-6 py-28 text-center shadow-sm">
-                <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-[#faf8f4]">
-                  <div className="h-8 w-8 animate-spin rounded-full border-4 border-[#d4af37]/30 border-t-[#d4af37]" />
-                </div>
+                <InlineLoader label={`Opening ${selectedInstitution?.name || 'dashboard'}`} className="py-0" />
                 <p className="mt-6 text-xl font-black text-gray-900">Opening {selectedInstitution?.name} dashboard…</p>
                 <p className="mt-2 text-sm text-gray-500">
                   Loading the full {activeMeta.label.toLowerCase()} view inside Digital Twin.

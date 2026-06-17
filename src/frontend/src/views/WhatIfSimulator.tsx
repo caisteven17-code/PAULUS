@@ -24,6 +24,7 @@ import {
 } from 'lucide-react';
 import ReactECharts from 'echarts-for-react';
 import { apiClient } from '../lib/api-client';
+import { InlineLoader } from '../components/ui/LoadingScreen';
 
 type AITwinMode = 'parish' | 'priest' | 'seminary' | 'school';
 type FinancialAITwinMode = Exclude<AITwinMode, 'priest'>;
@@ -826,9 +827,8 @@ function ParishAITwin({ mode = 'parish' }: { mode?: FinancialAITwinMode }) {
           </div>
           <h1 className="text-3xl font-serif font-bold text-church-black">{config.title}</h1>
         </div>
-        <div className="bg-white rounded-[32px] p-12 shadow-sm border border-church-grey/10 flex flex-col items-center gap-4">
-          <div className="w-8 h-8 border-2 border-gold-500/30 border-t-gold-500 rounded-full animate-spin" />
-          <p className="text-sm text-church-grey">Loading {config.pluralLower}...</p>
+        <div className="bg-white rounded-[32px] p-12 shadow-sm border border-church-grey/10">
+          <InlineLoader label={`Loading ${config.pluralLower}`} className="py-0" />
         </div>
       </div>
     );
@@ -1254,8 +1254,8 @@ function ParishAITwin({ mode = 'parish' }: { mode?: FinancialAITwinMode }) {
             </div>
 
             {loadingScenarios ? (
-              <div className="py-12 flex items-center justify-center">
-                <div className="w-5 h-5 border-2 border-church-grey/30 border-t-church-grey rounded-full animate-spin" />
+              <div className="py-4">
+                <InlineLoader label="Loading scenarios" />
               </div>
             ) : savedScenarios.length > 0 ? (
               <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
@@ -2025,8 +2025,8 @@ function PriestAITwin() {
             </div>
 
             {loadingScenarios ? (
-              <div className="py-12 flex items-center justify-center">
-                <div className="w-5 h-5 border-2 border-church-grey/30 border-t-church-grey rounded-full animate-spin" />
+              <div className="py-4">
+                <InlineLoader label="Loading scenarios" />
               </div>
             ) : savedScenarios.length > 0 ? (
               <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">

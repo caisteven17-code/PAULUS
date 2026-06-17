@@ -21,6 +21,7 @@ import {
 } from 'lucide-react';
 import { usePermissions } from '../hooks/usePermissions';
 import { apiClient } from '../lib/api-client';
+import { InlineLoader } from '../components/ui/LoadingScreen';
 
 interface DiocesanEvent {
   id: string;
@@ -48,6 +49,14 @@ const EVENT_TYPES = [
 ];
 
 const DIOCESE_NAME = 'Diocese of San Pablo';
+
+// Plural, human-friendly labels for the cascading institution-type filter.
+const TYPE_LABELS: Record<string, string> = {
+  diocese: 'Diocese',
+  parish: 'Parishes',
+  school: 'Schools',
+  seminary: 'Seminaries',
+};
 
 function formatLongDate(dateStr: string) {
   const d = dateStr.includes('T') ? new Date(dateStr) : new Date(dateStr + 'T00:00:00');
@@ -116,20 +125,25 @@ const EMPTY_FILTERS = {
   level: 'all',
 };
 
-type EventTab = 'ongoing' | 'upcoming' | 'past' | 'all' | 'archived';
+type EventTab = 'ongoing' | 'upcoming' | 'past' | 'all';
 
 const TAB_META: Record<EventTab, { label: string; icon: React.ElementType }> = {
   ongoing: { label: 'Ongoing', icon: Activity },
   upcoming: { label: 'Upcoming', icon: CalendarDays },
   past: { label: 'Past', icon: Clock },
   all: { label: 'All', icon: List },
-  archived: { label: 'Archived', icon: Archive },
 };
 
 export function Events() {
   const { permissions, user, loading: permissionsLoading } = usePermissions();
   const canManage = permissions.manage_events === true;
   const isDiocese = permissions.view_diocese === true;
+  // Oversight roles see every institution of a single type (e.g. the School
+  // Superintendent oversees all schools' events) without being diocese-level.
+  const isSchoolOverseer =
+    !isDiocese && (permissions.view_school_all === true || permissions.view_school_cluster === true);
+  // Anyone who looks across more than their own institution gets the filters.
+  const isOverview = isDiocese || isSchoolOverseer;
 
   const [events, setEvents] = useState<DiocesanEvent[]>([]);
   const [archivedEvents, setArchivedEvents] = useState<DiocesanEvent[]>([]);
@@ -140,7 +154,8 @@ export function Events() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [filter, setFilter] = useState<EventTab>('ongoing');
-  const [institutionFilter, setInstitutionFilter] = useState<string>('all');
+  const [typeFilter, setTypeFilter] = useState<string>('all'); // institution type (parish/school/...)
+  const [institutionFilter, setInstitutionFilter] = useState<string>('all'); // specific institution name
   const [filters, setFilters] = useState(EMPTY_FILTERS);
 
   // Toast
@@ -160,15 +175,21 @@ export function Events() {
 
   const scopeParams = useMemo(
     () =>
-      isDiocese
+      // Diocese + school overseers fetch the full set and narrow client-side via
+      // the cascading filters; everyone else is locked to their own institution.
+      isOverview
         ? undefined
         : {
             institutionId: user?.entityId,
             institutionName: user?.entityName,
             institutionType: user?.entityType,
           },
-    [isDiocese, user?.entityId, user?.entityName, user?.entityType],
+    [isOverview, user?.entityId, user?.entityName, user?.entityType],
   );
+
+  // The effective institution type the user is allowed to browse. School
+  // overseers are locked to schools; diocese users pick from the type dropdown.
+  const effectiveType = isSchoolOverseer ? 'school' : typeFilter;
 
   useEffect(() => {
     if (permissionsLoading) return;
@@ -197,17 +218,49 @@ export function Events() {
     };
   }, [permissionsLoading, canManage, scopeParams]);
 
-  // Institution dropdown options for the diocese overview
-  const institutionOptions = useMemo(() => {
-    const names = new Set<string>();
-    for (const e of [...events, ...archivedEvents]) if (e.institution_name) names.add(e.institution_name);
-    return Array.from(names).sort((a, b) => a.localeCompare(b));
-  }, [events, archivedEvents]);
+  // School overseers receive every institution's events from the API, so trim
+  // to schools before anything else looks at the data.
+  const baseEvents = useMemo(
+    () => (isSchoolOverseer ? events.filter((e) => e.institution_type === 'school') : events),
+    [events, isSchoolOverseer],
+  );
+  const baseArchived = useMemo(
+    () => (isSchoolOverseer ? archivedEvents.filter((e) => e.institution_type === 'school') : archivedEvents),
+    [archivedEvents, isSchoolOverseer],
+  );
+
+  // Institution names grouped by type — powers the cascading dropdowns.
+  const institutionsByType = useMemo(() => {
+    const map: Record<string, Set<string>> = {};
+    for (const e of [...baseEvents, ...baseArchived]) {
+      if (!e.institution_name) continue;
+      const t = e.institution_type || 'other';
+      (map[t] ||= new Set<string>()).add(e.institution_name);
+    }
+    return map;
+  }, [baseEvents, baseArchived]);
+
+  // Which institution types actually have events (drives the first dropdown).
+  const typeOptions = useMemo(() => {
+    const order = ['diocese', 'parish', 'school', 'seminary'];
+    return order.filter((t) => institutionsByType[t]?.size);
+  }, [institutionsByType]);
+
+  // Specific-institution options for the currently selected type.
+  const institutionOptionsForType = useMemo(() => {
+    if (effectiveType === 'all') {
+      const all = new Set<string>();
+      Object.values(institutionsByType).forEach((set) => set.forEach((n) => all.add(n)));
+      return Array.from(all).sort((a, b) => a.localeCompare(b));
+    }
+    return Array.from(institutionsByType[effectiveType] ?? []).sort((a, b) => a.localeCompare(b));
+  }, [institutionsByType, effectiveType]);
 
   // ── Filtering pipeline ─────────────────────────────────────────────────────
   const applyFilters = useCallback(
     (list: DiocesanEvent[]) => {
       let out = list;
+      if (effectiveType !== 'all') out = out.filter((e) => (e.institution_type || '') === effectiveType);
       if (institutionFilter !== 'all') out = out.filter((e) => e.institution_name === institutionFilter);
       if (filters.search.trim()) {
         const q = filters.search.trim().toLowerCase();
@@ -230,11 +283,11 @@ export function Events() {
       if (filters.level !== 'all') out = out.filter((e) => e.event_level === filters.level);
       return out;
     },
-    [institutionFilter, filters],
+    [effectiveType, institutionFilter, filters],
   );
 
-  const scoped = useMemo(() => applyFilters(events), [events, applyFilters]);
-  const scopedArchived = useMemo(() => applyFilters(archivedEvents), [archivedEvents, applyFilters]);
+  const scoped = useMemo(() => applyFilters(baseEvents), [baseEvents, applyFilters]);
+  const scopedArchived = useMemo(() => applyFilters(baseArchived), [baseArchived, applyFilters]);
 
   const ongoing = useMemo(
     () =>
@@ -269,16 +322,13 @@ export function Events() {
         ? upcoming
         : filter === 'past'
           ? past
-          : filter === 'archived'
-            ? scopedArchived
-            : all;
+          : all;
 
   const tabCounts: Record<EventTab, number> = {
     ongoing: ongoing.length,
     upcoming: upcoming.length,
     past: past.length,
     all: all.length,
-    archived: scopedArchived.length,
   };
 
   const hasActiveFilters =
@@ -355,7 +405,7 @@ export function Events() {
     try {
       await apiClient.archiveEvent(event.id);
       setArchivedEvents((prev) => [{ ...event, deleted_at: new Date().toISOString() }, ...prev]);
-      showToast(`"${event.event_name}" moved to the Archived tab.`);
+      showToast(`"${event.event_name}" moved to Archives.`);
     } catch {
       setEvents((prev) => [event, ...prev]);
       alert('Could not archive the event. Please try again.');
@@ -373,9 +423,7 @@ export function Events() {
     }
   };
 
-  const visibleTabs: EventTab[] = canManage
-    ? ['ongoing', 'upcoming', 'past', 'all', 'archived']
-    : ['ongoing', 'upcoming', 'past', 'all'];
+  const visibleTabs: EventTab[] = ['ongoing', 'upcoming', 'past', 'all'];
 
   const summaryCards = [
     { label: 'Ongoing', value: ongoing.length, icon: Activity },
@@ -401,7 +449,9 @@ export function Events() {
                 <p className="mt-2 max-w-2xl text-sm font-medium leading-relaxed text-white/55">
                   {isDiocese
                     ? 'Oversee events from every institution across the diocese.'
-                    : `Schedule and view activities for ${user?.entityName || 'your institution'}.`}
+                    : isSchoolOverseer
+                      ? 'Oversee events across all diocesan schools.'
+                      : `Schedule and view activities for ${user?.entityName || 'your institution'}.`}
                 </p>
               </div>
             </div>
@@ -457,25 +507,54 @@ export function Events() {
               })}
             </div>
 
-            {/* Institution filter — diocese overview only */}
+            {/* Cascading institution filter — diocese & oversight roles only */}
             <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
-              {isDiocese && institutionOptions.length > 0 && (
-                <div className="relative w-full sm:w-72">
-                  <Building2 className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
-                  <select
-                    value={institutionFilter}
-                    onChange={(e) => setInstitutionFilter(e.target.value)}
-                    className="h-11 w-full cursor-pointer appearance-none rounded-2xl border border-slate-200 bg-slate-50 pl-11 pr-10 text-sm font-bold text-slate-700 transition-all focus:border-gold-500 focus:bg-white focus:outline-none focus:ring-4 focus:ring-gold-500/10"
-                  >
-                    <option value="all">All institutions</option>
-                    {institutionOptions.map((name) => (
-                      <option key={name} value={name}>
-                        {name}
-                      </option>
-                    ))}
-                  </select>
-                  <ChevronDown className="pointer-events-none absolute right-4 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
-                </div>
+              {isOverview && (
+                <>
+                  {/* Step 1 — institution type */}
+                  <div className="relative w-full sm:w-44">
+                    <Landmark className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+                    <select
+                      value={effectiveType}
+                      disabled={isSchoolOverseer}
+                      onChange={(e) => {
+                        setTypeFilter(e.target.value);
+                        setInstitutionFilter('all'); // reset the second step
+                      }}
+                      className="h-11 w-full cursor-pointer appearance-none rounded-2xl border border-slate-200 bg-slate-50 pl-11 pr-10 text-sm font-bold text-slate-700 transition-all focus:border-gold-500 focus:bg-white focus:outline-none focus:ring-4 focus:ring-gold-500/10 disabled:cursor-not-allowed disabled:opacity-70"
+                    >
+                      {!isSchoolOverseer && <option value="all">All types</option>}
+                      {typeOptions.map((t) => (
+                        <option key={t} value={t}>
+                          {TYPE_LABELS[t] ?? t}
+                        </option>
+                      ))}
+                    </select>
+                    <ChevronDown className="pointer-events-none absolute right-4 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+                  </div>
+
+                  {/* Step 2 — specific institution (appears once a type narrows the list) */}
+                  {institutionOptionsForType.length > 0 && (
+                    <div className="relative w-full sm:w-64">
+                      <Building2 className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+                      <select
+                        value={institutionFilter}
+                        onChange={(e) => setInstitutionFilter(e.target.value)}
+                        className="h-11 w-full cursor-pointer appearance-none rounded-2xl border border-slate-200 bg-slate-50 pl-11 pr-10 text-sm font-bold text-slate-700 transition-all focus:border-gold-500 focus:bg-white focus:outline-none focus:ring-4 focus:ring-gold-500/10"
+                      >
+                        <option value="all">
+                          {effectiveType === 'all' ? 'All institutions' : `All ${TYPE_LABELS[effectiveType] ?? effectiveType}`}
+                        </option>
+                        {institutionOptionsForType.map((name) => (
+                          <option key={name} value={name}>
+                            {name}
+                          </option>
+                        ))}
+                      </select>
+                      <ChevronDown className="pointer-events-none absolute right-4 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+                    </div>
+                  )}
+                </>
               )}
               {canManage && (
                 <button
@@ -488,12 +567,6 @@ export function Events() {
               )}
             </div>
           </div>
-
-          {filter === 'archived' && (
-            <p className="mt-3 rounded-2xl bg-slate-50 px-4 py-3 text-xs font-semibold text-slate-500">
-              Archived events are hidden from the calendar — restore one to bring it back.
-            </p>
-          )}
         </div>
 
         {/* ── Filter bar ── */}
@@ -568,18 +641,13 @@ export function Events() {
 
         {/* ── Events list ── */}
         {loading ? (
-          <div className="flex flex-col items-center justify-center gap-4 rounded-3xl border border-slate-200 bg-white py-24">
-            <div className="h-10 w-10 animate-spin rounded-full border-4 border-slate-200 border-t-black" />
-            <p className="text-slate-400 font-medium">Loading events…</p>
+          <div className="rounded-3xl border border-slate-200 bg-white">
+            <InlineLoader label="Loading events" />
           </div>
         ) : displayed.length === 0 ? (
           <div className="flex flex-col items-center justify-center gap-5 rounded-3xl border border-dashed border-slate-300 bg-white py-24">
             <div className="flex h-20 w-20 items-center justify-center rounded-3xl border border-dashed border-slate-200 bg-slate-50">
-              {filter === 'archived' ? (
-                <Archive className="h-9 w-9 text-slate-300" />
-              ) : (
-                <CalendarDays className="h-9 w-9 text-slate-300" />
-              )}
+              <CalendarDays className="h-9 w-9 text-slate-300" />
             </div>
             <div className="text-center space-y-1">
               <p className="text-xl font-serif font-bold text-slate-950">
@@ -594,9 +662,7 @@ export function Events() {
                       ? 'No upcoming events scheduled yet.'
                       : filter === 'past'
                         ? 'No past events recorded.'
-                        : filter === 'archived'
-                          ? 'Archived events will appear here.'
-                          : 'No events recorded yet.'}
+                        : 'No events recorded yet.'}
               </p>
             </div>
             {canManage && (filter === 'ongoing' || filter === 'upcoming') && !hasActiveFilters && (
@@ -612,20 +678,18 @@ export function Events() {
           <div className="space-y-3">
             <AnimatePresence mode="popLayout">
               {displayed.map((event, idx) => {
-                const isArchivedTab = filter === 'archived';
                 const current = isCurrent(event);
                 const ongoing = isOngoing(event);
                 const tile = dateTileParts(event.start_date);
 
                 let rail = 'bg-slate-900';
-                if (isArchivedTab || !current) rail = 'bg-slate-200';
+                if (!current) rail = 'bg-slate-200';
                 else if (ongoing) rail = 'bg-emerald-500';
                 else if (event.event_level === 'Major event') rail = 'bg-gold-500';
 
                 const metaParts: string[] = [];
-                if (isArchivedTab && event.deleted_at) metaParts.push(`Archived ${formatLongDate(event.deleted_at)}`);
-                else if (!isArchivedTab && !current) metaParts.push('Completed');
-                if (isDiocese && event.institution_name) metaParts.push(event.institution_name);
+                if (!current) metaParts.push('Completed');
+                if (isOverview && event.institution_name) metaParts.push(event.institution_name);
                 metaParts.push(event.event_level);
                 if (event.event_type) metaParts.push(event.event_type);
 
@@ -637,7 +701,7 @@ export function Events() {
                     exit={{ opacity: 0, y: -8 }}
                     transition={{ delay: idx * 0.04 }}
                     className={`group relative overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-[0_8px_26px_rgba(15,23,42,0.04)] transition-all hover:border-slate-300 hover:shadow-[0_18px_42px_rgba(15,23,42,0.08)] ${
-                      isArchivedTab || !current ? 'opacity-70' : ''
+                      !current ? 'opacity-70' : ''
                     }`}
                   >
                     <div className={`absolute left-0 top-0 bottom-0 w-1 ${rail}`} />
@@ -660,37 +724,25 @@ export function Events() {
 
                           {canManage && (
                             <div className="flex items-center gap-1 shrink-0 -mt-0.5 -mr-1">
-                              {isArchivedTab ? (
-                                <button
-                                  onClick={() => handleRestore(event)}
-                                  className="inline-flex h-10 items-center gap-2 rounded-2xl border border-emerald-100 bg-emerald-50 px-4 text-xs font-black text-emerald-700 transition-colors hover:bg-emerald-100"
-                                >
-                                  <RotateCcw className="h-3.5 w-3.5" />
-                                  Restore
-                                </button>
-                              ) : (
-                                <>
-                                  <button
-                                    onClick={() => openEditModal(event)}
-                                    className="inline-flex h-10 items-center gap-2 rounded-2xl border border-slate-200 bg-white px-4 text-xs font-black text-slate-600 transition-colors hover:bg-slate-50 hover:text-slate-950"
-                                  >
-                                    <Edit2 className="h-3.5 w-3.5" />
-                                    Edit
-                                  </button>
-                                  <button
-                                    onClick={() => handleArchive(event)}
-                                    className="inline-flex h-10 items-center gap-2 rounded-2xl border border-slate-200 bg-white px-4 text-xs font-black text-slate-600 transition-colors hover:bg-amber-50 hover:text-amber-700"
-                                  >
-                                    <Archive className="h-3.5 w-3.5" />
-                                    Archive
-                                  </button>
-                                </>
-                              )}
+                              <button
+                                onClick={() => openEditModal(event)}
+                                className="inline-flex h-10 items-center gap-2 rounded-2xl border border-slate-200 bg-white px-4 text-xs font-black text-slate-600 transition-colors hover:bg-slate-50 hover:text-slate-950"
+                              >
+                                <Edit2 className="h-3.5 w-3.5" />
+                                Edit
+                              </button>
+                              <button
+                                onClick={() => handleArchive(event)}
+                                className="inline-flex h-10 items-center gap-2 rounded-2xl border border-slate-200 bg-white px-4 text-xs font-black text-slate-600 transition-colors hover:bg-amber-50 hover:text-amber-700"
+                              >
+                                <Archive className="h-3.5 w-3.5" />
+                                Archive
+                              </button>
                             </div>
                           )}
                         </div>
 
-                        {ongoing && !isArchivedTab && (
+                        {ongoing && (
                           <div className="mt-3 inline-flex items-center gap-1.5 rounded-full border border-emerald-100 bg-emerald-50 px-3 py-1 text-[10px] font-black uppercase tracking-[0.12em] text-emerald-700">
                             <span className="relative flex h-2 w-2">
                               <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />

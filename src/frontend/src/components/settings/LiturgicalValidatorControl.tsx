@@ -16,6 +16,7 @@ import {
 } from 'lucide-react';
 import { apiClient } from '../../lib/api-client';
 import { auth } from '../../firebase';
+import { InlineLoader } from '../ui/LoadingScreen';
 
 interface LiturgicalRecord {
   id: string;
@@ -553,7 +554,7 @@ export function LiturgicalValidatorControl() {
             {isLoading ? (
               <tr>
                 <td colSpan={7} className="py-24 text-center">
-                  <Loader2 className="w-8 h-8 text-[#D4AF37] animate-spin mx-auto" />
+                  <InlineLoader label="Loading records" className="py-0" />
                 </td>
               </tr>
             ) : visibleRecords.length > 0 ? (

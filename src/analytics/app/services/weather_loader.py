@@ -423,6 +423,60 @@ def rebuild_monthly_summary(period_start: Optional[str] = None, period_end: Opti
     return count
 
 
+def upsert_monthly_fleiss_kappa(
+    daily_rain_rows: list[dict],
+    daily_temp_rows: list[dict],
+) -> int:
+    """
+    Compute Fleiss' Kappa per (municipality, month) from the classified daily rows
+    and upsert rain_fleiss_kappa / temp_fleiss_kappa into weather_monthly_summary.
+
+    WCI is already handled by the SQL rebuild function. This covers the Kappa
+    columns that require Python to compute.
+    """
+    from collections import defaultdict
+    from app.services.weather_daily_classifier import compute_confidence_scores
+    from app.services.supabase_client import get_supabase
+
+    # Group rows by (municipality, year_month)
+    rain_by_key: dict[tuple, list[dict]] = defaultdict(list)
+    temp_by_key: dict[tuple, list[dict]] = defaultdict(list)
+
+    for r in daily_rain_rows:
+        ym = r["date"][:7] + "-01"  # "2024-03-15" → "2024-03-01"
+        rain_by_key[(r["municipality"], ym)].append(r)
+
+    for r in daily_temp_rows:
+        ym = r["date"][:7] + "-01"
+        temp_by_key[(r["municipality"], ym)].append(r)
+
+    all_keys = set(rain_by_key.keys()) | set(temp_by_key.keys())
+    upsert_rows = []
+
+    for (municipality, ym) in all_keys:
+        rain_rows = rain_by_key.get((municipality, ym), [])
+        temp_rows = temp_by_key.get((municipality, ym), [])
+        confidence = compute_confidence_scores(rain_rows, temp_rows)
+        upsert_rows.append({
+            "year_month":         ym,
+            "municipality":       municipality,
+            "rain_fleiss_kappa":  confidence["rainfall"]["fleiss_kappa"],
+            "temp_fleiss_kappa":  confidence["temperature"]["fleiss_kappa"],
+        })
+
+    if not upsert_rows:
+        return 0
+
+    sb = get_supabase()
+    sb.schema("reference").table("weather_monthly_summary").upsert(
+        upsert_rows,
+        on_conflict="year_month,municipality",
+    ).execute()
+
+    logger.info("Fleiss Kappa upserted for %d municipality-months", len(upsert_rows))
+    return len(upsert_rows)
+
+
 def load_daily_classified(path: Path) -> int:
     """
     Load classified daily rows (written by weather_collector.py or
@@ -440,8 +494,11 @@ def load_daily_classified(path: Path) -> int:
             "with the split rain_rows/temp_rows shape."
         )
 
-    rain_count = upsert_weather_rainfall_daily(data.get("rain_rows", []))
-    temp_count = upsert_weather_temperature_daily(data.get("temp_rows", []))
+    rain_rows = data.get("rain_rows", [])
+    temp_rows = data.get("temp_rows", [])
+
+    rain_count = upsert_weather_rainfall_daily(rain_rows)
+    temp_count = upsert_weather_temperature_daily(temp_rows)
     count = rain_count + temp_count
     logger.info(
         "Classified daily load complete — %d rainfall + %d temperature rows upserted.",
@@ -450,6 +507,7 @@ def load_daily_classified(path: Path) -> int:
     )
 
     rebuild_monthly_summary(data.get("period_start"), data.get("period_end"))
+    upsert_monthly_fleiss_kappa(rain_rows, temp_rows)
     return count
 
 

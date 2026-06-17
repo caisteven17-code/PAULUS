@@ -1,7 +1,8 @@
-﻿'use client';
+'use client';
 
 import React, { useState, useEffect } from 'react';
-import { ArrowLeft, CalendarClock, ChevronDown, ShieldAlert } from 'lucide-react';
+import { ArrowLeft, CalendarClock, ChevronDown, LogOut, ShieldAlert, X } from 'lucide-react';
+import { AnimatePresence, motion } from 'motion/react';
 import { TopNav } from './components/layout/TopNav';
 import { Sidebar } from './components/layout/Sidebar';
 import { Footer } from './components/layout/Footer';
@@ -17,6 +18,7 @@ import { DigitalTwin } from './views/DigitalTwin';
 import { DigitalTwinControlsPanel, SandboxState } from './components/layout/DigitalTwinControlsPanel';
 import { Announcements } from './views/Announcements';
 import { Events } from './views/Events';
+import { ArchivesPage } from './views/ArchivesPage';
 import { Budget } from './views/Budget';
 import { HealthTracker } from './views/HealthTracker';
 import { ConsolidatedFinancial } from './views/ConsolidatedFinancial';
@@ -25,9 +27,13 @@ import { ParishDataSubmission } from './views/ParishDataSubmission';
 import { BottomNav } from './components/ui/BottomNav';
 import { StewardChatbot } from './components/ui/StewardChatbot';
 import { OnboardingModal } from './components/auth/OnboardingModal';
+import { APP_CONFIG } from './constants';
 import { auth, AuthUser } from './firebase';
 import { supabaseBrowser } from './lib/supabase';
 import { AppRole, getAppRole } from './lib/access';
+import { hasAnyArchiveAccess } from './lib/archiveAccess';
+import { clearLoginTransitionPending, isLoginTransitionPending } from './lib/loginTransition';
+import { LoadingScreen, SplashTransition, BlackReveal } from './components/ui/LoadingScreen';
 import { usePermissions } from './hooks/usePermissions';
 
 export type Role = 'bishop' | 'admin' | 'priest' | 'school' | 'seminary';
@@ -115,6 +121,8 @@ const getFirstAllowedTab = (role: Role, permissions: Record<string, boolean>) =>
 
 const canAccessTab = (tab: string, role: Role, permissions: Record<string, boolean>) => {
   if (tab === 'profile') return true;
+  // Archives is a standalone top-level page gated by archive permissions.
+  if (tab === 'archives' || tab === 'admin-archives') return hasAnyArchiveAccess(permissions);
   if (tab.startsWith('admin-') || tab === 'settings' || tab === 'audit-log') {
     return tab === 'audit-log' ? permissions.view_audit_logs === true : hasAdminPermissions(permissions);
   }
@@ -148,9 +156,27 @@ const appRoleToRole = (appRole: string): Role => {
   return mapped as Role;
 };
 
+const wait = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+const LOGOUT_TRANSITION_DURATION = 3;
+
 export default function App() {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [isAuthReady, setIsAuthReady] = useState(false);
+  // Keep the branded splash on screen for a beat so it never just flashes by.
+  const [minSplashDone, setMinSplashDone] = useState(false);
+  // After the splash, the crest zooms in and fades to reveal the app once.
+  const [splashTransitionDone, setSplashTransitionDone] = useState(false);
+  // After a successful login, a black overlay (with the crest) fades out to
+  // reveal the dashboard — continuing the fade-in the Login screen started.
+  const [loginReveal, setLoginReveal] = useState(false);
+  const [logoutConfirmOpen, setLogoutConfirmOpen] = useState(false);
+  const [logoutTransition, setLogoutTransition] = useState(false);
+  const [logoutInProgress, setLogoutInProgress] = useState(false);
+  const logoutInProgressRef = React.useRef(false);
+  useEffect(() => {
+    const t = setTimeout(() => setMinSplashDone(true), 2500);
+    return () => clearTimeout(t);
+  }, []);
   const [role, setRole] = useState<Role>('bishop');
   const [activeTab, setActiveTab] = useState('home');
   const { permissions, loading: permissionsLoading } = usePermissions();
@@ -181,12 +207,22 @@ export default function App() {
 
     const unsubscribe = auth.onAuthStateChanged((user: AuthUser | null) => {
       if (user?.role) {
+        if (isLoginTransitionPending()) {
+          setIsAuthReady(true);
+          return;
+        }
+
         const internalRole = appRoleToRole(user.role);
         setRole(internalRole);
         setIsAuthenticated(true);
         // Use functional update so the effect doesn't need activeTab in its deps
         setActiveTab((prev) => (prev === 'home' ? roleDefaultTab[internalRole] : prev));
       } else {
+        if (logoutInProgressRef.current) {
+          setIsAuthReady(true);
+          return;
+        }
+
         setIsAuthenticated(false);
         setRole('bishop');
         setActiveTab('home');
@@ -198,9 +234,12 @@ export default function App() {
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleLogin = (loggedInRole: AppRole) => {
+    clearLoginTransitionPending();
     const internalRole = appRoleToRole(loggedInRole);
     setRole(internalRole);
     setIsAuthenticated(true);
+    // Login screen already faded to black — now fade it back out over the app.
+    setLoginReveal(true);
 
     // Set default tab based on role
     if (internalRole === 'priest') {
@@ -257,57 +296,142 @@ export default function App() {
       });
   }, [isAuthReady, isAuthenticated]);
 
-  /**
-   * Handles user logout and state reset
-   */
-  const handleLogout = async () => {
-    try {
-      await auth.signOut();
-      setIsAuthenticated(false);
-      setRole('bishop');
-      setActiveTab('home');
-    } catch (error) {
-      console.error('Logout error:', error);
-      // Fallback: reset state even if signOut fails
-      setIsAuthenticated(false);
-      setRole('bishop');
-      setActiveTab('home');
-    }
+  const requestLogout = () => {
+    if (logoutInProgress) return;
+    setLogoutConfirmOpen(true);
   };
 
-  if (!isAuthReady) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-church-light">
-        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-church-green"></div>
-      </div>
-    );
+  /**
+   * Handles confirmed user logout and state reset.
+   */
+  const handleLogout = async () => {
+    if (logoutInProgress) return;
+    setLogoutConfirmOpen(false);
+    setLogoutInProgress(true);
+    logoutInProgressRef.current = true;
+    setLogoutTransition(true);
+
+    await wait(1350);
+
+    try {
+      await auth.signOut();
+    } catch (error) {
+      console.error('Logout error:', error);
+    }
+
+    setIsAuthenticated(false);
+    setRole('bishop');
+    setActiveTab('home');
+    setOnboardingUser(null);
+    setOnboardingChecked(false);
+    setDigitalTwinSession(null);
+    setDigitalTwinActiveTab('parish-dashboard');
+    setDtSandboxState(null);
+
+    await wait(1650);
+    setLogoutTransition(false);
+    setLogoutInProgress(false);
+    logoutInProgressRef.current = false;
+  };
+
+  if (!isAuthReady || !minSplashDone) {
+    return <LoadingScreen label="Preparing" />;
   }
 
-  if (!isAuthenticated) {
-    return <Login onLogin={handleLogin} />;
-  }
+  // Plays over whatever loads first after the splash (login or dashboard).
+  const splashOverlay = !splashTransitionDone ? (
+    <SplashTransition onDone={() => setSplashTransitionDone(true)} />
+  ) : null;
 
-  // Hold the app while we determine whether onboarding is required —
-  // prevents the dashboard from flashing before the gate appears.
-  if (!onboardingChecked) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-church-light">
-        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-church-green"></div>
-      </div>
-    );
-  }
-
-  // Mandatory onboarding: the dashboard never renders until the form is done.
-  // The only exits are completing the form or logging out.
-  if (onboardingUser) {
-    return (
-      <OnboardingModal
-        user={onboardingUser}
-        onComplete={() => setOnboardingUser(null)}
-        onLogout={handleLogout}
+  // Black-with-crest reveal shown right after a successful login.
+  const loginRevealOverlay = loginReveal ? <BlackReveal onDone={() => setLoginReveal(false)} /> : null;
+  const logoutTransitionOverlay = logoutTransition ? (
+    <motion.div
+      initial={{ opacity: 0 }}
+      animate={{ opacity: [0, 1, 1, 0] }}
+      transition={{ duration: LOGOUT_TRANSITION_DURATION, times: [0, 0.42, 0.72, 1], ease: 'easeInOut' }}
+      className="pointer-events-none fixed inset-0 z-[320] flex flex-col items-center justify-center bg-black px-6 text-center"
+    >
+      <motion.img
+        src={APP_CONFIG.logoPath}
+        alt=""
+        className="h-24 w-24 object-contain drop-shadow-[0_10px_30px_rgba(212,175,55,0.3)]"
+        initial={{ opacity: 0, scale: 0.94 }}
+        animate={{ opacity: [0, 1, 1, 0], scale: [0.94, 1, 1.06] }}
+        transition={{ duration: LOGOUT_TRANSITION_DURATION, times: [0, 0.42, 0.72, 1], ease: 'easeInOut' }}
       />
-    );
-  }
+      <motion.p
+        className="mt-6 max-w-md border-t border-[#D4AF37]/25 pt-5 font-serif text-lg font-semibold leading-relaxed text-[#F8E7B0] drop-shadow-[0_8px_24px_rgba(212,175,55,0.18)] sm:text-xl"
+        initial={{ opacity: 0, y: 8 }}
+        animate={{ opacity: [0, 1, 1, 0], y: [8, 0, 0, -4] }}
+        transition={{ duration: LOGOUT_TRANSITION_DURATION, times: [0, 0.42, 0.72, 1], ease: 'easeInOut' }}
+      >
+        Until next time, may the Lord bless and keep you.
+      </motion.p>
+    </motion.div>
+  ) : null;
+  const logoutConfirmModal = (
+    <AnimatePresence>
+      {logoutConfirmOpen && (
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          transition={{ duration: 0.18 }}
+          className="fixed inset-0 z-[310] flex items-center justify-center bg-black/55 p-4 backdrop-blur-sm"
+        >
+          <motion.div
+            initial={{ opacity: 0, y: 16, scale: 0.96 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: 12, scale: 0.96 }}
+            transition={{ duration: 0.2, ease: 'easeOut' }}
+            className="w-full max-w-sm overflow-hidden rounded-[28px] border border-slate-200 bg-white shadow-2xl"
+          >
+            <div className="flex items-center justify-between border-b border-slate-100 px-6 py-5">
+              <div className="flex items-center gap-3">
+                <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-rose-50 text-rose-600">
+                  <LogOut className="h-5 w-5" />
+                </div>
+                <div>
+                  <h2 className="text-lg font-black text-slate-950">Sign out?</h2>
+                  <p className="text-xs font-semibold text-slate-400">Your current session will close.</p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setLogoutConfirmOpen(false)}
+                className="flex h-9 w-9 items-center justify-center rounded-xl text-slate-400 transition-colors hover:bg-slate-50 hover:text-slate-700"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+            <div className="px-6 py-6">
+              <p className="text-sm font-medium leading-relaxed text-slate-500">
+                Are you sure you want to sign out of the Diocese Financial Analytics System?
+              </p>
+              <div className="mt-6 grid grid-cols-2 gap-3">
+                <button
+                  type="button"
+                  onClick={() => setLogoutConfirmOpen(false)}
+                  className="rounded-xl border border-slate-200 px-4 py-3 text-sm font-bold text-slate-500 transition-colors hover:bg-slate-50 hover:text-slate-900"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={handleLogout}
+                  disabled={logoutInProgress}
+                  className="rounded-xl bg-rose-600 px-4 py-3 text-sm font-bold text-white shadow-lg shadow-rose-600/20 transition-colors hover:bg-rose-700 disabled:opacity-60"
+                >
+                  Yes, sign out
+                </button>
+              </div>
+            </div>
+          </motion.div>
+        </motion.div>
+      )}
+    </AnimatePresence>
+  );
 
   const renderDigitalTwinSessionContent = () => {
     if (!digitalTwinSession) return null;
@@ -317,7 +441,7 @@ export default function App() {
       year,
       onYearChange: setYear,
       onNavigate: setDigitalTwinActiveTab,
-      onLogout: handleLogout,
+      onLogout: requestLogout,
     } as const;
 
     if (digitalTwinSession.viewRole === 'priest') {
@@ -471,7 +595,7 @@ export default function App() {
           <Sidebar
             activeTab={digitalTwinActiveTab}
             onNavigate={setDigitalTwinActiveTab}
-            onLogout={handleLogout}
+            onLogout={requestLogout}
             role={digitalTwinSession.viewRole}
             timeframe={timeframe}
             onTimeframeChange={setTimeframe}
@@ -489,10 +613,10 @@ export default function App() {
                 setYear(y);
                 setDtPendingYear(y);
               }}
-              onLogout={handleLogout}
+              onLogout={requestLogout}
             />
 
-            {/* â”€â”€ Digital Twin Period Bar â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
+            {/* ------ Digital Twin Period Bar ------------------------------------------------------------------------------------------------ */}
             <div className="flex shrink-0 items-center gap-2 border-b border-amber-200 bg-gradient-to-r from-amber-50 to-yellow-50 px-4 py-2">
               <CalendarClock className="h-3.5 w-3.5 text-amber-700 shrink-0" />
               <span className="text-[11px] font-black uppercase tracking-[0.2em] text-amber-800 shrink-0">
@@ -545,7 +669,7 @@ export default function App() {
 
               {/* Active period badge */}
               <span className="ml-auto shrink-0 rounded-full border border-amber-300 bg-white px-2.5 py-0.5 text-[11px] font-bold text-amber-800">
-                {dtMonth} {year} â€¢ Read-only view
+                {dtMonth} {year} • Read-only view
               </span>
             </div>
 
@@ -617,14 +741,20 @@ export default function App() {
       </div>
     );
 
-    // Administration sub-routes â€” each deep-links to a specific Settings tab
+    // Archives — a standalone top-level page (no longer nested under Administration).
+    // Old 'admin-archives' deep links still resolve here.
+    if (activeTab === 'archives' || activeTab === 'admin-archives') {
+      if (!hasAnyArchiveAccess(permissions)) return renderAccessDenied();
+      return <ArchivesPage />;
+    }
+
+    // Administration sub-routes - each deep-links to a specific Settings tab
     const adminTabMap: Record<string, string> = {
       'admin-user-management': 'user-management',
       'admin-user-role': 'role-control',
       'admin-entity': 'entity-management',
       'admin-data': 'data-management',
       'admin-liturgical': 'liturgical-validator',
-      'admin-archives': 'archives',
       'admin-security': 'security',
       settings: 'user-management',
       profile: 'profile',
@@ -641,7 +771,7 @@ export default function App() {
       return (
         <Settings
           onBack={() => setActiveTab('home')}
-          onLogout={handleLogout}
+          onLogout={requestLogout}
           role={role}
           onNavigate={(page) => setActiveTab(page)}
           initialTab={adminTabMap[activeTab]}
@@ -675,7 +805,7 @@ export default function App() {
               year={year}
               onYearChange={setYear}
               onNavigate={setActiveTab}
-              onLogout={handleLogout}
+              onLogout={requestLogout}
             />
           );
         if (role === 'seminary')
@@ -686,7 +816,7 @@ export default function App() {
               year={year}
               onYearChange={setYear}
               onNavigate={setActiveTab}
-              onLogout={handleLogout}
+              onLogout={requestLogout}
             />
           );
       }
@@ -715,7 +845,7 @@ export default function App() {
               year={year}
               onYearChange={setYear}
               onNavigate={setActiveTab}
-              onLogout={handleLogout}
+              onLogout={requestLogout}
             />
           );
         case 'priest-health':
@@ -824,7 +954,7 @@ export default function App() {
               year={year}
               onYearChange={setYear}
               onNavigate={setActiveTab}
-              onLogout={handleLogout}
+              onLogout={requestLogout}
             />
           );
         case 'parish-data-submission':
@@ -864,7 +994,7 @@ export default function App() {
               year={year}
               onYearChange={setYear}
               onNavigate={setActiveTab}
-              onLogout={handleLogout}
+              onLogout={requestLogout}
             />
           );
         case 'parish-aitwin':
@@ -885,7 +1015,7 @@ export default function App() {
               year={year}
               onYearChange={setYear}
               onNavigate={setActiveTab}
-              onLogout={handleLogout}
+              onLogout={requestLogout}
             />
           );
         case 'priest-health':
@@ -907,7 +1037,7 @@ export default function App() {
               year={year}
               onYearChange={setYear}
               onNavigate={setActiveTab}
-              onLogout={handleLogout}
+              onLogout={requestLogout}
             />
           );
         case 'seminary-data-submission':
@@ -940,7 +1070,7 @@ export default function App() {
               year={year}
               onYearChange={setYear}
               onNavigate={setActiveTab}
-              onLogout={handleLogout}
+              onLogout={requestLogout}
             />
           );
         case 'school-data-submission':
@@ -995,16 +1125,28 @@ export default function App() {
   };
 
   return (
-    <ErrorBoundary>
-      <div className="flex flex-row min-h-screen bg-church-light font-sans">
-        <Sidebar
-          activeTab={activeTab}
-          onNavigate={setActiveTab}
-          onLogout={handleLogout}
-          role={role}
-          timeframe={timeframe}
-          onTimeframeChange={setTimeframe}
+    <>
+      {!isAuthenticated ? (
+        <Login onLogin={handleLogin} />
+      ) : onboardingUser ? (
+        <OnboardingModal
+          user={onboardingUser}
+          onComplete={() => setOnboardingUser(null)}
+          onLogout={requestLogout}
         />
+      ) : !onboardingChecked ? (
+        <LoadingScreen label={logoutInProgress ? 'Signing out' : 'Signing in'} />
+      ) : (
+        <ErrorBoundary>
+          <div className="flex flex-row min-h-screen bg-church-light font-sans">
+            <Sidebar
+              activeTab={activeTab}
+              onNavigate={setActiveTab}
+              onLogout={requestLogout}
+              role={role}
+              timeframe={timeframe}
+              onTimeframeChange={setTimeframe}
+            />
 
         <div className="flex flex-col flex-1 min-w-0 h-screen overflow-hidden">
           <TopNav
@@ -1015,7 +1157,7 @@ export default function App() {
             onTimeframeChange={setTimeframe}
             year={year}
             onYearChange={setYear}
-            onLogout={handleLogout}
+            onLogout={requestLogout}
           />
           <main className="flex-1 overflow-y-auto pb-20 md:pb-0">
             {renderContent()}
@@ -1025,7 +1167,13 @@ export default function App() {
 
         <BottomNav activeTab={activeTab} onNavigate={setActiveTab} role={role} />
         <StewardChatbot />
-      </div>
-    </ErrorBoundary>
+          </div>
+        </ErrorBoundary>
+      )}
+      {splashOverlay}
+      {loginRevealOverlay}
+      {logoutConfirmModal}
+      {logoutTransitionOverlay}
+    </>
   );
 }

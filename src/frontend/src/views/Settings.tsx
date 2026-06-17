@@ -1,7 +1,27 @@
 'use client';
 
 import React, { useState } from 'react';
-import { Users, UserPlus, Save, Database, ArrowRight, Pencil, Search, ShieldCheck, Eye, EyeOff } from 'lucide-react';
+import {
+  Users,
+  UserPlus,
+  Save,
+  Database,
+  ArrowRight,
+  Pencil,
+  Search,
+  ShieldCheck,
+  Eye,
+  EyeOff,
+  X,
+  Mail,
+  Building2,
+  Archive,
+  Shield,
+  RotateCcw,
+  Phone,
+  Cake,
+  CheckCircle,
+} from 'lucide-react';
 
 import { Role } from '../App';
 import { UserRole, Parish, Seminary, DiocesanSchool } from '../types';
@@ -30,11 +50,11 @@ import { UserRoleControl } from '../components/settings/UserRoleControl';
 import { DataManagementControl } from '../components/settings/DataManagementControl';
 import { LiturgicalValidatorControl } from '../components/settings/LiturgicalValidatorControl';
 import { EntityManagementControl } from '../components/settings/EntityManagementControl';
-import { ArchivesControl } from '../components/settings/ArchivesControl';
 import { ParishClassificationLogic } from '../components/settings/ParishClassificationLogic';
 import { DashboardHeader } from '../components/layout/DashboardHeader';
 import { getAccessRoleLabel, getAppRole, normalizeAccessRole } from '../lib/access';
 import { usePermissions } from '../hooks/usePermissions';
+import { roundedField, selectField } from '../lib/formStyles';
 
 export function Settings({ onBack, onLogout, onNavigate, role = 'bishop', initialTab }: SettingsProps) {
   const { permissions, user } = usePermissions();
@@ -200,6 +220,11 @@ export function Settings({ onBack, onLogout, onNavigate, role = 'bishop', initia
         status: u.status || 'active',
         entityId: u.entityId,
         entityType: u.entityType,
+        birthday: u.birthday || u.birthDate || u.dateOfBirth || u.user_metadata?.birthday || u.user_metadata?.birthDate || '',
+        onboardingCompleted:
+          u.onboardingCompleted === true ||
+          u.user_metadata?.onboardingCompleted === true ||
+          u.metadata?.onboardingCompleted === true,
       }));
 
       // Merge with localStorage mock accounts so they are never lost and always appear in the table!
@@ -214,6 +239,8 @@ export function Settings({ onBack, onLogout, onNavigate, role = 'bishop', initia
         status: u.status || 'active',
         entityId: u.entityId,
         entityType: u.entityType,
+        birthday: u.birthday || u.birthDate || u.dateOfBirth || '',
+        onboardingCompleted: u.onboardingCompleted === true,
       }));
 
       // Avoid duplicates: if a user with the same email exists in cloud DB, don't show the local storage copy!
@@ -235,6 +262,8 @@ export function Settings({ onBack, onLogout, onNavigate, role = 'bishop', initia
           status: u.status || 'active',
           entityId: u.entityId,
           entityType: u.entityType,
+          birthday: u.birthday || u.birthDate || u.dateOfBirth || '',
+          onboardingCompleted: u.onboardingCompleted === true,
         })),
       );
     } finally {
@@ -269,6 +298,7 @@ export function Settings({ onBack, onLogout, onNavigate, role = 'bishop', initia
   const [isArchiveModalOpen, setIsArchiveModalOpen] = useState(false);
   const [accountToArchive, setAccountToArchive] = useState<string | number | null>(null);
   const [editingAccountId, setEditingAccountId] = useState<string | number | null>(null);
+  const [viewAccount, setViewAccount] = useState<any | null>(null); // read-only user detail modal
   const [showAccountSuccess, setShowAccountSuccess] = useState<{ show: boolean; message: string }>({
     show: false,
     message: '',
@@ -276,6 +306,16 @@ export function Settings({ onBack, onLogout, onNavigate, role = 'bishop', initia
   const [showPasswordSuccess, setShowPasswordSuccess] = useState(false);
   const [showProfileSuccess, setShowProfileSuccess] = useState(false);
   const [passwords, setPasswords] = useState({ current: '', new: '' });
+  // Profile view/edit mode + password visibility + email-change OTP
+  const [isEditingProfile, setIsEditingProfile] = useState(false);
+  const [pwVisible, setPwVisible] = useState({ current: false, new: false });
+  const [emailOtp, setEmailOtp] = useState<{
+    open: boolean;
+    pendingEmail: string;
+    code: string;
+    sending: boolean;
+    error: string;
+  }>({ open: false, pendingEmail: '', code: '', sending: false, error: '' });
   const [viewMode, setViewMode] = useState<'active' | 'archived'>('active');
   const [profileForm, setProfileForm] = useState(() => {
     const currentUser = auth.currentUser || {};
@@ -318,23 +358,22 @@ export function Settings({ onBack, onLogout, onNavigate, role = 'bishop', initia
     setTimeout(() => setShowPasswordSuccess(false), 3000);
   };
 
-  const handleProfileSave = async (event: React.FormEvent) => {
-    event.preventDefault();
+  // Persist profile metadata using a specific email (the email only changes once
+  // the OTP is verified).
+  const persistProfile = async (emailToUse: string) => {
     const currentUser = auth.currentUser || {};
     const displayName =
       [profileForm.firstName, profileForm.lastName].filter(Boolean).join(' ') ||
       currentUser.displayName ||
-      profileForm.email;
+      emailToUse;
     const updatedUser = {
       ...currentUser,
       ...profileForm,
       displayName,
-      email: profileForm.email,
+      email: emailToUse,
       entityName: profileForm.entityName || currentUser.entityName,
       updatedAt: new Date().toISOString(),
     };
-
-    // Persist to Supabase if we have a real session
     await supabaseBrowser.auth
       .updateUser({
         data: {
@@ -351,13 +390,87 @@ export function Settings({ onBack, onLogout, onNavigate, role = 'bishop', initia
         },
       })
       .catch(() => {
-        // Ignore — may be a demo/offline session
+        /* demo/offline session — ignore */
       });
-
-    // Always update localStorage so the profile reflects in the UI
     localStorage.setItem('currentUser', JSON.stringify(updatedUser));
+  };
+
+  const resetProfileForm = () => {
+    const currentUser = auth.currentUser || {};
+    const nameParts = (currentUser.displayName || '').split(' ').filter(Boolean);
+    setProfileForm({
+      firstName: currentUser.firstName || nameParts[0] || '',
+      lastName: currentUser.lastName || nameParts.slice(1).join(' ') || '',
+      nickName: currentUser.nickName || '',
+      email: currentUser.email || '',
+      contactNumber: currentUser.contactNumber || '',
+      address: currentUser.address || '',
+      position: currentUser.position || currentUser.roleLabel || '',
+      entityName: currentUser.entityName || '',
+      emergencyContact: currentUser.emergencyContact || '',
+      notes: currentUser.notes || '',
+    });
+  };
+
+  const handleProfileSave = async (event: React.FormEvent) => {
+    event.preventDefault();
+    const currentUser = auth.currentUser || {};
+    const originalEmail = currentUser.email || '';
+    const newEmail = profileForm.email.trim();
+    const emailChanged = !!newEmail && newEmail.toLowerCase() !== originalEmail.toLowerCase();
+
+    // Save everything except the email straight away (email keeps its old value).
+    await persistProfile(emailChanged ? originalEmail : newEmail);
+
+    if (emailChanged) {
+      // Ask Supabase Auth to send a verification code to the NEW address.
+      setEmailOtp({ open: true, pendingEmail: newEmail, code: '', sending: true, error: '' });
+      const { error } = await supabaseBrowser.auth.updateUser({ email: newEmail });
+      setEmailOtp((s) => ({
+        ...s,
+        sending: false,
+        error: error ? error.message || 'Could not send the verification code.' : '',
+      }));
+      return; // stay in edit mode until the code is verified or cancelled
+    }
+
     setShowProfileSuccess(true);
+    setIsEditingProfile(false);
     setTimeout(() => setShowProfileSuccess(false), 3000);
+  };
+
+  const verifyEmailOtp = async () => {
+    const code = emailOtp.code.trim();
+    if (code.length < 6) {
+      setEmailOtp((s) => ({ ...s, error: 'Enter the 6-digit code sent to your new email.' }));
+      return;
+    }
+    setEmailOtp((s) => ({ ...s, sending: true, error: '' }));
+    const { error } = await supabaseBrowser.auth.verifyOtp({
+      email: emailOtp.pendingEmail,
+      token: code,
+      type: 'email_change',
+    });
+    if (error) {
+      setEmailOtp((s) => ({
+        ...s,
+        sending: false,
+        error: error.message || 'That code is invalid or expired. Your email was not changed.',
+      }));
+      return;
+    }
+    await persistProfile(emailOtp.pendingEmail); // commit the verified email
+    setEmailOtp({ open: false, pendingEmail: '', code: '', sending: false, error: '' });
+    setShowProfileSuccess(true);
+    setIsEditingProfile(false);
+    setTimeout(() => setShowProfileSuccess(false), 3000);
+  };
+
+  const cancelEmailOtp = () => {
+    // Email stays as it was; other fields were already saved.
+    setProfileForm((prev) => ({ ...prev, email: auth.currentUser?.email || prev.email }));
+    setEmailOtp({ open: false, pendingEmail: '', code: '', sending: false, error: '' });
+    setIsEditingProfile(false);
   };
 
   // Fetch roles from Supabase database
@@ -417,6 +530,7 @@ export function Settings({ onBack, onLogout, onNavigate, role = 'bishop', initia
   }, [schools]);
 
   const [searchQuery, setSearchQuery] = useState('');
+  const [roleFilter, setRoleFilter] = useState('all');
 
   const [formState, setFormState] = useState({
     institutionType: '' as InstitutionType | '',
@@ -778,14 +892,29 @@ export function Settings({ onBack, onLogout, onNavigate, role = 'bishop', initia
     return `${lastName}, ${firstName}`;
   };
 
-  const filteredAccounts = accounts.filter(
-    (acc) =>
-      acc.status === viewMode &&
-      (acc.entity.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        acc.leader.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        acc.email.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        acc.role.toLowerCase().includes(searchQuery.toLowerCase())),
+  const roleOptions = React.useMemo(
+    () =>
+      Array.from(
+        new Set(
+          accounts
+            .filter((acc: any) => acc.status === 'active')
+            .map((acc: any) => acc.role)
+            .filter(Boolean),
+        ),
+      ).sort(),
+    [accounts],
   );
+
+  const filteredAccounts = accounts.filter((acc) => {
+    const query = searchQuery.trim().toLowerCase();
+    const matchesSearch =
+      query.length === 0 ||
+      [acc.entity, acc.entityType, acc.leader, acc.email, acc.role]
+        .filter(Boolean)
+        .some((value) => String(value).toLowerCase().includes(query));
+
+    return acc.status === 'active' && matchesSearch && (roleFilter === 'all' || acc.role === roleFilter);
+  });
 
   return (
     <>
@@ -1128,15 +1257,49 @@ export function Settings({ onBack, onLogout, onNavigate, role = 'bishop', initia
                   className="xl:col-span-2 bg-white rounded-[32px] shadow-sm border border-gray-100 p-10"
                 >
                   <div className="flex items-start justify-between gap-6 mb-10">
-                    <div>
-                      <h3 className="text-3xl font-serif font-bold text-gray-900">My Profile</h3>
-                      <p className="text-sm text-gray-500 mt-1">
-                        Manage your personal information and contact details.
-                      </p>
+                    <div className="flex items-center gap-4">
+                      <div className="w-16 h-16 rounded-2xl bg-gold-500 text-black flex items-center justify-center text-2xl font-black shadow-lg shadow-gold-500/20 shrink-0">
+                        {(profileForm.firstName || profileForm.email || 'U').charAt(0).toUpperCase()}
+                      </div>
+                      <div>
+                        <h3 className="text-3xl font-serif font-bold text-gray-900">My Profile</h3>
+                        <p className="text-sm text-gray-500 mt-1">
+                          {isEditingProfile
+                            ? 'Update your personal information and contact details.'
+                            : 'Your personal information and contact details.'}
+                        </p>
+                      </div>
                     </div>
-                    <div className="w-16 h-16 rounded-2xl bg-gold-500 text-black flex items-center justify-center text-2xl font-black shadow-lg shadow-gold-500/20 shrink-0">
-                      {(profileForm.firstName || profileForm.email || 'U').charAt(0).toUpperCase()}
-                    </div>
+                    {!isEditingProfile ? (
+                      <button
+                        type="button"
+                        onClick={() => setIsEditingProfile(true)}
+                        className="inline-flex items-center gap-2 rounded-2xl bg-gray-900 px-5 py-3 text-sm font-bold text-white transition-all hover:bg-black active:scale-[0.98]"
+                      >
+                        <Pencil className="w-4 h-4" />
+                        Edit Profile
+                      </button>
+                    ) : (
+                      <div className="flex items-center gap-2">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            resetProfileForm();
+                            setIsEditingProfile(false);
+                          }}
+                          className="rounded-2xl border border-gray-200 px-5 py-3 text-sm font-bold text-gray-500 transition-all hover:bg-gray-50"
+                        >
+                          Cancel
+                        </button>
+                        <button
+                          type="submit"
+                          className="inline-flex items-center gap-2 rounded-2xl bg-[#D4AF37] px-6 py-3 text-sm font-bold text-black shadow-lg shadow-[#D4AF37]/20 transition-all hover:bg-[#E5C04B] active:scale-[0.98]"
+                        >
+                          <Save className="w-4 h-4" />
+                          Save
+                        </button>
+                      </div>
+                    )}
                   </div>
 
                   {showProfileSuccess && (
@@ -1156,18 +1319,6 @@ export function Settings({ onBack, onLogout, onNavigate, role = 'bishop', initia
                       { id: 'email', label: 'Email Address', type: 'email', placeholder: 'name@diocese.ph' },
                       { id: 'contactNumber', label: 'Contact Number', type: 'tel', placeholder: '+63 900 000 0000' },
                       {
-                        id: 'position',
-                        label: 'Position / Role',
-                        type: 'text',
-                        placeholder: 'Parish Priest, Admin, etc.',
-                      },
-                      {
-                        id: 'entityName',
-                        label: 'Assigned Institution',
-                        type: 'text',
-                        placeholder: 'Parish, school, seminary, or office',
-                      },
-                      {
                         id: 'emergencyContact',
                         label: 'Emergency Contact',
                         type: 'text',
@@ -1175,15 +1326,25 @@ export function Settings({ onBack, onLogout, onNavigate, role = 'bishop', initia
                       },
                     ].map((field) => (
                       <div key={field.id} className="space-y-2">
-                        <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest ml-1">
+                        <label className="text-[10px] font-bold text-white/45 uppercase tracking-widest ml-1">
                           {field.label}
+                          {field.id === 'email' && isEditingProfile && (
+                            <span className="ml-1.5 normal-case font-medium text-gray-300">
+                              (verified by code)
+                            </span>
+                          )}
                         </label>
                         <input
                           type={field.type}
                           value={(profileForm as any)[field.id]}
+                          disabled={!isEditingProfile}
                           onChange={(event) => setProfileForm((prev) => ({ ...prev, [field.id]: event.target.value }))}
                           placeholder={field.placeholder}
-                          className="w-full px-5 py-4 bg-gray-50 border border-gray-100 rounded-2xl text-gray-900 focus:outline-none focus:border-[#D4AF37] focus:ring-4 focus:ring-[#D4AF37]/10 transition-all font-medium placeholder:text-gray-300"
+                          className={`w-full px-5 py-4 rounded-2xl border text-gray-900 transition-all font-medium placeholder:text-gray-300 ${
+                            isEditingProfile
+                              ? 'bg-gray-50 border-gray-100 focus:outline-none focus:border-[#D4AF37] focus:ring-4 focus:ring-[#D4AF37]/10'
+                              : 'cursor-default border-transparent bg-gray-50/60 text-gray-700'
+                          }`}
                         />
                       </div>
                     ))}
@@ -1195,9 +1356,14 @@ export function Settings({ onBack, onLogout, onNavigate, role = 'bishop', initia
                       <input
                         type="text"
                         value={profileForm.address}
+                        disabled={!isEditingProfile}
                         onChange={(event) => setProfileForm((prev) => ({ ...prev, address: event.target.value }))}
                         placeholder="Complete address"
-                        className="w-full px-5 py-4 bg-gray-50 border border-gray-100 rounded-2xl text-gray-900 focus:outline-none focus:border-[#D4AF37] focus:ring-4 focus:ring-[#D4AF37]/10 transition-all font-medium placeholder:text-gray-300"
+                        className={`w-full px-5 py-4 rounded-2xl border text-gray-900 transition-all font-medium placeholder:text-gray-300 ${
+                          isEditingProfile
+                            ? 'bg-gray-50 border-gray-100 focus:outline-none focus:border-[#D4AF37] focus:ring-4 focus:ring-[#D4AF37]/10'
+                            : 'cursor-default border-transparent bg-gray-50/60 text-gray-700'
+                        }`}
                       />
                     </div>
 
@@ -1207,23 +1373,19 @@ export function Settings({ onBack, onLogout, onNavigate, role = 'bishop', initia
                       </label>
                       <textarea
                         value={profileForm.notes}
+                        disabled={!isEditingProfile}
                         onChange={(event) => setProfileForm((prev) => ({ ...prev, notes: event.target.value }))}
                         placeholder="Office hours, alternate contact, or other profile notes"
                         rows={4}
-                        className="w-full px-5 py-4 bg-gray-50 border border-gray-100 rounded-2xl text-gray-900 focus:outline-none focus:border-[#D4AF37] focus:ring-4 focus:ring-[#D4AF37]/10 transition-all font-medium placeholder:text-gray-300 resize-none"
+                        className={`w-full px-5 py-4 rounded-2xl border text-gray-900 transition-all font-medium placeholder:text-gray-300 resize-none ${
+                          isEditingProfile
+                            ? 'bg-gray-50 border-gray-100 focus:outline-none focus:border-[#D4AF37] focus:ring-4 focus:ring-[#D4AF37]/10'
+                            : 'cursor-default border-transparent bg-gray-50/60 text-gray-700'
+                        }`}
                       />
                     </div>
                   </div>
 
-                  <div className="flex justify-end mt-8">
-                    <button
-                      type="submit"
-                      className="bg-[#D4AF37] text-white px-8 py-4 rounded-2xl font-bold hover:bg-[#B5952F] transition-all shadow-lg shadow-[#D4AF37]/20 flex items-center justify-center gap-3 active:scale-[0.98]"
-                    >
-                      <Save className="w-5 h-5" />
-                      Save Profile
-                    </button>
-                  </div>
                 </form>
 
                 <div className="space-y-8">
@@ -1250,15 +1412,23 @@ export function Settings({ onBack, onLogout, onNavigate, role = 'bishop', initia
                           {auth.currentUser?.entityType || 'Diocese'}
                         </p>
                       </div>
+                      <div>
+                        <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">
+                          Assigned Institution
+                        </p>
+                        <p className="text-sm font-bold text-gray-900 mt-1">
+                          {auth.currentUser?.entityName || profileForm.entityName || 'Diocese of San Pablo'}
+                        </p>
+                      </div>
                     </div>
                   </div>
 
-                  <div className="bg-white rounded-[32px] shadow-sm border border-gray-100 p-8">
-                    <h4 className="text-lg font-bold text-gray-900 mb-2">Change Password</h4>
-                    <p className="text-sm text-gray-500 mb-6">Update the password used for this account.</p>
+                  <div className="rounded-[32px] border border-slate-800 bg-slate-950 p-8 text-white shadow-xl shadow-slate-950/10">
+                    <h4 className="text-lg font-bold text-white mb-2">Change Password</h4>
+                    <p className="text-sm text-white/55 mb-6">Update the password used for this account.</p>
 
                     {showPasswordSuccess && (
-                      <div className="mb-6 p-4 bg-emerald-50 border border-emerald-100 text-emerald-700 rounded-2xl text-sm font-bold flex items-center gap-3">
+                      <div className="mb-6 p-4 bg-emerald-400/10 border border-emerald-300/20 text-emerald-100 rounded-2xl text-sm font-bold flex items-center gap-3">
                         <ShieldCheck className="w-5 h-5" />
                         Password updated successfully!
                       </div>
@@ -1269,30 +1439,52 @@ export function Settings({ onBack, onLogout, onNavigate, role = 'bishop', initia
                         <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest ml-1">
                           Current Password
                         </label>
-                        <input
-                          type="password"
-                          value={passwords.current}
-                          onChange={(event) => setPasswords((prev) => ({ ...prev, current: event.target.value }))}
-                          placeholder="••••••••"
-                          className="w-full px-5 py-4 bg-gray-50 border border-gray-100 rounded-2xl text-gray-900 focus:outline-none focus:border-[#D4AF37] focus:ring-4 focus:ring-[#D4AF37]/10 transition-all font-medium placeholder:text-gray-300"
-                        />
+                        <div className="relative">
+                          <input
+                            type={pwVisible.current ? 'text' : 'password'}
+                            value={passwords.current}
+                            onChange={(event) => setPasswords((prev) => ({ ...prev, current: event.target.value }))}
+                            placeholder="••••••••"
+                            className="w-full px-5 py-4 pr-12 rounded-2xl border border-white/10 bg-white/8 text-white focus:outline-none focus:border-[#D4AF37] focus:ring-4 focus:ring-[#D4AF37]/15 transition-all font-medium placeholder:text-white/30"
+                          />
+                          <button
+                            type="button"
+                            onClick={() => setPwVisible((p) => ({ ...p, current: !p.current }))}
+                            className="absolute right-4 top-1/2 -translate-y-1/2 text-white/45 hover:text-white transition-colors"
+                            tabIndex={-1}
+                            aria-label={pwVisible.current ? 'Hide password' : 'Show password'}
+                          >
+                            {pwVisible.current ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+                          </button>
+                        </div>
                       </div>
                       <div className="space-y-2">
-                        <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest ml-1">
+                        <label className="text-[10px] font-bold text-white/45 uppercase tracking-widest ml-1">
                           New Password
                         </label>
-                        <input
-                          type="password"
-                          value={passwords.new}
-                          onChange={(event) => setPasswords((prev) => ({ ...prev, new: event.target.value }))}
-                          placeholder="••••••••"
-                          className="w-full px-5 py-4 bg-gray-50 border border-gray-100 rounded-2xl text-gray-900 focus:outline-none focus:border-[#D4AF37] focus:ring-4 focus:ring-[#D4AF37]/10 transition-all font-medium placeholder:text-gray-300"
-                        />
+                        <div className="relative">
+                          <input
+                            type={pwVisible.new ? 'text' : 'password'}
+                            value={passwords.new}
+                            onChange={(event) => setPasswords((prev) => ({ ...prev, new: event.target.value }))}
+                            placeholder="••••••••"
+                            className="w-full px-5 py-4 pr-12 rounded-2xl border border-white/10 bg-white/8 text-white focus:outline-none focus:border-[#D4AF37] focus:ring-4 focus:ring-[#D4AF37]/15 transition-all font-medium placeholder:text-white/30"
+                          />
+                          <button
+                            type="button"
+                            onClick={() => setPwVisible((p) => ({ ...p, new: !p.new }))}
+                            className="absolute right-4 top-1/2 -translate-y-1/2 text-white/45 hover:text-white transition-colors"
+                            tabIndex={-1}
+                            aria-label={pwVisible.new ? 'Hide password' : 'Show password'}
+                          >
+                            {pwVisible.new ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+                          </button>
+                        </div>
                       </div>
                       <button
                         type="button"
                         onClick={handleUpdatePassword}
-                        className="w-full bg-gray-900 text-white px-8 py-4 rounded-2xl font-bold hover:bg-black transition-all flex items-center justify-center gap-3 active:scale-[0.98]"
+                        className="w-full bg-[#D4AF37] text-slate-950 px-8 py-4 rounded-2xl font-bold hover:bg-[#E2BF43] transition-all flex items-center justify-center gap-3 active:scale-[0.98] shadow-lg shadow-[#D4AF37]/20"
                       >
                         <Save className="w-5 h-5" />
                         Update Password
@@ -1300,6 +1492,63 @@ export function Settings({ onBack, onLogout, onNavigate, role = 'bishop', initia
                     </div>
                   </div>
                 </div>
+
+                {/* ── Email change OTP verification ── */}
+                {emailOtp.open && (
+                  <div className="fixed inset-0 z-[140] flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm">
+                    <div className="w-full max-w-md overflow-hidden rounded-3xl bg-white shadow-2xl">
+                      <div className="bg-slate-900 p-6 text-white">
+                        <p className="text-[10px] font-black uppercase tracking-[0.2em] text-gold-400">
+                          Verify Your New Email
+                        </p>
+                        <h3 className="mt-1 font-serif text-2xl font-bold">Enter the 6-digit code</h3>
+                        <p className="mt-1 text-sm text-white/55">
+                          We sent a verification code to <span className="font-bold text-white">{emailOtp.pendingEmail}</span>.
+                          Your email won’t change until the code is confirmed.
+                        </p>
+                      </div>
+                      <div className="space-y-5 p-6">
+                        <input
+                          type="text"
+                          inputMode="numeric"
+                          maxLength={6}
+                          value={emailOtp.code}
+                          onChange={(e) =>
+                            setEmailOtp((s) => ({ ...s, code: e.target.value.replace(/\D/g, ''), error: '' }))
+                          }
+                          placeholder="••••••"
+                          className="w-full rounded-2xl border border-gray-200 bg-gray-50 px-5 py-4 text-center text-2xl font-black tracking-[0.5em] text-gray-900 outline-none focus:border-[#D4AF37] focus:ring-4 focus:ring-[#D4AF37]/10"
+                        />
+                        {emailOtp.sending && !emailOtp.error && (
+                          <p className="text-center text-xs font-semibold text-gray-400">Working…</p>
+                        )}
+                        {emailOtp.error && (
+                          <p className="rounded-xl bg-rose-50 px-4 py-3 text-center text-sm font-semibold text-rose-600">
+                            {emailOtp.error}
+                          </p>
+                        )}
+                        <div className="flex gap-3">
+                          <button
+                            type="button"
+                            onClick={cancelEmailOtp}
+                            disabled={emailOtp.sending}
+                            className="flex-1 rounded-2xl border border-gray-200 px-6 py-3 text-sm font-bold text-gray-500 transition-colors hover:bg-gray-50"
+                          >
+                            Cancel
+                          </button>
+                          <button
+                            type="button"
+                            onClick={verifyEmailOtp}
+                            disabled={emailOtp.sending || emailOtp.code.length < 6}
+                            className="flex-1 rounded-2xl bg-[#D4AF37] px-6 py-3 text-sm font-bold text-black shadow-lg shadow-[#D4AF37]/20 transition-colors hover:bg-[#E5C04B] disabled:cursor-not-allowed disabled:bg-gray-200 disabled:text-gray-400"
+                          >
+                            Verify &amp; Update
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                )}
               </div>
             )}
 
@@ -1558,27 +1807,8 @@ export function Settings({ onBack, onLogout, onNavigate, role = 'bishop', initia
                     <p className="text-xs text-gray-500">Manage access and roles for diocese personnel.</p>
                   </div>
                   <div className="flex items-center gap-4">
-                    <div className="flex p-1 bg-gray-100 rounded-xl">
-                      <button
-                        onClick={() => setViewMode('active')}
-                        className={`px-5 py-2 rounded-lg text-xs font-bold transition-all ${
-                          viewMode === 'active'
-                            ? 'bg-white text-gray-900 shadow-sm'
-                            : 'text-gray-400 hover:text-gray-600'
-                        }`}
-                      >
-                        Active
-                      </button>
-                      <button
-                        onClick={() => setViewMode('archived')}
-                        className={`px-5 py-2 rounded-lg text-xs font-bold transition-all ${
-                          viewMode === 'archived'
-                            ? 'bg-white text-amber-600 shadow-sm'
-                            : 'text-gray-400 hover:text-gray-600'
-                        }`}
-                      >
-                        Archived
-                      </button>
+                    <div className="rounded-xl bg-gray-100 px-4 py-2 text-xs font-bold text-gray-700">
+                      Active Accounts
                     </div>
                     <button
                       onClick={() => {
@@ -1593,15 +1823,33 @@ export function Settings({ onBack, onLogout, onNavigate, role = 'bishop', initia
                   </div>
                 </div>
 
-                <div className="relative mb-6">
-                  <Search className="w-4 h-4 absolute left-4.5 top-1/2 -translate-y-1/2 text-gray-400" />
-                  <input
-                    type="text"
-                    placeholder="Search institutions, types, roles, or emails..."
-                    value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
-                    className="w-full pl-12 pr-6 py-3.5 bg-gray-50 border border-gray-100 rounded-2xl text-sm text-gray-900 focus:outline-none focus:border-[#D4AF37] focus:ring-4 focus:ring-[#D4AF37]/10 transition-all font-medium"
-                  />
+                <div className="mb-6 grid grid-cols-1 gap-3 lg:grid-cols-[1fr_220px]">
+                  <div className="relative">
+                    <Search className="w-4 h-4 absolute left-4.5 top-1/2 -translate-y-1/2 text-gray-400" />
+                    <input
+                      type="text"
+                      placeholder="Search institutions, types, roles, or emails..."
+                      value={searchQuery}
+                      onChange={(e) => setSearchQuery(e.target.value)}
+                      className={roundedField(
+                        Boolean(searchQuery.trim()),
+                        'w-full pl-12 pr-6 py-3.5 rounded-2xl text-sm font-medium',
+                      )}
+                    />
+                  </div>
+                  <select
+                    value={roleFilter}
+                    onChange={(e) => setRoleFilter(e.target.value)}
+                    className={selectField(roleFilter !== 'all', 'h-full rounded-2xl px-4 py-3.5 text-sm font-bold')}
+                    aria-label="Filter user accounts by role"
+                  >
+                    <option value="all">All roles</option>
+                    {roleOptions.map((roleName) => (
+                      <option key={roleName} value={roleName}>
+                        {roleName}
+                      </option>
+                    ))}
+                  </select>
                 </div>
 
                 <div className="overflow-x-auto">
@@ -1631,7 +1879,11 @@ export function Settings({ onBack, onLogout, onNavigate, role = 'bishop', initia
                     <tbody className="divide-y divide-gray-50">
                       {filteredAccounts.length > 0 ? (
                         filteredAccounts.map((account) => (
-                          <tr key={account.id} className="group hover:bg-gray-50/50 transition-colors">
+                          <tr
+                            key={account.id}
+                            onClick={() => setViewAccount(account)}
+                            className="group cursor-pointer hover:bg-gray-50/50 transition-colors"
+                          >
                             <td className="py-4 pr-4">
                               <div className="font-bold text-gray-900 text-sm">{account.entity}</div>
                             </td>
@@ -1659,7 +1911,10 @@ export function Settings({ onBack, onLogout, onNavigate, role = 'bishop', initia
                               <div className="flex items-center justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                                 {viewMode === 'active' && (
                                   <button
-                                    onClick={() => handleEditClick(account)}
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      handleEditClick(account);
+                                    }}
                                     className="p-2 text-gray-400 hover:text-[#D4AF37] hover:bg-[#D4AF37]/10 rounded-lg transition-all"
                                     title="Edit Account"
                                   >
@@ -1667,7 +1922,10 @@ export function Settings({ onBack, onLogout, onNavigate, role = 'bishop', initia
                                   </button>
                                 )}
                                 <button
-                                  onClick={() => handleArchiveAccount(account.id)}
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleArchiveAccount(account.id);
+                                  }}
                                   className={`p-2 rounded-lg transition-all ${
                                     viewMode === 'active'
                                       ? 'text-gray-400 hover:text-amber-600 hover:bg-amber-50'
@@ -1703,6 +1961,134 @@ export function Settings({ onBack, onLogout, onNavigate, role = 'bishop', initia
               </div>
             )}
 
+            {/* ── Read-only user detail modal (Edit / Archive in the corner) ── */}
+            {viewAccount &&
+              (() => {
+                const isArchived = viewAccount.status === 'archived' || viewAccount.status === 'inactive';
+                const initial = (getFormattedFullName(viewAccount.leader) || viewAccount.email || '?')
+                  .charAt(0)
+                  .toUpperCase();
+                const Field = ({
+                  icon: Icon,
+                  label,
+                  value,
+                }: {
+                  icon: React.ElementType;
+                  label: string;
+                  value?: any;
+                }) => (
+                  <div className="rounded-2xl border border-gray-100 bg-gray-50 p-4">
+                    <p className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wider text-gray-400">
+                      <Icon className="h-3.5 w-3.5" /> {label}
+                    </p>
+                    <p className="mt-1.5 break-words text-sm font-bold text-gray-900">
+                      {value === undefined || value === null || value === '' ? '—' : value}
+                    </p>
+                  </div>
+                );
+                return (
+                  <div
+                    className="fixed inset-0 z-[130] flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm"
+                    onClick={() => setViewAccount(null)}
+                  >
+                    <div
+                      onClick={(e) => e.stopPropagation()}
+                      className="flex max-h-[88vh] w-full max-w-2xl flex-col overflow-hidden rounded-3xl bg-white shadow-2xl"
+                    >
+                      {/* Dark header */}
+                      <div className="flex items-start justify-between gap-4 bg-slate-900 p-6 text-white">
+                        <div className="flex min-w-0 items-center gap-4">
+                          <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-gold-500 font-serif text-lg font-bold text-black">
+                            {initial}
+                          </div>
+                          <div className="min-w-0">
+                            <div className="flex items-center gap-2">
+                              <span className="rounded-md border border-white/15 bg-white/10 px-2 py-0.5 text-[10px] font-black uppercase tracking-wider text-white/70">
+                                {viewAccount.role}
+                              </span>
+                              <span
+                                className={`rounded-md px-2 py-0.5 text-[10px] font-black uppercase tracking-wider ${
+                                  isArchived ? 'bg-rose-500/20 text-rose-200' : 'bg-emerald-500/20 text-emerald-200'
+                                }`}
+                              >
+                                {isArchived ? 'Archived' : 'Active'}
+                              </span>
+                            </div>
+                            <h3 className="mt-1.5 truncate font-serif text-2xl font-bold">
+                              {getFormattedFullName(viewAccount.leader) || viewAccount.email}
+                            </h3>
+                          </div>
+                        </div>
+                        <div className="flex shrink-0 items-center gap-1">
+                          {!isArchived && (
+                            <button
+                              onClick={() => {
+                                const acc = viewAccount;
+                                setViewAccount(null);
+                                handleEditClick(acc);
+                              }}
+                              className="inline-flex items-center gap-1.5 rounded-xl bg-white/10 px-3 py-2 text-xs font-bold text-white transition-colors hover:bg-white hover:text-slate-900"
+                            >
+                              <Pencil className="h-3.5 w-3.5" /> Edit
+                            </button>
+                          )}
+                          <button
+                            onClick={() => {
+                              handleArchiveAccount(viewAccount.id);
+                              setViewAccount(null);
+                            }}
+                            className={`inline-flex items-center gap-1.5 rounded-xl px-3 py-2 text-xs font-bold transition-colors ${
+                              isArchived
+                                ? 'text-white/70 hover:bg-emerald-500 hover:text-white'
+                                : 'text-white/70 hover:bg-rose-500 hover:text-white'
+                            }`}
+                          >
+                            {isArchived ? <RotateCcw className="h-3.5 w-3.5" /> : <Archive className="h-3.5 w-3.5" />}
+                            {isArchived ? 'Restore' : 'Archive'}
+                          </button>
+                          <button
+                            onClick={() => setViewAccount(null)}
+                            className="rounded-xl p-2 text-white/60 transition-colors hover:bg-white/10 hover:text-white"
+                          >
+                            <X className="h-5 w-5" />
+                          </button>
+                        </div>
+                      </div>
+
+                      {/* Body */}
+                      <div className="grid flex-1 grid-cols-1 gap-3 overflow-y-auto p-6 sm:grid-cols-2">
+                        <Field icon={Mail} label="Email Address" value={viewAccount.email} />
+                        <Field icon={Shield} label="Access Role" value={viewAccount.role} />
+                        <Field
+                          icon={Cake}
+                          label="Birthday"
+                          value={
+                            viewAccount.birthday
+                              ? new Date(viewAccount.birthday).toLocaleDateString('en-US', {
+                                  month: 'long',
+                                  day: 'numeric',
+                                  year: 'numeric',
+                                })
+                              : ''
+                          }
+                        />
+                        <Field
+                          icon={CheckCircle}
+                          label="Registration Status"
+                          value={viewAccount.onboardingCompleted ? 'Registered' : 'Unregistered'}
+                        />
+                        <Field icon={Building2} label="Assigned Institution" value={viewAccount.entity} />
+                        <Field
+                          icon={Building2}
+                          label="Institution Type"
+                          value={viewAccount.entityType || 'Institution'}
+                        />
+                      </div>
+                    </div>
+                  </div>
+                );
+              })()}
+
             {activeTab === 'role-control' && permissions.manage_roles === true && (
               <UserRoleControl roles={roles} onUpdateRoles={handleUpdateRoles} accounts={accounts} />
             )}
@@ -1719,20 +2105,6 @@ export function Settings({ onBack, onLogout, onNavigate, role = 'bishop', initia
                 accounts={accounts}
               />
             )}
-
-            {activeTab === 'archives' &&
-              (permissions.create_users === true || permissions.manage_entities === true) && (
-                <ArchivesControl
-                  parishes={parishes}
-                  seminaries={seminaries}
-                  schools={schools}
-                  accounts={accounts}
-                  onUpdateParishes={setParishes}
-                  onUpdateSeminaries={setSeminaries}
-                  onUpdateSchools={setSchools}
-                  onUpdateAccounts={fetchAccounts}
-                />
-              )}
 
             {activeTab === 'data-management' &&
               (permissions.download_csv === true ||

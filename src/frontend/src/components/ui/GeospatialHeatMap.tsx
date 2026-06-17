@@ -6,6 +6,7 @@ import 'leaflet/dist/leaflet.css';
 import { Layers, MapPin, TrendingUp, Info } from 'lucide-react';
 import * as turf from '@turf/turf';
 import parishesData from '../../data/parishes-geocoded.json';
+import { InlineLoader } from './LoadingScreen';
 
 // --- DATA MAPPINGS ---
 
@@ -673,10 +674,7 @@ export const GeospatialHeatMap = React.memo(function GeospatialHeatMapComponent(
   if (loading) {
     return (
       <div className="flex items-center justify-center h-full w-full bg-gray-50 rounded-xl border border-gray-200">
-        <div className="flex flex-col items-center text-church-green">
-          <div className="w-8 h-8 border-4 border-current border-t-transparent rounded-full animate-spin mb-4"></div>
-          <p className="font-bold">Loading Map Data...</p>
-        </div>
+        <InlineLoader label="Loading map data" className="py-0" />
       </div>
     );
   }

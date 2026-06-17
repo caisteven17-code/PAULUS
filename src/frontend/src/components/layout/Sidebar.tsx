@@ -29,6 +29,7 @@ import { APP_CONFIG, INITIAL_ROLES } from '../../constants';
 import { Timeframe } from '../../App';
 import { auth } from '../../firebase';
 import { usePermissions } from '../../hooks/usePermissions';
+import { hasAnyArchiveAccess } from '../../lib/archiveAccess';
 
 interface SidebarProps {
   activeTab: string;
@@ -88,6 +89,27 @@ export function Sidebar({ activeTab = '', onNavigate, role, timeframe = '6m', on
   const canViewSchools = permissions.view_school_dashboard === true;
   const canViewProjects = permissions.view_projects === true || permissions.manage_projects === true;
 
+  // Group visibility — used to show/hide section dividers so we never render an
+  // orphan label with nothing beneath it.
+  const showInstitutions = canViewParishes || canViewPriests || canViewSeminaries || canViewSchools;
+  const adminVisible =
+    permissions.create_users === true ||
+    permissions.manage_roles === true ||
+    permissions.manage_entities === true ||
+    permissions.upload_csv_admin === true ||
+    permissions.view_audit_logs === true ||
+    permissions.validate_liturgical_calendar === true;
+  const showOperations =
+    canViewProjects ||
+    permissions.digital_twin === true ||
+    adminVisible ||
+    hasAnyArchiveAccess(permissions) ||
+    hasDioceseAccess;
+
+  const SectionLabel = ({ children }: { children: React.ReactNode }) => (
+    <p className="px-4 pb-1 pt-5 text-[9px] font-black uppercase tracking-[0.28em] text-white/20">{children}</p>
+  );
+
   const parishSubtabs = [
     { id: 'parish-dashboard', label: 'Dashboard', icon: BarChart3, section: 'PARISH' },
     { id: 'parish-aitwin', label: 'Simulator', icon: Zap, section: 'PARISH' },
@@ -131,8 +153,8 @@ export function Sidebar({ activeTab = '', onNavigate, role, timeframe = '6m', on
       </div>
 
       {/* Main Menu Label */}
-      <div className="px-6 mb-4">
-        <h3 className="text-[10px] font-black text-white/20 uppercase tracking-[0.3em]">Main Menu</h3>
+      <div className="px-6 mb-3">
+        <h3 className="text-[10px] font-black text-white/20 uppercase tracking-[0.3em]">Overview</h3>
       </div>
 
       {/* Navigation Section */}
@@ -146,7 +168,7 @@ export function Sidebar({ activeTab = '', onNavigate, role, timeframe = '6m', on
           return (
             <button
               onClick={() => onNavigate(item.id)}
-              className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-300 group ${
+              className={`w-full flex items-center gap-3 px-4 py-2.5 rounded-xl transition-all duration-300 group ${
                 isActive ? 'bg-white/10 text-gold-400 shadow-sm' : 'text-white/50 hover:bg-white/5 hover:text-white'
               }`}
             >
@@ -168,7 +190,7 @@ export function Sidebar({ activeTab = '', onNavigate, role, timeframe = '6m', on
             return (
               <button
                 onClick={() => onNavigate('announcements')}
-                className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-300 group ${
+                className={`w-full flex items-center gap-3 px-4 py-2.5 rounded-xl transition-all duration-300 group ${
                   isActive ? 'bg-white/10 text-gold-400 shadow-sm' : 'text-white/50 hover:bg-white/5 hover:text-white'
                 }`}
               >
@@ -190,7 +212,7 @@ export function Sidebar({ activeTab = '', onNavigate, role, timeframe = '6m', on
             return (
               <button
                 onClick={() => onNavigate('events')}
-                className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-300 group ${
+                className={`w-full flex items-center gap-3 px-4 py-2.5 rounded-xl transition-all duration-300 group ${
                   isActive ? 'bg-white/10 text-gold-400 shadow-sm' : 'text-white/50 hover:bg-white/5 hover:text-white'
                 }`}
               >
@@ -212,7 +234,7 @@ export function Sidebar({ activeTab = '', onNavigate, role, timeframe = '6m', on
             return (
               <button
                 onClick={() => onNavigate('budget')}
-                className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-300 group ${
+                className={`w-full flex items-center gap-3 px-4 py-2.5 rounded-xl transition-all duration-300 group ${
                   isActive ? 'bg-white/10 text-gold-400 shadow-sm' : 'text-white/50 hover:bg-white/5 hover:text-white'
                 }`}
               >
@@ -226,6 +248,9 @@ export function Sidebar({ activeTab = '', onNavigate, role, timeframe = '6m', on
               </button>
             );
           })()}
+
+        {/* Section: Institutions */}
+        {showInstitutions && <SectionLabel>Institutions</SectionLabel>}
 
         {/* Parishes Dropdown */}
         <div className={canViewParishes ? '' : 'hidden'}>
@@ -486,6 +511,9 @@ export function Sidebar({ activeTab = '', onNavigate, role, timeframe = '6m', on
           </AnimatePresence>
         </div>
 
+        {/* Section: Tools & Administration */}
+        {showOperations && <SectionLabel>Tools &amp; Administration</SectionLabel>}
+
         {/* Projects */}
         {(() => {
           if (!canViewProjects) return null;
@@ -493,7 +521,7 @@ export function Sidebar({ activeTab = '', onNavigate, role, timeframe = '6m', on
           return (
             <button
               onClick={() => onNavigate('projects')}
-              className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-300 group ${
+              className={`w-full flex items-center gap-3 px-4 py-2.5 rounded-xl transition-all duration-300 group ${
                 isActive ? 'bg-white/10 text-gold-400 shadow-sm' : 'text-white/50 hover:bg-white/5 hover:text-white'
               }`}
             >
@@ -514,7 +542,7 @@ export function Sidebar({ activeTab = '', onNavigate, role, timeframe = '6m', on
             return (
               <button
                 onClick={() => onNavigate('digital-twin')}
-                className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-300 group ${
+                className={`w-full flex items-center gap-3 px-4 py-2.5 rounded-xl transition-all duration-300 group ${
                   isActive ? 'bg-white/10 text-gold-400 shadow-sm' : 'text-white/50 hover:bg-white/5 hover:text-white'
                 }`}
               >
@@ -612,12 +640,6 @@ export function Sidebar({ activeTab = '', onNavigate, role, timeframe = '6m', on
                       show: permissions.validate_liturgical_calendar === true,
                     },
                     {
-                      id: 'admin-archives',
-                      label: 'Archives',
-                      icon: Archive,
-                      show: permissions.create_users === true || permissions.manage_entities === true,
-                    },
-                    {
                       id: 'audit-log',
                       label: 'Audit Log',
                       icon: ScrollText,
@@ -648,6 +670,28 @@ export function Sidebar({ activeTab = '', onNavigate, role, timeframe = '6m', on
           </div>
         )}
 
+        {/* Archives — standalone top-level page (moved out of Administration) */}
+        {hasAnyArchiveAccess(permissions) &&
+          (() => {
+            const isActive = activeTab === 'archives' || activeTab === 'admin-archives';
+            return (
+              <button
+                onClick={() => onNavigate('archives')}
+                className={`w-full flex items-center gap-3 px-4 py-2.5 rounded-xl transition-all duration-300 group ${
+                  isActive ? 'bg-white/10 text-gold-400 shadow-sm' : 'text-white/50 hover:bg-white/5 hover:text-white'
+                }`}
+              >
+                <Archive
+                  className={`w-4 h-4 transition-colors ${isActive ? 'text-gold-400' : 'text-white/20 group-hover:text-white/40'}`}
+                />
+                <span className="text-xs font-bold tracking-wide">Archives</span>
+                {isActive && (
+                  <div className="ml-auto w-1.5 h-1.5 bg-gold-400 rounded-full shadow-[0_0_8px_rgba(212,175,55,0.6)]" />
+                )}
+              </button>
+            );
+          })()}
+
         {/* Consolidated Financial — diocese-level summary (bishop / admin) */}
         {hasDioceseAccess &&
           (() => {
@@ -656,7 +700,7 @@ export function Sidebar({ activeTab = '', onNavigate, role, timeframe = '6m', on
               <button
                 onClick={() => onNavigate('consolidated')}
                 className={
-                  'w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-300 group ' +
+                  'w-full flex items-center gap-3 px-4 py-2.5 rounded-xl transition-all duration-300 group ' +
                   (isActive ? 'bg-white/10 text-gold-400 shadow-sm' : 'text-white/50 hover:bg-white/5 hover:text-white')
                 }
               >

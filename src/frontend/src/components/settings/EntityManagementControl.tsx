@@ -16,10 +16,18 @@ import {
   ShieldAlert,
   CheckCircle,
   Database,
+  X,
+  Phone,
+  Mail,
+  MapPin,
+  Archive,
+  Users,
+  Layers,
 } from 'lucide-react';
 import { Parish, Seminary, DiocesanSchool, EntityClass } from '../../types';
 import { VICARIATES, CLASSES, ALL_PARISHES, INITIAL_PARISHES } from '../../constants';
 import { dataService } from '../../services/dataService';
+import { roundedField, selectField } from '../../lib/formStyles';
 import { MapContainer, TileLayer, Marker, useMap } from 'react-leaflet';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
@@ -250,10 +258,15 @@ export function EntityManagementControl({
 }: EntityManagementControlProps) {
   const [activeSubTab, setActiveSubTab] = useState<'parishes' | 'seminaries' | 'schools'>('parishes');
   const [searchQuery, setSearchQuery] = useState('');
+  const [vicariateFilter, setVicariateFilter] = useState('all');
+  const [classFilter, setClassFilter] = useState('all');
+  const [districtFilter, setDistrictFilter] = useState('all');
+  const [clusterFilter, setClusterFilter] = useState('all');
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingEntity, setEditingEntity] = useState<any | null>(null);
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
   const [entityToDelete, setEntityToDelete] = useState<any | null>(null);
+  const [viewEntity, setViewEntity] = useState<any | null>(null); // read-only detail modal
   const [showSuccess, setShowSuccess] = useState<{ show: boolean; message: string }>({ show: false, message: '' });
 
   const [deleteState, setDeleteState] = useState<{
@@ -275,6 +288,13 @@ export function EntityManagementControl({
     isPredefined: false,
     hasAny: false,
   });
+
+  useEffect(() => {
+    setVicariateFilter('all');
+    setClassFilter('all');
+    setDistrictFilter('all');
+    setClusterFilter('all');
+  }, [activeSubTab]);
 
   useEffect(() => {
     if (!entityToDelete) {
@@ -1259,19 +1279,32 @@ export function EntityManagementControl({
   };
 
   const filteredData = () => {
-    const query = searchQuery.toLowerCase();
+    const query = searchQuery.trim().toLowerCase();
+    const itemClass = (item: any) => item.class || item.entityClass || '';
+    const itemDistrict = (item: any) => item.district || VICARIATE_TO_DISTRICT[item.vicariate] || '';
+    const matchesQuery = (item: any, fields: any[]) =>
+      query.length === 0 || fields.filter(Boolean).some((field) => String(field).toLowerCase().includes(query));
+
     if (activeSubTab === 'parishes') {
       return dedupeEntities(parishes)
         .filter((p) => p.status !== 'inactive')
-        .filter((p) => p.name.toLowerCase().includes(query) || p.vicariate.toLowerCase().includes(query));
+        .filter((p) => matchesQuery(p, [p.name, p.address, p.vicariate, itemClass(p), itemDistrict(p)]))
+        .filter((p) => vicariateFilter === 'all' || p.vicariate === vicariateFilter)
+        .filter((p) => classFilter === 'all' || itemClass(p) === classFilter)
+        .filter((p) => districtFilter === 'all' || itemDistrict(p) === districtFilter);
     } else if (activeSubTab === 'seminaries') {
       return dedupeEntities(seminaries)
         .filter((s) => s.status !== 'inactive')
-        .filter((s) => s.name.toLowerCase().includes(query) || s.vicariate.toLowerCase().includes(query));
+        .filter((s) => matchesQuery(s, [s.name, s.address, s.vicariate, itemClass(s), itemDistrict(s)]))
+        .filter((s) => vicariateFilter === 'all' || s.vicariate === vicariateFilter)
+        .filter((s) => classFilter === 'all' || itemClass(s) === classFilter)
+        .filter((s) => districtFilter === 'all' || itemDistrict(s) === districtFilter);
     } else {
       return dedupeEntities(schools)
         .filter((s) => s.status !== 'inactive')
-        .filter((s) => s.name.toLowerCase().includes(query) || s.cluster.toString().includes(query));
+        .filter((s) => matchesQuery(s, [s.name, s.address, `Cluster ${s.cluster}`, itemClass(s), s.level]))
+        .filter((s) => clusterFilter === 'all' || String(s.cluster) === clusterFilter)
+        .filter((s) => classFilter === 'all' || itemClass(s) === classFilter);
     }
   };
 
@@ -2150,15 +2183,79 @@ export function EntityManagementControl({
         </div>
       </div>
 
-      <div className="relative mb-8">
-        <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
-        <input
-          type="text"
-          placeholder={`Search ${activeSubTab}...`}
-          value={searchQuery}
-          onChange={(e) => setSearchQuery(e.target.value)}
-          className="w-full pl-12 pr-4 py-4 bg-gray-50 border border-gray-200 rounded-2xl text-gray-900 focus:outline-none focus:border-[#D4AF37] focus:ring-1 focus:ring-[#D4AF37] transition-all placeholder:text-gray-400"
-        />
+      <div className="mb-8 grid grid-cols-1 gap-3 xl:grid-cols-[minmax(260px,1fr)_repeat(3,minmax(160px,190px))]">
+        <div className="relative">
+          <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
+          <input
+            type="text"
+            placeholder={`Search ${activeSubTab}...`}
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className={roundedField(Boolean(searchQuery.trim()), 'w-full pl-12 pr-4 py-4 rounded-2xl text-sm font-medium')}
+          />
+        </div>
+
+        {activeSubTab !== 'schools' && (
+          <select
+            value={vicariateFilter}
+            onChange={(e) => setVicariateFilter(e.target.value)}
+            className={selectField(vicariateFilter !== 'all', 'rounded-2xl px-4 py-4 text-sm font-bold')}
+            aria-label="Filter by vicariate"
+          >
+            <option value="all">All vicariates</option>
+            {VICARIATES.map((vicariate) => (
+              <option key={vicariate} value={vicariate}>
+                {stripVicariatePrefix(vicariate)}
+              </option>
+            ))}
+          </select>
+        )}
+
+        {activeSubTab === 'schools' && (
+          <select
+            value={clusterFilter}
+            onChange={(e) => setClusterFilter(e.target.value)}
+            className={selectField(clusterFilter !== 'all', 'rounded-2xl px-4 py-4 text-sm font-bold')}
+            aria-label="Filter by school cluster"
+          >
+            <option value="all">All clusters</option>
+            {[1, 2, 3].map((cluster) => (
+              <option key={cluster} value={String(cluster)}>
+                Cluster {cluster}
+              </option>
+            ))}
+          </select>
+        )}
+
+        <select
+          value={classFilter}
+          onChange={(e) => setClassFilter(e.target.value)}
+          className={selectField(classFilter !== 'all', 'rounded-2xl px-4 py-4 text-sm font-bold')}
+          aria-label="Filter by class"
+        >
+          <option value="all">All classes</option>
+          {CLASSES.map((entityClass) => (
+            <option key={entityClass} value={entityClass}>
+              {entityClass}
+            </option>
+          ))}
+        </select>
+
+        {activeSubTab !== 'schools' && (
+          <select
+            value={districtFilter}
+            onChange={(e) => setDistrictFilter(e.target.value)}
+            className={selectField(districtFilter !== 'all', 'rounded-2xl px-4 py-4 text-sm font-bold')}
+            aria-label="Filter by district"
+          >
+            <option value="all">All districts</option>
+            {DISTRICTS.map((district) => (
+              <option key={district} value={district}>
+                {district}
+              </option>
+            ))}
+          </select>
+        )}
       </div>
 
       <div className="overflow-x-auto">
@@ -2171,6 +2268,10 @@ export function EntityManagementControl({
               <th className="pb-4 text-[10px] font-bold text-gray-400 uppercase tracking-widest">
                 {activeSubTab === 'schools' ? 'Cluster' : 'Vicariate'}
               </th>
+              <th className="pb-4 text-[10px] font-bold text-gray-400 uppercase tracking-widest">Class</th>
+              <th className="pb-4 text-[10px] font-bold text-gray-400 uppercase tracking-widest">
+                {activeSubTab === 'schools' ? 'Level' : 'District'}
+              </th>
               <th className="pb-4 text-[10px] font-bold text-gray-400 uppercase tracking-widest text-right pr-4">
                 Actions
               </th>
@@ -2178,7 +2279,11 @@ export function EntityManagementControl({
           </thead>
           <tbody className="divide-y divide-gray-50">
             {filteredData().map((item: any, index: number) => (
-              <tr key={item.id || `item-${index}`} className="group hover:bg-gray-50/50 transition-colors">
+              <tr
+                key={item.id || `item-${index}`}
+                onClick={() => setViewEntity({ ...item, __kind: activeSubTab })}
+                className="group cursor-pointer hover:bg-gray-50/50 transition-colors"
+              >
                 <td className="py-5 pl-4">
                   <div className="flex flex-col">
                     <span className="text-gray-900 font-bold text-sm flex items-center gap-1.5">
@@ -2200,24 +2305,40 @@ export function EntityManagementControl({
                     {activeSubTab === 'schools' ? `Cluster ${item.cluster}` : stripVicariatePrefix(item.vicariate)}
                   </span>
                 </td>
+                <td className="py-5">
+                  <span className="px-3 py-1 bg-amber-50 text-amber-700 rounded-full text-[10px] font-bold uppercase tracking-wider">
+                    {item.class || item.entityClass || '-'}
+                  </span>
+                </td>
+                <td className="py-5">
+                  <span className="text-xs font-bold text-gray-500">
+                    {activeSubTab === 'schools'
+                      ? item.level || '-'
+                      : item.district || VICARIATE_TO_DISTRICT[item.vicariate] || '-'}
+                  </span>
+                </td>
                 <td className="py-5 text-right pr-4">
                   <div className="flex items-center justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                     <button
-                      onClick={() => handleOpenModal(item)}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleOpenModal(item);
+                      }}
                       className="text-[#D4AF37] hover:bg-[#FDF6E3] p-2 rounded-xl transition-all"
                       title="Edit"
                     >
                       <Pencil className="w-4 h-4" />
                     </button>
                     <button
-                      onClick={() => {
+                      onClick={(e) => {
+                        e.stopPropagation();
                         setEntityToDelete(item);
                         setIsDeleteModalOpen(true);
                       }}
-                      className="text-rose-500 hover:bg-rose-50 p-2 rounded-xl transition-all"
-                      title="Delete"
+                      className="text-amber-500 hover:bg-amber-50 p-2 rounded-xl transition-all"
+                      title="Archive"
                     >
-                      <Trash2 className="w-4 h-4" />
+                      <Archive className="w-4 h-4" />
                     </button>
                   </div>
                 </td>
@@ -2225,7 +2346,7 @@ export function EntityManagementControl({
             ))}
             {filteredData().length === 0 && (
               <tr key="no-entities">
-                <td colSpan={3} className="py-20 text-center">
+                <td colSpan={5} className="py-20 text-center">
                   <div className="flex flex-col items-center gap-3">
                     <div className="w-16 h-16 bg-gray-50 rounded-full flex items-center justify-center">
                       <Search className="w-8 h-8 text-gray-300" />
@@ -2241,6 +2362,124 @@ export function EntityManagementControl({
           </tbody>
         </table>
       </div>
+
+      {/* ── Read-only entity detail modal (Edit / Archive in the corner) ── */}
+      {viewEntity &&
+        (() => {
+          const kind: 'parishes' | 'seminaries' | 'schools' = viewEntity.__kind || activeSubTab;
+          const typeLabel = kind === 'parishes' ? 'Parish' : kind === 'seminaries' ? 'Seminary' : 'School';
+          const KindIcon = kind === 'parishes' ? Building2 : kind === 'seminaries' ? GraduationCap : School;
+          const leader =
+            kind === 'parishes' ? viewEntity.pastor : kind === 'seminaries' ? viewEntity.rector : viewEntity.principal;
+          const leaderLabel = kind === 'parishes' ? 'Pastor' : kind === 'seminaries' ? 'Rector' : 'Principal';
+          const isInactive = viewEntity.status === 'inactive';
+
+          const Field = ({ icon: Icon, label, value }: { icon: React.ElementType; label: string; value?: any }) => (
+            <div className="rounded-2xl border border-gray-100 bg-gray-50 p-4">
+              <p className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wider text-gray-400">
+                <Icon className="h-3.5 w-3.5" /> {label}
+              </p>
+              <p className="mt-1.5 text-sm font-bold text-gray-900 break-words">
+                {value === undefined || value === null || value === '' ? '—' : value}
+              </p>
+            </div>
+          );
+
+          return (
+            <div
+              className="fixed inset-0 z-[130] flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm"
+              onClick={() => setViewEntity(null)}
+            >
+              <div
+                onClick={(e) => e.stopPropagation()}
+                className="flex max-h-[88vh] w-full max-w-2xl flex-col overflow-hidden rounded-3xl bg-white shadow-2xl"
+              >
+                {/* Dark header */}
+                <div className="flex items-start justify-between gap-4 bg-slate-900 p-6 text-white">
+                  <div className="flex min-w-0 items-center gap-4">
+                    <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl border border-gold-500/25 bg-white/5">
+                      <KindIcon className="h-6 w-6 text-gold-400" />
+                    </div>
+                    <div className="min-w-0">
+                      <div className="flex items-center gap-2">
+                        <span className="rounded-md border border-white/15 bg-white/10 px-2 py-0.5 text-[10px] font-black uppercase tracking-wider text-white/70">
+                          {typeLabel}
+                        </span>
+                        <span
+                          className={`rounded-md px-2 py-0.5 text-[10px] font-black uppercase tracking-wider ${
+                            isInactive ? 'bg-rose-500/20 text-rose-200' : 'bg-emerald-500/20 text-emerald-200'
+                          }`}
+                        >
+                          {isInactive ? 'Archived' : 'Active'}
+                        </span>
+                      </div>
+                      <h3 className="mt-1.5 truncate font-serif text-2xl font-bold">{viewEntity.name}</h3>
+                    </div>
+                  </div>
+                  <div className="flex shrink-0 items-center gap-1">
+                    <button
+                      onClick={() => {
+                        const entity = viewEntity;
+                        setViewEntity(null);
+                        handleOpenModal(entity);
+                      }}
+                      className="inline-flex items-center gap-1.5 rounded-xl bg-white/10 px-3 py-2 text-xs font-bold text-white transition-colors hover:bg-white hover:text-slate-900"
+                    >
+                      <Pencil className="h-3.5 w-3.5" /> Edit
+                    </button>
+                    {!isInactive && (
+                      <button
+                        onClick={() => {
+                          setEntityToDelete(viewEntity);
+                          setIsDeleteModalOpen(true);
+                          setViewEntity(null);
+                        }}
+                        className="inline-flex items-center gap-1.5 rounded-xl px-3 py-2 text-xs font-bold text-white/70 transition-colors hover:bg-rose-500 hover:text-white"
+                      >
+                        <Archive className="h-3.5 w-3.5" /> Archive
+                      </button>
+                    )}
+                    <button
+                      onClick={() => setViewEntity(null)}
+                      className="rounded-xl p-2 text-white/60 transition-colors hover:bg-white/10 hover:text-white"
+                    >
+                      <X className="h-5 w-5" />
+                    </button>
+                  </div>
+                </div>
+
+                {/* Body */}
+                <div className="grid flex-1 grid-cols-1 gap-3 overflow-y-auto p-6 sm:grid-cols-2">
+                  <Field icon={MapPin} label="Address" value={viewEntity.address} />
+                  <Field
+                    icon={KindIcon}
+                    label={kind === 'schools' ? 'Cluster' : 'Vicariate'}
+                    value={kind === 'schools' ? `Cluster ${viewEntity.cluster}` : viewEntity.vicariate}
+                  />
+                  {viewEntity.district && <Field icon={Layers} label="District" value={viewEntity.district} />}
+                  <Field icon={Layers} label="Class" value={viewEntity.class} />
+                  <Field icon={Users} label={leaderLabel} value={leader} />
+                  <Field icon={Phone} label="Contact Number" value={viewEntity.contactNumber} />
+                  <Field icon={Mail} label="Email" value={viewEntity.email} />
+                  {kind === 'parishes' && (
+                    <Field icon={Database} label="Subsidy Type" value={viewEntity.subsidyType} />
+                  )}
+                  {(kind === 'seminaries' || kind === 'schools') && (
+                    <>
+                      <Field icon={Users} label="Enrollment" value={viewEntity.enrollment} />
+                      <Field icon={Users} label="Capacity" value={viewEntity.capacity} />
+                      <Field icon={Users} label="Staff" value={viewEntity.staff} />
+                    </>
+                  )}
+                  {kind === 'schools' && <Field icon={Layers} label="Level" value={viewEntity.level} />}
+                  {viewEntity.lat && viewEntity.lng && (
+                    <Field icon={MapPin} label="Coordinates" value={`${viewEntity.lat}, ${viewEntity.lng}`} />
+                  )}
+                </div>
+              </div>
+            </div>
+          );
+        })()}
     </div>
   );
 }

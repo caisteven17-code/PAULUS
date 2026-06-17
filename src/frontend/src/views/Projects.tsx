@@ -1,12 +1,14 @@
 'use client';
 
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import {
   Plus,
   Search,
   Filter,
   LayoutGrid,
   ChevronDown,
+  ChevronLeft,
+  ChevronRight,
   Check,
   Target,
   User,
@@ -14,6 +16,10 @@ import {
   Church,
   GraduationCap,
   School,
+  Archive,
+  ArrowUpDown,
+  Eye,
+  Briefcase,
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Project, Donation, ProjectCategory, EntityType, ProjectExpense } from '../types';
@@ -23,6 +29,7 @@ import { ProjectCreationForm, ProjectInstitutionOption } from '../components/pro
 import { dataService } from '../services/dataService';
 import { auth } from '../firebase';
 import { usePermissions } from '../hooks/usePermissions';
+import { dateField, roundedField, selectField } from '../lib/formStyles';
 
 interface ProjectsProps {
   role?: string;
@@ -30,6 +37,23 @@ interface ProjectsProps {
 
 const isUuid = (value?: string) =>
   typeof value === 'string' && /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value);
+
+const PAGE_SIZE = 9;
+
+const CATEGORIES = [
+  'All',
+  'Building/Construction',
+  'Equipment',
+  'Programs/Outreach',
+  'Education',
+  'Emergency/Relief',
+  'Liturgical',
+  'Operational',
+  'Infrastructure',
+  'Heritage',
+  'Charity',
+  'Facilities',
+];
 
 export function Projects({ role }: ProjectsProps) {
   const [projects, setProjects] = useState<Project[]>([]);
@@ -40,11 +64,49 @@ export function Projects({ role }: ProjectsProps) {
   const [searchQuery, setSearchQuery] = useState('');
   const [filterCategory, setFilterCategory] = useState<ProjectCategory | 'All'>('All');
   const [filterEntityType, setFilterEntityType] = useState<EntityType | 'All'>('All');
+  const [filterStatus, setFilterStatus] = useState<'all' | 'active' | 'completed' | 'on-hold'>('all');
+  const [sortBy, setSortBy] = useState<'recent' | 'name' | 'progress' | 'raised'>('recent');
+  const [dateFrom, setDateFrom] = useState('');
+  const [dateTo, setDateTo] = useState('');
+  const [page, setPage] = useState(1);
   const [showFilterDropdown, setShowFilterDropdown] = useState(false);
   const [showEntityFilterDropdown, setShowEntityFilterDropdown] = useState(false);
   const [userContext, setUserContext] = useState<{ id: string; name: string; type: EntityType } | null>(null);
   const { permissions } = usePermissions();
   const canAccessProjects = permissions.view_projects === true || permissions.manage_projects === true;
+
+  // ── Role-based visibility ──────────────────────────────────────────────────
+  const isDiocese = permissions.view_diocese === true;
+  // Oversight roles (e.g. School Superintendent) see every school's projects but
+  // do not own any single institution, so they are view-only like the diocese.
+  const isSchoolOverseer =
+    !isDiocese && (permissions.view_school_all === true || permissions.view_school_cluster === true);
+  const isOverview = isDiocese || isSchoolOverseer;
+  // The diocese can add projects and edit the ones it owns (entityType 'diocese');
+  // school overseers are fully view-only; institution owners manage their own.
+  const canCreate = permissions.manage_projects === true && !isSchoolOverseer;
+  const canManageProject = (p?: Project | null) =>
+    permissions.manage_projects === true &&
+    (isDiocese ? p?.entityType === 'diocese' : isSchoolOverseer ? false : true);
+
+  // Client-side soft archive (projects have no archive column yet).
+  const [archivedIds, setArchivedIds] = useState<string[]>(() => {
+    if (typeof window === 'undefined') return [];
+    try {
+      return JSON.parse(localStorage.getItem('projects_archived') || '[]');
+    } catch {
+      return [];
+    }
+  });
+  const persistArchived = useCallback((ids: string[]) => {
+    setArchivedIds(ids);
+    try {
+      localStorage.setItem('projects_archived', JSON.stringify(ids));
+    } catch {
+      /* ignore */
+    }
+  }, []);
+  const isArchived = useCallback((id: string) => archivedIds.includes(id), [archivedIds]);
 
   useEffect(() => {
     const unsubscribe = auth.onAuthStateChanged((user: any) => {
@@ -68,69 +130,114 @@ export function Projects({ role }: ProjectsProps) {
   useEffect(() => {
     if (!userContext || !canAccessProjects) return;
 
-    // If bishop, we can see all projects or filter by type
-    // If others, we only see our own projects
-    const subEntityType =
-      userContext.type === 'diocese' ? (filterEntityType === 'All' ? undefined : filterEntityType) : userContext.type;
-    const subEntityId = userContext.type === 'diocese' ? undefined : userContext.id;
+    // Diocese: all projects (optionally filtered by type). School overseers: all
+    // schools. Everyone else: only their own institution.
+    const subEntityType = isDiocese
+      ? filterEntityType === 'All'
+        ? undefined
+        : filterEntityType
+      : isSchoolOverseer
+        ? ('school' as EntityType)
+        : userContext.type;
+    const subEntityId = isOverview ? undefined : userContext.id;
 
     const unsubscribeProjects = dataService.subscribeToProjects(
-      (updatedProjects) => {
-        setProjects(updatedProjects);
-      },
+      (updatedProjects) => setProjects(updatedProjects),
       subEntityId,
       subEntityType as any,
     );
-
-    const unsubscribeDonations = dataService.subscribeToDonations((updatedDonations) => {
-      setDonations(updatedDonations);
-    });
-
-    const unsubscribeExpenses = dataService.subscribeToExpenses((updatedExpenses) => {
-      setExpenses(updatedExpenses);
-    });
+    const unsubscribeDonations = dataService.subscribeToDonations((d) => setDonations(d));
+    const unsubscribeExpenses = dataService.subscribeToExpenses((e) => setExpenses(e));
 
     return () => {
       unsubscribeProjects();
       unsubscribeDonations();
       unsubscribeExpenses();
     };
-  }, [userContext, filterEntityType, canAccessProjects]);
+  }, [userContext, filterEntityType, canAccessProjects, isDiocese, isSchoolOverseer, isOverview]);
 
-  const isDiocese = permissions.view_diocese === true;
   const currentProjectInstitution: ProjectInstitutionOption | null = userContext
-    ? {
-        id: userContext.id,
-        name: userContext.name,
-        type: userContext.type,
-      }
+    ? { id: userContext.id, name: userContext.name, type: userContext.type }
     : null;
 
-  const filteredProjects = projects.filter((p) => {
-    const query = searchQuery.toLowerCase();
-    const entityLabel = p.entityName ?? p.entityId;
-    const matchesSearch =
-      p.name.toLowerCase().includes(query) ||
-      entityLabel.toLowerCase().includes(query) ||
-      p.category.toLowerCase().includes(query);
-    const matchesCategory = filterCategory === 'All' || p.category === filterCategory;
-    return matchesSearch && matchesCategory;
-  });
+  // ── Filtering + sorting + pagination ───────────────────────────────────────
+  const filteredProjects = useMemo(() => {
+    let out = projects.slice();
 
-  const projectSummary = useMemo(() => {
-    const seminaryProjects = projects.filter((project) => project.entityType === 'seminary').length;
-    const parishProjects = projects.filter((project) => project.entityType === 'parish').length;
-    const schoolProjects = projects.filter((project) => project.entityType === 'school').length;
-    const dioceseProjects = projects.filter((project) => project.entityType === 'diocese').length;
+    // School overseers receive every type from the API — keep only schools.
+    if (isSchoolOverseer) out = out.filter((p) => p.entityType === 'school');
 
-    return { seminaryProjects, parishProjects, schoolProjects, dioceseProjects };
-  }, [projects]);
+    out = out.filter((p) => !isArchived(p.id));
 
+    if (searchQuery.trim()) {
+      const q = searchQuery.toLowerCase();
+      out = out.filter(
+        (p) =>
+          p.name.toLowerCase().includes(q) ||
+          (p.entityName ?? p.entityId).toLowerCase().includes(q) ||
+          p.category.toLowerCase().includes(q),
+      );
+    }
+    if (filterCategory !== 'All') out = out.filter((p) => p.category === filterCategory);
+    if (filterStatus !== 'all') out = out.filter((p) => p.status === filterStatus);
+    if (dateFrom) out = out.filter((p) => p.startDate >= dateFrom);
+    if (dateTo) out = out.filter((p) => p.startDate <= dateTo);
+
+    const progress = (p: Project) => (p.targetAmount > 0 ? p.currentAmount / p.targetAmount : 0);
+    out.sort((a, b) => {
+      if (sortBy === 'name') return a.name.localeCompare(b.name);
+      if (sortBy === 'progress') return progress(b) - progress(a);
+      if (sortBy === 'raised') return b.currentAmount - a.currentAmount;
+      return new Date(b.startDate).getTime() - new Date(a.startDate).getTime(); // recent
+    });
+    return out;
+  }, [projects, isSchoolOverseer, filterStatus, isArchived, searchQuery, filterCategory, dateFrom, dateTo, sortBy]);
+
+  useEffect(() => {
+    setPage(1);
+  }, [searchQuery, filterCategory, filterEntityType, filterStatus, sortBy, dateFrom, dateTo]);
+
+  const totalPages = Math.max(1, Math.ceil(filteredProjects.length / PAGE_SIZE));
+  const safePage = Math.min(page, totalPages);
+  const pagedProjects = filteredProjects.slice((safePage - 1) * PAGE_SIZE, safePage * PAGE_SIZE);
+
+  const visibleForStats = useMemo(
+    () => (isSchoolOverseer ? projects.filter((p) => p.entityType === 'school') : projects).filter((p) => !isArchived(p.id)),
+    [projects, isSchoolOverseer, isArchived],
+  );
+
+  const projectSummary = useMemo(
+    () => ({
+      dioceseProjects: visibleForStats.filter((p) => p.entityType === 'diocese').length,
+      parishProjects: visibleForStats.filter((p) => p.entityType === 'parish').length,
+      seminaryProjects: visibleForStats.filter((p) => p.entityType === 'seminary').length,
+      schoolProjects: visibleForStats.filter((p) => p.entityType === 'school').length,
+    }),
+    [visibleForStats],
+  );
+
+  const hasActiveFilters =
+    searchQuery !== '' ||
+    filterCategory !== 'All' ||
+    filterStatus !== 'all' ||
+    dateFrom !== '' ||
+    dateTo !== '' ||
+    (isDiocese && filterEntityType !== 'All');
+
+  const clearFilters = () => {
+    setSearchQuery('');
+    setFilterCategory('All');
+    setFilterEntityType('All');
+    setFilterStatus('all');
+    setDateFrom('');
+    setDateTo('');
+  };
+
+  // ── Handlers (unchanged behaviour) ─────────────────────────────────────────
   const handleAddProject = (
     newProject: Omit<Project, 'id' | 'currentAmount' | 'healthScore' | 'successProbability' | 'recommendation'>,
   ) => {
     if (!userContext) return;
-
     const project: Project = {
       ...newProject,
       id: '',
@@ -149,21 +256,14 @@ export function Projects({ role }: ProjectsProps) {
     void dataService.saveDonation(newDonation as Donation).then((saved) => {
       setDonations((prev) => [saved, ...prev.filter((donation) => donation.id !== saved.id)]);
     });
-
-    // Update project current amount in dataService
     const projectToUpdate = projects.find((p) => p.id === newDonation.projectId);
     if (projectToUpdate) {
-      const updatedProject = {
-        ...projectToUpdate,
-        currentAmount: projectToUpdate.currentAmount + newDonation.amount,
-      };
+      const updatedProject = { ...projectToUpdate, currentAmount: projectToUpdate.currentAmount + newDonation.amount };
       setProjects((prev) => prev.map((project) => (project.id === updatedProject.id ? updatedProject : project)));
       void dataService.saveProject(updatedProject).then((saved) => {
         setProjects((prev) => prev.map((project) => (project.id === saved.id ? saved : project)));
       });
     }
-
-    // Update selected project if it's the one receiving donation
     if (selectedProject?.id === newDonation.projectId) {
       setSelectedProject((prev) => (prev ? { ...prev, currentAmount: prev.currentAmount + newDonation.amount } : null));
     }
@@ -173,20 +273,17 @@ export function Projects({ role }: ProjectsProps) {
     void dataService.saveExpense(newExpense as ProjectExpense).then((saved) => {
       setExpenses((prev) => [saved, ...prev.filter((expense) => expense.id !== saved.id)]);
     });
-
     const projectToUpdate = projects.find((p) => p.id === newExpense.projectId);
     if (projectToUpdate) {
-      const updatedTotalExpenses = (projectToUpdate.totalExpenses || 0) + newExpense.amount;
       const updatedProject = {
         ...projectToUpdate,
-        totalExpenses: updatedTotalExpenses,
+        totalExpenses: (projectToUpdate.totalExpenses || 0) + newExpense.amount,
       };
       setProjects((prev) => prev.map((project) => (project.id === updatedProject.id ? updatedProject : project)));
       void dataService.saveProject(updatedProject).then((saved) => {
         setProjects((prev) => prev.map((project) => (project.id === saved.id ? saved : project)));
       });
     }
-
     if (selectedProject?.id === newExpense.projectId) {
       setSelectedProject((prev) =>
         prev ? { ...prev, totalExpenses: (prev.totalExpenses || 0) + newExpense.amount } : null,
@@ -203,9 +300,7 @@ export function Projects({ role }: ProjectsProps) {
       totalExpenses: 0,
       status: 'active',
       startDate: new Date().toISOString().split('T')[0],
-      // Keep other details like description, targetAmount, category, etc.
     };
-
     void dataService.saveProject(clonedProject).then((saved) => {
       setProjects((prev) => [saved, ...prev.filter((existing) => existing.id !== saved.id)]);
       setSelectedProject(saved);
@@ -255,78 +350,100 @@ export function Projects({ role }: ProjectsProps) {
         onAddExpense={handleAddExpense}
         onCloneProject={handleCloneProject}
         role={role}
-        canManageProjects={permissions.manage_projects}
+        canManageProjects={canManageProject(selectedProject)}
       />
     );
   }
 
+  const summaryCards = [
+    { label: 'Total', value: visibleForStats.length, icon: LayoutGrid },
+    {
+      label: 'Raised',
+      value: `₱${visibleForStats.reduce((a, p) => a + p.currentAmount, 0).toLocaleString()}`,
+      icon: Target,
+    },
+    {
+      label: 'Goal',
+      value: `₱${visibleForStats.reduce((a, p) => a + p.targetAmount, 0).toLocaleString()}`,
+      icon: Target,
+    },
+    { label: 'Donors', value: donations.length, icon: User },
+  ];
+
   return (
-    <div className="min-h-screen bg-church-light p-4 md:p-8">
-      <div className="max-w-[1600px] mx-auto">
-        {/* Header */}
-        <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6 mb-12">
-          <div>
-            <h1 className="text-4xl font-serif font-bold text-church-black tracking-tight">Projects</h1>
-            <div className="flex items-center gap-2 mt-2">
-              <span className="text-xs font-bold text-gold-600 uppercase tracking-widest bg-gold-50 px-2 py-1 rounded-md">
-                {userContext?.type}
-              </span>
-              <span className="text-sm text-gray-500 font-medium">{userContext?.name}</span>
+    <div className="min-h-screen bg-[#f5f5f5] pt-8 pb-20 px-4 sm:px-6 lg:px-8">
+      <div className="mx-auto w-full max-w-[1500px]">
+        {/* ── Header ── */}
+        <div className="mb-6 overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-[0_18px_48px_rgba(15,23,42,0.08)]">
+          <div className="grid gap-0 lg:grid-cols-[minmax(0,1fr)_420px]">
+            <div className="relative p-6 md:p-8">
+              <div className="absolute inset-y-8 left-0 w-1 rounded-r-full bg-gold-500" />
+            <div className="flex min-w-0 items-center gap-4">
+              <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl border border-slate-200 bg-slate-950">
+                <Briefcase className="h-5 w-5 text-gold-400" />
+              </div>
+              <div className="min-w-0">
+                <div className="flex flex-wrap items-center gap-2">
+                  <p className="text-[10px] font-black uppercase tracking-[0.28em] text-gold-400">Diocesan Projects</p>
+                  {isSchoolOverseer && (
+                    <span className="inline-flex items-center gap-1 rounded-md border border-slate-200 bg-slate-100 px-2 py-0.5 text-[9px] font-black uppercase tracking-wider text-slate-500">
+                      <Eye className="h-3 w-3" /> View only
+                    </span>
+                  )}
+                </div>
+                <h1 className="mt-1 font-serif text-3xl font-bold leading-none text-slate-950 md:text-4xl">Projects</h1>
+                <p className="mt-2 max-w-2xl text-sm font-medium leading-relaxed text-slate-500">
+                  {isDiocese
+                    ? 'Track fundraising and delivery across every institution in the diocese.'
+                    : isSchoolOverseer
+                      ? 'Oversee fundraising and delivery across all diocesan schools.'
+                      : `Manage and track projects for ${userContext?.name || 'your institution'}.`}
+                </p>
+              </div>
             </div>
-            <p className="text-base text-gray-500 font-medium mt-2 max-w-2xl">
-              Track fundraising progress, monitor delivery status, and compare project performance across diocesan
-              institutions.
-            </p>
+
+              {canCreate && (
+                <button
+                  onClick={() => setIsCreateModalOpen(true)}
+                  className="mt-6 inline-flex h-11 shrink-0 items-center justify-center gap-2 rounded-2xl bg-gold-500 px-5 text-[11px] font-black uppercase tracking-[0.18em] text-black shadow-lg shadow-gold-500/20 transition-all hover:bg-gold-400"
+                >
+                  <Plus className="h-4 w-4" /> New Project
+                </button>
+              )}
+            </div>
+            <div className="border-t border-slate-200 bg-slate-950 p-4 lg:border-l lg:border-t-0 md:p-6">
+              <div className="grid h-full grid-cols-2 gap-3">
+                {summaryCards.map((c) => (
+                  <div key={c.label} className="rounded-2xl border border-white/10 bg-white/[0.06] p-4">
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="text-[9px] font-black uppercase tracking-[0.12em] text-white/35">{c.label}</span>
+                      <c.icon className="h-3 w-3 text-gold-400" />
+                    </div>
+                    <p className="mt-2 truncate text-xl font-black leading-none text-white">{c.value}</p>
+                  </div>
+                ))}
+              </div>
+            </div>
           </div>
-          {permissions.manage_projects && (
-            <motion.button
-              whileHover={{ scale: 1.02 }}
-              whileTap={{ scale: 0.98 }}
-              onClick={() => setIsCreateModalOpen(true)}
-              className="px-8 py-4 bg-gold-500 text-church-green-dark rounded-2xl font-bold hover:bg-gold-600 transition-all shadow-xl shadow-gold-500/20 flex items-center gap-3 whitespace-nowrap"
-            >
-              <Plus className="w-5 h-5" />
-              NEW PROJECT
-            </motion.button>
-          )}
         </div>
 
+        {/* Diocese breakdown */}
         {isDiocese && (
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-10">
+          <div className="mb-6 grid grid-cols-2 gap-3 md:grid-cols-4">
             {[
-              {
-                label: 'Diocese Projects',
-                value: projectSummary.dioceseProjects,
-                icon: Building2,
-                tone: 'bg-purple-50 text-purple-700 border-purple-100',
-              },
-              {
-                label: 'Parish Projects',
-                value: projectSummary.parishProjects,
-                icon: Church,
-                tone: 'bg-blue-50 text-blue-700 border-blue-100',
-              },
-              {
-                label: 'Seminary Projects',
-                value: projectSummary.seminaryProjects,
-                icon: GraduationCap,
-                tone: 'bg-emerald-50 text-emerald-700 border-emerald-100',
-              },
-              {
-                label: 'School Projects',
-                value: projectSummary.schoolProjects,
-                icon: School,
-                tone: 'bg-amber-50 text-amber-700 border-amber-100',
-              },
+              { label: 'Diocese', value: projectSummary.dioceseProjects, icon: Building2 },
+              { label: 'Parish', value: projectSummary.parishProjects, icon: Church },
+              { label: 'Seminary', value: projectSummary.seminaryProjects, icon: GraduationCap },
+              { label: 'School', value: projectSummary.schoolProjects, icon: School },
             ].map((item) => (
-              <div key={item.label} className={`rounded-3xl border px-5 py-4 ${item.tone}`}>
+              <div key={item.label} className="rounded-3xl border border-slate-200 bg-white px-5 py-4">
                 <div className="flex items-center justify-between gap-4">
                   <div>
-                    <p className="text-[10px] font-black uppercase tracking-[0.25em] opacity-70">{item.label}</p>
-                    <p className="mt-2 text-2xl font-serif font-bold">{item.value}</p>
+                    <p className="text-[10px] font-black uppercase tracking-[0.18em] text-slate-400">{item.label}</p>
+                    <p className="mt-1.5 font-serif text-2xl font-bold text-slate-900">{item.value}</p>
                   </div>
-                  <div className="h-11 w-11 rounded-2xl bg-white/70 flex items-center justify-center">
-                    <item.icon className="w-5 h-5" />
+                  <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-slate-100 text-slate-600">
+                    <item.icon className="h-5 w-5" />
                   </div>
                 </div>
               </div>
@@ -334,94 +451,53 @@ export function Projects({ role }: ProjectsProps) {
           </div>
         )}
 
-        {/* Summary Stats */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-12">
-          {[
-            {
-              label: 'Active Projects',
-              value: projects.length,
-              icon: LayoutGrid,
-              color: 'text-blue-600',
-              bg: 'bg-blue-50',
-            },
-            {
-              label: 'Total Raised',
-              value: `₱${projects.reduce((acc, p) => acc + p.currentAmount, 0).toLocaleString()}`,
-              icon: Target,
-              color: 'text-gold-600',
-              bg: 'bg-gold-50',
-            },
-            {
-              label: 'Total Goal',
-              value: `₱${projects.reduce((acc, p) => acc + p.targetAmount, 0).toLocaleString()}`,
-              icon: Target,
-              color: 'text-church-green',
-              bg: 'bg-church-green/5',
-            },
-            {
-              label: 'Total Donors',
-              value: donations.length,
-              icon: User,
-              color: 'text-purple-600',
-              bg: 'bg-purple-50',
-            },
-          ].map((stat, i) => (
-            <motion.div
-              key={stat.label}
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: i * 0.1 }}
-              className="bg-white p-6 rounded-3xl border border-gray-100 shadow-sm"
-            >
-              <div className={`w-12 h-12 ${stat.bg} ${stat.color} rounded-2xl flex items-center justify-center mb-4`}>
-                <stat.icon className="w-6 h-6" />
-              </div>
-              <p className="text-xs font-bold text-gray-400 uppercase tracking-widest">{stat.label}</p>
-              <p className="text-2xl font-serif font-bold text-church-black mt-1">{stat.value}</p>
-            </motion.div>
-          ))}
-        </div>
+        {/* ── Filter bar ── */}
+        <div className="mb-6 rounded-3xl border border-slate-200 bg-white p-3 shadow-[0_12px_32px_rgba(15,23,42,0.05)]">
+          <div className="flex flex-col gap-2 lg:flex-row lg:flex-wrap lg:items-center">
+            <div className="relative min-w-[220px] flex-1">
+              <Search className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+              <input
+                type="text"
+                placeholder="Search projects…"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className={roundedField(Boolean(searchQuery.trim()), 'h-11 w-full rounded-2xl pl-11 pr-4 text-sm font-semibold')}
+              />
+            </div>
 
-        {/* Filters & Search */}
-        <div className="flex flex-col md:flex-row gap-4 mb-10">
-          <div className="flex-1 relative group">
-            <Search className="absolute left-5 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400 group-focus-within:text-gold-500 transition-colors" />
-            <input
-              type="text"
-              placeholder="Search by project name, institution, or category..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full pl-14 pr-6 py-4 bg-white border border-gray-100 rounded-2xl text-sm font-medium focus:outline-none focus:ring-4 focus:ring-gold-500/10 focus:border-gold-500 focus:bg-white transition-all shadow-sm placeholder:text-gray-300"
+            {/* Status */}
+            <Select
+              value={filterStatus}
+              onChange={(v) => setFilterStatus(v as any)}
+              options={[
+                ['all', 'All statuses'],
+                ['active', 'Active'],
+                ['completed', 'Completed'],
+                ['on-hold', 'On hold'],
+              ]}
             />
-          </div>
 
-          <div className="flex gap-4">
+            {/* Entity type — diocese only */}
             {isDiocese && (
               <div className="relative">
                 <button
-                  onClick={() => setShowEntityFilterDropdown(!showEntityFilterDropdown)}
-                  className={`px-6 py-4 bg-white border border-gray-100 rounded-2xl text-sm font-bold text-church-black flex items-center gap-4 hover:bg-gray-50 transition-all shadow-sm ${showEntityFilterDropdown ? 'ring-4 ring-gold-500/10 border-gold-500' : ''}`}
+                  onClick={() => setShowEntityFilterDropdown((v) => !v)}
+                  className={`flex h-11 items-center gap-2 rounded-2xl border bg-slate-50 px-4 text-sm font-bold text-slate-700 transition-all ${
+                    showEntityFilterDropdown ? 'border-gold-500 ring-4 ring-gold-500/10' : 'border-slate-200'
+                  }`}
                 >
-                  <Building2 className="w-4 h-4 text-gold-600" />
-                  <span className="uppercase tracking-widest text-[11px]">{filterEntityType}</span>
-                  <ChevronDown
-                    className={`w-4 h-4 text-gray-400 transition-transform duration-300 ${showEntityFilterDropdown ? 'rotate-180' : ''}`}
-                  />
+                  <Building2 className="h-4 w-4 text-slate-400" />
+                  <span className="capitalize">{filterEntityType === 'All' ? 'All types' : filterEntityType}</span>
+                  <ChevronDown className={`h-4 w-4 text-slate-400 transition-transform ${showEntityFilterDropdown ? 'rotate-180' : ''}`} />
                 </button>
-
                 <AnimatePresence>
                   {showEntityFilterDropdown && (
                     <motion.div
-                      initial={{ opacity: 0, y: 10, scale: 0.95 }}
-                      animate={{ opacity: 1, y: 0, scale: 1 }}
-                      exit={{ opacity: 0, y: 10, scale: 0.95 }}
-                      className="absolute right-0 mt-3 w-64 bg-white rounded-3xl shadow-2xl border border-gray-100 py-3 z-50 overflow-hidden"
+                      initial={{ opacity: 0, y: 8 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      exit={{ opacity: 0, y: 8 }}
+                      className="absolute right-0 z-50 mt-2 w-56 overflow-hidden rounded-2xl border border-slate-100 bg-white py-2 shadow-2xl"
                     >
-                      <div className="px-4 py-2 mb-2 border-b border-gray-50">
-                        <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">
-                          Institution Type
-                        </p>
-                      </div>
                       {['All', 'diocese', 'parish', 'seminary', 'school'].map((type) => (
                         <button
                           key={type}
@@ -429,21 +505,15 @@ export function Projects({ role }: ProjectsProps) {
                             setFilterEntityType(type as any);
                             setShowEntityFilterDropdown(false);
                           }}
-                          className="w-full px-4 py-3 text-left text-sm font-medium hover:bg-gold-50 flex items-center justify-between transition-colors group"
+                          className="flex w-full items-center justify-between px-4 py-2.5 text-left text-sm font-medium transition-colors hover:bg-gold-50"
                         >
-                          <div className="flex items-center gap-3">
-                            <div className="text-gold-600">{type !== 'All' && getEntityIcon(type)}</div>
-                            <span
-                              className={
-                                filterEntityType === type
-                                  ? 'text-gold-600 font-bold capitalize'
-                                  : 'text-gray-600 group-hover:text-gold-700 capitalize'
-                              }
-                            >
-                              {type}
+                          <span className="flex items-center gap-2.5">
+                            <span className="text-slate-400">{type !== 'All' && getEntityIcon(type)}</span>
+                            <span className={filterEntityType === type ? 'font-bold text-gold-600 capitalize' : 'text-slate-600 capitalize'}>
+                              {type === 'All' ? 'All types' : type}
                             </span>
-                          </div>
-                          {filterEntityType === type && <Check className="w-4 h-4 text-gold-600" />}
+                          </span>
+                          {filterEntityType === type && <Check className="h-4 w-4 text-gold-600" />}
                         </button>
                       ))}
                     </motion.div>
@@ -452,120 +522,170 @@ export function Projects({ role }: ProjectsProps) {
               </div>
             )}
 
+            {/* Category */}
             <div className="relative">
               <button
-                onClick={() => setShowFilterDropdown(!showFilterDropdown)}
-                className={`px-6 py-4 bg-white border border-gray-100 rounded-2xl text-sm font-bold text-church-black flex items-center gap-4 hover:bg-gray-50 transition-all shadow-sm ${showFilterDropdown ? 'ring-4 ring-gold-500/10 border-gold-500' : ''}`}
+                onClick={() => setShowFilterDropdown((v) => !v)}
+                className={`flex h-11 items-center gap-2 rounded-2xl border bg-slate-50 px-4 text-sm font-bold text-slate-700 transition-all ${
+                  showFilterDropdown ? 'border-gold-500 ring-4 ring-gold-500/10' : 'border-slate-200'
+                }`}
               >
-                <Filter className="w-4 h-4 text-gold-600" />
-                <span className="uppercase tracking-widest text-[11px]">{filterCategory}</span>
-                <ChevronDown
-                  className={`w-4 h-4 text-gray-400 transition-transform duration-300 ${showFilterDropdown ? 'rotate-180' : ''}`}
-                />
+                <Filter className="h-4 w-4 text-slate-400" />
+                <span>{filterCategory === 'All' ? 'All categories' : filterCategory}</span>
+                <ChevronDown className={`h-4 w-4 text-slate-400 transition-transform ${showFilterDropdown ? 'rotate-180' : ''}`} />
               </button>
-
               <AnimatePresence>
                 {showFilterDropdown && (
                   <motion.div
-                    initial={{ opacity: 0, y: 10, scale: 0.95 }}
-                    animate={{ opacity: 1, y: 0, scale: 1 }}
-                    exit={{ opacity: 0, y: 10, scale: 0.95 }}
-                    className="absolute right-0 mt-3 w-72 bg-white rounded-3xl shadow-2xl border border-gray-100 py-3 z-50 overflow-hidden"
+                    initial={{ opacity: 0, y: 8 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: 8 }}
+                    className="absolute right-0 z-50 mt-2 max-h-72 w-64 overflow-y-auto rounded-2xl border border-slate-100 bg-white py-2 shadow-2xl"
                   >
-                    <div className="px-4 py-2 mb-2 border-b border-gray-50">
-                      <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">
-                        Filter by Category
-                      </p>
-                    </div>
-                    {[
-                      'All',
-                      'Building/Construction',
-                      'Equipment',
-                      'Programs/Outreach',
-                      'Education',
-                      'Emergency/Relief',
-                      'Liturgical',
-                      'Operational',
-                      'Infrastructure',
-                      'Heritage',
-                      'Charity',
-                      'Facilities',
-                    ].map((cat) => (
+                    {CATEGORIES.map((cat) => (
                       <button
                         key={cat}
                         onClick={() => {
                           setFilterCategory(cat as any);
                           setShowFilterDropdown(false);
                         }}
-                        className="w-full px-4 py-3 text-left text-sm font-medium hover:bg-gold-50 flex items-center justify-between transition-colors group"
+                        className="flex w-full items-center justify-between px-4 py-2.5 text-left text-sm font-medium transition-colors hover:bg-gold-50"
                       >
-                        <span
-                          className={
-                            filterCategory === cat
-                              ? 'text-gold-600 font-bold'
-                              : 'text-gray-600 group-hover:text-gold-700'
-                          }
-                        >
-                          {cat}
+                        <span className={filterCategory === cat ? 'font-bold text-gold-600' : 'text-slate-600'}>
+                          {cat === 'All' ? 'All categories' : cat}
                         </span>
-                        {filterCategory === cat && <Check className="w-4 h-4 text-gold-600" />}
+                        {filterCategory === cat && <Check className="h-4 w-4 text-gold-600" />}
                       </button>
                     ))}
                   </motion.div>
                 )}
               </AnimatePresence>
             </div>
+
+            {/* Sort */}
+            <Select
+              icon={<ArrowUpDown className="h-3.5 w-3.5 text-slate-400" />}
+              value={sortBy}
+              onChange={(v) => setSortBy(v as any)}
+              options={[
+                ['recent', 'Most recent'],
+                ['name', 'Name (A–Z)'],
+                ['progress', 'Progress'],
+                ['raised', 'Amount raised'],
+              ]}
+            />
+
+            {/* Date range */}
+            <input
+              type="date"
+              value={dateFrom}
+              onChange={(e) => setDateFrom(e.target.value)}
+              className={dateField(Boolean(dateFrom), 'h-11 rounded-2xl px-3 text-sm font-semibold')}
+            />
+            <input
+              type="date"
+              value={dateTo}
+              min={dateFrom || undefined}
+              onChange={(e) => setDateTo(e.target.value)}
+              className={dateField(Boolean(dateTo), 'h-11 rounded-2xl px-3 text-sm font-semibold')}
+            />
+
+            {hasActiveFilters && (
+              <button
+                onClick={clearFilters}
+                className="inline-flex h-11 items-center gap-1.5 rounded-2xl border border-slate-200 px-4 text-xs font-black uppercase tracking-[0.12em] text-slate-500 transition-all hover:bg-slate-50 hover:text-slate-900"
+              >
+                Clear
+              </button>
+            )}
           </div>
         </div>
 
-        {/* Project Grid */}
-        <AnimatePresence mode="wait">
-          {filteredProjects.length > 0 ? (
-            <motion.div
-              key="grid"
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8"
-            >
-              {filteredProjects.map((project, index) => (
-                <motion.div
-                  key={project.id}
-                  initial={{ opacity: 0, y: 20 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ delay: index * 0.05 }}
-                >
-                  <ProjectDashboardCard project={project} onClick={setSelectedProject} />
-                </motion.div>
-              ))}
-            </motion.div>
-          ) : (
-            <motion.div
-              key="empty"
-              initial={{ opacity: 0, scale: 0.95 }}
-              animate={{ opacity: 1, scale: 1 }}
-              className="text-center py-32 bg-white rounded-[40px] border border-dashed border-gray-200 shadow-sm"
-            >
-              <div className="w-24 h-24 bg-gray-50 rounded-full flex items-center justify-center text-gray-300 mx-auto mb-6">
-                <Search className="w-10 h-10" />
-              </div>
-              <h3 className="text-2xl font-serif font-bold text-church-black mb-2">No projects found</h3>
-              <p className="text-gray-400 max-w-sm mx-auto">
-                Try adjusting the search or filters to surface matching projects for this view.
+        {/* ── Project grid ── */}
+        {pagedProjects.length > 0 ? (
+          <>
+            <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3">
+              {pagedProjects.map((project, index) => {
+                return (
+                  <motion.div
+                    key={project.id}
+                    initial={{ opacity: 0, y: 16 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: index * 0.04 }}
+                    className="group relative"
+                  >
+                    <ProjectDashboardCard project={project} onClick={setSelectedProject} />
+                    {/* Archive / restore — owners only */}
+                    {canManageProject(project) && (
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          persistArchived(Array.from(new Set([...archivedIds, project.id])));
+                        }}
+                        className="absolute right-4 top-4 z-10 inline-flex items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-2.5 py-1.5 text-[10px] font-black uppercase tracking-wide text-slate-500 opacity-0 shadow-sm transition-all hover:bg-rose-500 hover:text-white group-hover:opacity-100"
+                        title="Archive project"
+                      >
+                        <Archive className="h-3 w-3" />
+                        Archive
+                      </button>
+                    )}
+                  </motion.div>
+                );
+              })}
+            </div>
+
+            {/* Pagination */}
+            <div className="mt-8 flex items-center justify-between rounded-2xl border border-slate-200 bg-white px-5 py-3">
+              <p className="text-xs font-semibold text-slate-400">
+                Showing {(safePage - 1) * PAGE_SIZE + 1}–{Math.min(safePage * PAGE_SIZE, filteredProjects.length)} of{' '}
+                {filteredProjects.length} project{filteredProjects.length === 1 ? '' : 's'}
               </p>
+              {totalPages > 1 && (
+                <div className="flex items-center gap-2">
+                  <button
+                    disabled={safePage <= 1}
+                    onClick={() => setPage((p) => Math.max(1, p - 1))}
+                    className="inline-flex h-9 w-9 items-center justify-center rounded-xl border border-slate-200 text-slate-500 transition-colors hover:bg-slate-50 disabled:opacity-40"
+                  >
+                    <ChevronLeft className="h-4 w-4" />
+                  </button>
+                  <span className="text-xs font-bold text-slate-600">
+                    {safePage} / {totalPages}
+                  </span>
+                  <button
+                    disabled={safePage >= totalPages}
+                    onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+                    className="inline-flex h-9 w-9 items-center justify-center rounded-xl border border-slate-200 text-slate-500 transition-colors hover:bg-slate-50 disabled:opacity-40"
+                  >
+                    <ChevronRight className="h-4 w-4" />
+                  </button>
+                </div>
+              )}
+            </div>
+          </>
+        ) : (
+          <div className="flex flex-col items-center justify-center gap-4 rounded-3xl border border-dashed border-slate-300 bg-white py-28 text-center">
+            <div className="flex h-20 w-20 items-center justify-center rounded-3xl border border-dashed border-slate-200 bg-slate-50">
+              <Search className="h-9 w-9 text-slate-300" />
+            </div>
+            <div className="space-y-1">
+              <h3 className="font-serif text-2xl font-bold text-slate-900">No projects found</h3>
+              <p className="max-w-sm text-sm text-slate-400">
+                {hasActiveFilters
+                  ? 'Try adjusting the search or filters to surface matching projects.'
+                  : 'Projects will appear here once added.'}
+              </p>
+            </div>
+            {hasActiveFilters && (
               <button
-                onClick={() => {
-                  setSearchQuery('');
-                  setFilterCategory('All');
-                  setFilterEntityType('All');
-                }}
-                className="mt-8 text-gold-600 font-bold text-sm hover:text-gold-700 transition-colors underline underline-offset-8"
+                onClick={clearFilters}
+                className="text-sm font-bold text-gold-600 underline underline-offset-4 transition-colors hover:text-gold-700"
               >
                 Clear all filters
               </button>
-            </motion.div>
-          )}
-        </AnimatePresence>
+            )}
+          </div>
+        )}
       </div>
 
       <ProjectCreationForm
@@ -574,6 +694,39 @@ export function Projects({ role }: ProjectsProps) {
         currentInstitution={currentProjectInstitution}
         onSubmit={handleAddProject}
       />
+    </div>
+  );
+}
+
+/** Compact styled native select used across the filter bar. */
+function Select({
+  value,
+  onChange,
+  options,
+  icon,
+}: {
+  value: string;
+  onChange: (v: string) => void;
+  options: [string, string][];
+  icon?: React.ReactNode;
+}) {
+  return (
+    <div className="relative">
+      {icon && <span className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2">{icon}</span>}
+      <select
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        className={selectField(value !== 'all' && value !== 'All' && value !== 'recent', `h-11 rounded-2xl ${
+          icon ? 'pl-9' : 'pl-4'
+        } pr-9 text-sm font-bold`)}
+      >
+        {options.map(([v, l]) => (
+          <option key={v} value={v}>
+            {l}
+          </option>
+        ))}
+      </select>
+      <ChevronDown className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
     </div>
   );
 }

@@ -41,6 +41,7 @@ import { FinancialHealthGauge } from '../components/ui/FinancialHealthGauge';
 import { HealthDimensionBar } from '../components/ui/HealthDimensionBar';
 import { DiagnosticCard } from '../components/ui/DiagnosticCard';
 import { StewardChatbot } from '../components/ui/StewardChatbot';
+import { InlineLoader } from '../components/ui/LoadingScreen';
 import { DashboardHeader } from '../components/layout/DashboardHeader';
 import { Card, CardHeader, CardTitle, CardContent } from '../components/ui/Card';
 import { DataImportExport } from '../components/projects/DataImportExport';
@@ -1616,7 +1617,7 @@ export function PriestDashboard({
   if (isLoading && !isEmbedded) {
     return (
       <div className="flex items-center justify-center h-[calc(100vh-80px)]">
-        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-church-green"></div>
+        <InlineLoader label="Loading dashboard" />
       </div>
     );
   }

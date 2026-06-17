@@ -3,16 +3,16 @@
   "latitude": 14.2739,
   "longitude": 121.1239,
   "period_start": "2023-01-01",
-  "period_end": "2026-06-09",
+  "period_end": "2026-06-10",
   "champion_source": "nasa_power_sb",
   "scores": {
     "open_meteo": {
       "coverage": 100.0,
       "plausibility": 100.0,
-      "consistency": 11.07,
-      "composite": 64.43,
-      "record_count": 1256,
-      "rainfall_mismatch_count": 910,
+      "consistency": 11.06,
+      "composite": 64.42,
+      "record_count": 1257,
+      "rainfall_mismatch_count": 911,
       "rainfall_mismatches": [
         "2023-01-01: 0.9mm vs median 17.8mm",
         "2023-01-02: 0.8mm vs median 16.7mm",
@@ -31,7 +31,7 @@
       "plausibility": 100.0,
       "consistency": 100.0,
       "composite": 100.0,
-      "record_count": 1256,
+      "record_count": 1257,
       "rainfall_mismatch_count": 0,
       "rainfall_mismatches": []
     },
@@ -40,7 +40,7 @@
       "plausibility": 100.0,
       "consistency": 100.0,
       "composite": 100.0,
-      "record_count": 1256,
+      "record_count": 1257,
       "rainfall_mismatch_count": 0,
       "rainfall_mismatches": []
     }
@@ -671,11 +671,11 @@
       "period": "2026-06",
       "year": 2026,
       "month": 6,
-      "temp_avg_c": 27.25,
-      "temp_max_c": 30.41,
-      "temp_min_c": 25.29,
-      "rainfall_mm": 157.0,
-      "wind_ms_avg": 2.71,
+      "temp_avg_c": 27.34,
+      "temp_max_c": 30.55,
+      "temp_min_c": 25.26,
+      "rainfall_mm": 161.51,
+      "wind_ms_avg": 2.77,
       "typhoon_days_count": 0,
       "major_events_count": 0,
       "minor_events_count": 0,
@@ -10732,6 +10732,14 @@
         "temp_min_c": 27.9,
         "rainfall_mm": 2.4,
         "wind_ms": 5.6
+      },
+      {
+        "date": "2026-06-10",
+        "temp_avg_c": 29.6,
+        "temp_max_c": 32.7,
+        "temp_min_c": 27.5,
+        "rainfall_mm": 2.2,
+        "wind_ms": 7.14
       }
     ],
     "nasa_power_sb": [
@@ -22037,6 +22045,15 @@
         "temp_min_c": 25.45,
         "rainfall_mm": 3.38,
         "wind_ms": 3.05,
+        "rh_pct": null
+      },
+      {
+        "date": "2026-06-10",
+        "temp_avg_c": 28.09,
+        "temp_max_c": 31.9,
+        "temp_min_c": 24.99,
+        "rainfall_mm": 4.51,
+        "wind_ms": 3.29,
         "rh_pct": null
       }
     ],
@@ -33344,6 +33361,15 @@
         "rainfall_mm": 3.38,
         "wind_ms": 2.29,
         "rh_pct": 79.6
+      },
+      {
+        "date": "2026-06-10",
+        "temp_avg_c": 28.09,
+        "temp_max_c": 31.9,
+        "temp_min_c": 24.99,
+        "rainfall_mm": 4.51,
+        "wind_ms": 2.49,
+        "rh_pct": 80.42
       }
     ]
   }
