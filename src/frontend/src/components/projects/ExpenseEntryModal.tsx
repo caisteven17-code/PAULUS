@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { X, Wallet, Calendar, CreditCard, FileText, Check, ChevronDown, Upload, AlertCircle } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { formatCurrency } from '../../lib/format';
@@ -11,11 +11,15 @@ interface ExpenseEntryModalProps {
   isOpen: boolean;
   onClose: () => void;
   onSubmit: (expense: Omit<ProjectExpense, 'id'>) => void;
+  onEdit?: (expense: ProjectExpense) => void;
+  initialData?: ProjectExpense;
   projectId: string;
   projectName: string;
 }
 
-export function ExpenseEntryModal({ isOpen, onClose, onSubmit, projectId, projectName }: ExpenseEntryModalProps) {
+export function ExpenseEntryModal({ isOpen, onClose, onSubmit, onEdit, initialData, projectId, projectName }: ExpenseEntryModalProps) {
+  const isEditMode = !!initialData;
+
   const [formData, setFormData] = useState({
     description: '',
     amount: '',
@@ -26,13 +30,34 @@ export function ExpenseEntryModal({ isOpen, onClose, onSubmit, projectId, projec
   const [proofFile, setProofFile] = useState<File | null>(null);
   const [uploadError, setUploadError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [submitted, setSubmitted] = useState(false);
+
+  useEffect(() => {
+    if (isOpen && initialData) {
+      setFormData({
+        description: initialData.description ?? '',
+        amount: initialData.amount.toString(),
+        date: initialData.date ? new Date(initialData.date).toISOString().split('T')[0] : new Date().toISOString().split('T')[0],
+        paymentMethod: initialData.paymentMethod ?? 'Cash',
+        notes: initialData.notes ?? '',
+      });
+      setProofFile(null);
+      setSubmitted(false);
+    } else if (isOpen && !initialData) {
+      setFormData({ description: '', amount: '', date: new Date().toISOString().split('T')[0], paymentMethod: 'Cash', notes: '' });
+      setProofFile(null);
+      setSubmitted(false);
+    }
+  }, [isOpen, initialData]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    setSubmitted(true);
+    if (!formData.description.trim() || !formData.amount || Number(formData.amount) <= 0 || !formData.date) return;
     setIsSubmitting(true);
     setUploadError(null);
 
-    let proofFileUrl: string | undefined;
+    let proofFileUrl: string | undefined = isEditMode ? initialData?.proofFileName : undefined;
 
     if (proofFile) {
       const ext = proofFile.name.split('.').pop();
@@ -53,7 +78,7 @@ export function ExpenseEntryModal({ isOpen, onClose, onSubmit, projectId, projec
       proofFileUrl = urlData.publicUrl;
     }
 
-    onSubmit({
+    const payload = {
       projectId,
       description: formData.description,
       amount: Number(formData.amount),
@@ -61,17 +86,17 @@ export function ExpenseEntryModal({ isOpen, onClose, onSubmit, projectId, projec
       paymentMethod: formData.paymentMethod,
       proofFileName: proofFileUrl,
       notes: formData.notes,
-    });
+    };
+
+    if (isEditMode && onEdit && initialData) {
+      onEdit({ ...initialData, ...payload });
+    } else {
+      onSubmit(payload);
+    }
 
     setIsSubmitting(false);
     onClose();
-    setFormData({
-      description: '',
-      amount: '',
-      date: new Date().toISOString().split('T')[0],
-      paymentMethod: 'Cash',
-      notes: '',
-    });
+    setFormData({ description: '', amount: '', date: new Date().toISOString().split('T')[0], paymentMethod: 'Cash', notes: '' });
     setProofFile(null);
   };
 
@@ -96,7 +121,7 @@ export function ExpenseEntryModal({ isOpen, onClose, onSubmit, projectId, projec
             <div className="p-6 md:p-8 border-b border-gray-100 flex justify-between items-center bg-white sticky top-0 z-20 shrink-0">
               <div className="min-w-0">
                 <h2 className="text-xl md:text-2xl font-serif font-bold text-church-black tracking-tight truncate">
-                  Record Disbursement
+                  {isEditMode ? 'Edit Disbursement' : 'Record Disbursement'}
                 </h2>
                 <p className="text-xs md:text-sm text-gray-500 font-medium mt-1 truncate">Project: {projectName}</p>
               </div>
@@ -116,31 +141,37 @@ export function ExpenseEntryModal({ isOpen, onClose, onSubmit, projectId, projec
                   <div className="space-y-2">
                     <label className="text-[11px] font-bold text-gold-700 uppercase tracking-[0.2em] flex items-center gap-2">
                       <FileText className="w-3.5 h-3.5" />
-                      Description
+                      Description <span className="text-rose-500">*</span>
                     </label>
                     <input
                       type="text"
-                      required
                       value={formData.description}
                       onChange={(e) => setFormData({ ...formData, description: e.target.value })}
                       placeholder="Materials, labor, equipment…"
-                      className="w-full px-5 py-4 bg-gray-50/50 border border-gray-200 rounded-2xl text-sm font-medium focus:outline-none focus:ring-4 focus:ring-gold-500/10 focus:border-gold-500 focus:bg-white transition-all placeholder:text-gray-300"
+                      className={`w-full px-5 py-4 bg-gray-50/50 border rounded-2xl text-sm font-medium focus:outline-none focus:ring-4 focus:bg-white transition-all placeholder:text-gray-300 ${
+                        submitted && !formData.description.trim()
+                          ? 'border-rose-400 focus:border-rose-500 focus:ring-rose-500/10'
+                          : 'border-gray-200 focus:border-gold-500 focus:ring-gold-500/10'
+                      }`}
                     />
                   </div>
 
                   <div className="space-y-2">
                     <label className="text-[11px] font-bold text-gold-700 uppercase tracking-[0.2em] flex items-center gap-2">
                       <Wallet className="w-3.5 h-3.5" />
-                      Amount (₱)
+                      Amount (₱) <span className="text-rose-500">*</span>
                     </label>
                     <div className="space-y-3">
                       <input
                         type="number"
-                        required
                         value={formData.amount}
                         onChange={(e) => setFormData({ ...formData, amount: e.target.value })}
                         placeholder="0.00"
-                        className="w-full px-5 py-4 bg-gray-50/50 border border-gray-200 rounded-2xl text-base font-serif font-bold focus:outline-none focus:ring-4 focus:ring-gold-500/10 focus:border-gold-500 focus:bg-white transition-all placeholder:text-gray-300"
+                        className={`w-full px-5 py-4 bg-gray-50/50 border rounded-2xl text-base font-serif font-bold focus:outline-none focus:ring-4 focus:bg-white transition-all placeholder:text-gray-300 ${
+                          submitted && (!formData.amount || Number(formData.amount) <= 0)
+                            ? 'border-rose-400 focus:border-rose-500 focus:ring-rose-500/10'
+                            : 'border-gray-200 focus:border-gold-500 focus:ring-gold-500/10'
+                        }`}
                       />
                       <div className="flex flex-wrap gap-2">
                         {[1000, 5000, 10000, 25000].map((amt) => (
@@ -167,14 +198,17 @@ export function ExpenseEntryModal({ isOpen, onClose, onSubmit, projectId, projec
                   <div className="space-y-2">
                     <label className="text-[11px] font-bold text-gold-700 uppercase tracking-[0.2em] flex items-center gap-2">
                       <Calendar className="w-3.5 h-3.5" />
-                      Date Paid
+                      Date Paid <span className="text-rose-500">*</span>
                     </label>
                     <input
                       type="date"
-                      required
                       value={formData.date}
                       onChange={(e) => setFormData({ ...formData, date: e.target.value })}
-                      className="w-full px-5 py-4 bg-gray-50/50 border border-gray-200 rounded-2xl text-sm font-medium focus:outline-none focus:ring-4 focus:ring-gold-500/10 focus:border-gold-500 focus:bg-white transition-all"
+                      className={`w-full px-5 py-4 bg-gray-50/50 border rounded-2xl text-sm font-medium focus:outline-none focus:ring-4 focus:bg-white transition-all ${
+                        submitted && !formData.date
+                          ? 'border-rose-400 focus:border-rose-500 focus:ring-rose-500/10'
+                          : 'border-gray-200 focus:border-gold-500 focus:ring-gold-500/10'
+                      }`}
                     />
                   </div>
 
@@ -267,7 +301,7 @@ export function ExpenseEntryModal({ isOpen, onClose, onSubmit, projectId, projec
                     ) : (
                       <>
                         <Check className="w-5 h-5" />
-                        RECORD DISBURSEMENT
+                        {isEditMode ? 'SAVE CHANGES' : 'RECORD DISBURSEMENT'}
                       </>
                     )}
                   </button>

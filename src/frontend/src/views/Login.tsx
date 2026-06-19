@@ -19,6 +19,7 @@ export function Login({ onLogin }: LoginProps) {
   const [showPassword, setShowPassword]       = useState(false);
   const [error, setError]                     = useState('');
   const [isLoading, setIsLoading]             = useState(false);
+  const [failedAttempts, setFailedAttempts]   = useState(0);
   const [transitioning, setTransitioning]     = useState(false);
   const [showForgotPassword, setShowForgotPassword] = useState(false);
   const [step, setStep]                       = useState<'credentials' | 'mfa'>('credentials');
@@ -28,6 +29,7 @@ export function Login({ onLogin }: LoginProps) {
   const [pendingRole, setPendingRole]         = useState<AppRole>('bishop');
 
   const completeLogin = (role: AppRole) => {
+    setFailedAttempts(0);
     setTransitioning(true);
     setTimeout(() => onLogin(role), 800);
   };
@@ -112,7 +114,18 @@ export function Login({ onLogin }: LoginProps) {
       completeLogin(role);
     } catch {
       clearLoginTransitionPending();
-      setError('Invalid email or password. Please try again.');
+      const nextAttempts = failedAttempts + 1;
+      setFailedAttempts(nextAttempts);
+      if (nextAttempts >= 3 && email.trim()) {
+        void fetch('/api/auth/security-alert', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email: email.toLowerCase().trim() }),
+        });
+        setError('Too many failed attempts. A security alert has been sent to your email.');
+      } else {
+        setError('Invalid email or password. Please try again.');
+      }
     } finally { setIsLoading(false); }
   };
 

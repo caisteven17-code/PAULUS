@@ -321,6 +321,7 @@ export const INITIAL_ROLES: UserRole[] = [
       view_seminary_dashboard: false,
       view_school_dashboard: false,
       manage_own_institution: false,
+      validate_liturgical_calendar: false,
     },
   },
   {
@@ -392,6 +393,7 @@ export const INITIAL_ROLES: UserRole[] = [
       view_seminary_dashboard: true,
       view_school_dashboard: true,
       manage_own_institution: false,
+      validate_liturgical_calendar: false,
     },
   },
   {

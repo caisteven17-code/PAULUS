@@ -158,6 +158,18 @@ export function Events() {
   const [institutionFilter, setInstitutionFilter] = useState<string>('all'); // specific institution name
   const [filters, setFilters] = useState(EMPTY_FILTERS);
 
+  const [archiveConfirmEvent, setArchiveConfirmEvent] = useState<DiocesanEvent | null>(null);
+
+  // Returns true only when the current user owns this specific event.
+  const canManageEvent = useCallback(
+    (event: DiocesanEvent): boolean => {
+      if (!canManage) return false;
+      if (isDiocese) return !event.institution_type || event.institution_type === 'diocese';
+      return event.institution_name === user?.entityName || event.institution_id === user?.entityId;
+    },
+    [canManage, isDiocese, user?.entityName, user?.entityId],
+  );
+
   // Toast
   const [toast, setToast] = useState<string | null>(null);
   const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -722,7 +734,7 @@ export function Events() {
                             {event.event_name}
                           </h2>
 
-                          {canManage && (
+                          {canManageEvent(event) && (
                             <div className="flex items-center gap-1 shrink-0 -mt-0.5 -mr-1">
                               <button
                                 onClick={() => openEditModal(event)}
@@ -732,7 +744,7 @@ export function Events() {
                                 Edit
                               </button>
                               <button
-                                onClick={() => handleArchive(event)}
+                                onClick={() => setArchiveConfirmEvent(event)}
                                 className="inline-flex h-10 items-center gap-2 rounded-2xl border border-slate-200 bg-white px-4 text-xs font-black text-slate-600 transition-colors hover:bg-amber-50 hover:text-amber-700"
                               >
                                 <Archive className="h-3.5 w-3.5" />
@@ -977,6 +989,64 @@ export function Events() {
             className="fixed bottom-24 left-1/2 -translate-x-1/2 z-[110] bg-slate-950 text-white px-6 py-4 rounded-2xl shadow-2xl text-sm font-medium"
           >
             {toast}
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Archive confirmation modal */}
+      <AnimatePresence>
+        {archiveConfirmEvent && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.18 }}
+            className="fixed inset-0 z-[200] flex items-center justify-center bg-black/55 p-4 backdrop-blur-sm"
+          >
+            <motion.div
+              initial={{ opacity: 0, y: 16, scale: 0.96 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              exit={{ opacity: 0, y: 12, scale: 0.96 }}
+              transition={{ duration: 0.2, ease: 'easeOut' }}
+              className="w-full max-w-sm overflow-hidden rounded-[28px] border border-slate-200 bg-white shadow-2xl"
+            >
+              <div className="flex items-center gap-4 border-b border-slate-100 px-6 py-5">
+                <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-amber-50 text-amber-600">
+                  <Archive className="h-5 w-5" />
+                </div>
+                <div>
+                  <h2 className="text-lg font-black text-slate-950">Archive Event?</h2>
+                  <p className="text-xs font-semibold text-slate-400">This action can be undone from Archives.</p>
+                </div>
+              </div>
+              <div className="px-6 py-5">
+                <p className="text-sm leading-relaxed text-slate-600">
+                  Are you sure you want to archive{' '}
+                  <span className="font-bold text-slate-900">"{archiveConfirmEvent.event_name}"</span>? It will be
+                  removed from the active calendar.
+                </p>
+              </div>
+              <div className="flex items-center gap-3 border-t border-slate-100 px-6 pb-6 pt-4">
+                <button
+                  type="button"
+                  onClick={() => setArchiveConfirmEvent(null)}
+                  className="flex-1 rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-black text-slate-600 transition-colors hover:bg-slate-50"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    const ev = archiveConfirmEvent;
+                    setArchiveConfirmEvent(null);
+                    void handleArchive(ev);
+                  }}
+                  className="flex-1 rounded-2xl bg-amber-600 px-4 py-3 text-sm font-black text-white transition-colors hover:bg-amber-700"
+                >
+                  Archive
+                </button>
+              </div>
+            </motion.div>
           </motion.div>
         )}
       </AnimatePresence>

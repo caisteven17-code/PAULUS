@@ -167,6 +167,12 @@ export function Projects({ role }: ProjectsProps) {
     // School overseers receive every type from the API — keep only schools.
     if (isSchoolOverseer) out = out.filter((p) => p.entityType === 'school');
 
+    // Diocese view: apply the entity-type dropdown filter client-side so the
+    // list updates immediately without waiting for a fresh API response.
+    if (isDiocese && filterEntityType !== 'All') {
+      out = out.filter((p) => p.entityType === filterEntityType);
+    }
+
     out = out.filter((p) => !isArchived(p.id));
 
     if (searchQuery.trim()) {
@@ -191,7 +197,7 @@ export function Projects({ role }: ProjectsProps) {
       return new Date(b.startDate).getTime() - new Date(a.startDate).getTime(); // recent
     });
     return out;
-  }, [projects, isSchoolOverseer, filterStatus, isArchived, searchQuery, filterCategory, dateFrom, dateTo, sortBy]);
+  }, [projects, isSchoolOverseer, isDiocese, filterEntityType, filterStatus, isArchived, searchQuery, filterCategory, dateFrom, dateTo, sortBy]);
 
   useEffect(() => {
     setPage(1);
@@ -291,6 +297,29 @@ export function Projects({ role }: ProjectsProps) {
     }
   };
 
+  const handleEditDonation = (updated: Donation) => {
+    setDonations((prev) => prev.map((d) => (d.id === updated.id ? updated : d)));
+    void dataService.saveDonation(updated).then((saved) => {
+      setDonations((prev) => prev.map((d) => (d.id === saved.id ? saved : d)));
+    });
+  };
+
+  const handleEditExpense = (updated: ProjectExpense) => {
+    setExpenses((prev) => prev.map((e) => (e.id === updated.id ? updated : e)));
+    void dataService.saveExpense(updated).then((saved) => {
+      setExpenses((prev) => prev.map((e) => (e.id === saved.id ? saved : e)));
+    });
+  };
+
+  const handleEditProject = (updated: Project) => {
+    setProjects((prev) => prev.map((p) => (p.id === updated.id ? updated : p)));
+    setSelectedProject(updated);
+    void dataService.saveProject(updated).then((saved) => {
+      setProjects((prev) => prev.map((p) => (p.id === saved.id ? saved : p)));
+      setSelectedProject(saved);
+    });
+  };
+
   const handleCloneProject = (project: Project) => {
     const clonedProject: Project = {
       ...project,
@@ -348,6 +377,9 @@ export function Projects({ role }: ProjectsProps) {
         onBack={() => setSelectedProject(null)}
         onAddDonation={handleAddDonation}
         onAddExpense={handleAddExpense}
+        onEditProject={handleEditProject}
+        onEditDonation={handleEditDonation}
+        onEditExpense={handleEditExpense}
         onCloneProject={handleCloneProject}
         role={role}
         canManageProjects={canManageProject(selectedProject)}
@@ -367,7 +399,7 @@ export function Projects({ role }: ProjectsProps) {
       value: `₱${visibleForStats.reduce((a, p) => a + p.targetAmount, 0).toLocaleString()}`,
       icon: Target,
     },
-    { label: 'Donors', value: donations.length, icon: User },
+    { label: 'Donors', value: donations.filter((d) => visibleForStats.some((p) => p.id === d.projectId)).length, icon: User },
   ];
 
   return (

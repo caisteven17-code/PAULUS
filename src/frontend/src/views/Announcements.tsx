@@ -189,6 +189,7 @@ export function Announcements() {
   const [loading,              setLoading]              = useState(true);
   const [isSubmitting,         setIsSubmitting]         = useState(false);
   const [formError,            setFormError]            = useState<string | null>(null);
+  const [formSubmitted,        setFormSubmitted]        = useState(false);
   const [confirmState, setConfirmState] = useState<null | {
     title: string;
     message: string;
@@ -284,12 +285,14 @@ export function Announcements() {
     setFormData({ title: '', content: '', priority: 'medium', category: 'general', startDate: '', endDate: '', saveAs: 'active' });
     setEditingId(null);
     setFormError(null);
+    setFormSubmitted(false);
   }, []);
 
   // ── Submit form ────────────────────────────────────────────────────────────
-  const handleSubmitForm = useCallback(async () => {
+  const handleSubmitForm = useCallback(async (submitStatus?: 'draft' | 'active') => {
+    setFormSubmitted(true);
     if (!formData.title.trim() || !formData.content.trim()) {
-      setFormError('Please fill in both the title and the content.');
+      setFormError('Please fill in the required fields marked with *.');
       return;
     }
     if (formData.startDate && formData.endDate && new Date(formData.endDate) <= new Date(formData.startDate)) {
@@ -337,7 +340,7 @@ export function Announcements() {
           authorRole: user?.role  || 'chancellor',
           priority:   formData.priority,
           category:   formData.category,
-          status:     formData.saveAs,
+          status:     submitStatus ?? formData.saveAs,
           startDate:  formData.startDate ? new Date(formData.startDate).toISOString() : undefined,
           endDate:    formData.endDate   ? new Date(formData.endDate).toISOString()   : undefined,
         };
@@ -372,11 +375,11 @@ export function Announcements() {
             author: user?.name || "Chancellor's Office",
             authorRole: user?.role || 'chancellor',
             priority: formData.priority, category: formData.category,
-            status: formData.saveAs,
+            status: submitStatus ?? formData.saveAs,
             pinned: false,
             startDate: formData.startDate ? new Date(formData.startDate).getTime() : now,
             endDate:   formData.endDate   ? new Date(formData.endDate).getTime()   : null,
-            publishedAt: formData.saveAs === 'active' ? now : null,
+            publishedAt: (submitStatus ?? formData.saveAs) === 'active' ? now : null,
             archivedAt: null, archivedBy: null,
             createdAt: now,
           };
@@ -918,7 +921,7 @@ export function Announcements() {
                   <div className="space-y-2">
                     <label className="flex items-center gap-2 text-[11px] font-bold uppercase tracking-[0.2em] text-gold-700">
                       <Megaphone className="h-3.5 w-3.5" />
-                      Title
+                      Title <span className="text-rose-500">*</span>
                     </label>
                     <input
                       type="text"
@@ -926,7 +929,11 @@ export function Announcements() {
                       maxLength={TITLE_MAX}
                       onChange={(e) => setFormData({ ...formData, title: e.target.value })}
                       placeholder="e.g. Clergy Assembly, Financial Report Deadline…"
-                      className="w-full rounded-2xl border border-slate-200 bg-slate-50/50 px-5 py-4 text-base font-medium transition-all placeholder:text-slate-300 focus:border-gold-500 focus:bg-white focus:outline-none focus:ring-4 focus:ring-gold-500/10"
+                      className={`w-full rounded-2xl border bg-slate-50/50 px-5 py-4 text-base font-medium transition-all placeholder:text-slate-300 focus:bg-white focus:outline-none focus:ring-4 ${
+                        formSubmitted && !formData.title.trim()
+                          ? 'border-rose-400 focus:border-rose-500 focus:ring-rose-500/10'
+                          : 'border-slate-200 focus:border-gold-500 focus:ring-gold-500/10'
+                      }`}
                     />
                     <p className="text-right text-[10px] font-semibold text-slate-400">
                       {formData.title.length}/{TITLE_MAX}
@@ -936,7 +943,7 @@ export function Announcements() {
                   {/* Content */}
                   <div className="space-y-2">
                     <label className="text-[11px] font-bold uppercase tracking-[0.2em] text-gold-700">
-                      Content
+                      Content <span className="text-rose-500">*</span>
                     </label>
                     <textarea
                       value={formData.content}
@@ -944,7 +951,11 @@ export function Announcements() {
                       onChange={(e) => setFormData({ ...formData, content: e.target.value })}
                       placeholder="Write the full announcement here…"
                       rows={6}
-                      className="w-full resize-none rounded-2xl border border-slate-200 bg-slate-50/50 px-5 py-4 text-sm font-medium transition-all placeholder:text-slate-300 focus:border-gold-500 focus:bg-white focus:outline-none focus:ring-4 focus:ring-gold-500/10"
+                      className={`w-full resize-none rounded-2xl border bg-slate-50/50 px-5 py-4 text-sm font-medium transition-all placeholder:text-slate-300 focus:bg-white focus:outline-none focus:ring-4 ${
+                        formSubmitted && !formData.content.trim()
+                          ? 'border-rose-400 focus:border-rose-500 focus:ring-rose-500/10'
+                          : 'border-slate-200 focus:border-gold-500 focus:ring-gold-500/10'
+                      }`}
                     />
                     <p className="text-right text-[10px] font-semibold text-slate-400">
                       {formData.content.length}/{CONTENT_MAX}
@@ -955,7 +966,7 @@ export function Announcements() {
                   <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
                     <div className="space-y-2">
                       <label className="text-[11px] font-bold uppercase tracking-[0.2em] text-gold-700">
-                        Category
+                        Category <span className="text-rose-500">*</span>
                       </label>
                       <div className="relative">
                         <select
@@ -974,7 +985,7 @@ export function Announcements() {
 
                     <div className="space-y-2">
                       <label className="text-[11px] font-bold uppercase tracking-[0.2em] text-gold-700">
-                        Priority
+                        Priority <span className="text-rose-500">*</span>
                       </label>
                       <div className="relative">
                         <select
@@ -1022,35 +1033,11 @@ export function Announcements() {
                     </div>
                   </div>
 
-                  {/* Save As */}
                   {!editingId && (
-                    <div className="space-y-2">
-                      <label className="text-[11px] font-bold uppercase tracking-[0.2em] text-gold-700">Save As</label>
-                      <div className="grid grid-cols-2 gap-3">
-                        {(['draft', 'active'] as const).map((opt) => (
-                          <button
-                            key={opt}
-                            type="button"
-                            onClick={() => setFormData({ ...formData, saveAs: opt })}
-                            className={`rounded-2xl border-2 px-5 py-4 text-sm font-bold transition-all ${
-                              formData.saveAs === opt
-                                ? opt === 'draft'
-                                  ? 'border-slate-400 bg-slate-100 text-slate-900'
-                                  : 'border-gold-500 bg-gold-50 text-gold-800'
-                                : 'border-slate-200 text-slate-500 hover:border-slate-300'
-                            }`}
-                          >
-                            {opt === 'draft' ? 'Save as Draft' : 'Publish Now'}
-                          </button>
-                        ))}
-                      </div>
-                      {formData.saveAs === 'active' && (
-                        <p className="flex items-center gap-1.5 text-[10px] font-medium text-amber-600">
-                          <AlertTriangle className="h-3 w-3 shrink-0" />
-                          Once published, you have 5 minutes to delete. After that, only edit or archive is available.
-                        </p>
-                      )}
-                    </div>
+                    <p className="flex items-center gap-1.5 text-[10px] font-medium text-amber-600">
+                      <AlertTriangle className="h-3 w-3 shrink-0" />
+                      Once published, you have 5 minutes to delete. After that, only edit or archive is available.
+                    </p>
                   )}
 
                   {formError && (
@@ -1061,29 +1048,48 @@ export function Announcements() {
                   )}
 
                   {/* Buttons */}
-                  <div className="flex flex-col-reverse gap-3 pt-2 sm:flex-row">
-                    <button
-                      type="button"
-                      onClick={() => setShowForm(false)}
-                      className="w-full rounded-2xl px-6 py-4 text-sm font-bold text-slate-500 transition-all hover:bg-slate-50 sm:flex-1"
-                    >
-                      Cancel
-                    </button>
-                    <button
-                      onClick={handleSubmitForm}
-                      disabled={isSubmitting}
-                      className="flex w-full items-center justify-center gap-3 rounded-2xl bg-gold-500 px-6 py-4 text-sm font-bold text-church-green-dark shadow-xl shadow-gold-500/20 transition-all hover:bg-gold-600 disabled:opacity-50 sm:flex-[2]"
-                    >
-                      {isSubmitting ? (
-                        <div className="h-5 w-5 animate-spin rounded-full border-2 border-church-green-dark/30 border-t-church-green-dark" />
-                      ) : (
-                        <>
-                          {editingId ? <Check className="h-5 w-5" /> : <Send className="h-4 w-4" />}
-                          {editingId ? 'SAVE CHANGES' : formData.saveAs === 'draft' ? 'SAVE DRAFT' : 'PUBLISH ANNOUNCEMENT'}
-                        </>
-                      )}
-                    </button>
-                  </div>
+                  {editingId ? (
+                    <div className="flex flex-col-reverse gap-3 pt-2 sm:flex-row">
+                      <button
+                        type="button"
+                        onClick={() => setShowForm(false)}
+                        className="w-full rounded-2xl px-6 py-4 text-sm font-bold text-slate-500 transition-all hover:bg-slate-50 sm:flex-1"
+                      >
+                        Cancel
+                      </button>
+                      <button
+                        onClick={() => handleSubmitForm()}
+                        disabled={isSubmitting}
+                        className="flex w-full items-center justify-center gap-2 rounded-2xl bg-gold-500 px-6 py-4 text-sm font-bold text-church-green-dark shadow-xl shadow-gold-500/20 transition-all hover:bg-gold-600 disabled:opacity-50 sm:flex-[2]"
+                      >
+                        {isSubmitting ? <div className="h-5 w-5 animate-spin rounded-full border-2 border-church-green-dark/30 border-t-church-green-dark" /> : <><Check className="h-5 w-5" />Save Changes</>}
+                      </button>
+                    </div>
+                  ) : (
+                    <div className="flex flex-col-reverse gap-3 pt-2 sm:flex-row">
+                      <button
+                        type="button"
+                        onClick={() => setShowForm(false)}
+                        className="w-full rounded-2xl px-6 py-4 text-sm font-bold text-slate-500 transition-all hover:bg-slate-50 sm:flex-1"
+                      >
+                        Cancel
+                      </button>
+                      <button
+                        onClick={() => handleSubmitForm('draft')}
+                        disabled={isSubmitting}
+                        className="flex w-full items-center justify-center gap-2 rounded-2xl border-2 border-slate-300 bg-white px-6 py-4 text-sm font-bold text-slate-700 transition-all hover:border-slate-400 hover:bg-slate-50 disabled:opacity-50 sm:flex-1"
+                      >
+                        {isSubmitting ? <div className="h-4 w-4 animate-spin rounded-full border-2 border-slate-400 border-t-slate-700" /> : 'Save as Draft'}
+                      </button>
+                      <button
+                        onClick={() => handleSubmitForm('active')}
+                        disabled={isSubmitting}
+                        className="flex w-full items-center justify-center gap-2 rounded-2xl bg-gold-500 px-6 py-4 text-sm font-bold text-church-green-dark shadow-xl shadow-gold-500/20 transition-all hover:bg-gold-600 disabled:opacity-50 sm:flex-[2]"
+                      >
+                        {isSubmitting ? <div className="h-5 w-5 animate-spin rounded-full border-2 border-church-green-dark/30 border-t-church-green-dark" /> : <><Send className="h-4 w-4" />Publish Now</>}
+                      </button>
+                    </div>
+                  )}
                 </div>
               </div>
             </motion.div>

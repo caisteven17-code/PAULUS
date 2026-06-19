@@ -1,20 +1,41 @@
 {
-  "overall_fleiss_kappa": 0.4215,
+  "overall_fleiss_kappa": 0.4124,
   "overall_fleiss_strength": "Moderate",
-  "overall_wci_pct": 92.34,
+  "overall_wci_pct": 82.5,
   "rainfall": {
-    "total_rows": 2514,
-    "n_items_for_kappa": 2514,
-    "fleiss_kappa": 0.2898,
+    "total_rows": 37740,
+    "n_items_for_kappa": 37740,
+    "fleiss_kappa": 0.2751,
     "fleiss_strength": "Fair",
-    "weighted_confidence_index_pct": 98.57
+    "weighted_confidence_index_pct": 98.47
+  },
+  "severe_weather": {
+    "total_rows": 37740,
+    "n_items_for_kappa": 37740,
+    "fleiss_kappa": 0.6094,
+    "fleiss_strength": "Substantial",
+    "weighted_confidence_index_pct": 83.7
   },
   "temperature": {
-    "total_rows": 2514,
-    "n_items_for_kappa": 2514,
-    "note": "Validation bins raw temp_c; classification display uses Rothfusz heat index.",
-    "fleiss_kappa": 0.5533,
+    "total_rows": 37740,
+    "n_items_for_kappa": 37740,
+    "note": "Validation bins raw temp_c; classification uses Rothfusz heat index.",
+    "fleiss_kappa": 0.5205,
     "fleiss_strength": "Moderate",
-    "weighted_confidence_index_pct": 86.11
+    "weighted_confidence_index_pct": 83.51
+  },
+  "humidity": {
+    "total_rows": 37740,
+    "n_items_for_kappa": 37740,
+    "fleiss_kappa": 0.2935,
+    "fleiss_strength": "Fair",
+    "weighted_confidence_index_pct": 65.55
+  },
+  "wind": {
+    "total_rows": 37740,
+    "n_items_for_kappa": 37740,
+    "fleiss_kappa": 0.3635,
+    "fleiss_strength": "Fair",
+    "weighted_confidence_index_pct": 63.13
   }
 }

@@ -25,6 +25,7 @@ import {
 import ReactECharts from 'echarts-for-react';
 import { apiClient } from '../lib/api-client';
 import { InlineLoader } from '../components/ui/LoadingScreen';
+import { usePermissions } from '../hooks/usePermissions';
 
 type AITwinMode = 'parish' | 'priest' | 'seminary' | 'school';
 type FinancialAITwinMode = Exclude<AITwinMode, 'priest'>;
@@ -575,10 +576,15 @@ function calculatePriestScenario(
 
 function ParishAITwin({ mode = 'parish' }: { mode?: FinancialAITwinMode }) {
   const config = financialTwinConfigs[mode];
+  const { permissions: simPermissions, user: simUser } = usePermissions();
+  const isDioceseUser = simPermissions.view_diocese === true;
   const [liveProfiles, setLiveProfiles] = useState<FinancialTwinProfile[]>([]);
   const [profilesLoaded, setProfilesLoaded] = useState(false);
   const [loadError, setLoadError] = useState(false);
-  const profiles = liveProfiles;
+  // Non-diocesan users only see their own institution in the simulator.
+  const profiles = isDioceseUser
+    ? liveProfiles
+    : liveProfiles.filter((p) => p.name === simUser?.entityName);
   const [selectedParishId, setSelectedParishId] = useState<string>('');
 
   // Fetch real institution financial profiles; fall back to hardcoded on failure.

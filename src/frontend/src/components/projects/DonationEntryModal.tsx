@@ -1,6 +1,6 @@
 ﻿'use client';
 
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { X, DollarSign, Calendar, User, CreditCard, FileText, Check, ChevronDown, Upload, AlertCircle } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { formatCurrency } from '../../lib/format';
@@ -11,11 +11,15 @@ interface DonationEntryModalProps {
   isOpen: boolean;
   onClose: () => void;
   onSubmit: (donation: Omit<Donation, 'id'>) => void;
+  onEdit?: (donation: Donation) => void;
+  initialData?: Donation;
   projectId: string;
   projectName: string;
 }
 
-export function DonationEntryModal({ isOpen, onClose, onSubmit, projectId, projectName }: DonationEntryModalProps) {
+export function DonationEntryModal({ isOpen, onClose, onSubmit, onEdit, initialData, projectId, projectName }: DonationEntryModalProps) {
+  const isEditMode = !!initialData;
+
   const [formData, setFormData] = useState({
     donorName: '',
     amount: '',
@@ -26,13 +30,34 @@ export function DonationEntryModal({ isOpen, onClose, onSubmit, projectId, proje
   const [receiptFile, setReceiptFile] = useState<File | null>(null);
   const [uploadError, setUploadError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [submitted, setSubmitted] = useState(false);
+
+  useEffect(() => {
+    if (isOpen && initialData) {
+      setFormData({
+        donorName: initialData.donorName === 'Anonymous' ? '' : (initialData.donorName ?? ''),
+        amount: initialData.amount.toString(),
+        date: initialData.date ? new Date(initialData.date).toISOString().split('T')[0] : new Date().toISOString().split('T')[0],
+        paymentMethod: initialData.paymentMethod ?? 'Cash',
+        notes: initialData.notes ?? '',
+      });
+      setReceiptFile(null);
+      setSubmitted(false);
+    } else if (isOpen && !initialData) {
+      setFormData({ donorName: '', amount: '', date: new Date().toISOString().split('T')[0], paymentMethod: 'Cash', notes: '' });
+      setReceiptFile(null);
+      setSubmitted(false);
+    }
+  }, [isOpen, initialData]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    setSubmitted(true);
+    if (!formData.amount || Number(formData.amount) <= 0 || !formData.date) return;
     setIsSubmitting(true);
     setUploadError(null);
 
-    let receiptProofUrl: string | undefined;
+    let receiptProofUrl: string | undefined = isEditMode ? initialData?.receiptProofName : undefined;
 
     if (receiptFile) {
       const ext = receiptFile.name.split('.').pop();
@@ -53,7 +78,7 @@ export function DonationEntryModal({ isOpen, onClose, onSubmit, projectId, proje
       receiptProofUrl = urlData.publicUrl;
     }
 
-    onSubmit({
+    const payload = {
       projectId,
       donorName: formData.donorName || 'Anonymous',
       amount: Number(formData.amount),
@@ -61,16 +86,16 @@ export function DonationEntryModal({ isOpen, onClose, onSubmit, projectId, proje
       paymentMethod: formData.paymentMethod,
       receiptProofName: receiptProofUrl,
       notes: formData.notes,
-    });
+    };
+
+    if (isEditMode && onEdit && initialData) {
+      onEdit({ ...initialData, ...payload });
+    } else {
+      onSubmit(payload);
+    }
 
     setIsSubmitting(false);
-    setFormData({
-      donorName: '',
-      amount: '',
-      date: new Date().toISOString().split('T')[0],
-      paymentMethod: 'Cash',
-      notes: '',
-    });
+    setFormData({ donorName: '', amount: '', date: new Date().toISOString().split('T')[0], paymentMethod: 'Cash', notes: '' });
     setReceiptFile(null);
     onClose();
   };
@@ -96,7 +121,7 @@ export function DonationEntryModal({ isOpen, onClose, onSubmit, projectId, proje
             <div className="p-6 md:p-8 border-b border-gray-100 flex justify-between items-center bg-white sticky top-0 z-20 shrink-0">
               <div className="min-w-0">
                 <h2 className="text-xl md:text-2xl font-serif font-bold text-church-black tracking-tight truncate">
-                  Record Donation
+                  {isEditMode ? 'Edit Donation' : 'Record Donation'}
                 </h2>
                 <p className="text-xs md:text-sm text-gray-500 font-medium mt-1 truncate">Project: {projectName}</p>
               </div>
@@ -128,16 +153,19 @@ export function DonationEntryModal({ isOpen, onClose, onSubmit, projectId, proje
                   <div className="space-y-2">
                     <label className="text-[11px] font-bold text-gold-700 uppercase tracking-[0.2em] flex items-center gap-2">
                       <DollarSign className="w-3.5 h-3.5" />
-                      Amount (₱)
+                      Amount (₱) <span className="text-rose-500">*</span>
                     </label>
                     <div className="space-y-3">
                       <input
                         type="number"
-                        required
                         value={formData.amount}
                         onChange={(e) => setFormData({ ...formData, amount: e.target.value })}
                         placeholder="0.00"
-                        className="w-full px-5 py-4 bg-gray-50/50 border border-gray-200 rounded-2xl text-base font-serif font-bold focus:outline-none focus:ring-4 focus:ring-gold-500/10 focus:border-gold-500 focus:bg-white transition-all placeholder:text-gray-300"
+                        className={`w-full px-5 py-4 bg-gray-50/50 border rounded-2xl text-base font-serif font-bold focus:outline-none focus:ring-4 focus:bg-white transition-all placeholder:text-gray-300 ${
+                          submitted && (!formData.amount || Number(formData.amount) <= 0)
+                            ? 'border-rose-400 focus:border-rose-500 focus:ring-rose-500/10'
+                            : 'border-gray-200 focus:border-gold-500 focus:ring-gold-500/10'
+                        }`}
                       />
                       <div className="flex flex-wrap gap-2">
                         {[500, 1000, 5000, 10000].map((amt) => (
@@ -163,14 +191,17 @@ export function DonationEntryModal({ isOpen, onClose, onSubmit, projectId, proje
                   <div className="space-y-2">
                     <label className="text-[11px] font-bold text-gold-700 uppercase tracking-[0.2em] flex items-center gap-2">
                       <Calendar className="w-3.5 h-3.5" />
-                      Date Received
+                      Date Received <span className="text-rose-500">*</span>
                     </label>
                     <input
                       type="date"
-                      required
                       value={formData.date}
                       onChange={(e) => setFormData({ ...formData, date: e.target.value })}
-                      className="w-full px-5 py-4 bg-gray-50/50 border border-gray-200 rounded-2xl text-sm font-medium focus:outline-none focus:ring-4 focus:ring-gold-500/10 focus:border-gold-500 focus:bg-white transition-all"
+                      className={`w-full px-5 py-4 bg-gray-50/50 border rounded-2xl text-sm font-medium focus:outline-none focus:ring-4 focus:bg-white transition-all ${
+                        submitted && !formData.date
+                          ? 'border-rose-400 focus:border-rose-500 focus:ring-rose-500/10'
+                          : 'border-gray-200 focus:border-gold-500 focus:ring-gold-500/10'
+                      }`}
                     />
                   </div>
 
@@ -261,7 +292,7 @@ export function DonationEntryModal({ isOpen, onClose, onSubmit, projectId, proje
                     ) : (
                       <>
                         <Check className="w-5 h-5" />
-                        RECORD DONATION
+                        {isEditMode ? 'SAVE CHANGES' : 'RECORD DONATION'}
                       </>
                     )}
                   </button>

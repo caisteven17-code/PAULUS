@@ -54,6 +54,7 @@ export function ProjectCreationForm({
   });
 
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [submitted, setSubmitted] = useState(false);
 
   useEffect(() => {
     if (!isOpen || !currentInstitution) return;
@@ -67,7 +68,9 @@ export function ProjectCreationForm({
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    setSubmitted(true);
     if (!currentInstitution) return;
+    if (!formData.name.trim() || !formData.targetAmount || !formData.startDate) return;
     setIsSubmitting(true);
 
     try {
@@ -134,15 +137,18 @@ export function ProjectCreationForm({
                 <div className="space-y-2">
                   <label className="text-[11px] font-bold text-gold-700 uppercase tracking-[0.2em] flex items-center gap-2">
                     <Tag className="w-3.5 h-3.5" />
-                    Project Name
+                    Project Name <span className="text-rose-500">*</span>
                   </label>
                   <input
                     type="text"
-                    required
                     value={formData.name}
                     onChange={(e) => setFormData({ ...formData, name: e.target.value })}
                     placeholder="e.g., Church Roof Repair"
-                    className="w-full px-5 py-4 bg-gray-50/50 border border-gray-200 rounded-2xl text-sm font-medium focus:outline-none focus:ring-4 focus:ring-gold-500/10 focus:border-gold-500 focus:bg-white transition-all placeholder:text-gray-300"
+                    className={`w-full px-5 py-4 bg-gray-50/50 border rounded-2xl text-sm font-medium focus:outline-none focus:ring-4 focus:bg-white transition-all placeholder:text-gray-300 ${
+                      submitted && !formData.name.trim()
+                        ? 'border-rose-400 focus:border-rose-500 focus:ring-rose-500/10'
+                        : 'border-gray-200 focus:border-gold-500 focus:ring-gold-500/10'
+                    }`}
                   />
                 </div>
 
@@ -205,29 +211,35 @@ export function ProjectCreationForm({
                 <div className="space-y-2">
                   <label className="text-[11px] font-bold text-gold-700 uppercase tracking-[0.2em] flex items-center gap-2">
                     <Target className="w-3.5 h-3.5" />
-                    Target (₱)
+                    Target (₱) <span className="text-rose-500">*</span>
                   </label>
                   <input
                     type="number"
-                    required
                     value={formData.targetAmount}
                     onChange={(e) => setFormData({ ...formData, targetAmount: e.target.value })}
                     placeholder="0.00"
-                    className="w-full px-5 py-4 bg-gray-50/50 border border-gray-200 rounded-2xl text-base font-serif font-bold focus:outline-none focus:ring-4 focus:ring-gold-500/10 focus:border-gold-500 focus:bg-white transition-all placeholder:text-gray-300"
+                    className={`w-full px-5 py-4 bg-gray-50/50 border rounded-2xl text-base font-serif font-bold focus:outline-none focus:ring-4 focus:bg-white transition-all placeholder:text-gray-300 ${
+                      submitted && !formData.targetAmount
+                        ? 'border-rose-400 focus:border-rose-500 focus:ring-rose-500/10'
+                        : 'border-gray-200 focus:border-gold-500 focus:ring-gold-500/10'
+                    }`}
                   />
                 </div>
 
                 <div className="space-y-2">
                   <label className="text-[11px] font-bold text-gold-700 uppercase tracking-[0.2em] flex items-center gap-2">
                     <Calendar className="w-3.5 h-3.5" />
-                    Start Date
+                    Start Date <span className="text-rose-500">*</span>
                   </label>
                   <input
                     type="date"
-                    required
                     value={formData.startDate}
                     onChange={(e) => setFormData({ ...formData, startDate: e.target.value })}
-                    className="w-full px-5 py-4 bg-gray-50/50 border border-gray-200 rounded-2xl text-sm font-medium focus:outline-none focus:ring-4 focus:ring-gold-500/10 focus:border-gold-500 focus:bg-white transition-all"
+                    className={`w-full px-5 py-4 bg-gray-50/50 border rounded-2xl text-sm font-medium focus:outline-none focus:ring-4 focus:bg-white transition-all ${
+                      submitted && !formData.startDate
+                        ? 'border-rose-400 focus:border-rose-500 focus:ring-rose-500/10'
+                        : 'border-gray-200 focus:border-gold-500 focus:ring-gold-500/10'
+                    }`}
                   />
                 </div>
 

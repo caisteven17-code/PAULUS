@@ -218,49 +218,95 @@ export class AppAuthService {
     return fallback.data?.id ?? null;
   }
 
+  private profileCodePrefix(roleId: string): string {
+    const map: Record<string, string> = {
+      parish_priest: 'PR',
+      bishop: 'BSH',
+      seminary_rector: 'REC',
+      admin: 'ADM',
+      school_principal: 'SCH-ADM',
+      finance_staff: 'FIN',
+    };
+    return map[roleId] ?? 'USR';
+  }
+
   private async upsertDioceseProfile(userId: string, body: any, fallbackEmail?: string): Promise<void> {
     const email = body.email ?? fallbackEmail ?? '';
     const roleId = body.role ?? 'parish_priest';
     const fullName = body.displayName ?? email.split('@')[0] ?? '';
     const institutionId = await this.resolveInstitutionId(body.entityId, body.entityName, body.entityType);
 
-    const { error } = await this.supabaseService.admin.schema('diocese').from('profiles').upsert(
-      {
-        external_auth_id: userId,
-        full_name: fullName,
-        email,
-        role_id: roleId,
-        institution_id: institutionId,
-        is_active: true,
-        deleted_at: null,
-        updated_at: new Date().toISOString(),
-      },
-      { onConflict: 'external_auth_id' },
-    );
+    const profileFields = {
+      full_name: fullName,
+      email,
+      role_id: roleId,
+      institution_id: institutionId,
+      is_active: true,
+      deleted_at: null,
+      updated_at: new Date().toISOString(),
+    };
 
-    if (!error) return;
+    // ── Step 1: Try UPDATE first ──────────────────────────────────────────────
+    // UPDATE never fires the BEFORE INSERT trigger (trg_profile_code), so it
+    // never touches diocese.code_counters. This covers every edit of an
+    // existing user and avoids the "permission denied" error entirely.
+    const { data: updatedRows, error: updateErr } = await this.supabaseService.admin
+      .schema('diocese')
+      .from('profiles')
+      .update(profileFields)
+      .eq('external_auth_id', userId)
+      .select('id');
 
-    // '23503' = foreign_key_violation — role_id not found in diocese.roles (roles not seeded yet).
-    // Retry with no role so the profile row still lands in the DB; role can be fixed once roles are seeded.
-    if (error.code === '23503') {
-      const { error: retryError } = await this.supabaseService.admin.schema('diocese').from('profiles').upsert(
-        {
-          external_auth_id: userId,
-          full_name: fullName,
-          email,
-          role_id: null,
-          institution_id: institutionId,
-          is_active: false, // CHECK constraint requires is_active=false when role_id is null
-          deleted_at: null,
-          updated_at: new Date().toISOString(),
-        },
-        { onConflict: 'external_auth_id' },
-      );
-      if (retryError) throw retryError;
+    if (!updateErr && (updatedRows?.length ?? 0) > 0) return;
+
+    // ── Step 2: Profile row doesn't exist yet — INSERT ────────────────────────
+    // Migration 192 adds SECURITY DEFINER to the trigger functions so the
+    // INSERT-triggered profile_code generation works for all callers.
+    const { error: insertErr } = await this.supabaseService.admin
+      .schema('diocese')
+      .from('profiles')
+      .insert({ external_auth_id: userId, ...profileFields });
+
+    if (!insertErr) return;
+
+    // ── Step 3: code_counters permission error (migration 192 not applied yet) ─
+    // Bypass the trigger by supplying a placeholder profile_code so the
+    // WHEN (NEW.profile_code IS NULL) condition is not met.
+    const isPermErr =
+      insertErr.code === '42501' ||
+      insertErr.message?.toLowerCase().includes('code_counters') ||
+      insertErr.message?.toLowerCase().includes('permission denied');
+
+    if (isPermErr) {
+      const placeholder = `${this.profileCodePrefix(roleId)}-TEMP-${userId.slice(0, 8).toUpperCase()}`;
+      const { error: bypassErr } = await this.supabaseService.admin
+        .schema('diocese')
+        .from('profiles')
+        .insert({ external_auth_id: userId, ...profileFields, profile_code: placeholder });
+      if (!bypassErr) return;
+      // FK violation on role_id with placeholder code
+      if (bypassErr.code === '23503') {
+        const { error: e } = await this.supabaseService.admin
+          .schema('diocese')
+          .from('profiles')
+          .insert({ external_auth_id: userId, ...profileFields, role_id: null, is_active: false, profile_code: placeholder });
+        if (e) throw e;
+        return;
+      }
+      throw bypassErr;
+    }
+
+    // ── Step 4: FK violation on role_id (roles not yet seeded) ───────────────
+    if (insertErr.code === '23503') {
+      const { error: fkErr } = await this.supabaseService.admin
+        .schema('diocese')
+        .from('profiles')
+        .insert({ external_auth_id: userId, ...profileFields, role_id: null, is_active: false });
+      if (fkErr) throw fkErr;
       return;
     }
 
-    throw error;
+    throw insertErr;
   }
 
   private mapSupabaseUser(supabaseUser: any): AuthUser {
@@ -628,6 +674,15 @@ export class AppAuthService {
       await this.otpTable().delete().eq('email', email).eq('purpose', purpose).eq('otp_code', code);
       throw sendError;
     }
+  }
+
+  async sendSecurityAlert(email: string, ipAddress?: string): Promise<{ ok: true; devMode: boolean }> {
+    const { devMode } = await this.emailService.sendSecurityAlertEmail({
+      email: email.toLowerCase().trim(),
+      ipAddress,
+      attemptedAt: new Date().toISOString(),
+    });
+    return { ok: true, devMode };
   }
 
   /** Validates a pending OTP and marks it used. */

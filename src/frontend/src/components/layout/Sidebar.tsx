@@ -23,6 +23,7 @@ import {
   CalendarDays,
   CalendarCheck,
   Wallet,
+  Upload,
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { APP_CONFIG, INITIAL_ROLES } from '../../constants';
@@ -110,9 +111,16 @@ export function Sidebar({ activeTab = '', onNavigate, role, timeframe = '6m', on
     <p className="px-4 pb-1 pt-5 text-[9px] font-black uppercase tracking-[0.28em] text-white/20">{children}</p>
   );
 
+  const hasEntityDataAccess =
+    (permissions.download_csv === true || permissions.upload_csv_entity === true) &&
+    permissions.upload_csv_admin !== true;
+
   const parishSubtabs = [
     { id: 'parish-dashboard', label: 'Dashboard', icon: BarChart3, section: 'PARISH' },
     { id: 'parish-aitwin', label: 'Simulator', icon: Zap, section: 'PARISH' },
+    ...(hasEntityDataAccess && permissions.view_parish === true
+      ? [{ id: 'parish-data-submission', label: 'Data Submission', icon: Upload }]
+      : []),
   ];
 
   const priestSubtabs = [
@@ -124,11 +132,17 @@ export function Sidebar({ activeTab = '', onNavigate, role, timeframe = '6m', on
   const seminarySubtabs = [
     { id: 'seminaries', label: 'Dashboard', icon: BarChart3 },
     { id: 'seminary-aitwin', label: 'Simulator', icon: Zap },
+    ...(hasEntityDataAccess && permissions.view_seminary === true
+      ? [{ id: 'seminary-data-submission', label: 'Data Submission', icon: Upload }]
+      : []),
   ];
 
   const schoolSubtabs = [
     { id: 'school', label: 'Dashboard', icon: BarChart3 },
     { id: 'school-aitwin', label: 'Simulator', icon: Zap },
+    ...(hasEntityDataAccess && permissions.view_school === true
+      ? [{ id: 'school-data-submission', label: 'Data Submission', icon: Upload }]
+      : []),
   ];
 
   return (

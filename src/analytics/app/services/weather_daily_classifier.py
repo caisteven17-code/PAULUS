@@ -125,22 +125,22 @@ TEMP_DANGER_MIN_C = 42.0
 TEMP_EXTREME_DANGER_MIN_C = 52.0
 
 # Wind: PAGASA-aligned thresholds (m/s)
-WIND_LIGHT_MIN_MS    = 3.0
-WIND_MODERATE_MIN_MS = 7.0
-WIND_STRONG_MIN_MS   = 14.0
-WIND_STORM_MIN_MS    = 24.0
+WIND_LIGHT_MIN_MS    = 1.5   # Beaufort Force 2 — WMO Beaufort Scale
+WIND_MODERATE_MIN_MS = 5.5   # Beaufort Force 4 — WMO Beaufort Scale
+WIND_STRONG_MIN_MS   = 10.7  # Beaufort Force 6 — WMO Beaufort Scale
+WIND_STORM_MIN_MS    = 17.2  # Beaufort Force 8 — WMO Beaufort Scale
 
 # Humidity: standard comfort scale (% RH)
-HUMIDITY_LOW_MAX_PCT         = 40.0
-HUMIDITY_COMFORTABLE_MAX_PCT = 60.0
-HUMIDITY_HIGH_MAX_PCT        = 80.0
+HUMIDITY_LOW_MAX_PCT      = 71.0  # Below PH monthly minimum avg (71% March) — PAGASA Climatological Normals
+HUMIDITY_MODERATE_MAX_PCT = 80.0  # Typical dry season range — PAGASA Climatological Normals
+HUMIDITY_HIGH_MAX_PCT     = 85.0  # Typical wet season range — PAGASA Climatological Normals
 
 # ── Source agreement tolerances (daily) ───────────────────────────────────────
 
-RAIN_AGREE_TOLERANCE_MM  = 10.0  # NASA POWER AG vs each rainfall validator
-TEMP_AGREE_TOLERANCE_C   = 3.0   # NASA POWER AG vs each temperature validator
-WIND_AGREE_TOLERANCE_MS  = 2.0   # NASA POWER AG vs each wind validator
-HUMID_AGREE_TOLERANCE_PCT = 10.0  # NASA POWER AG vs each humidity validator
+RAIN_AGREE_TOLERANCE_MM   = 10.0  # informed by ClimGridPh-RR RMSE = 12.74 mm/day (DOST-PAGASA 2024, Table 1) — Philippines-specific gridded rainfall uncertainty
+TEMP_AGREE_TOLERANCE_C    = 2.0   # 1× RMSE (2.10°C)      — NASA POWER official validation docs
+WIND_AGREE_TOLERANCE_MS   = 1.5   # 1× RMSE (1.45 m/s)    — NASA POWER official validation docs
+HUMID_AGREE_TOLERANCE_PCT = 5.0   # 1× MAE  (5.05%)       — Bandar Lampung Indonesia comparative study
 
 # Both dimensions use absolute MedAE for confidence scoring at the daily level.
 # Relative MedAE (used by weather_validator.py) is reserved for monthly
@@ -321,18 +321,19 @@ def classify_wind(wind_ms: Optional[float]) -> Optional[str]:
 
 def classify_humidity(rh_pct: Optional[float]) -> Optional[str]:
     """
-    Classify relative humidity (%) into comfort categories.
-      low         < 40%
-      comfortable 40–60%
-      high        60–80%
-      very_high   > 80%
+    Classify relative humidity (%) based on PAGASA climatological normals
+    for the Philippines (monthly avg range: 71% March – 85% September).
+      low       < 71%   below PH monthly minimum avg
+      moderate  71–80%  typical dry season range
+      high      80–85%  typical wet season range
+      very_high > 85%   above PH monthly maximum avg
     """
     if rh_pct is None:
         return None
     if rh_pct < HUMIDITY_LOW_MAX_PCT:
         return "low"
-    if rh_pct < HUMIDITY_COMFORTABLE_MAX_PCT:
-        return "comfortable"
+    if rh_pct < HUMIDITY_MODERATE_MAX_PCT:
+        return "moderate"
     if rh_pct < HUMIDITY_HIGH_MAX_PCT:
         return "high"
     return "very_high"
@@ -569,7 +570,6 @@ def classify_day(
         [
             ("ERA5",      era5_weathercode),
             ("ECMWF IFS", ecmwf_ifs_weathercode),
-            ("UKMO",      ukmo_weathercode),
         ],
         classify_severe,
         0,   # tolerance=0 — agreement is purely by category, not numeric diff
@@ -631,11 +631,11 @@ def classify_day(
             "gsmap_nrt_rainfall_mm":     round(gsmap_nrt_rainfall_mm, 2) if gsmap_nrt_rainfall_mm is not None else None,
             "era5_rainfall_mm":          round(era5_rainfall_mm, 2) if era5_rainfall_mm is not None else None,
             "ukmo_rainfall_mm":          round(ukmo_rainfall_mm, 2) if ukmo_rainfall_mm is not None else None,
-            "diff_nasa_chirps_mm":       _diff(nasa_rainfall_mm, chirps_rainfall_mm),
-            "diff_nasa_open_meteo_mm":   _diff(nasa_rainfall_mm, open_meteo_rainfall_mm),
-            "diff_nasa_gsmap_mm":        _diff(nasa_rainfall_mm, gsmap_nrt_rainfall_mm),
-            "diff_nasa_era5_mm":         _diff(nasa_rainfall_mm, era5_rainfall_mm),
-            "diff_nasa_ukmo_mm":         _diff(nasa_rainfall_mm, ukmo_rainfall_mm),
+            "chirps_rain_classification":      classify_rain(chirps_rainfall_mm),
+            "open_meteo_rain_classification":  classify_rain(open_meteo_rainfall_mm),
+            "gsmap_rain_classification":       classify_rain(gsmap_nrt_rainfall_mm),
+            "era5_rain_classification":        classify_rain(era5_rainfall_mm),
+            "ukmo_rain_classification":        classify_rain(ukmo_rainfall_mm),
             "rain_classification":       rain["classification"],
             "validators_agreed":         rain["validators_agreed"],
             "wmo_quality_flag":          rain["wmo_quality_flag"],
@@ -669,10 +669,10 @@ def classify_day(
             "era5_temp_c":                 round(era5_temp_c, 2) if era5_temp_c is not None else None,
             "ecmwf_ifs_temp_c":            round(ecmwf_ifs_temp_c, 2) if ecmwf_ifs_temp_c is not None else None,
             "ukmo_temp_c":                 round(ukmo_temp_c, 2) if ukmo_temp_c is not None else None,
-            "diff_nasa_open_meteo_c":      _diff(nasa_temp_c, open_meteo_temp_c),
-            "diff_nasa_era5_c":            _diff(nasa_temp_c, era5_temp_c),
-            "diff_nasa_ecmwf_ifs_c":       _diff(nasa_temp_c, ecmwf_ifs_temp_c),
-            "diff_nasa_ukmo_c":            _diff(nasa_temp_c, ukmo_temp_c),
+            "open_meteo_temp_classification":  classify_temp(open_meteo_temp_c),
+            "era5_temp_classification":        classify_temp(era5_temp_c),
+            "ecmwf_ifs_temp_classification":   classify_temp(ecmwf_ifs_temp_c),
+            "ukmo_temp_classification":        classify_temp(ukmo_temp_c),
             "temp_classification":         temp["classification"],
             "validators_agreed":           temp["validators_agreed"],
             "wmo_quality_flag":            temp["wmo_quality_flag"],
@@ -680,8 +680,8 @@ def classify_day(
             # Humidity
             "open_meteo_rh_pct":           round(open_meteo_rh_pct, 2) if open_meteo_rh_pct is not None else None,
             "era5_rh_pct":                 round(era5_rh_pct, 2) if era5_rh_pct is not None else None,
-            "diff_nasa_open_meteo_rh_pct": _diff(nasa_rh_pct, open_meteo_rh_pct),
-            "diff_nasa_era5_rh_pct":       _diff(nasa_rh_pct, era5_rh_pct),
+            "open_meteo_humidity_classification": classify_humidity(open_meteo_rh_pct),
+            "era5_humidity_classification":       classify_humidity(era5_rh_pct),
             "humidity_classification":     hum.get("classification"),
             "humidity_validators_agreed":  hum.get("validators_agreed", 0),
             "humidity_wmo_quality_flag":   hum.get("wmo_quality_flag"),
@@ -699,10 +699,10 @@ def classify_day(
             "era5_wind_ms":               round(era5_wind_ms, 2) if era5_wind_ms is not None else None,
             "ecmwf_ifs_wind_ms":          round(ecmwf_ifs_wind_ms, 2) if ecmwf_ifs_wind_ms is not None else None,
             "ukmo_wind_ms":               round(ukmo_wind_ms, 2) if ukmo_wind_ms is not None else None,
-            "diff_nasa_open_meteo_wind_ms": _diff(nasa_wind_ms, open_meteo_wind_ms),
-            "diff_nasa_era5_wind_ms":     _diff(nasa_wind_ms, era5_wind_ms),
-            "diff_nasa_ecmwf_ifs_wind_ms": _diff(nasa_wind_ms, ecmwf_ifs_wind_ms),
-            "diff_nasa_ukmo_wind_ms":     _diff(nasa_wind_ms, ukmo_wind_ms),
+            "open_meteo_wind_classification":   classify_wind(open_meteo_wind_ms),
+            "era5_wind_classification":         classify_wind(era5_wind_ms),
+            "ecmwf_ifs_wind_classification":    classify_wind(ecmwf_ifs_wind_ms),
+            "ukmo_wind_classification":         classify_wind(ukmo_wind_ms),
             "wind_classification":        wind["classification"],
             "validators_agreed":          wind["validators_agreed"],
             "wmo_quality_flag":           wind["wmo_quality_flag"],
@@ -1396,11 +1396,12 @@ def compute_confidence_scores(
         "Open-Meteo ERA5-Land": "open_meteo_weathercode",
         "ERA5 (Full)":          "era5_weathercode",
         "ECMWF IFS":            "ecmwf_ifs_weathercode",
-        "UKMO":                 "ukmo_weathercode",
+        # UKMO excluded — 62.7% mismatch rate due to different WMO weathercode
+        # conventions for tropical Philippines weather (structural disagreement)
     }
     severe_items = _build_items(rain_rows, severe_col_map, lambda c: classify_severe(int(c)) if c is not None else None)
     severe_fk    = _fleiss_kappa(severe_items)
-    severe_wci   = _wci(rain_rows, 3, agreed_col="severe_validators_agreed")
+    severe_wci   = _wci(rain_rows, 2, agreed_col="severe_validators_agreed")
 
     # ── Temperature ───────────────────────────────────────────────────────────
     temp_col_map = {

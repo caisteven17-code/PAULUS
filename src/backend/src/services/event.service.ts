@@ -102,7 +102,29 @@ export class EventService {
     }
 
     const { data } = await query.limit(1).maybeSingle();
-    return data?.id ?? null;
+    if (data?.id) return data.id;
+
+    // Auto-register seminary/school/parish institutions not yet in diocese.institutions.
+    if (institutionType === 'school' || institutionType === 'seminary' || institutionType === 'parish') {
+      const { data: created, error: insertErr } = await this.db()
+        .from('institutions')
+        .insert({ name: institutionName.trim(), institution_type: institutionType, is_active: true })
+        .select('id')
+        .single();
+      if (!insertErr && created?.id) return created.id;
+      // If insert failed (duplicate), fetch the existing record.
+      const { data: existing } = await this.db()
+        .from('institutions')
+        .select('id')
+        .eq('name', institutionName.trim())
+        .eq('institution_type', institutionType)
+        .is('deleted_at', null)
+        .limit(1)
+        .maybeSingle();
+      if (existing?.id) return existing.id;
+    }
+
+    return null;
   }
 
   private toEvent(row: any, institution?: { name?: string; institution_type?: string }): DiocesanEvent {

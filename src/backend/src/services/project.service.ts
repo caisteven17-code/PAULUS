@@ -37,9 +37,31 @@ export class ProjectService {
     if (!candidates.length) return (data ?? []).map((row: any) => row.id);
 
     const candidateSet = new Set(candidates.map((value) => value.toLowerCase()));
-    return (data ?? [])
+    const found = (data ?? [])
       .filter((row: any) => candidateSet.has(String(row.name ?? '').toLowerCase()))
       .map((row: any) => row.id);
+
+    // Auto-register seminary/school institutions that are not yet in diocese.institutions.
+    if (found.length === 0 && entityName && entityType && entityType !== 'diocese') {
+      const insertName = entityName.trim();
+      const { data: created, error: insertErr } = await this.db()
+        .from('institutions')
+        .insert({ name: insertName, institution_type: entityType, is_active: true })
+        .select('id')
+        .single();
+      if (!insertErr && created?.id) return [created.id];
+      // If insert failed (e.g. duplicate), try fetching the existing record.
+      const { data: existing } = await this.db()
+        .from('institutions')
+        .select('id')
+        .eq('name', insertName)
+        .eq('institution_type', entityType)
+        .is('deleted_at', null)
+        .single();
+      if (existing?.id) return [existing.id];
+    }
+
+    return found;
   }
 
   private toProject(row: any): Project {

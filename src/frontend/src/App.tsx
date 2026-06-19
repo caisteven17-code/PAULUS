@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { ArrowLeft, CalendarClock, ChevronDown, LogOut, ShieldAlert, X } from 'lucide-react';
 import { AnimatePresence, motion } from 'motion/react';
 import { TopNav } from './components/layout/TopNav';
@@ -133,8 +133,11 @@ const canAccessTab = (tab: string, role: Role, permissions: Record<string, boole
   if (tab === 'parish-data-submission' || tab === 'seminary-data-submission' || tab === 'school-data-submission') {
     return permissions.download_csv === true || permissions.upload_csv_entity === true;
   }
-  if (tab === 'parish-aitwin' || tab === 'priest-aitwin') {
+  if (tab === 'parish-aitwin') {
     return permissions.view_parish_dashboard === true || permissions.digital_twin === true;
+  }
+  if (tab === 'priest-aitwin') {
+    return permissions.manage_assignments === true;
   }
   if (tab === 'priest-dashboard' || tab === 'priest-health') return permissions.view_priests === true;
   if (tab === 'seminaries') return permissions.view_seminary_dashboard === true;
@@ -173,13 +176,17 @@ export default function App() {
   const [logoutTransition, setLogoutTransition] = useState(false);
   const [logoutInProgress, setLogoutInProgress] = useState(false);
   const logoutInProgressRef = React.useRef(false);
+  const [roleChangedModal, setRoleChangedModal] = useState(false);
+  const trackedRoleRef = React.useRef<string>('');
+
   useEffect(() => {
     const t = setTimeout(() => setMinSplashDone(true), 2500);
     return () => clearTimeout(t);
   }, []);
   const [role, setRole] = useState<Role>('bishop');
   const [activeTab, setActiveTab] = useState('home');
-  const { permissions, loading: permissionsLoading } = usePermissions();
+  const mainScrollRef = useRef<HTMLElement>(null);
+  const { permissions, user, loading: permissionsLoading } = usePermissions();
   const [timeframe, setTimeframe] = useState<Timeframe>('6m');
   const [year, setYear] = useState<number>(2026);
   const [digitalTwinSession, setDigitalTwinSession] = useState<DigitalTwinSession | null>(null);
@@ -260,6 +267,10 @@ export default function App() {
     }
   }, [activeTab, isAuthReady, isAuthenticated, permissions, permissionsLoading, role]);
 
+  useEffect(() => {
+    mainScrollRef.current?.scrollTo({ top: 0, behavior: 'instant' });
+  }, [activeTab]);
+
   // Gate the whole system behind the onboarding form for real Supabase users.
   // Demo / localStorage sessions have no Supabase session and are skipped.
   useEffect(() => {
@@ -295,6 +306,35 @@ export default function App() {
         setOnboardingChecked(true);
       });
   }, [isAuthReady, isAuthenticated]);
+
+  // Record the role when the user first logs in, then poll for changes.
+  useEffect(() => {
+    if (isAuthenticated && user?.role) {
+      trackedRoleRef.current = user.role;
+    } else {
+      trackedRoleRef.current = '';
+    }
+  }, [isAuthenticated, user?.role]);
+
+  useEffect(() => {
+    if (!isAuthenticated || !user?.email) return;
+    const check = async () => {
+      if (logoutInProgressRef.current) return;
+      try {
+        const res = await fetch('/api/admin/users');
+        if (!res.ok) return;
+        const users: any[] = await res.json();
+        const found = users.find((u: any) => u.email?.toLowerCase() === user.email?.toLowerCase());
+        if (found && trackedRoleRef.current && found.role !== trackedRoleRef.current) {
+          setRoleChangedModal(true);
+        }
+      } catch {
+        // Backend unavailable — skip silently
+      }
+    };
+    const interval = setInterval(check, 60000);
+    return () => clearInterval(interval);
+  }, [isAuthenticated, user?.email]);
 
   const requestLogout = () => {
     if (logoutInProgress) return;
@@ -426,6 +466,52 @@ export default function App() {
                   Yes, sign out
                 </button>
               </div>
+            </div>
+          </motion.div>
+        </motion.div>
+      )}
+    </AnimatePresence>
+  );
+
+  const roleChangedModalEl = (
+    <AnimatePresence>
+      {roleChangedModal && (
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          transition={{ duration: 0.18 }}
+          className="fixed inset-0 z-[320] flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm"
+        >
+          <motion.div
+            initial={{ opacity: 0, y: 16, scale: 0.96 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: 12, scale: 0.96 }}
+            transition={{ duration: 0.2, ease: 'easeOut' }}
+            className="w-full max-w-sm overflow-hidden rounded-[28px] border border-slate-200 bg-white shadow-2xl"
+          >
+            <div className="flex items-center gap-4 border-b border-slate-100 px-6 py-5">
+              <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-amber-50 text-amber-600">
+                <ShieldAlert className="h-5 w-5" />
+              </div>
+              <div>
+                <h2 className="text-lg font-black text-slate-950">Role Updated</h2>
+                <p className="text-xs font-semibold text-slate-400">Your account permissions have changed.</p>
+              </div>
+            </div>
+            <div className="px-6 py-5">
+              <p className="text-sm leading-relaxed text-slate-600">
+                An administrator has updated your role. You need to sign in again for the changes to take effect.
+              </p>
+            </div>
+            <div className="border-t border-slate-100 px-6 pb-6 pt-4">
+              <button
+                type="button"
+                onClick={() => { setRoleChangedModal(false); void handleLogout(); }}
+                className="w-full rounded-2xl bg-slate-950 px-4 py-3.5 text-sm font-black text-white transition-colors hover:bg-slate-800"
+              >
+                Sign Out Now
+              </button>
             </div>
           </motion.div>
         </motion.div>
@@ -1159,7 +1245,7 @@ export default function App() {
             onYearChange={setYear}
             onLogout={requestLogout}
           />
-          <main className="flex-1 overflow-y-auto pb-20 md:pb-0">
+          <main ref={mainScrollRef} className="flex-1 overflow-y-auto pb-20 md:pb-0">
             {renderContent()}
             <Footer />
           </main>
@@ -1173,6 +1259,7 @@ export default function App() {
       {splashOverlay}
       {loginRevealOverlay}
       {logoutConfirmModal}
+      {roleChangedModalEl}
       {logoutTransitionOverlay}
     </>
   );

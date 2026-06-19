@@ -137,6 +137,29 @@ export class AuthController {
     }
   }
 
+  @Post('security-alert')
+  async securityAlert(@Body() body: any, @Req() req: Request, @Res() res: Response) {
+    const { email } = body ?? {};
+    if (!email) {
+      return res.status(HttpStatus.BAD_REQUEST).json({ error: 'email is required.' });
+    }
+    try {
+      const result = await this.authService.sendSecurityAlert(email, clientIp(req));
+      await this.auditLogService.logEvent({
+        userName: email,
+        userRole: 'unknown',
+        category: 'auth',
+        severity: 'warning',
+        action: 'Failed Login Alert',
+        detail: `3 consecutive failed login attempts detected for ${email}`,
+        ipAddress: clientIp(req),
+      });
+      return res.status(HttpStatus.OK).json(result);
+    } catch (err: any) {
+      return this.otpErrorResponse(res, err);
+    }
+  }
+
   @Post('verify-otp')
   async verifyOtp(@Body() body: any, @Res() res: Response) {
     const { email, code, purpose } = body ?? {};

@@ -303,6 +303,7 @@ export function Settings({ onBack, onLogout, onNavigate, role = 'bishop', initia
     show: false,
     message: '',
   });
+  const [duplicatePriestModal, setDuplicatePriestModal] = useState<{ open: boolean; existingPriest: string; existingPriestEmail: string; parishName: string; onProceed: () => void }>({ open: false, existingPriest: '', existingPriestEmail: '', parishName: '', onProceed: () => {} });
   const [showPasswordSuccess, setShowPasswordSuccess] = useState(false);
   const [showProfileSuccess, setShowProfileSuccess] = useState(false);
   const [passwords, setPasswords] = useState({ current: '', new: '' });
@@ -694,6 +695,34 @@ export function Settings({ onBack, onLogout, onNavigate, role = 'bishop', initia
 
     try {
       const accessRole = normalizeAccessRole(formState.role);
+
+      // One-priest-per-parish rule: warn before creating/reassigning a second parish_priest.
+      if (
+        accessRole === 'parish_priest' &&
+        formState.institutionType === 'parish' &&
+        formState.entity
+      ) {
+        const existing = accounts.find(
+          (a) =>
+            (a.role === 'parish_priest' || normalizeAccessRole(a.role) === 'parish_priest') &&
+            a.entityName === formState.entity &&
+            (editingAccountId === null || a.id?.toString() !== editingAccountId?.toString()),
+        );
+        if (existing) {
+          await new Promise<void>((resolve, reject) => {
+            setDuplicatePriestModal({
+              open: true,
+              existingPriest: existing.displayName || existing.email || 'another priest',
+              existingPriestEmail: existing.email || existing.displayName || '',
+              parishName: formState.entity,
+              onProceed: resolve,
+            });
+            setTimeout(() => reject(new Error('DUPLICATE_CANCELLED')), 300_000);
+          }).catch(() => { throw new Error('DUPLICATE_CANCELLED'); });
+          setDuplicatePriestModal({ open: false, existingPriest: '', existingPriestEmail: '', parishName: '', onProceed: () => {} });
+        }
+      }
+
       const selectedEntity = findSelectedEntity(formState.entity, accessRole);
       const roleLabel = getAccessRoleLabel(accessRole);
       const constructedLeaderName =
@@ -749,6 +778,10 @@ export function Settings({ onBack, onLogout, onNavigate, role = 'bishop', initia
 
       await fetchAccounts();
     } catch (err: any) {
+      if (err?.message === 'DUPLICATE_CANCELLED') {
+        setDuplicatePriestModal({ open: false, existingPriest: '', existingPriestEmail: '', parishName: '', onProceed: () => {} });
+        return;
+      }
       console.error('Error saving account, falling back to local storage:', err);
       try {
         const stored: any[] = JSON.parse(localStorage.getItem('users') || '[]');
@@ -1837,7 +1870,7 @@ export function Settings({ onBack, onLogout, onNavigate, role = 'bishop', initia
 
                 <div className="mb-6 grid grid-cols-1 gap-3 lg:grid-cols-[1fr_220px]">
                   <div className="relative">
-                    <Search className="w-4 h-4 absolute left-4.5 top-1/2 -translate-y-1/2 text-gray-400" />
+                    <Search className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400" />
                     <input
                       type="text"
                       placeholder="Search institutions, types, roles, or emails..."
@@ -1845,7 +1878,7 @@ export function Settings({ onBack, onLogout, onNavigate, role = 'bishop', initia
                       onChange={(e) => setSearchQuery(e.target.value)}
                       className={roundedField(
                         Boolean(searchQuery.trim()),
-                        'w-full pl-12 pr-6 py-3.5 rounded-2xl text-sm font-medium',
+                        'w-full pl-10 pr-6 py-3.5 rounded-2xl text-sm font-medium',
                       )}
                     />
                   </div>
@@ -2207,6 +2240,77 @@ export function Settings({ onBack, onLogout, onNavigate, role = 'bishop', initia
           </div>
         </div>
       </div>
+
+      {/* Duplicate-priest warning modal */}
+      {duplicatePriestModal.open && (
+        <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm animate-in fade-in duration-200">
+          <div className="w-full max-w-md overflow-hidden rounded-[28px] border border-slate-200 bg-white shadow-2xl animate-in zoom-in-95 duration-200">
+            {/* Header */}
+            <div className="flex items-start gap-4 bg-amber-50 px-6 py-5">
+              <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-amber-100">
+                <svg className="h-6 w-6 text-amber-700" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.007v.008H12v-.008z" />
+                </svg>
+              </div>
+              <div className="min-w-0">
+                <h2 className="text-lg font-black text-slate-950">Parish Priest Already Assigned</h2>
+                <p className="mt-0.5 text-xs font-semibold text-amber-700">Each parish should have only one assigned priest.</p>
+              </div>
+            </div>
+
+            {/* Body */}
+            <div className="px-6 py-5 space-y-3">
+              <div className="rounded-2xl border border-slate-100 bg-slate-50 px-4 py-3">
+                <p className="text-[11px] font-black uppercase tracking-widest text-slate-400">Parish</p>
+                <p className="mt-0.5 text-sm font-bold text-slate-900">{duplicatePriestModal.parishName}</p>
+              </div>
+              <div className="rounded-2xl border border-slate-100 bg-slate-50 px-4 py-3">
+                <p className="text-[11px] font-black uppercase tracking-widest text-slate-400">Currently Assigned Priest</p>
+                <p className="mt-0.5 text-sm font-bold text-slate-900">{duplicatePriestModal.existingPriest}</p>
+              </div>
+              <p className="text-sm leading-relaxed text-slate-500">
+                Would you like to find and manage the existing priest first, or proceed with this new assignment?
+              </p>
+            </div>
+
+            {/* Actions */}
+            <div className="border-t border-slate-100 px-6 pb-6 pt-4 space-y-2">
+              {/* Primary CTA: find the existing priest */}
+              <button
+                type="button"
+                onClick={() => {
+                  setDuplicatePriestModal({ open: false, existingPriest: '', existingPriestEmail: '', parishName: '', onProceed: () => {} });
+                  closeModal();
+                  setSearchQuery(duplicatePriestModal.existingPriestEmail || duplicatePriestModal.existingPriest);
+                }}
+                className="w-full rounded-2xl bg-slate-950 px-4 py-3.5 text-sm font-black text-white transition-colors hover:bg-slate-800"
+              >
+                Find &amp; Manage Existing Priest
+              </button>
+
+              <div className="flex items-center gap-2">
+                {/* Cancel */}
+                <button
+                  type="button"
+                  onClick={() => setDuplicatePriestModal({ open: false, existingPriest: '', existingPriestEmail: '', parishName: '', onProceed: () => {} })}
+                  className="flex-1 rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-black text-slate-600 transition-colors hover:bg-slate-50"
+                >
+                  Cancel
+                </button>
+
+                {/* Proceed anyway */}
+                <button
+                  type="button"
+                  onClick={() => { duplicatePriestModal.onProceed(); }}
+                  className="flex-1 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-black text-amber-700 transition-colors hover:bg-amber-100"
+                >
+                  Proceed Anyway
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </>
   );
 }
