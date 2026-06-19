@@ -6,7 +6,6 @@ import {
   ChevronRight,
   Save,
   RotateCcw,
-  Upload,
   AlertTriangle,
   History,
   Clock,
@@ -22,12 +21,63 @@ import { apiClient } from '../../lib/api-client';
 
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'] as const;
 
-export interface SandboxState {
-  projectedCollections: number;
-  projectedDisbursements: number;
-  projectedRemittances: number;
-  projectedExpenses: number;
-  projectedBudgetAllocation: number;
+const CURRENT_YEAR = new Date().getFullYear();
+const PERIOD_YEARS = Array.from({ length: CURRENT_YEAR - 2023 + 1 }, (_, i) => 2023 + i);
+
+/** Sandbox values keyed by field name; the active key set depends on institution type. */
+export type SandboxState = Record<string, number>;
+
+interface SandboxField {
+  key: string;
+  label: string;
+  color: string;
+}
+
+/** Which fields the sandbox panel shows, per institution type. School/seminary sets
+ *  are draft simplifications — labels/groupings can be refined later. */
+const SANDBOX_FIELD_CONFIG: Record<'parish' | 'school' | 'seminary', SandboxField[]> = {
+  parish: [
+    { key: 'totalSacraments', label: 'Total Sacraments', color: 'text-emerald-700' },
+    { key: 'totalCollections', label: 'Total Collections', color: 'text-emerald-700' },
+    { key: 'totalPastoralExpenses', label: 'Total Pastoral Expenses (Mass Stipend)', color: 'text-rose-700' },
+    { key: 'totalParishExpenses', label: 'Total Parish Expenses', color: 'text-blue-700' },
+    { key: 'totalMassIntentionsUnclaimed', label: 'Total Mass Intentions (Not Claimed by Priest)', color: 'text-purple-700' },
+    { key: 'totalMassIntentionsClaimed', label: 'Total Mass Intentions (Claimed by Priest)', color: 'text-purple-700' },
+    { key: 'totalSpecialCollections', label: 'Total Special Collections', color: 'text-amber-700' },
+  ],
+  school: [
+    { key: 'totalCollections', label: 'Total Collections', color: 'text-emerald-700' },
+    { key: 'totalPayroll', label: 'Total Faculty Payroll', color: 'text-rose-700' },
+    { key: 'totalOperatingExpenses', label: 'Total Operating Expenses', color: 'text-blue-700' },
+  ],
+  seminary: [
+    { key: 'totalCollections', label: 'Total Collections', color: 'text-emerald-700' },
+    { key: 'totalPayroll', label: 'Total Payroll & Incentives', color: 'text-rose-700' },
+    { key: 'totalOperatingExpenses', label: 'Total Operating Expenses', color: 'text-blue-700' },
+  ],
+};
+
+/** Collapses whichever per-type sandbox fields are active into the two aggregate
+ *  numbers the counterfactual-replay endpoint and the impact-analysis math expect. */
+function computeReceiptsAndExpenses(
+  institutionType: 'parish' | 'seminary' | 'school',
+  state: SandboxState,
+): { receipts: number; expenses: number } {
+  if (institutionType === 'parish') {
+    return {
+      receipts:
+        (state.totalSacraments ?? 0) +
+        (state.totalCollections ?? 0) +
+        (state.totalSpecialCollections ?? 0) +
+        (state.totalMassIntentionsClaimed ?? 0) +
+        (state.totalMassIntentionsUnclaimed ?? 0),
+      expenses: (state.totalPastoralExpenses ?? 0) + (state.totalParishExpenses ?? 0),
+    };
+  }
+  return {
+    receipts: state.totalCollections ?? 0,
+    expenses: (state.totalPayroll ?? 0) + (state.totalOperatingExpenses ?? 0),
+  };
 }
 
 /** A Digital Twin scenario row from diocese.digital_twin_scenarios (private to creator). */
@@ -111,13 +161,12 @@ export function DigitalTwinControlsPanel({
 }: DigitalTwinControlsPanelProps) {
   const [isCollapsed, setIsCollapsed] = useState(false);
   const [savedScenarios, setSavedScenarios] = useState<SavedScenario[]>([]);
-  const [uploadedFileName, setUploadedFileName] = useState('');
   const [stateHistory, setStateHistory] = useState<StateSnapshot[]>([]);
   const [showHistory, setShowHistory] = useState(false);
 
   // Period loader state (shared by Load-from-Period and Historical Replay)
   const [periodMonth, setPeriodMonth] = useState<string>('Dec');
-  const [periodYear, setPeriodYear] = useState<number>(2025);
+  const [periodYear, setPeriodYear] = useState<number>(CURRENT_YEAR);
   const [isLoadingPeriod, setIsLoadingPeriod] = useState(false);
   const [periodStatus, setPeriodStatus] = useState<{ ok: boolean; msg: string } | null>(null);
 
@@ -158,6 +207,11 @@ export function DigitalTwinControlsPanel({
         expenses_pastoral?: number;
         expenses_parish?: number;
         netReceipts?: number;
+        sacraments_rate?: number;
+        collections_mass?: number;
+        others_massIntentionsClaimed?: number;
+        others_massIntentionsNotClaimed?: number;
+        others_specialCollections?: number;
       }> = await res.json();
 
       // Match by month + year; fall back to month-only if no year on records
@@ -170,16 +224,23 @@ export function DigitalTwinControlsPanel({
         return;
       }
 
-      onSandboxStateChange({
-        projectedCollections: record.collections,
-        projectedDisbursements: record.expenses_pastoral ?? Math.round(record.disbursements * 0.35),
-        projectedRemittances: Math.round(record.consumableCollections * 0.12),
-        projectedExpenses: record.expenses_parish ?? Math.round(record.disbursements * 0.65),
-        projectedBudgetAllocation:
-          record.netReceipts != null
-            ? Math.round(record.netReceipts * 0.8)
-            : Math.round((record.collections - record.disbursements) * 0.8),
-      });
+      if (institutionType === 'parish') {
+        onSandboxStateChange({
+          totalSacraments: record.sacraments_rate ?? 0,
+          totalCollections: record.collections_mass ?? 0,
+          totalPastoralExpenses: record.expenses_pastoral ?? Math.round(record.disbursements * 0.35),
+          totalParishExpenses: record.expenses_parish ?? Math.round(record.disbursements * 0.65),
+          totalMassIntentionsUnclaimed: record.others_massIntentionsNotClaimed ?? 0,
+          totalMassIntentionsClaimed: record.others_massIntentionsClaimed ?? 0,
+          totalSpecialCollections: record.others_specialCollections ?? 0,
+        });
+      } else {
+        onSandboxStateChange({
+          totalCollections: record.collections,
+          totalPayroll: record.expenses_pastoral ?? Math.round(record.disbursements * 0.35),
+          totalOperatingExpenses: record.expenses_parish ?? Math.round(record.disbursements * 0.65),
+        });
+      }
 
       const yearNote = record.year ? ` ${record.year}` : '';
       setPeriodStatus({ ok: true, msg: `Loaded ${periodMonth}${yearNote} data.` });
@@ -200,15 +261,12 @@ export function DigitalTwinControlsPanel({
     setIsReplaying(true);
     setReplayStatus(null);
     try {
-      const totalOutflow =
-        currentSandboxState.projectedDisbursements +
-        currentSandboxState.projectedRemittances +
-        currentSandboxState.projectedExpenses;
+      const { receipts, expenses } = computeReceiptsAndExpenses(institutionType, currentSandboxState);
       const result: ReplayResult = await apiClient.runDigitalTwinReplay(institutionType, institutionId, {
         start_month: MONTHS.indexOf(periodMonth as (typeof MONTHS)[number]) + 1,
         start_year: periodYear,
-        modified_receipts: currentSandboxState.projectedCollections,
-        modified_expenses: totalOutflow,
+        modified_receipts: receipts,
+        modified_expenses: expenses,
       });
       setReplayResult(result);
       setReplayStatus({
@@ -321,13 +379,13 @@ export function DigitalTwinControlsPanel({
     }
   }, [currentSandboxState]);
 
-  const simulatedNet =
-    currentSandboxState.projectedCollections -
-    currentSandboxState.projectedDisbursements -
-    currentSandboxState.projectedRemittances -
-    currentSandboxState.projectedExpenses;
+  const { receipts: simulatedReceipts, expenses: simulatedExpenses } = computeReceiptsAndExpenses(
+    institutionType,
+    currentSandboxState,
+  );
+  const simulatedNet = simulatedReceipts - simulatedExpenses;
 
-  const balanceDelta = simulatedNet - baselineNet + currentSandboxState.projectedBudgetAllocation * 0.15;
+  const balanceDelta = simulatedNet - baselineNet;
 
   const simulatedHealth = Math.max(20, Math.min(98, Math.round(baselineHealthScore + balanceDelta / 45000)));
 
@@ -343,7 +401,7 @@ export function DigitalTwinControlsPanel({
   const advisoryMessage =
     simulatedNet >= baselineNet
       ? "This Digital Twin projection improves the institution's net monthly position if those assumptions hold."
-      : 'This Digital Twin projection weakens resilience. Review disbursements, remittances, expenses, or budget allocation before acting.';
+      : 'This Digital Twin projection weakens resilience. Review your adjusted collections and expenses before acting.';
 
   const handleRevertToSnapshot = (snapshot: StateSnapshot) => {
     onSandboxStateChange(snapshot.state);
@@ -430,7 +488,7 @@ export function DigitalTwinControlsPanel({
                       <div className="min-w-0 flex-1">
                         <p className="text-xs font-bold text-gray-900 truncate">{snapshot.label}</p>
                         <p className="mt-1 text-xs text-gray-500">
-                          Collections: {formatCurrency(snapshot.state.projectedCollections)}
+                          Collections: {formatCurrency(snapshot.state.totalCollections ?? 0)}
                         </p>
                       </div>
                       <div className="text-xs font-bold text-[#111111] bg-white px-2 py-1 rounded-full flex-shrink-0">
@@ -518,7 +576,7 @@ export function DigitalTwinControlsPanel({
                   onChange={(e) => setPeriodYear(Number(e.target.value))}
                   className="w-20 rounded-[12px] border border-gray-200 bg-[#faf8f4] px-2 py-2 text-xs font-semibold text-gray-900 outline-none focus:border-[#d4af37]"
                 >
-                  {[2024, 2025, 2026].map((y) => (
+                  {PERIOD_YEARS.map((y) => (
                     <option key={y} value={y}>
                       {y}
                     </option>
@@ -547,24 +605,18 @@ export function DigitalTwinControlsPanel({
             {/* Parameters Section */}
             <div className="space-y-2 pt-2 border-t border-gray-200">
               <p className="text-[11px] font-black uppercase tracking-[0.22em] text-gray-500">Financial Parameters</p>
-              {[
-                ['projectedCollections', 'Collections', 'text-emerald-700'],
-                ['projectedDisbursements', 'Disbursements', 'text-blue-700'],
-                ['projectedRemittances', 'Remittances', 'text-purple-700'],
-                ['projectedExpenses', 'Expenses', 'text-rose-700'],
-                ['projectedBudgetAllocation', 'Budget', 'text-amber-700'],
-              ].map(([key, label, color]) => (
+              {SANDBOX_FIELD_CONFIG[institutionType].map(({ key, label, color }) => (
                 <label key={key} className="space-y-1.5 block">
                   <div className="flex items-center justify-between">
                     <span className={`text-xs font-bold ${color}`}>{label}</span>
                     <span className="text-xs font-bold text-gray-600">
-                      {formatCurrency(currentSandboxState[key as keyof SandboxState])}
+                      {formatCurrency(currentSandboxState[key] ?? 0)}
                     </span>
                   </div>
                   <input
                     type="number"
                     min="0"
-                    value={currentSandboxState[key as keyof SandboxState]}
+                    value={currentSandboxState[key] ?? 0}
                     onChange={(event) =>
                       onSandboxStateChange({
                         ...currentSandboxState,
@@ -719,98 +771,6 @@ export function DigitalTwinControlsPanel({
                 <AlertTriangle className="mt-0.5 h-4 w-4 text-amber-700 flex-shrink-0" />
                 <p className="text-xs font-semibold leading-5 text-amber-900">{advisoryMessage}</p>
               </div>
-            </div>
-
-            {/* File Upload — overrides all fields */}
-            <div className="rounded-[14px] border border-dashed border-gray-300 bg-[#faf8f4] p-3 space-y-2">
-              <div>
-                <p className="text-xs font-bold text-gray-900">Upload Financial Report</p>
-                <p className="text-xs text-gray-500 leading-4 mt-0.5">CSV values will override all fields below.</p>
-              </div>
-              <label className="flex cursor-pointer items-center justify-center gap-2 rounded-[12px] border border-gray-200 bg-white px-3 py-2 text-xs font-black text-gray-700 transition hover:border-[#d4af37] hover:bg-[#faf8f4]">
-                <Upload className="h-3.5 w-3.5" />
-                Choose CSV File
-                <input
-                  type="file"
-                  accept=".csv,text/csv"
-                  className="hidden"
-                  onChange={async (event) => {
-                    const file = event.target.files?.[0];
-                    if (!file) return;
-                    setUploadedFileName(file.name);
-                    setPeriodStatus(null);
-
-                    try {
-                      const csvText = await file.text();
-                      const res = await fetch('/api/financial/parse', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({
-                          csv: csvText,
-                          entityId: institutionName,
-                          entityType: institutionType,
-                        }),
-                      });
-                      if (!res.ok) throw new Error('Parse failed');
-
-                      const records: Array<{
-                        collections: number;
-                        consumableCollections: number;
-                        disbursements: number;
-                        expenses_pastoral?: number;
-                        expenses_parish?: number;
-                        netReceipts?: number;
-                      }> = await res.json();
-
-                      if (!records.length) {
-                        setPeriodStatus({ ok: false, msg: 'No records found in file.' });
-                        return;
-                      }
-
-                      // Aggregate all rows from the file
-                      let sumCollections = 0,
-                        sumConsumable = 0,
-                        sumDisbursements = 0;
-                      let sumPastoral = 0,
-                        sumParish = 0,
-                        sumNet = 0;
-                      for (const r of records) {
-                        sumCollections += r.collections;
-                        sumConsumable += r.consumableCollections;
-                        sumDisbursements += r.disbursements;
-                        sumPastoral += r.expenses_pastoral ?? Math.round(r.disbursements * 0.35);
-                        sumParish += r.expenses_parish ?? Math.round(r.disbursements * 0.65);
-                        sumNet += r.netReceipts ?? r.collections - r.disbursements;
-                      }
-
-                      onSandboxStateChange({
-                        projectedCollections: sumCollections,
-                        projectedDisbursements: sumPastoral,
-                        projectedRemittances: Math.round(sumConsumable * 0.12),
-                        projectedExpenses: sumParish,
-                        projectedBudgetAllocation: Math.round(sumNet * 0.8),
-                      });
-
-                      setPeriodStatus({
-                        ok: true,
-                        msg: `${file.name} — ${records.length} row${records.length > 1 ? 's' : ''} applied.`,
-                      });
-                    } catch {
-                      setPeriodStatus({ ok: false, msg: 'Failed to parse file.' });
-                    }
-                  }}
-                />
-              </label>
-              {uploadedFileName ? (
-                <p className="text-xs font-semibold text-emerald-700">✓ {uploadedFileName}</p>
-              ) : (
-                <p className="text-xs text-gray-400">No file attached</p>
-              )}
-              {periodStatus && (
-                <p className={`text-xs font-semibold ${periodStatus.ok ? 'text-emerald-700' : 'text-rose-700'}`}>
-                  {periodStatus.ok ? '✓' : '✕'} {periodStatus.msg}
-                </p>
-              )}
             </div>
 
             {/* Saved Scenarios (private to the current user) */}

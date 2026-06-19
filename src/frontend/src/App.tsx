@@ -50,17 +50,27 @@ type DigitalTwinSession = {
 };
 
 // Seed the sandbox from the institution's real monthly figures so the panel
-// opens on the actual baseline instead of zeros. Splits mirror the heuristics
-// used by the panel's period loader (35% pastoral / 65% parish, 12% remittance).
+// opens on the actual baseline instead of zeros. These are heuristic estimates
+// only — "Load from Period" overwrites them with the real per-category figures.
+// Splits mirror the heuristics used by the panel's period loader.
 const buildInitialSandboxState = (session: DigitalTwinSession): SandboxState => {
   const collections = session.monthlyCollections ?? 0;
   const expenses = session.monthlyExpenses ?? 0;
+  if (session.entityType === 'parish') {
+    return {
+      totalSacraments: Math.round(collections * 0.08),
+      totalCollections: Math.round(collections * 0.7),
+      totalSpecialCollections: Math.round(collections * 0.1),
+      totalMassIntentionsClaimed: Math.round(collections * 0.07),
+      totalMassIntentionsUnclaimed: Math.round(collections * 0.05),
+      totalPastoralExpenses: Math.round(expenses * 0.35),
+      totalParishExpenses: Math.round(expenses * 0.65),
+    };
+  }
   return {
-    projectedCollections: collections,
-    projectedDisbursements: Math.round(expenses * 0.35),
-    projectedRemittances: Math.round(collections * 0.12),
-    projectedExpenses: Math.round(expenses * 0.65),
-    projectedBudgetAllocation: Math.max(0, Math.round((collections - expenses) * 0.8)),
+    totalCollections: collections,
+    totalPayroll: Math.round(expenses * 0.35),
+    totalOperatingExpenses: Math.round(expenses * 0.65),
   };
 };
 
