@@ -277,6 +277,24 @@ def fetch_open_meteo_ukmo(lat: float, lon: float, start: date, end: date) -> lis
     return _parse_open_meteo_daily(data)
 
 
+def fetch_open_meteo_gfs(lat: float, lon: float, start: date, end: date) -> list[dict]:
+    """NOAA GFS via Open-Meteo archive — independent of the ECMWF/NASA lineage already in use."""
+    url = f"https://archive-api.open-meteo.com/v1/archive?{_open_meteo_params(lat, lon, start, end, model='ncep_gfs_seamless')}"
+    data = _fetch_json(url)
+    if not data or "daily" not in data:
+        return []
+    return _parse_open_meteo_daily(data)
+
+
+def fetch_open_meteo_jma(lat: float, lon: float, start: date, end: date) -> list[dict]:
+    """Japan Meteorological Agency via Open-Meteo archive — independent of the ECMWF/NASA lineage already in use."""
+    url = f"https://archive-api.open-meteo.com/v1/archive?{_open_meteo_params(lat, lon, start, end, model='jma_seamless')}"
+    data = _fetch_json(url)
+    if not data or "daily" not in data:
+        return []
+    return _parse_open_meteo_daily(data)
+
+
 def _fetch_nasa_power(
     lat: float,
     lon: float,

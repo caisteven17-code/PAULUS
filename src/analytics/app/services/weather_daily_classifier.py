@@ -1264,6 +1264,89 @@ def build_chirps_daily_cache(lat: float, lon: float, start: date, end: date) -> 
 # ── Confidence scoring ────────────────────────────────────────────────────────
 
 
+def _fleiss_kappa(items: list[dict]) -> Optional[float]:
+    """items: list of {rater_name: category_str}. Raters may differ per item."""
+    if len(items) < 2:
+        return None
+    # Collect all categories across all items
+    all_cats: set[str] = set()
+    for item in items:
+        all_cats.update(item.values())
+    cats = sorted(all_cats)
+    k = len(cats)
+    if k < 2:
+        return None
+
+    # Build count matrix: n_items x n_cats (how many raters assigned each cat per item)
+    n_items = len(items)
+    cat_idx = {c: i for i, c in enumerate(cats)}
+    counts: list[list[int]] = [[0] * k for _ in range(n_items)]
+    n_raters_per_item: list[int] = []
+    for i, item in enumerate(items):
+        rater_count = 0
+        for cat in item.values():
+            counts[i][cat_idx[cat]] += 1
+            rater_count += 1
+        n_raters_per_item.append(rater_count)
+
+    # Filter items with fewer than 2 raters (cannot compute agreement)
+    valid = [(counts[i], n_raters_per_item[i]) for i in range(n_items) if n_raters_per_item[i] >= 2]
+    if len(valid) < 2:
+        return None
+
+    # P_bar: mean per-item agreement proportion
+    p_items = []
+    for cnt, n_j in valid:
+        denom = n_j * (n_j - 1)
+        p_j = sum(c * (c - 1) for c in cnt) / denom if denom > 0 else 0.0
+        p_items.append(p_j)
+    p_bar = sum(p_items) / len(p_items)
+
+    # P_e_bar: sum of squared marginal proportions across all valid items
+    total_ratings = sum(n_j for _, n_j in valid)
+    if total_ratings == 0:
+        return None
+    cat_totals = [0] * k
+    for cnt, _ in valid:
+        for j, c in enumerate(cnt):
+            cat_totals[j] += c
+    p_e_bar = sum((t / total_ratings) ** 2 for t in cat_totals)
+
+    if p_e_bar >= 1.0:
+        return 1.0
+    return round((p_bar - p_e_bar) / (1.0 - p_e_bar), 4)
+
+
+def _fk_label(k: Optional[float]) -> str:
+    if k is None:
+        return "insufficient data"
+    if k < 0.0:
+        return "Poor"
+    if k < 0.20:
+        return "Slight"
+    if k < 0.40:
+        return "Fair"
+    if k < 0.60:
+        return "Moderate"
+    if k < 0.80:
+        return "Substantial"
+    return "Almost Perfect"
+
+
+def _build_items(rows: list[dict], col_map: dict[str, str], classify_fn) -> list[dict]:
+    """col_map: {rater_label: row_key}. Returns Fleiss items list."""
+    items = []
+    for row in rows:
+        item: dict[str, str] = {}
+        for label, col in col_map.items():
+            val = row.get(col)
+            if val is not None:
+                item[label] = classify_fn(val)
+        if len(item) >= 2:
+            items.append(item)
+    return items
+
+
 def compute_confidence_scores(
     rain_rows: list[dict],
     temp_rows: list[dict],
@@ -1292,91 +1375,11 @@ def compute_confidence_scores(
     """
     # ── helpers ───────────────────────────────────────────────────────────────
 
-    def _fleiss_kappa(items: list[dict]) -> Optional[float]:
-        """items: list of {rater_name: category_str}. Raters may differ per item."""
-        if len(items) < 2:
-            return None
-        # Collect all categories across all items
-        all_cats: set[str] = set()
-        for item in items:
-            all_cats.update(item.values())
-        cats = sorted(all_cats)
-        k = len(cats)
-        if k < 2:
-            return None
-
-        # Build count matrix: n_items x n_cats (how many raters assigned each cat per item)
-        n_items = len(items)
-        cat_idx = {c: i for i, c in enumerate(cats)}
-        counts: list[list[int]] = [[0] * k for _ in range(n_items)]
-        n_raters_per_item: list[int] = []
-        for i, item in enumerate(items):
-            rater_count = 0
-            for cat in item.values():
-                counts[i][cat_idx[cat]] += 1
-                rater_count += 1
-            n_raters_per_item.append(rater_count)
-
-        # Filter items with fewer than 2 raters (cannot compute agreement)
-        valid = [(counts[i], n_raters_per_item[i]) for i in range(n_items) if n_raters_per_item[i] >= 2]
-        if len(valid) < 2:
-            return None
-
-        # P_bar: mean per-item agreement proportion
-        p_items = []
-        for cnt, n_j in valid:
-            denom = n_j * (n_j - 1)
-            p_j = sum(c * (c - 1) for c in cnt) / denom if denom > 0 else 0.0
-            p_items.append(p_j)
-        p_bar = sum(p_items) / len(p_items)
-
-        # P_e_bar: sum of squared marginal proportions across all valid items
-        total_ratings = sum(n_j for _, n_j in valid)
-        if total_ratings == 0:
-            return None
-        cat_totals = [0] * k
-        for cnt, _ in valid:
-            for j, c in enumerate(cnt):
-                cat_totals[j] += c
-        p_e_bar = sum((t / total_ratings) ** 2 for t in cat_totals)
-
-        if p_e_bar >= 1.0:
-            return 1.0
-        return round((p_bar - p_e_bar) / (1.0 - p_e_bar), 4)
-
-    def _fk_label(k: Optional[float]) -> str:
-        if k is None:
-            return "insufficient data"
-        if k < 0.0:
-            return "Poor"
-        if k < 0.20:
-            return "Slight"
-        if k < 0.40:
-            return "Fair"
-        if k < 0.60:
-            return "Moderate"
-        if k < 0.80:
-            return "Substantial"
-        return "Almost Perfect"
-
     def _wci(rows: list[dict], n_validators: int, agreed_col: str = "validators_agreed") -> float:
         if not rows or n_validators == 0:
             return 0.0
         weights = [r.get(agreed_col, 0) / n_validators for r in rows]
         return round(sum(weights) / len(weights) * 100, 2)
-
-    def _build_items(rows: list[dict], col_map: dict[str, str], classify_fn) -> list[dict]:
-        """col_map: {rater_label: row_key}. Returns Fleiss items list."""
-        items = []
-        for row in rows:
-            item: dict[str, str] = {}
-            for label, col in col_map.items():
-                val = row.get(col)
-                if val is not None:
-                    item[label] = classify_fn(val)
-            if len(item) >= 2:
-                items.append(item)
-        return items
 
     # ── Rainfall ─────────────────────────────────────────────────────────────
     rain_col_map = {
@@ -1484,5 +1487,221 @@ def compute_confidence_scores(
             "fleiss_kappa":                  wind_fk,
             "fleiss_strength":               _fk_label(wind_fk),
             "weighted_confidence_index_pct": wind_wci,
+        },
+    }
+
+
+# ── Temporal-aggregation preprocessing (neighborhood / upscaling) ────────────
+# Mitigates the spatial-temporal "double penalty" in point-wise multi-source
+# comparison (Ebert, 2008, Meteorological Applications; Roberts & Lean, 2008,
+# Monthly Weather Review; restated for ensembles in Necker et al., 2024,
+# QJRMS). Convective tropical rainfall displaced by even a day between two
+# independently-gridded sources scores as total disagreement at the daily
+# level even though both correctly detected rain nearby. Aggregating to a
+# coarser temporal window before classifying approximates the standard
+# upscaling fix without needing raw gridded rasters, which this pipeline does
+# not store (each source returns one point value per municipality per day,
+# not a surrounding grid to average over spatially).
+
+_PERIOD_WINDOW_DAYS = {"W": 7, "M": 30}  # nominal window length, for scaling summed thresholds
+
+
+def _period_key(day: str, period: str) -> str:
+    """Group-by bucket key for 'W' (ISO week) or 'M' (calendar month)."""
+    d = date.fromisoformat(day) if isinstance(day, str) else day
+    if period == "M":
+        return f"{d.year:04d}-{d.month:02d}"
+    if period == "W":
+        iso_year, iso_week, _ = d.isocalendar()
+        return f"{iso_year:04d}-W{iso_week:02d}"
+    raise ValueError(f"Unsupported period: {period!r} (expected 'W' or 'M')")
+
+
+def aggregate_rows_by_period(
+    rows: list[dict],
+    sum_cols: list[str],
+    mean_cols: list[str],
+    period: str,
+    date_col: str = "date",
+    group_col: str = "municipality",
+) -> list[dict]:
+    """
+    Collapse daily rows into one row per (group_col, period bucket): sum_cols
+    are summed (e.g. rainfall mm — an accumulation), mean_cols are averaged
+    (e.g. temp/wind/RH — an instantaneous-style measurement). Rows missing
+    date_col or group_col are skipped; missing values are excluded from their
+    column's aggregate rather than treated as zero.
+    """
+    value_cols = (*sum_cols, *mean_cols)
+    buckets: dict[tuple, dict] = {}
+    for row in rows:
+        raw_date = row.get(date_col)
+        group_val = row.get(group_col)
+        if raw_date is None or group_val is None:
+            continue
+        key = (group_val, _period_key(raw_date, period))
+        bucket = buckets.setdefault(key, {c: [] for c in value_cols})
+        for c in value_cols:
+            val = row.get(c)
+            if val is not None:
+                bucket[c].append(val)
+
+    out = []
+    for (group_val, period_val), bucket in buckets.items():
+        agg_row = {group_col: group_val, date_col: period_val}
+        for c in sum_cols:
+            agg_row[c] = sum(bucket[c]) if bucket[c] else None
+        for c in mean_cols:
+            agg_row[c] = (sum(bucket[c]) / len(bucket[c])) if bucket[c] else None
+        out.append(agg_row)
+    return out
+
+
+_RAIN_SEVERITY_RANK = {"light": 0, "moderate": 1, "heavy": 2}
+_RAIN_RANK_TO_LABEL = {v: k for k, v in _RAIN_SEVERITY_RANK.items()}
+
+
+def _build_rain_peak_items(
+    rows: list[dict],
+    col_map: dict[str, str],
+    period: str,
+    date_col: str = "date",
+    group_col: str = "municipality",
+) -> list[dict]:
+    """
+    Neighborhood-style rainfall items: classify each day per source with the
+    existing (unscaled) classify_rain(), then take each source's MAX-severity
+    day within the window as that source's label for the window. This tests
+    whether sources agree an event of a given severity happened SOMEWHERE in
+    the window — tolerant of which exact day the peak landed on — rather than
+    requiring the summed window total to cross a rescaled threshold (which
+    collapses category diversity; see compute_temporal_aggregated_confidence
+    docstring for why summing was rejected).
+    """
+    buckets: dict[tuple, dict[str, int]] = {}
+    for row in rows:
+        raw_date = row.get(date_col)
+        group_val = row.get(group_col)
+        if raw_date is None or group_val is None:
+            continue
+        key = (group_val, _period_key(raw_date, period))
+        bucket = buckets.setdefault(key, {})
+        for label, col in col_map.items():
+            val = row.get(col)
+            if val is None:
+                continue
+            rank = _RAIN_SEVERITY_RANK[classify_rain(val)]
+            if label not in bucket or rank > bucket[label]:
+                bucket[label] = rank
+
+    items = []
+    for bucket in buckets.values():
+        item = {label: _RAIN_RANK_TO_LABEL[rank] for label, rank in bucket.items()}
+        if len(item) >= 2:
+            items.append(item)
+    return items
+
+
+def compute_temporal_aggregated_confidence(
+    daily_rain_rows: list[dict],
+    daily_temp_rows: list[dict],
+    daily_wind_rows: Optional[list[dict]] = None,
+    period: str = "W",
+) -> dict:
+    """
+    Re-run Fleiss' Kappa after upscaling daily rows to a coarser temporal
+    window (period: 'W' weekly, 'M' monthly), per municipality. See module
+    note above for the double-penalty rationale.
+
+    Rainfall uses a peak-classification neighborhood comparison (see
+    _build_rain_peak_items): each source's window label is the most severe
+    daily classification it recorded anywhere in the window, using the
+    existing unscaled PAGASA thresholds. An earlier version summed the
+    window and rescaled the thresholds linearly (x7 / x30) — that collapsed
+    nearly all windows into a single category (no official PAGASA
+    weekly/monthly scale exists to calibrate the rescale against), which
+    crashes Fleiss' Kappa rather than revealing displacement-driven
+    disagreement. Peak-classification avoids that failure mode.
+    Temperature/humidity/wind are MEANED over the window, so the existing
+    daily thresholds apply unscaled and directly.
+    Severe weather (nominal WMO codes) is intentionally excluded: averaging
+    or summing a categorical code is meaningless. A fractional-occurrence
+    (FSS-style) treatment would be needed instead — out of scope here.
+    """
+    if period not in _PERIOD_WINDOW_DAYS:
+        raise ValueError(f"period must be 'W' or 'M', got {period!r}")
+
+    temp_mean_cols = [
+        "nasa_power_temp_c", "open_meteo_temp_c", "era5_temp_c",
+        "ecmwf_ifs_temp_c", "ukmo_temp_c",
+    ]
+    humidity_mean_cols = ["nasa_power_rh_pct", "open_meteo_rh_pct", "era5_rh_pct"]
+    wind_mean_cols = [
+        "nasa_power_wind_ms", "open_meteo_wind_ms", "era5_wind_ms",
+        "ecmwf_ifs_wind_ms", "ukmo_wind_ms",
+    ]
+
+    temp_agg = aggregate_rows_by_period(daily_temp_rows, [], temp_mean_cols + humidity_mean_cols, period)
+    wind_agg = aggregate_rows_by_period(daily_wind_rows or [], [], wind_mean_cols, period)
+
+    rain_col_map = {
+        "NASA POWER AG": "nasa_power_rainfall_mm", "CHIRPS": "chirps_rainfall_mm",
+        "Open-Meteo ERA5-Land": "open_meteo_rainfall_mm", "GSMaP NRT": "gsmap_nrt_rainfall_mm",
+        "ERA5 (Full)": "era5_rainfall_mm", "UKMO": "ukmo_rainfall_mm",
+    }
+    temp_col_map = {
+        "NASA POWER AG": "nasa_power_temp_c", "Open-Meteo ERA5-Land": "open_meteo_temp_c",
+        "ERA5 (Full)": "era5_temp_c", "ECMWF IFS": "ecmwf_ifs_temp_c", "UKMO": "ukmo_temp_c",
+    }
+    humidity_col_map = {
+        "NASA POWER AG": "nasa_power_rh_pct", "Open-Meteo ERA5-Land": "open_meteo_rh_pct",
+        "ERA5 (Full)": "era5_rh_pct",
+    }
+    wind_col_map = {
+        "NASA POWER AG": "nasa_power_wind_ms", "Open-Meteo ERA5-Land": "open_meteo_wind_ms",
+        "ERA5 (Full)": "era5_wind_ms", "ECMWF IFS": "ecmwf_ifs_wind_ms", "UKMO": "ukmo_wind_ms",
+    }
+
+    rain_items = _build_rain_peak_items(daily_rain_rows, rain_col_map, period)
+    temp_items = _build_items(temp_agg, temp_col_map, classify_temp)
+    humidity_items = _build_items(temp_agg, humidity_col_map, classify_humidity)
+    wind_items = _build_items(wind_agg, wind_col_map, classify_wind)
+
+    rain_fk = _fleiss_kappa(rain_items)
+    temp_fk = _fleiss_kappa(temp_items)
+    humidity_fk = _fleiss_kappa(humidity_items)
+    wind_fk = _fleiss_kappa(wind_items)
+
+    fk_scores = [k for k in [rain_fk, temp_fk, humidity_fk, wind_fk] if k is not None]
+    overall_fk = round(sum(fk_scores) / len(fk_scores), 4) if fk_scores else None
+
+    return {
+        "period": period,
+        "overall_fleiss_kappa": overall_fk,
+        "overall_fleiss_strength": _fk_label(overall_fk),
+        "rainfall": {
+            "n_periods": len(rain_items),
+            "n_items_for_kappa": len(rain_items),
+            "fleiss_kappa": rain_fk,
+            "fleiss_strength": _fk_label(rain_fk),
+            "note": "Peak-classification: each source's window label is its most severe day in the window (unscaled PAGASA thresholds).",
+        },
+        "temperature": {
+            "n_periods": len(temp_agg),
+            "n_items_for_kappa": len(temp_items),
+            "fleiss_kappa": temp_fk,
+            "fleiss_strength": _fk_label(temp_fk),
+        },
+        "humidity": {
+            "n_periods": len(temp_agg),
+            "n_items_for_kappa": len(humidity_items),
+            "fleiss_kappa": humidity_fk,
+            "fleiss_strength": _fk_label(humidity_fk),
+        },
+        "wind": {
+            "n_periods": len(wind_agg),
+            "n_items_for_kappa": len(wind_items),
+            "fleiss_kappa": wind_fk,
+            "fleiss_strength": _fk_label(wind_fk),
         },
     }
