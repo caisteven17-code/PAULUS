@@ -28,6 +28,8 @@ import { usePermissions } from '../hooks/usePermissions';
 import { apiClient } from '../lib/api-client';
 import { getArchiveAccess, ArchiveAccess } from '../lib/archiveAccess';
 import { InlineLoader } from '../components/ui/LoadingScreen';
+import { Avatar } from '../components/ui/Avatar';
+import { ENTITY_TYPE_ICON } from '../lib/entityIcons';
 
 type ArchiveType = 'user' | 'entity' | 'event' | 'announcement' | 'project' | 'health';
 
@@ -52,11 +54,7 @@ const TYPE_META: Record<ArchiveType, { label: string; icon: React.ElementType; t
   health: { label: 'Health Record', icon: Heart, tint: 'bg-fuchsia-50 border-fuchsia-100 text-fuchsia-600', chip: 'bg-fuchsia-50 text-fuchsia-700 border-fuchsia-100' },
 };
 
-const SUBTYPE_ICON: Record<string, React.ElementType> = {
-  parish: Building2,
-  seminary: GraduationCap,
-  school: School,
-};
+const SUBTYPE_ICON: Record<string, React.ElementType> = ENTITY_TYPE_ICON;
 
 const PAGE_SIZE = 10;
 
@@ -516,9 +514,17 @@ export function ArchivesPage() {
                     <tr key={item.key} className="group transition-colors hover:bg-slate-50/60">
                       <td className="px-6 py-4">
                         <div className="flex items-center gap-3">
-                          <div className={`flex h-9 w-9 items-center justify-center rounded-xl border ${meta.tint}`}>
-                            <Icon className="h-4 w-4" />
-                          </div>
+                          {item.type === 'user' ? (
+                            <Avatar
+                              name={item.title}
+                              photoUrl={item.raw?.avatarUrl || item.raw?.photoURL}
+                              size={36}
+                            />
+                          ) : (
+                            <div className={`flex h-9 w-9 items-center justify-center rounded-xl border ${meta.tint}`}>
+                              <Icon className="h-4 w-4" />
+                            </div>
+                          )}
                           <div className="min-w-0">
                             <p className="truncate text-sm font-bold text-slate-900">{item.title}</p>
                             <p className="truncate text-[11px] text-slate-400">{item.detail || item.subtitle}</p>

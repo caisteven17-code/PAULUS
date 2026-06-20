@@ -26,6 +26,7 @@ import ReactECharts from 'echarts-for-react';
 import { apiClient } from '../lib/api-client';
 import { InlineLoader } from '../components/ui/LoadingScreen';
 import { usePermissions } from '../hooks/usePermissions';
+import { normalizeAccessRole } from '../lib/access';
 
 type AITwinMode = 'parish' | 'priest' | 'seminary' | 'school';
 type FinancialAITwinMode = Exclude<AITwinMode, 'priest'>;
@@ -581,10 +582,16 @@ function ParishAITwin({ mode = 'parish' }: { mode?: FinancialAITwinMode }) {
   const [liveProfiles, setLiveProfiles] = useState<FinancialTwinProfile[]>([]);
   const [profilesLoaded, setProfilesLoaded] = useState(false);
   const [loadError, setLoadError] = useState(false);
-  // Non-diocesan users only see their own institution in the simulator.
+  // Non-diocesan users may only view the financials of their own designated
+  // institution. Match on institution id first (stable), then fall back to a
+  // case-insensitive name match for accounts created before ids were stored.
   const profiles = isDioceseUser
     ? liveProfiles
-    : liveProfiles.filter((p) => p.name === simUser?.entityName);
+    : liveProfiles.filter(
+        (p) =>
+          (!!simUser?.entityId && String(p.id) === String(simUser.entityId)) ||
+          (!!simUser?.entityName && p.name?.toLowerCase() === String(simUser.entityName).toLowerCase()),
+      );
   const [selectedParishId, setSelectedParishId] = useState<string>('');
 
   // Fetch real institution financial profiles; fall back to hardcoded on failure.
@@ -1531,9 +1538,46 @@ function PriestAITwin() {
     loadScenarios();
   }, []);
 
+  // The priest dropdown is sourced from User Management (the real parish-priest
+  // accounts) rather than a hardcoded list. Priests with no recorded prior
+  // assignments fall into the simulator's existing "insufficient history" state.
+  const [priestDirectory, setPriestDirectory] = useState<any[]>([]);
+  useEffect(() => {
+    let cancelled = false;
+    fetch('/api/admin/users')
+      .then((r) => (r.ok ? r.json() : Promise.reject(new Error('users fetch failed'))))
+      .then((users: any[]) => {
+        if (cancelled || !Array.isArray(users)) return;
+        const mapped = users
+          .filter((u) => normalizeAccessRole(u.roleId || u.role) === 'parish_priest')
+          .map((u) => ({
+            id: u.id,
+            name: u.displayName || u.email || 'Unnamed Priest',
+            currentParish: u.entityName || '',
+            previousAssignments: 0,
+            assignmentHealth: 65,
+            stewardship: 65,
+            reporting: 70,
+            adaptability: 70,
+            yearsInPost: 1,
+            strength: 'Reassignment analytics will appear once prior assignment history is recorded.',
+            assignmentHistory: [] as any[],
+          }));
+        setPriestDirectory(mapped);
+      })
+      .catch((err) => console.error('[WhatIfSimulator] failed to load priests from User Management:', err));
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  // Fall back to the bundled sample priests only if no parish-priest accounts
+  // exist yet, so the simulator is never completely empty during a demo.
+  const priestList: any[] = priestDirectory.length ? priestDirectory : priests;
+
   const selectedPriest = useMemo(
-    () => (selectedPriestId ? priests.find((priest) => priest.id === selectedPriestId) : undefined),
-    [selectedPriestId],
+    () => (selectedPriestId ? priestList.find((priest) => priest.id === selectedPriestId) : undefined),
+    [selectedPriestId, priestList],
   );
   const selectedParish = useMemo(
     () => (params.targetParishId ? reassignmentParishes.find((parish) => parish.id === params.targetParishId) : undefined),
@@ -1638,7 +1682,7 @@ function PriestAITwin() {
   const loadScenario = (scenario: PriestSavedScenario) => {
     setSelectedPriestId(scenario.priestId);
     setParams(scenario.params);
-    const priest = priests.find((item) => item.id === scenario.priestId) || priests[0];
+    const priest = priestList.find((item) => item.id === scenario.priestId) || priestList[0];
     const parish =
       reassignmentParishes.find((item) => item.id === scenario.params.targetParishId) || reassignmentParishes[0];
     setResults(calculatePriestScenario(priest, parish, scenario.params));
@@ -1701,7 +1745,7 @@ function PriestAITwin() {
                   className={`w-full px-4 py-4 bg-church-light border border-church-grey/10 rounded-2xl focus:outline-none focus:ring-2 focus:ring-gold-500 font-medium ${selectedPriestId ? 'text-church-black' : 'text-church-grey'}`}
                 >
                   <option value="" disabled>Select a priest here</option>
-                  {priests.map((priest) => (
+                  {priestList.map((priest) => (
                     <option key={priest.id} value={priest.id}>
                       {priest.name}
                     </option>

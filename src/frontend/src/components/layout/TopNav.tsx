@@ -6,6 +6,7 @@ import { Calendar, ChevronDown, Check, User, Database, LogOut } from 'lucide-rea
 import { Role, Timeframe } from '../../App';
 import { auth } from '../../firebase';
 import { ALL_PARISHES } from '../../constants';
+import { Avatar } from '../ui/Avatar';
 
 const TIMEFRAME_LABELS: Record<Timeframe, string> = {
   '6m': 'Past 6 Months',
@@ -74,8 +75,7 @@ export function TopNav({
           ? [`Rector: ${pastorName}`, 'Access: Seminary']
           : ['District not assigned', vicariateLabel, `Parish Priest: ${pastorName}`, 'Access: Parish Priest'];
 
-    const userInitial =
-      pastorName.charAt(0).toUpperCase() || (role === 'school' ? 'S' : role === 'seminary' ? 'R' : 'B');
+    const avatarPhoto = (user as any)?.avatarUrl || (user as any)?.photoURL || '';
 
     return (
       <header className="bg-black text-white border-b border-white/5 sticky top-0 z-50 min-h-[78px] flex items-center w-full">
@@ -162,9 +162,10 @@ export function TopNav({
             <div className="relative">
               <button
                 onClick={() => setIsAccountOpen(!isAccountOpen)}
-                className="flex h-11 w-11 lg:h-12 lg:w-12 items-center justify-center rounded-full border border-gold-200 bg-gold-500 text-black shadow-[0_0_24px_rgba(212,175,55,0.3)] hover:bg-gold-400 transition-colors cursor-pointer shrink-0"
+                className="rounded-full shrink-0 cursor-pointer shadow-[0_0_24px_rgba(212,175,55,0.3)] hover:scale-105 transition-transform"
+                aria-label="Account menu"
               >
-                <span className="text-lg font-black">{userInitial}</span>
+                <Avatar name={pastorName} photoUrl={avatarPhoto} size={48} />
               </button>
 
               {isAccountOpen && (
@@ -218,6 +219,9 @@ export function TopNav({
 
   const isDioceseHeader = ['bishop', 'admin', 'chancellor', 'diocesan_oeconomus', 'finance_staff'].includes(role);
   if (isDioceseHeader) {
+    const user = auth.currentUser;
+    const pastorName = user?.displayName || user?.email || 'Account';
+    const avatarPhoto = (user as any)?.avatarUrl || (user as any)?.photoURL || '';
     return (
       <header className="bg-black text-white border-b border-white/5 sticky top-0 z-30 h-16 flex items-center w-full">
         <div className="flex items-center justify-between w-full px-8">
@@ -289,9 +293,10 @@ export function TopNav({
             <div className="relative">
               <button
                 onClick={() => setIsAccountOpen(!isAccountOpen)}
-                className="w-10 h-10 bg-gold-500 text-black rounded-full flex items-center justify-center hover:bg-gold-600 transition-colors cursor-pointer shadow-lg shadow-gold-500/20 border border-gold-600 shrink-0"
+                className="rounded-full flex items-center justify-center cursor-pointer shadow-lg shadow-gold-500/20 shrink-0 hover:scale-105 transition-transform"
+                aria-label="Account menu"
               >
-                <User className="w-5 h-5" />
+                <Avatar name={pastorName} photoUrl={avatarPhoto} size={40} />
               </button>
 
               {isAccountOpen && (

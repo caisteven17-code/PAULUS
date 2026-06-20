@@ -41,24 +41,41 @@ export class ProjectService {
       .filter((row: any) => candidateSet.has(String(row.name ?? '').toLowerCase()))
       .map((row: any) => row.id);
 
-    // Auto-register seminary/school institutions that are not yet in diocese.institutions.
-    if (found.length === 0 && entityName && entityType && entityType !== 'diocese') {
-      const insertName = entityName.trim();
-      const { data: created, error: insertErr } = await this.db()
-        .from('institutions')
-        .insert({ name: insertName, institution_type: entityType, is_active: true })
-        .select('id')
-        .single();
-      if (!insertErr && created?.id) return [created.id];
-      // If insert failed (e.g. duplicate), try fetching the existing record.
-      const { data: existing } = await this.db()
-        .from('institutions')
-        .select('id')
-        .eq('name', insertName)
-        .eq('institution_type', entityType)
-        .is('deleted_at', null)
-        .single();
-      if (existing?.id) return [existing.id];
+    // Auto-register seminary/school/parish institutions that are not yet in
+    // diocese.institutions. This is the safety net so a school/seminary user can
+    // still save even if Entity Management never synced their institution.
+    if (found.length === 0 && (entityName || entityId) && entityType && entityType !== 'diocese') {
+      const insertName = (entityName ?? entityId ?? '').trim();
+      if (insertName) {
+        const { data: created, error: insertErr } = await this.db()
+          .from('institutions')
+          .insert({ name: insertName, institution_type: entityType, is_active: true })
+          .select('id')
+          .single();
+        if (!insertErr && created?.id) return [created.id];
+        if (insertErr) {
+          console.error(
+            `[project.service] auto-register institution failed for "${insertName}" (${entityType}):`,
+            insertErr.code,
+            insertErr.message,
+          );
+        }
+        // If insert failed (e.g. duplicate name, or it now exists), fetch it —
+        // including soft-deleted rows so we can surface a clearer reason.
+        const { data: existing } = await this.db()
+          .from('institutions')
+          .select('id, deleted_at')
+          .eq('name', insertName)
+          .eq('institution_type', entityType)
+          .limit(1)
+          .maybeSingle();
+        if (existing?.id && !existing.deleted_at) return [existing.id];
+        if (existing?.deleted_at) {
+          console.error(
+            `[project.service] institution "${insertName}" (${entityType}) exists but is archived; restore it in Entity Management to save here.`,
+          );
+        }
+      }
     }
 
     return found;

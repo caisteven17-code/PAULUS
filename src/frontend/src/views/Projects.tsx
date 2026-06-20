@@ -30,6 +30,7 @@ import { dataService } from '../services/dataService';
 import { auth } from '../firebase';
 import { usePermissions } from '../hooks/usePermissions';
 import { dateField, roundedField, selectField } from '../lib/formStyles';
+import { FilterModal, FilterField } from '../components/ui/FilterModal';
 
 interface ProjectsProps {
   role?: string;
@@ -65,6 +66,7 @@ export function Projects({ role }: ProjectsProps) {
   const [filterCategory, setFilterCategory] = useState<ProjectCategory | 'All'>('All');
   const [filterEntityType, setFilterEntityType] = useState<EntityType | 'All'>('All');
   const [filterStatus, setFilterStatus] = useState<'all' | 'active' | 'completed' | 'on-hold'>('all');
+  const [filterInstitution, setFilterInstitution] = useState<string>('all'); // specific institution name
   const [sortBy, setSortBy] = useState<'recent' | 'name' | 'progress' | 'raised'>('recent');
   const [dateFrom, setDateFrom] = useState('');
   const [dateTo, setDateTo] = useState('');
@@ -107,6 +109,8 @@ export function Projects({ role }: ProjectsProps) {
     }
   }, []);
   const isArchived = useCallback((id: string) => archivedIds.includes(id), [archivedIds]);
+  // Confirm before archiving a project ("Are you sure you want to archive this?").
+  const [archiveConfirm, setArchiveConfirm] = useState<{ id: string; name: string } | null>(null);
 
   useEffect(() => {
     const unsubscribe = auth.onAuthStateChanged((user: any) => {
@@ -186,6 +190,7 @@ export function Projects({ role }: ProjectsProps) {
     }
     if (filterCategory !== 'All') out = out.filter((p) => p.category === filterCategory);
     if (filterStatus !== 'all') out = out.filter((p) => p.status === filterStatus);
+    if (filterInstitution !== 'all') out = out.filter((p) => (p.entityName ?? p.entityId) === filterInstitution);
     if (dateFrom) out = out.filter((p) => p.startDate >= dateFrom);
     if (dateTo) out = out.filter((p) => p.startDate <= dateTo);
 
@@ -197,11 +202,24 @@ export function Projects({ role }: ProjectsProps) {
       return new Date(b.startDate).getTime() - new Date(a.startDate).getTime(); // recent
     });
     return out;
-  }, [projects, isSchoolOverseer, isDiocese, filterEntityType, filterStatus, isArchived, searchQuery, filterCategory, dateFrom, dateTo, sortBy]);
+  }, [projects, isSchoolOverseer, isDiocese, filterEntityType, filterStatus, filterInstitution, isArchived, searchQuery, filterCategory, dateFrom, dateTo, sortBy]);
+
+  // Specific-institution options (per-institution filter, like the Events tab),
+  // scoped to the currently selected entity type.
+  const institutionOptions = useMemo(() => {
+    const names = new Set<string>();
+    for (const p of projects) {
+      if (isArchived(p.id)) continue;
+      if (isDiocese && filterEntityType !== 'All' && p.entityType !== filterEntityType) continue;
+      const n = p.entityName ?? p.entityId;
+      if (n) names.add(n);
+    }
+    return Array.from(names).sort();
+  }, [projects, isDiocese, filterEntityType, isArchived]);
 
   useEffect(() => {
     setPage(1);
-  }, [searchQuery, filterCategory, filterEntityType, filterStatus, sortBy, dateFrom, dateTo]);
+  }, [searchQuery, filterCategory, filterEntityType, filterStatus, filterInstitution, sortBy, dateFrom, dateTo]);
 
   const totalPages = Math.max(1, Math.ceil(filteredProjects.length / PAGE_SIZE));
   const safePage = Math.min(page, totalPages);
@@ -226,15 +244,28 @@ export function Projects({ role }: ProjectsProps) {
     searchQuery !== '' ||
     filterCategory !== 'All' ||
     filterStatus !== 'all' ||
+    filterInstitution !== 'all' ||
     dateFrom !== '' ||
     dateTo !== '' ||
     (isDiocese && filterEntityType !== 'All');
+
+  // Count of active filters inside the modal (search stays inline, so excluded).
+  const modalFilterCount =
+    (filterCategory !== 'All' ? 1 : 0) +
+    (filterStatus !== 'all' ? 1 : 0) +
+    (filterInstitution !== 'all' ? 1 : 0) +
+    (dateFrom ? 1 : 0) +
+    (dateTo ? 1 : 0) +
+    (sortBy !== 'recent' ? 1 : 0) +
+    (isDiocese && filterEntityType !== 'All' ? 1 : 0);
 
   const clearFilters = () => {
     setSearchQuery('');
     setFilterCategory('All');
     setFilterEntityType('All');
     setFilterStatus('all');
+    setFilterInstitution('all');
+    setSortBy('recent');
     setDateFrom('');
     setDateTo('');
   };
@@ -497,139 +528,102 @@ export function Projects({ role }: ProjectsProps) {
               />
             </div>
 
-            {/* Status */}
-            <Select
-              value={filterStatus}
-              onChange={(v) => setFilterStatus(v as any)}
-              options={[
-                ['all', 'All statuses'],
-                ['active', 'Active'],
-                ['completed', 'Completed'],
-                ['on-hold', 'On hold'],
-              ]}
-            />
-
-            {/* Entity type — diocese only */}
-            {isDiocese && (
-              <div className="relative">
-                <button
-                  onClick={() => setShowEntityFilterDropdown((v) => !v)}
-                  className={`flex h-11 items-center gap-2 rounded-2xl border bg-slate-50 px-4 text-sm font-bold text-slate-700 transition-all ${
-                    showEntityFilterDropdown ? 'border-gold-500 ring-4 ring-gold-500/10' : 'border-slate-200'
-                  }`}
+            {/* All secondary filters live in a pop-up modal to keep the bar clean */}
+            <FilterModal activeCount={modalFilterCount} onClear={clearFilters}>
+              <FilterField label="Status">
+                <select
+                  value={filterStatus}
+                  onChange={(e) => setFilterStatus(e.target.value as any)}
+                  className={selectField(filterStatus !== 'all', 'h-11 w-full rounded-2xl px-4 text-sm font-bold')}
                 >
-                  <Building2 className="h-4 w-4 text-slate-400" />
-                  <span className="capitalize">{filterEntityType === 'All' ? 'All types' : filterEntityType}</span>
-                  <ChevronDown className={`h-4 w-4 text-slate-400 transition-transform ${showEntityFilterDropdown ? 'rotate-180' : ''}`} />
-                </button>
-                <AnimatePresence>
-                  {showEntityFilterDropdown && (
-                    <motion.div
-                      initial={{ opacity: 0, y: 8 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      exit={{ opacity: 0, y: 8 }}
-                      className="absolute right-0 z-50 mt-2 w-56 overflow-hidden rounded-2xl border border-slate-100 bg-white py-2 shadow-2xl"
-                    >
-                      {['All', 'diocese', 'parish', 'seminary', 'school'].map((type) => (
-                        <button
-                          key={type}
-                          onClick={() => {
-                            setFilterEntityType(type as any);
-                            setShowEntityFilterDropdown(false);
-                          }}
-                          className="flex w-full items-center justify-between px-4 py-2.5 text-left text-sm font-medium transition-colors hover:bg-gold-50"
-                        >
-                          <span className="flex items-center gap-2.5">
-                            <span className="text-slate-400">{type !== 'All' && getEntityIcon(type)}</span>
-                            <span className={filterEntityType === type ? 'font-bold text-gold-600 capitalize' : 'text-slate-600 capitalize'}>
-                              {type === 'All' ? 'All types' : type}
-                            </span>
-                          </span>
-                          {filterEntityType === type && <Check className="h-4 w-4 text-gold-600" />}
-                        </button>
-                      ))}
-                    </motion.div>
-                  )}
-                </AnimatePresence>
-              </div>
-            )}
+                  <option value="all">All statuses</option>
+                  <option value="active">Active</option>
+                  <option value="completed">Completed</option>
+                  <option value="on-hold">On hold</option>
+                </select>
+              </FilterField>
 
-            {/* Category */}
-            <div className="relative">
-              <button
-                onClick={() => setShowFilterDropdown((v) => !v)}
-                className={`flex h-11 items-center gap-2 rounded-2xl border bg-slate-50 px-4 text-sm font-bold text-slate-700 transition-all ${
-                  showFilterDropdown ? 'border-gold-500 ring-4 ring-gold-500/10' : 'border-slate-200'
-                }`}
-              >
-                <Filter className="h-4 w-4 text-slate-400" />
-                <span>{filterCategory === 'All' ? 'All categories' : filterCategory}</span>
-                <ChevronDown className={`h-4 w-4 text-slate-400 transition-transform ${showFilterDropdown ? 'rotate-180' : ''}`} />
-              </button>
-              <AnimatePresence>
-                {showFilterDropdown && (
-                  <motion.div
-                    initial={{ opacity: 0, y: 8 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    exit={{ opacity: 0, y: 8 }}
-                    className="absolute right-0 z-50 mt-2 max-h-72 w-64 overflow-y-auto rounded-2xl border border-slate-100 bg-white py-2 shadow-2xl"
+              {isDiocese && (
+                <FilterField label="Institution type">
+                  <select
+                    value={filterEntityType}
+                    onChange={(e) => {
+                      setFilterEntityType(e.target.value as any);
+                      setFilterInstitution('all');
+                    }}
+                    className={selectField(filterEntityType !== 'All', 'h-11 w-full rounded-2xl px-4 text-sm font-bold capitalize')}
                   >
-                    {CATEGORIES.map((cat) => (
-                      <button
-                        key={cat}
-                        onClick={() => {
-                          setFilterCategory(cat as any);
-                          setShowFilterDropdown(false);
-                        }}
-                        className="flex w-full items-center justify-between px-4 py-2.5 text-left text-sm font-medium transition-colors hover:bg-gold-50"
-                      >
-                        <span className={filterCategory === cat ? 'font-bold text-gold-600' : 'text-slate-600'}>
-                          {cat === 'All' ? 'All categories' : cat}
-                        </span>
-                        {filterCategory === cat && <Check className="h-4 w-4 text-gold-600" />}
-                      </button>
-                    ))}
-                  </motion.div>
-                )}
-              </AnimatePresence>
-            </div>
+                    <option value="All">All types</option>
+                    <option value="diocese">Diocese</option>
+                    <option value="parish">Parish</option>
+                    <option value="seminary">Seminary</option>
+                    <option value="school">School</option>
+                  </select>
+                </FilterField>
+              )}
 
-            {/* Sort */}
-            <Select
-              icon={<ArrowUpDown className="h-3.5 w-3.5 text-slate-400" />}
-              value={sortBy}
-              onChange={(v) => setSortBy(v as any)}
-              options={[
-                ['recent', 'Most recent'],
-                ['name', 'Name (A–Z)'],
-                ['progress', 'Progress'],
-                ['raised', 'Amount raised'],
-              ]}
-            />
+              <FilterField label="Institution">
+                <select
+                  value={filterInstitution}
+                  onChange={(e) => setFilterInstitution(e.target.value)}
+                  className={selectField(filterInstitution !== 'all', 'h-11 w-full rounded-2xl px-4 text-sm font-bold')}
+                >
+                  <option value="all">All institutions</option>
+                  {institutionOptions.map((name) => (
+                    <option key={name} value={name}>
+                      {name}
+                    </option>
+                  ))}
+                </select>
+              </FilterField>
 
-            {/* Date range */}
-            <input
-              type="date"
-              value={dateFrom}
-              onChange={(e) => setDateFrom(e.target.value)}
-              className={dateField(Boolean(dateFrom), 'h-11 rounded-2xl px-3 text-sm font-semibold')}
-            />
-            <input
-              type="date"
-              value={dateTo}
-              min={dateFrom || undefined}
-              onChange={(e) => setDateTo(e.target.value)}
-              className={dateField(Boolean(dateTo), 'h-11 rounded-2xl px-3 text-sm font-semibold')}
-            />
+              <FilterField label="Category">
+                <select
+                  value={filterCategory}
+                  onChange={(e) => setFilterCategory(e.target.value as any)}
+                  className={selectField(filterCategory !== 'All', 'h-11 w-full rounded-2xl px-4 text-sm font-bold')}
+                >
+                  {CATEGORIES.map((cat) => (
+                    <option key={cat} value={cat}>
+                      {cat === 'All' ? 'All categories' : cat}
+                    </option>
+                  ))}
+                </select>
+              </FilterField>
 
-            {hasActiveFilters && (
-              <button
-                onClick={clearFilters}
-                className="inline-flex h-11 items-center gap-1.5 rounded-2xl border border-slate-200 px-4 text-xs font-black uppercase tracking-[0.12em] text-slate-500 transition-all hover:bg-slate-50 hover:text-slate-900"
-              >
-                Clear
-              </button>
-            )}
+              <FilterField label="Sort by">
+                <select
+                  value={sortBy}
+                  onChange={(e) => setSortBy(e.target.value as any)}
+                  className={selectField(sortBy !== 'recent', 'h-11 w-full rounded-2xl px-4 text-sm font-bold')}
+                >
+                  <option value="recent">Most recent</option>
+                  <option value="name">Name (A–Z)</option>
+                  <option value="progress">Progress</option>
+                  <option value="raised">Amount raised</option>
+                </select>
+              </FilterField>
+
+              <div className="grid grid-cols-2 gap-3">
+                <FilterField label="From">
+                  <input
+                    type="date"
+                    value={dateFrom}
+                    onChange={(e) => setDateFrom(e.target.value)}
+                    className={dateField(Boolean(dateFrom), 'h-11 w-full rounded-2xl px-3 text-sm font-semibold')}
+                  />
+                </FilterField>
+                <FilterField label="To">
+                  <input
+                    type="date"
+                    value={dateTo}
+                    min={dateFrom || undefined}
+                    onChange={(e) => setDateTo(e.target.value)}
+                    className={dateField(Boolean(dateTo), 'h-11 w-full rounded-2xl px-3 text-sm font-semibold')}
+                  />
+                </FilterField>
+              </div>
+            </FilterModal>
           </div>
         </div>
 
@@ -652,7 +646,7 @@ export function Projects({ role }: ProjectsProps) {
                       <button
                         onClick={(e) => {
                           e.stopPropagation();
-                          persistArchived(Array.from(new Set([...archivedIds, project.id])));
+                          setArchiveConfirm({ id: project.id, name: project.name });
                         }}
                         className="absolute right-4 top-4 z-10 inline-flex items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-2.5 py-1.5 text-[10px] font-black uppercase tracking-wide text-slate-500 opacity-0 shadow-sm transition-all hover:bg-rose-500 hover:text-white group-hover:opacity-100"
                         title="Archive project"
@@ -726,6 +720,58 @@ export function Projects({ role }: ProjectsProps) {
         currentInstitution={currentProjectInstitution}
         onSubmit={handleAddProject}
       />
+
+      {/* Confirm before archiving a project */}
+      <AnimatePresence>
+        {archiveConfirm && (
+          <div className="fixed inset-0 z-[120] flex items-center justify-center p-4">
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setArchiveConfirm(null)}
+              className="absolute inset-0 bg-black/50 backdrop-blur-sm"
+            />
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95, y: 16 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 16 }}
+              className="relative w-full max-w-sm overflow-hidden rounded-3xl bg-white shadow-2xl"
+            >
+              <div className="space-y-6 p-8 text-center">
+                <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full border border-amber-100 bg-amber-50 text-amber-500">
+                  <Archive className="h-8 w-8" />
+                </div>
+                <div className="space-y-2">
+                  <h3 className="text-xl font-bold text-slate-900">Archive project</h3>
+                  <p className="text-xs font-semibold leading-relaxed text-slate-500">
+                    Are you sure you want to archive &quot;{archiveConfirm.name}&quot;? You can restore it later from
+                    Archives.
+                  </p>
+                </div>
+                <div className="flex gap-3">
+                  <button
+                    onClick={() => setArchiveConfirm(null)}
+                    className="flex-1 rounded-xl border border-slate-200 px-6 py-3 text-sm font-bold text-slate-500 transition-colors hover:bg-slate-50"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    onClick={() => {
+                      persistArchived(Array.from(new Set([...archivedIds, archiveConfirm.id])));
+                      setArchiveConfirm(null);
+                    }}
+                    className="flex flex-1 items-center justify-center gap-2 rounded-xl bg-amber-500 px-6 py-3 text-sm font-bold text-white shadow-lg transition-colors hover:bg-amber-600"
+                  >
+                    <Archive className="h-4 w-4" />
+                    Confirm
+                  </button>
+                </div>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }

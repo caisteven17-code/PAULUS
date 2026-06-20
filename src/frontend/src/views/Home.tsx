@@ -23,6 +23,7 @@ import {
 } from 'lucide-react';
 import { motion } from 'motion/react';
 import { apiClient } from '../lib/api-client';
+import { ENTITY_TYPE_ICON } from '../lib/entityIcons';
 import { SubmissionTracker } from '../components/projects/SubmissionTracker';
 import { ClassificationManagement, ClassificationRecord } from '../components/ui/ClassificationManagement';
 import ReactECharts from 'echarts-for-react';
@@ -163,16 +164,19 @@ export function Home({ onNavigate, role = 'bishop', permissions = {} }: HomeProp
 
   useEffect(() => {
     let cancelled = false;
+    // Count from the SAME source Entity Management uses (diocese.institutions),
+    // so the homepage snapshot always matches Entity Management instead of
+    // showing hardcoded fallback numbers.
     apiClient
-      .getEntities()
-      .then((entities) => {
-        if (cancelled || !Array.isArray(entities) || entities.length === 0) return;
-        const counts = { parish: 0, seminary: 0, school: 0 };
-        for (const e of entities as any[]) {
-          const type = (e.entity_type ?? e.type ?? '') as keyof typeof counts;
-          if (type in counts) counts[type] += 1;
-        }
-        setInstitutionCounts(counts);
+      .getAdminEntities()
+      .then((data: any) => {
+        if (cancelled || !data) return;
+        const len = (v: any) => (Array.isArray(v) ? v.length : 0);
+        setInstitutionCounts({
+          parish: len(data.parishes),
+          seminary: len(data.seminaries),
+          school: len(data.schools),
+        });
       })
       .catch((err) => {
         console.error('[Home] entity counts fetch failed, keeping fallback values:', err);
@@ -184,9 +188,9 @@ export function Home({ onNavigate, role = 'bishop', permissions = {} }: HomeProp
 
   const institutionStats = useMemo(
     () => [
-      { title: 'Parishes', value: String(institutionCounts.parish), icon: Church, color: 'gold' },
-      { title: 'Seminaries', value: String(institutionCounts.seminary), icon: BookOpen, color: 'emerald' },
-      { title: 'Diocesan Schools', value: String(institutionCounts.school), icon: GraduationCap, color: 'purple' },
+      { title: 'Parishes', value: String(institutionCounts.parish), icon: ENTITY_TYPE_ICON.parish, color: 'gold' },
+      { title: 'Seminaries', value: String(institutionCounts.seminary), icon: ENTITY_TYPE_ICON.seminary, color: 'emerald' },
+      { title: 'Diocesan Schools', value: String(institutionCounts.school), icon: ENTITY_TYPE_ICON.school, color: 'purple' },
     ],
     [institutionCounts],
   );

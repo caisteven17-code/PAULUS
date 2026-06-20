@@ -356,21 +356,29 @@ export class AppAuthService {
     const { data, error } = await this.supabaseService.supabaseServer.auth.admin.listUsers({ perPage: 1000 });
     if (error) throw error;
 
-    // Map each auth id -> profile photo + birthday (profiles is the source of truth).
+    // Map each auth id -> profile photo + birthday + onboarding flag.
+    // Auth user_metadata and diocese.profiles can drift (e.g. older accounts
+    // were onboarded before the profile sync existed), so we read BOTH and let
+    // whichever has the value win — otherwise a registered user can show as
+    // "Unregistered" with a blank birthday even though they completed onboarding.
     const avatarByAuthId = new Map<string, string>();
     const birthdayByAuthId = new Map<string, string>();
+    const onboardedByAuthId = new Map<string, boolean>();
     const { data: profiles } = await this.supabaseService.admin
       .schema('diocese')
       .from('profiles')
-      .select('external_auth_id, avatar_url, birthday');
+      .select('external_auth_id, avatar_url, birthday, onboarding_completed');
     for (const p of profiles ?? []) {
       if (!p.external_auth_id) continue;
       if (p.avatar_url) avatarByAuthId.set(p.external_auth_id, p.avatar_url);
       if (p.birthday) birthdayByAuthId.set(p.external_auth_id, p.birthday);
+      if (p.onboarding_completed === true) onboardedByAuthId.set(p.external_auth_id, true);
     }
 
     return (data.users ?? []).map((u) => {
       const meta = u.user_metadata ?? {};
+      const onboardingCompleted =
+        onboardedByAuthId.get(u.id) === true || meta.onboardingCompleted === true || meta.onboarding_completed === true;
       return {
         id: u.id,
         email: u.email ?? '',
@@ -382,6 +390,7 @@ export class AppAuthService {
         entityId: (meta.entityId ?? meta.entity_id ?? '') as string,
         avatarUrl: avatarByAuthId.get(u.id) ?? meta.avatarUrl ?? meta.avatar_url ?? null,
         birthday: birthdayByAuthId.get(u.id) ?? meta.birthday ?? meta.birth_date ?? null,
+        onboardingCompleted,
         status: u.banned_until ? 'archived' : ((meta.status ?? 'active') as string),
         createdAt: u.created_at ?? null,
         lastSignIn: u.last_sign_in_at ?? null,

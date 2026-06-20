@@ -28,12 +28,15 @@ import {
   PinOff,
   Copy,
   Check,
+  Stethoscope,
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { useAuth } from '../firebase';
 import { formatDate } from '../lib/format';
 import { usePermissions } from '../hooks/usePermissions';
 import { InlineLoader } from '../components/ui/LoadingScreen';
+import { apiClient } from '../lib/api-client';
+import { getPriestHealthReminder, getDioceseHealthSummary } from '../lib/healthAnnouncements';
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -204,6 +207,28 @@ export function Announcements() {
     const id = setInterval(() => setTick((t) => t + 1), 1000);
     return () => clearInterval(id);
   }, []);
+
+  // ── Auto-generated medical-records reminders (computed, read-only) ───────────
+  const [healthRecords, setHealthRecords] = useState<any[]>([]);
+  const [showHealthNames, setShowHealthNames] = useState(false);
+  useEffect(() => {
+    apiClient
+      .getHealthRecords()
+      .then((d: any) => setHealthRecords(Array.isArray(d) ? d : []))
+      .catch(() => setHealthRecords([]));
+  }, []);
+  const isPriestView =
+    permissions.view_priests === true && permissions.view_diocese !== true && permissions.manage_entities !== true;
+  const canSeeHealthSummary = permissions.view_diocese === true || permissions.manage_assignments === true;
+  const myHealthRecord = isPriestView
+    ? healthRecords.find(
+        (p) =>
+          (p.email && user?.email && p.email.toLowerCase() === user.email.toLowerCase()) ||
+          (p.name && user?.displayName && p.name.toLowerCase() === user.displayName.toLowerCase()),
+      )
+    : undefined;
+  const myHealthReminder = isPriestView && myHealthRecord ? getPriestHealthReminder(myHealthRecord) : null;
+  const dioceseHealthSummary = canSeeHealthSummary ? getDioceseHealthSummary(healthRecords) : null;
 
   // Toast state
   const [toast, setToast] = useState<{ message: string } | null>(null);
@@ -713,6 +738,91 @@ export function Announcements() {
             </div>
           </div>
         </div>
+
+        {/* ── Auto-generated medical-records reminders (System · Important) ── */}
+        {myHealthReminder && (
+          <div className="mb-6 flex items-start gap-4 rounded-3xl border border-amber-200 bg-amber-50 p-5 md:p-6">
+            <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-amber-500 text-white">
+              <Stethoscope className="h-5 w-5" />
+            </div>
+            <div className="min-w-0 flex-1">
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="rounded-md bg-amber-500/15 px-2 py-0.5 text-[9px] font-black uppercase tracking-wider text-amber-700">
+                  System · Important
+                </span>
+                <p className="text-sm font-black text-amber-900">{myHealthReminder.title}</p>
+              </div>
+              <p className="mt-1 text-sm font-medium leading-relaxed text-amber-800">{myHealthReminder.content}</p>
+            </div>
+          </div>
+        )}
+        {dioceseHealthSummary && (
+          <button
+            onClick={() => setShowHealthNames(true)}
+            className="mb-6 flex w-full items-center gap-4 rounded-3xl border border-amber-200 bg-amber-50 p-5 text-left transition-colors hover:bg-amber-100 md:p-6"
+          >
+            <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-amber-500 text-white">
+              <Stethoscope className="h-5 w-5" />
+            </div>
+            <div className="min-w-0 flex-1">
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="rounded-md bg-amber-500/15 px-2 py-0.5 text-[9px] font-black uppercase tracking-wider text-amber-700">
+                  System · Important
+                </span>
+                <p className="text-sm font-black text-amber-900">{dioceseHealthSummary.title}</p>
+              </div>
+              <p className="mt-1 text-sm font-medium leading-relaxed text-amber-800">{dioceseHealthSummary.content}</p>
+            </div>
+            <ChevronRight className="h-5 w-5 shrink-0 text-amber-500" />
+          </button>
+        )}
+
+        {/* ── Diocesan drill-down: priests with pending medical records ── */}
+        <AnimatePresence>
+          {showHealthNames && dioceseHealthSummary && (
+            <div className="fixed inset-0 z-[140] flex items-center justify-center p-4">
+              <motion.div
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                onClick={() => setShowHealthNames(false)}
+                className="absolute inset-0 bg-black/50 backdrop-blur-sm"
+              />
+              <motion.div
+                initial={{ opacity: 0, scale: 0.96, y: 16 }}
+                animate={{ opacity: 1, scale: 1, y: 0 }}
+                exit={{ opacity: 0, scale: 0.96, y: 16 }}
+                className="relative flex max-h-[80vh] w-full max-w-md flex-col overflow-hidden rounded-3xl bg-white shadow-2xl"
+              >
+                <div className="flex items-center justify-between border-b border-slate-100 px-6 py-5">
+                  <div>
+                    <p className="text-[10px] font-black uppercase tracking-widest text-amber-600">System · Important</p>
+                    <h3 className="mt-0.5 text-lg font-black text-slate-950">Pending Medical Records</h3>
+                  </div>
+                  <button
+                    onClick={() => setShowHealthNames(false)}
+                    className="rounded-xl p-2 text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-700"
+                  >
+                    <X className="h-5 w-5" />
+                  </button>
+                </div>
+                <div className="divide-y divide-slate-50 overflow-y-auto px-2 py-2">
+                  {(dioceseHealthSummary.names ?? []).map((n, i) => (
+                    <div key={`${n.name}-${i}`} className="flex items-center justify-between gap-3 px-4 py-3">
+                      <div className="min-w-0">
+                        <p className="truncate text-sm font-bold text-slate-900">{n.name}</p>
+                        {n.parish && <p className="truncate text-[11px] text-slate-400">{n.parish}</p>}
+                      </div>
+                      <span className="shrink-0 rounded-full bg-amber-50 px-2.5 py-1 text-[10px] font-black uppercase tracking-wider text-amber-700">
+                        {n.status}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </motion.div>
+            </div>
+          )}
+        </AnimatePresence>
 
         {/* ── Sidebar + feed ── */}
         <div className={`grid grid-cols-1 gap-6 lg:items-start ${canManage ? 'lg:grid-cols-[280px_minmax(0,1fr)]' : ''}`}>

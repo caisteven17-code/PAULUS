@@ -126,7 +126,13 @@ export function Sidebar({ activeTab = '', onNavigate, role, timeframe = '6m', on
   const priestSubtabs = [
     { id: 'priest-dashboard', label: 'Dashboard', icon: BarChart3 },
     ...(canViewPriests ? [{ id: 'priest-health', label: 'Health Tracker', icon: Heart, section: 'PRIEST' }] : []),
-    { id: 'priest-aitwin', label: 'Simulator', icon: Zap, section: 'PRIEST' },
+    // The Priest (reassignment) Simulator is governed solely by the
+    // "Priest Assignment Simulator" permission (manage_assignments) so the menu
+    // matches User Role Control — e.g. it is hidden for Finance Staff and
+    // Seminary roles that are not granted it, and shown for Chancellor.
+    ...(permissions.manage_assignments === true
+      ? [{ id: 'priest-aitwin', label: 'Simulator', icon: Zap, section: 'PRIEST' }]
+      : []),
   ];
 
   const seminarySubtabs = [

@@ -33,7 +33,7 @@ import { supabaseBrowser } from './lib/supabase';
 import { AppRole, getAppRole } from './lib/access';
 import { hasAnyArchiveAccess } from './lib/archiveAccess';
 import { clearLoginTransitionPending, isLoginTransitionPending } from './lib/loginTransition';
-import { LoadingScreen, SplashTransition, BlackReveal } from './components/ui/LoadingScreen';
+import { LoadingScreen, BlackReveal } from './components/ui/LoadingScreen';
 import { usePermissions } from './hooks/usePermissions';
 import { auditIdentity, logAuditEvent } from './lib/audit';
 
@@ -222,10 +222,6 @@ const tabFromPath = (path: string) => PATH_TO_TAB[normalizePath(path)] ?? 'home'
 export default function App() {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [isAuthReady, setIsAuthReady] = useState(false);
-  // Keep the branded splash on screen for a beat so it never just flashes by.
-  const [minSplashDone, setMinSplashDone] = useState(false);
-  // After the splash, the crest zooms in and fades to reveal the app once.
-  const [splashTransitionDone, setSplashTransitionDone] = useState(false);
   // After a successful login, a black overlay (with the crest) fades out to
   // reveal the dashboard — continuing the fade-in the Login screen started.
   const [loginReveal, setLoginReveal] = useState(false);
@@ -238,10 +234,6 @@ export default function App() {
   const [roleChangedModal, setRoleChangedModal] = useState(false);
   const trackedRoleRef = React.useRef<string>('');
 
-  useEffect(() => {
-    const t = setTimeout(() => setMinSplashDone(true), 2500);
-    return () => clearTimeout(t);
-  }, []);
   const [role, setRole] = useState<Role>('bishop');
   const [activeTab, setActiveTab] = useState(() =>
     typeof window === 'undefined' ? 'home' : tabFromPath(window.location.pathname),
@@ -410,8 +402,16 @@ export default function App() {
         // Backend unavailable — skip silently
       }
     };
-    const interval = setInterval(check, 60000);
-    return () => clearInterval(interval);
+    // Check immediately (so a role change is caught the moment the app loads or
+    // regains focus) and then poll, instead of waiting a full minute first.
+    check();
+    const interval = setInterval(check, 20000);
+    const onFocus = () => check();
+    window.addEventListener('focus', onFocus);
+    return () => {
+      clearInterval(interval);
+      window.removeEventListener('focus', onFocus);
+    };
   }, [isAuthenticated, user?.email]);
 
   const requestLogout = () => {
@@ -520,14 +520,9 @@ export default function App() {
     };
   }, [isAuthenticated, isAuthReady, user?.email]);
 
-  if (!isAuthReady || !minSplashDone) {
-    return <LoadingScreen label="Preparing" />;
+  if (!isAuthReady) {
+    return <div className="min-h-screen bg-slate-50" />;
   }
-
-  // Plays over whatever loads first after the splash (login or dashboard).
-  const splashOverlay = !splashTransitionDone ? (
-    <SplashTransition onDone={() => setSplashTransitionDone(true)} />
-  ) : null;
 
   // Black-with-crest reveal shown right after a successful login.
   const loginRevealOverlay = loginReveal ? <BlackReveal onDone={() => setLoginReveal(false)} /> : null;
@@ -1130,8 +1125,9 @@ export default function App() {
           if (permissions.view_priests !== true) return renderAccessDenied();
           return <HealthTracker />;
         case 'priest-aitwin':
-          if (permissions.view_parish_dashboard !== true && permissions.digital_twin !== true)
-            return renderAccessDenied();
+          // Priest reassignment simulator is gated by the Priest Assignment
+          // Simulator permission only, matching canAccessTab and the sidebar.
+          if (permissions.manage_assignments !== true) return renderAccessDenied();
           return <WhatIfSimulator mode="priest" />;
         case 'seminaries':
           if (permissions.view_seminary_dashboard !== true) return renderAccessDenied();
@@ -1299,7 +1295,9 @@ export default function App() {
         case 'priest-health':
           return permissions.view_priests ? <HealthTracker /> : renderAccessDenied();
         case 'priest-aitwin':
-          return permissions.view_parish_dashboard === true || permissions.digital_twin === true ? (
+          // Priest reassignment simulator is gated by the Priest Assignment
+          // Simulator permission only, matching canAccessTab and the sidebar.
+          return permissions.manage_assignments === true ? (
             <WhatIfSimulator mode="priest" />
           ) : (
             renderAccessDenied()
@@ -1448,7 +1446,6 @@ export default function App() {
           </div>
         </ErrorBoundary>
       )}
-      {splashOverlay}
       {loginRevealOverlay}
       {logoutConfirmModal}
       {roleChangedModalEl}

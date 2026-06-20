@@ -9,6 +9,8 @@ import { usePermissions } from '../hooks/usePermissions';
 import { apiClient } from '../lib/api-client';
 import { getAccessRoleLabel } from '../lib/access';
 import { InlineLoader } from '../components/ui/LoadingScreen';
+import { getSubmissionStatus, type SubmissionStatus } from '../lib/healthDeadlines';
+import { getPriestHealthReminder, getDioceseHealthSummary } from '../lib/healthAnnouncements';
 
 interface PriestRecord {
   id: string;
@@ -78,6 +80,7 @@ export function HealthTracker() {
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState<'all' | 'good' | 'fair' | 'needs-attention'>('all');
   const [page, setPage] = useState(1);
+  const [showHealthNames, setShowHealthNames] = useState(false); // diocesan drill-down modal
   const PAGE_SIZE = 9;
   // Soft-archive is kept client-side (no archive column on health_records yet),
   // persisted so the archived view survives reloads.
@@ -760,10 +763,18 @@ export function HealthTracker() {
   }
 
   // Submission status from the priest's most recent check-up.
+  // Birth-month-anchored submission status (Submitted / Pending this month /
+  // N months late / 1 year late) from the medical-records deadline engine.
   const submissionStatus = (latest?: PriestRecord): { label: string; dot: string; tone: string } => {
-    if (!latest || !latest.lastCheckup) return { label: 'No record', dot: 'bg-rose-500', tone: 'text-rose-600' };
-    if (needsCheckup(latest.lastCheckup)) return { label: 'Overdue', dot: 'bg-amber-500', tone: 'text-amber-600' };
-    return { label: 'Up to date', dot: 'bg-emerald-500', tone: 'text-emerald-600' };
+    const s = getSubmissionStatus(latest?.birthDate, latest?.lastCheckup);
+    const styles: Record<SubmissionStatus['severity'], { dot: string; tone: string }> = {
+      ok: { dot: 'bg-emerald-500', tone: 'text-emerald-600' },
+      due: { dot: 'bg-amber-500', tone: 'text-amber-600' },
+      late: { dot: 'bg-orange-500', tone: 'text-orange-600' },
+      critical: { dot: 'bg-rose-500', tone: 'text-rose-600' },
+      unknown: { dot: 'bg-slate-300', tone: 'text-slate-500' },
+    };
+    return { label: s.label, ...styles[s.severity] };
   };
 
   // ── Group records by priest so each card represents one person with history ──
@@ -806,6 +817,25 @@ export function HealthTracker() {
   const totalPages = Math.max(1, Math.ceil(priestGroups.length / PAGE_SIZE));
   const safePage = Math.min(page, totalPages);
   const pagedGroups = priestGroups.slice((safePage - 1) * PAGE_SIZE, safePage * PAGE_SIZE);
+
+  // ── Auto-generated medical-records reminders (System / Important) ──────────
+  // Computed live from the records, so they disappear once a record is submitted.
+  const healthLikeRecords = activePriests.map((p) => ({
+    name: p.name,
+    parish: p.parish,
+    email: p.email,
+    birthDate: p.birthDate,
+    lastCheckup: p.lastCheckup,
+  }));
+  const dioceseSummary = canManageRecords ? getDioceseHealthSummary(healthLikeRecords) : null;
+  const myRecord = isPriestView
+    ? priests.find(
+        (p) =>
+          (p.email && user?.email && p.email.toLowerCase() === user.email.toLowerCase()) ||
+          (p.name && user?.displayName && p.name.toLowerCase() === user.displayName.toLowerCase()),
+      )
+    : undefined;
+  const myReminder = isPriestView && myRecord ? getPriestHealthReminder(myRecord) : null;
 
   return (
     <div className="min-h-screen bg-[#f5f5f5] pt-8 pb-20 px-4 sm:px-6 lg:px-8">
@@ -868,6 +898,44 @@ export function HealthTracker() {
             </div>
           </div>
         </div>
+
+        {/* ------ Auto-generated medical-records reminders (System · Important) ------ */}
+        {myReminder && (
+          <div className="mb-6 flex items-start gap-4 rounded-3xl border border-amber-200 bg-amber-50 p-5 md:p-6">
+            <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-amber-500 text-white">
+              <Stethoscope className="h-5 w-5" />
+            </div>
+            <div className="min-w-0 flex-1">
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="rounded-md bg-amber-500/15 px-2 py-0.5 text-[9px] font-black uppercase tracking-wider text-amber-700">
+                  System · Important
+                </span>
+                <p className="text-sm font-black text-amber-900">{myReminder.title}</p>
+              </div>
+              <p className="mt-1 text-sm font-medium leading-relaxed text-amber-800">{myReminder.content}</p>
+            </div>
+          </div>
+        )}
+        {dioceseSummary && (
+          <button
+            onClick={() => setShowHealthNames(true)}
+            className="mb-6 flex w-full items-center gap-4 rounded-3xl border border-amber-200 bg-amber-50 p-5 text-left transition-colors hover:bg-amber-100 md:p-6"
+          >
+            <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-amber-500 text-white">
+              <Stethoscope className="h-5 w-5" />
+            </div>
+            <div className="min-w-0 flex-1">
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="rounded-md bg-amber-500/15 px-2 py-0.5 text-[9px] font-black uppercase tracking-wider text-amber-700">
+                  System · Important
+                </span>
+                <p className="text-sm font-black text-amber-900">{dioceseSummary.title}</p>
+              </div>
+              <p className="mt-1 text-sm font-medium leading-relaxed text-amber-800">{dioceseSummary.content}</p>
+            </div>
+            <ChevronRight className="h-5 w-5 shrink-0 text-amber-500" />
+          </button>
+        )}
 
         {/* ------ Filter / search bar ------ */}
         <div className="mb-6 rounded-3xl border border-slate-200 bg-white p-3 shadow-[0_12px_32px_rgba(15,23,42,0.06)]">
@@ -1431,6 +1499,53 @@ export function HealthTracker() {
                 </div>
               </motion.div>
             </motion.div>
+          )}
+        </AnimatePresence>
+
+        {/* ------ Diocesan drill-down: priests with pending medical records ------ */}
+        <AnimatePresence>
+          {showHealthNames && dioceseSummary && (
+            <div className="fixed inset-0 z-[140] flex items-center justify-center p-4">
+              <motion.div
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                onClick={() => setShowHealthNames(false)}
+                className="absolute inset-0 bg-black/50 backdrop-blur-sm"
+              />
+              <motion.div
+                initial={{ opacity: 0, scale: 0.96, y: 16 }}
+                animate={{ opacity: 1, scale: 1, y: 0 }}
+                exit={{ opacity: 0, scale: 0.96, y: 16 }}
+                className="relative flex max-h-[80vh] w-full max-w-md flex-col overflow-hidden rounded-3xl bg-white shadow-2xl"
+              >
+                <div className="flex items-center justify-between border-b border-slate-100 px-6 py-5">
+                  <div>
+                    <p className="text-[10px] font-black uppercase tracking-widest text-amber-600">System · Important</p>
+                    <h3 className="mt-0.5 text-lg font-black text-slate-950">Pending Medical Records</h3>
+                  </div>
+                  <button
+                    onClick={() => setShowHealthNames(false)}
+                    className="rounded-xl p-2 text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-700"
+                  >
+                    <X className="h-5 w-5" />
+                  </button>
+                </div>
+                <div className="divide-y divide-slate-50 overflow-y-auto px-2 py-2">
+                  {(dioceseSummary.names ?? []).map((n, i) => (
+                    <div key={`${n.name}-${i}`} className="flex items-center justify-between gap-3 px-4 py-3">
+                      <div className="min-w-0">
+                        <p className="truncate text-sm font-bold text-slate-900">{n.name}</p>
+                        {n.parish && <p className="truncate text-[11px] text-slate-400">{n.parish}</p>}
+                      </div>
+                      <span className="shrink-0 rounded-full bg-amber-50 px-2.5 py-1 text-[10px] font-black uppercase tracking-wider text-amber-700">
+                        {n.status}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </motion.div>
+            </div>
           )}
         </AnimatePresence>
       </div>

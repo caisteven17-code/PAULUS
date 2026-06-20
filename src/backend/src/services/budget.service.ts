@@ -141,6 +141,11 @@ export class BudgetService {
 
     const year = Number(input.year);
     if (!Number.isInteger(year) || year < 2000 || year > 2100) return null;
+    // Past-year budget plans are historical and cannot be edited.
+    if (year < new Date().getFullYear()) {
+      console.warn(`[budget.service] saveBudgets rejected: year ${year} is in the past.`);
+      return null;
+    }
 
     const rows = (input.entries ?? [])
       .filter((e) => Number.isInteger(Number(e.month)) && Number(e.month) >= 1 && Number(e.month) <= 12)

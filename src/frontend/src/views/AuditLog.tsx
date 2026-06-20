@@ -964,7 +964,7 @@ export function AuditLog() {
 
   const handleExport = () => {
     const rows = [
-      ['Log ID', 'Date', 'Time', 'User', 'Role', 'Institution Type', 'Institution', 'Category', 'Action', 'Detail', 'IP'],
+      ['Log ID', 'Date', 'Time', 'User', 'Role', 'Institution Type', 'Institution', 'Category', 'Action', 'Detail'],
       ...filtered.map((l) => [
         l.id,
         l.date,
@@ -976,7 +976,6 @@ export function AuditLog() {
         CATEGORY_CONFIG[l.category].label,
         l.action,
         l.detail,
-        l.ip,
       ]),
     ];
     const csv = rows.map((r) => r.map((c) => `"${c}"`).join(',')).join('\n');
@@ -1590,9 +1589,7 @@ export function AuditLog() {
               <div className="bg-church-black px-6 py-5 rounded-t-2xl flex items-start justify-between gap-4">
                 <div className="flex-1 min-w-0">
                   <div className="flex flex-wrap items-center gap-2 mb-2">
-                    <span
-                      className={`text-[10px] font-black px-2.5 py-0.5 rounded-full uppercase tracking-wider ${(CATEGORY_CONFIG[selectedLog.category] ?? CATEGORY_CONFIG['system']).pill}`}
-                    >
+                    <span className="rounded-full border border-[#D4AF37]/70 bg-white px-2.5 py-0.5 text-[10px] font-black uppercase tracking-wider text-church-black shadow-sm shadow-[#D4AF37]/20">
                       {(CATEGORY_CONFIG[selectedLog.category] ?? CATEGORY_CONFIG['system']).label}
                     </span>
                     <span
@@ -1618,7 +1615,6 @@ export function AuditLog() {
                   { label: 'User', value: selectedLog.user },
                   { label: 'Role', value: selectedLog.role },
                   { label: 'Date & Time', value: `${selectedLog.date} — ${selectedLog.timestamp}` },
-                  { label: 'IP Address', value: selectedLog.ip, mono: true },
                   ...(selectedLog.entity ? [{ label: 'Entity', value: selectedLog.entity, green: true }] : []),
                   { label: 'Log ID', value: selectedLog.id, mono: true },
                 ].map((item, i) => (

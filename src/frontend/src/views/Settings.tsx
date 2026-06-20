@@ -39,6 +39,7 @@ import { auth } from '../firebase';
 import { dataService } from '../services/dataService';
 import { supabaseBrowser } from '../lib/supabase';
 import { getInitials } from '../lib/initials';
+import { FilterModal, FilterField } from '../components/ui/FilterModal';
 
 interface SettingsProps {
   onBack: () => void;
@@ -289,11 +290,15 @@ export function Settings({ onBack, onLogout, onNavigate, role = 'bishop', initia
         if (Array.isArray(data.parishes)) setParishes(data.parishes);
         if (Array.isArray(data.seminaries)) setSeminaries(data.seminaries);
         if (Array.isArray(data.schools)) setSchools(data.schools);
-      } catch {
-        // Fallback to compiled-in constants
-        setParishes(INITIAL_PARISHES as Parish[]);
-        setSeminaries(INITIAL_SEMINARIES as Seminary[]);
-        setSchools(INITIAL_SCHOOLS as DiocesanSchool[]);
+      } catch (err) {
+        // No compiled-in fallback: the Add User dropdowns must reflect ONLY what
+        // exists in Entity Management (diocese.institutions). Showing constants
+        // here is what surfaced phantom institutions (e.g. seminaries/schools
+        // that were never registered) in the dropdowns.
+        console.error('[Settings] entity dropdown fetch failed; showing none rather than stale constants:', err);
+        setParishes([]);
+        setSeminaries([]);
+        setSchools([]);
       }
     };
     fetchEntities();
@@ -622,6 +627,8 @@ export function Settings({ onBack, onLogout, onNavigate, role = 'bishop', initia
 
   const [searchQuery, setSearchQuery] = useState('');
   const [roleFilter, setRoleFilter] = useState('all');
+  const [typeFilter, setTypeFilter] = useState('all'); // institution type
+  const [institutionFilter, setInstitutionFilter] = useState('all'); // specific institution
 
   const [formState, setFormState] = useState({
     institutionType: '' as InstitutionType | '',
@@ -695,21 +702,39 @@ export function Settings({ onBack, onLogout, onNavigate, role = 'bishop', initia
   }, [formState.institutionType, roles]);
 
   const institutionNames = React.useMemo(() => {
-    const list =
+    // Source the Add User dropdown strictly from Entity Management
+    // (diocese.institutions, loaded into parishes/seminaries/schools). Merging
+    // compiled-in constants here is what made unregistered institutions appear.
+    const list: any[] =
       formState.institutionType === 'school'
-        ? [...schools, ...INITIAL_SCHOOLS]
+        ? schools
         : formState.institutionType === 'seminary'
-          ? [...seminaries, ...INITIAL_SEMINARIES]
+          ? seminaries
           : formState.institutionType === 'parish'
-            ? [...parishes, ...ALL_PARISHES]
+            ? parishes
             : [];
 
-    return Array.from(new Set(list.map((item) => item.name))).sort();
+    // `value` stays the bare name (so findSelectedEntity can resolve it), while
+    // the label shows the vicariate (parish) or cluster (school) in parentheses
+    // to disambiguate. Seminaries have no vicariate/cluster, so just the name.
+    const seen = new Set<string>();
+    const out: { name: string; label: string }[] = [];
+    for (const item of list) {
+      if (!item?.name || seen.has(item.name)) continue;
+      seen.add(item.name);
+      let suffix = '';
+      if (formState.institutionType === 'parish' && item.vicariate) suffix = ` (${item.vicariate})`;
+      else if (formState.institutionType === 'school' && item.cluster) suffix = ` (Cluster ${item.cluster})`;
+      out.push({ name: item.name, label: `${item.name}${suffix}` });
+    }
+    return out.sort((a, b) => a.name.localeCompare(b.name));
   }, [formState.institutionType, parishes, seminaries, schools]);
 
   const institutionNameSuggestions = React.useMemo(() => {
     const query = formState.entity.trim().toLowerCase();
-    const matches = query ? institutionNames.filter((name) => name.toLowerCase().includes(query)) : institutionNames;
+    const matches = query
+      ? institutionNames.filter((i) => i.name.toLowerCase().includes(query))
+      : institutionNames;
 
     return matches.slice(0, 8);
   }, [formState.entity, institutionNames]);
@@ -759,12 +784,9 @@ export function Settings({ onBack, onLogout, onNavigate, role = 'bishop', initia
       };
     }
 
-    const entityList =
-      entityType === 'school'
-        ? [...schools, ...INITIAL_SCHOOLS]
-        : entityType === 'seminary'
-          ? [...seminaries, ...INITIAL_SEMINARIES]
-          : [...parishes, ...INITIAL_PARISHES];
+    // Resolve the selected institution to its real registry row so the new
+    // account stores the institution UUID as entityId (Entity Management only).
+    const entityList = entityType === 'school' ? schools : entityType === 'seminary' ? seminaries : parishes;
     const entity = entityList.find((item) => item.name === entityName);
 
     return {
@@ -792,10 +814,16 @@ export function Settings({ onBack, onLogout, onNavigate, role = 'bishop', initia
         formState.institutionType === 'parish' &&
         formState.entity
       ) {
+        // Account rows carry the institution under `entity` (and the normalized
+        // role under `roleId`) — matching on the non-existent `a.entityName`
+        // with the role label is why the warning never fired and duplicates
+        // (e.g. two priests in Holy Trinity Parish) slipped through.
+        const targetParish = formState.entity.trim().toLowerCase();
         const existing = accounts.find(
           (a) =>
-            (a.role === 'parish_priest' || normalizeAccessRole(a.role) === 'parish_priest') &&
-            a.entityName === formState.entity &&
+            normalizeAccessRole(a.roleId || a.role) === 'parish_priest' &&
+            (a.entity || '').trim().toLowerCase() === targetParish &&
+            a.status !== 'archived' &&
             (editingAccountId === null || a.id?.toString() !== editingAccountId?.toString()),
         );
         if (existing) {
@@ -1028,6 +1056,31 @@ export function Settings({ onBack, onLogout, onNavigate, role = 'bishop', initia
     [accounts],
   );
 
+  // Institution options for the User Management filter, scoped to the selected
+  // institution type so the dropdown stays relevant.
+  const accountInstitutionOptions = React.useMemo(
+    () =>
+      Array.from(
+        new Set(
+          accounts
+            .filter((acc: any) => acc.status === 'active')
+            .filter((acc: any) => typeFilter === 'all' || (acc.entityType || '') === typeFilter)
+            .map((acc: any) => acc.entity)
+            .filter(Boolean),
+        ),
+      ).sort(),
+    [accounts, typeFilter],
+  );
+
+  const userFilterCount =
+    (roleFilter !== 'all' ? 1 : 0) + (typeFilter !== 'all' ? 1 : 0) + (institutionFilter !== 'all' ? 1 : 0);
+
+  const clearUserFilters = () => {
+    setRoleFilter('all');
+    setTypeFilter('all');
+    setInstitutionFilter('all');
+  };
+
   const filteredAccounts = accounts.filter((acc) => {
     const query = searchQuery.trim().toLowerCase();
     const matchesSearch =
@@ -1036,7 +1089,13 @@ export function Settings({ onBack, onLogout, onNavigate, role = 'bishop', initia
         .filter(Boolean)
         .some((value) => String(value).toLowerCase().includes(query));
 
-    return acc.status === 'active' && matchesSearch && (roleFilter === 'all' || acc.role === roleFilter);
+    return (
+      acc.status === 'active' &&
+      matchesSearch &&
+      (roleFilter === 'all' || acc.role === roleFilter) &&
+      (typeFilter === 'all' || (acc.entityType || '') === typeFilter) &&
+      (institutionFilter === 'all' || acc.entity === institutionFilter)
+    );
   });
 
   return (
@@ -1217,9 +1276,9 @@ export function Settings({ onBack, onLogout, onNavigate, role = 'bishop', initia
                         <option value="" disabled>
                           {institutionNamePlaceholder}
                         </option>
-                        {institutionNames.map((name) => (
-                          <option key={name} value={name}>
-                            {name}
+                        {institutionNames.map((item) => (
+                          <option key={item.name} value={item.name}>
+                            {item.label}
                           </option>
                         ))}
                       </select>
@@ -2004,8 +2063,8 @@ export function Settings({ onBack, onLogout, onNavigate, role = 'bishop', initia
                   </div>
                 </div>
 
-                <div className="mb-6 grid grid-cols-1 gap-3 lg:grid-cols-[1fr_220px]">
-                  <div className="relative">
+                <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-center">
+                  <div className="relative flex-1">
                     <Search className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400" />
                     <input
                       type="text"
@@ -2018,19 +2077,54 @@ export function Settings({ onBack, onLogout, onNavigate, role = 'bishop', initia
                       )}
                     />
                   </div>
-                  <select
-                    value={roleFilter}
-                    onChange={(e) => setRoleFilter(e.target.value)}
-                    className={selectField(roleFilter !== 'all', 'h-full rounded-2xl px-4 py-3.5 text-sm font-bold')}
-                    aria-label="Filter user accounts by role"
-                  >
-                    <option value="all">All roles</option>
-                    {roleOptions.map((roleName) => (
-                      <option key={roleName} value={roleName}>
-                        {roleName}
-                      </option>
-                    ))}
-                  </select>
+                  <FilterModal activeCount={userFilterCount} onClear={clearUserFilters}>
+                    <FilterField label="Role">
+                      <select
+                        value={roleFilter}
+                        onChange={(e) => setRoleFilter(e.target.value)}
+                        className={selectField(roleFilter !== 'all', 'h-11 w-full rounded-2xl px-4 text-sm font-bold')}
+                      >
+                        <option value="all">All roles</option>
+                        {roleOptions.map((roleName) => (
+                          <option key={roleName} value={roleName}>
+                            {roleName}
+                          </option>
+                        ))}
+                      </select>
+                    </FilterField>
+
+                    <FilterField label="Institution type">
+                      <select
+                        value={typeFilter}
+                        onChange={(e) => {
+                          setTypeFilter(e.target.value);
+                          setInstitutionFilter('all');
+                        }}
+                        className={selectField(typeFilter !== 'all', 'h-11 w-full rounded-2xl px-4 text-sm font-bold capitalize')}
+                      >
+                        <option value="all">All types</option>
+                        <option value="diocese">Diocese</option>
+                        <option value="parish">Parish</option>
+                        <option value="seminary">Seminary</option>
+                        <option value="school">School</option>
+                      </select>
+                    </FilterField>
+
+                    <FilterField label="Institution">
+                      <select
+                        value={institutionFilter}
+                        onChange={(e) => setInstitutionFilter(e.target.value)}
+                        className={selectField(institutionFilter !== 'all', 'h-11 w-full rounded-2xl px-4 text-sm font-bold')}
+                      >
+                        <option value="all">All institutions</option>
+                        {accountInstitutionOptions.map((name) => (
+                          <option key={name} value={name}>
+                            {name}
+                          </option>
+                        ))}
+                      </select>
+                    </FilterField>
+                  </FilterModal>
                 </div>
 
                 <div className="overflow-x-auto">

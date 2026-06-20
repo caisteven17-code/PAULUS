@@ -19,6 +19,8 @@ import {
 import { usePermissions } from '../hooks/usePermissions';
 import { apiClient } from '../lib/api-client';
 import { InlineLoader } from '../components/ui/LoadingScreen';
+import { FilterModal, FilterField } from '../components/ui/FilterModal';
+import { selectField } from '../lib/formStyles';
 
 interface BudgetRow {
   id: string;
@@ -125,6 +127,11 @@ function InstitutionBudget({
   const [saveError, setSaveError] = useState<string | null>(null);
   const [saveSuccess, setSaveSuccess] = useState(false);
 
+  // Budget plans can only be edited for the current year onward — a past year's
+  // plan is historical and must stay read-only (you cannot re-plan 2021 in 2026).
+  const isPastYear = year < currentYear;
+  const canEdit = canManage && !isPastYear;
+
   useEffect(() => {
     let active = true;
     setLoading(true);
@@ -170,6 +177,10 @@ function InstitutionBudget({
     canManage && !loading && year === currentYear && Object.keys(savedAmounts).length === 0;
 
   const handleSave = async () => {
+    if (isPastYear) {
+      setSaveError(`The ${year} budget is from a past year and can no longer be edited.`);
+      return;
+    }
     setIsSaving(true);
     setSaveError(null);
     setSaveSuccess(false);
@@ -224,6 +235,21 @@ function InstitutionBudget({
         </div>
         <YearSelector year={year} onChange={setYear} />
       </div>
+
+      {/* Past-year lock banner */}
+      {canManage && isPastYear && (
+        <div className="flex items-start gap-4 bg-gray-50 border border-gray-200 rounded-3xl p-5 md:p-6 mb-8">
+          <div className="w-10 h-10 rounded-2xl bg-gray-200 flex items-center justify-center shrink-0">
+            <AlertCircle className="w-5 h-5 text-gray-500" />
+          </div>
+          <div>
+            <p className="text-sm font-bold text-church-black">{year} budget is read-only</p>
+            <p className="text-xs text-gray-500 font-medium mt-0.5">
+              Past-year budget plans cannot be edited. Switch to {currentYear} to set or adjust the current plan.
+            </p>
+          </div>
+        </div>
+      )}
 
       {/* New-year reminder banner */}
       <AnimatePresence>
@@ -298,7 +324,7 @@ function InstitutionBudget({
                       </span>
                     )}
                   </div>
-                  {canManage ? (
+                  {canEdit ? (
                     <div className="relative">
                       <span className="absolute left-4 top-1/2 -translate-y-1/2 text-sm font-bold text-gray-300">₱</span>
                       <input
@@ -322,7 +348,7 @@ function InstitutionBudget({
           </div>
 
           {/* Save bar */}
-          {canManage && (
+          {canEdit && (
             <div className="sticky bottom-4 mt-8">
               <div className="bg-white/95 backdrop-blur border border-gray-100 rounded-3xl shadow-xl p-4 md:p-5 flex flex-col sm:flex-row items-center gap-4">
                 <div className="flex-1 text-center sm:text-left">
@@ -386,6 +412,7 @@ function DioceseBudgetOverview() {
   const [loading, setLoading] = useState(true);
   const [rows, setRows] = useState<BudgetRow[]>([]);
   const [typeFilter, setTypeFilter] = useState<'all' | 'parish' | 'school' | 'seminary'>('all');
+  const [institutionFilter, setInstitutionFilter] = useState('all'); // specific institution
   const [search, setSearch] = useState('');
   const [expanded, setExpanded] = useState<string | null>(null);
 
@@ -422,14 +449,29 @@ function DioceseBudgetOverview() {
     return Array.from(byInstitution.values()).sort((a, b) => a.name.localeCompare(b.name));
   }, [rows]);
 
+  const institutionOptions = useMemo(
+    () =>
+      Array.from(
+        new Set(institutions.filter((i) => typeFilter === 'all' || i.type === typeFilter).map((i) => i.name)),
+      ).sort(),
+    [institutions, typeFilter],
+  );
+
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
     return institutions.filter((inst) => {
       if (typeFilter !== 'all' && inst.type !== typeFilter) return false;
+      if (institutionFilter !== 'all' && inst.name !== institutionFilter) return false;
       if (q && !inst.name.toLowerCase().includes(q)) return false;
       return true;
     });
-  }, [institutions, typeFilter, search]);
+  }, [institutions, typeFilter, institutionFilter, search]);
+
+  const budgetFilterCount = (typeFilter !== 'all' ? 1 : 0) + (institutionFilter !== 'all' ? 1 : 0);
+  const clearBudgetFilters = () => {
+    setTypeFilter('all');
+    setInstitutionFilter('all');
+  };
 
   const grandTotal = useMemo(() => filtered.reduce((sum, inst) => sum + inst.total, 0), [filtered]);
 
@@ -468,28 +510,8 @@ function DioceseBudgetOverview() {
         />
       </div>
 
-      {/* Filters */}
-      <div className="flex flex-col md:flex-row gap-3 mb-6">
-        <div className="flex gap-2 bg-white border border-gray-100 rounded-2xl p-1.5 shadow-sm w-fit">
-          {(
-            [
-              ['all', 'All'],
-              ['parish', 'Parishes'],
-              ['school', 'Schools'],
-              ['seminary', 'Seminaries'],
-            ] as const
-          ).map(([value, label]) => (
-            <button
-              key={value}
-              onClick={() => setTypeFilter(value)}
-              className={`px-4 py-2.5 rounded-xl text-sm font-bold transition-all ${
-                typeFilter === value ? 'bg-church-black text-white shadow-md' : 'text-gray-400 hover:text-gray-700'
-              }`}
-            >
-              {label}
-            </button>
-          ))}
-        </div>
+      {/* Filters — search stays inline, the rest live in a pop-up modal */}
+      <div className="flex flex-col sm:flex-row sm:items-center gap-3 mb-6">
         <div className="relative flex-1 max-w-sm">
           <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-300" />
           <input
@@ -500,6 +522,38 @@ function DioceseBudgetOverview() {
             className="w-full pl-11 pr-4 py-3 bg-white border border-gray-100 rounded-2xl text-sm font-medium shadow-sm focus:outline-none focus:ring-4 focus:ring-gold-500/10 focus:border-gold-500 transition-all placeholder:text-gray-300"
           />
         </div>
+        <FilterModal activeCount={budgetFilterCount} onClear={clearBudgetFilters}>
+          <FilterField label="Institution type">
+            <select
+              value={typeFilter}
+              onChange={(e) => {
+                setTypeFilter(e.target.value as 'all' | 'parish' | 'school' | 'seminary');
+                setInstitutionFilter('all');
+              }}
+              className={selectField(typeFilter !== 'all', 'h-11 w-full rounded-2xl px-4 text-sm font-bold')}
+            >
+              <option value="all">All types</option>
+              <option value="parish">Parishes</option>
+              <option value="school">Schools</option>
+              <option value="seminary">Seminaries</option>
+            </select>
+          </FilterField>
+
+          <FilterField label="Institution">
+            <select
+              value={institutionFilter}
+              onChange={(e) => setInstitutionFilter(e.target.value)}
+              className={selectField(institutionFilter !== 'all', 'h-11 w-full rounded-2xl px-4 text-sm font-bold')}
+            >
+              <option value="all">All institutions</option>
+              {institutionOptions.map((name) => (
+                <option key={name} value={name}>
+                  {name}
+                </option>
+              ))}
+            </select>
+          </FilterField>
+        </FilterModal>
       </div>
 
       {/* Institution list */}

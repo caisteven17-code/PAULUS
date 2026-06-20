@@ -28,6 +28,7 @@ import { Parish, Seminary, DiocesanSchool, EntityClass } from '../../types';
 import { VICARIATES, CLASSES, ALL_PARISHES, INITIAL_PARISHES } from '../../constants';
 import { dataService } from '../../services/dataService';
 import { roundedField, selectField } from '../../lib/formStyles';
+import { ENTITY_TYPE_ICON } from '../../lib/entityIcons';
 import { MapContainer, TileLayer, Marker, useMap } from 'react-leaflet';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
@@ -1018,10 +1019,11 @@ export function EntityManagementControl({
         status: 'active',
       };
     } else if (activeSubTab === 'seminaries') {
+      // Seminaries have no vicariate / district / class / cluster.
       payload = {
         ...payload,
-        ...baseData,
-        class: formState.class,
+        name: formState.name,
+        address: formState.address,
         rector: editingEntity?.rector || '',
         enrollment: editingEntity?.enrollment || 0,
         capacity: editingEntity?.capacity || 0,
@@ -1032,11 +1034,11 @@ export function EntityManagementControl({
         status: 'active',
       };
     } else {
+      // Schools are organized by cluster only — they have no class.
       payload = {
         ...payload,
         name: formState.name,
         cluster: formState.cluster,
-        class: formState.class,
         address: formState.address,
         principal: editingEntity?.principal || '',
         level: editingEntity?.level || 'K-12',
@@ -2149,7 +2151,7 @@ export function EntityManagementControl({
                 activeSubTab === 'parishes' ? 'bg-white text-[#D4AF37] shadow-sm' : 'text-gray-400 hover:text-gray-600'
               }`}
             >
-              <Building2 className="w-3.5 h-3.5" />
+              <ENTITY_TYPE_ICON.parish className="w-3.5 h-3.5" />
               Parishes
             </button>
             <button
@@ -2195,7 +2197,9 @@ export function EntityManagementControl({
           />
         </div>
 
-        {activeSubTab !== 'schools' && (
+        {/* Only parishes have vicariates/classes/districts. Seminaries have none
+            of these; schools are organized by cluster only. */}
+        {activeSubTab === 'parishes' && (
           <select
             value={vicariateFilter}
             onChange={(e) => setVicariateFilter(e.target.value)}
@@ -2227,21 +2231,23 @@ export function EntityManagementControl({
           </select>
         )}
 
-        <select
-          value={classFilter}
-          onChange={(e) => setClassFilter(e.target.value)}
-          className={selectField(classFilter !== 'all', 'rounded-2xl px-4 py-4 text-sm font-bold')}
-          aria-label="Filter by class"
-        >
-          <option value="all">All classes</option>
-          {CLASSES.map((entityClass) => (
-            <option key={entityClass} value={entityClass}>
-              {entityClass}
-            </option>
-          ))}
-        </select>
+        {activeSubTab === 'parishes' && (
+          <select
+            value={classFilter}
+            onChange={(e) => setClassFilter(e.target.value)}
+            className={selectField(classFilter !== 'all', 'rounded-2xl px-4 py-4 text-sm font-bold')}
+            aria-label="Filter by class"
+          >
+            <option value="all">All classes</option>
+            {CLASSES.map((entityClass) => (
+              <option key={entityClass} value={entityClass}>
+                {entityClass}
+              </option>
+            ))}
+          </select>
+        )}
 
-        {activeSubTab !== 'schools' && (
+        {activeSubTab === 'parishes' && (
           <select
             value={districtFilter}
             onChange={(e) => setDistrictFilter(e.target.value)}
@@ -2261,17 +2267,27 @@ export function EntityManagementControl({
       <div className="overflow-x-auto">
         <table className="w-full text-left border-collapse">
           <thead>
+            {/* Column set per type: parishes have vicariate/class/district,
+                schools have cluster/level (no class), seminaries have neither. */}
             <tr className="border-b border-gray-100">
               <th className="pb-4 text-[10px] font-bold text-gray-400 uppercase tracking-widest pl-4">
                 Name & Address
               </th>
-              <th className="pb-4 text-[10px] font-bold text-gray-400 uppercase tracking-widest">
-                {activeSubTab === 'schools' ? 'Cluster' : 'Vicariate'}
-              </th>
-              <th className="pb-4 text-[10px] font-bold text-gray-400 uppercase tracking-widest">Class</th>
-              <th className="pb-4 text-[10px] font-bold text-gray-400 uppercase tracking-widest">
-                {activeSubTab === 'schools' ? 'Level' : 'District'}
-              </th>
+              {activeSubTab === 'parishes' && (
+                <th className="pb-4 text-[10px] font-bold text-gray-400 uppercase tracking-widest">Vicariate</th>
+              )}
+              {activeSubTab === 'schools' && (
+                <th className="pb-4 text-[10px] font-bold text-gray-400 uppercase tracking-widest">Cluster</th>
+              )}
+              {activeSubTab === 'parishes' && (
+                <th className="pb-4 text-[10px] font-bold text-gray-400 uppercase tracking-widest">Class</th>
+              )}
+              {activeSubTab === 'parishes' && (
+                <th className="pb-4 text-[10px] font-bold text-gray-400 uppercase tracking-widest">District</th>
+              )}
+              {activeSubTab === 'schools' && (
+                <th className="pb-4 text-[10px] font-bold text-gray-400 uppercase tracking-widest">Level</th>
+              )}
               <th className="pb-4 text-[10px] font-bold text-gray-400 uppercase tracking-widest text-right pr-4">
                 Actions
               </th>
@@ -2300,23 +2316,39 @@ export function EntityManagementControl({
                     <span className="text-gray-400 text-[11px] mt-0.5">{item.address}</span>
                   </div>
                 </td>
-                <td className="py-5">
-                  <span className="px-3 py-1 bg-gray-100 text-gray-600 rounded-full text-[10px] font-bold uppercase tracking-wider">
-                    {activeSubTab === 'schools' ? `Cluster ${item.cluster}` : stripVicariatePrefix(item.vicariate)}
-                  </span>
-                </td>
-                <td className="py-5">
-                  <span className="px-3 py-1 bg-amber-50 text-amber-700 rounded-full text-[10px] font-bold uppercase tracking-wider">
-                    {item.class || item.entityClass || '-'}
-                  </span>
-                </td>
-                <td className="py-5">
-                  <span className="text-xs font-bold text-gray-500">
-                    {activeSubTab === 'schools'
-                      ? item.level || '-'
-                      : item.district || VICARIATE_TO_DISTRICT[item.vicariate] || '-'}
-                  </span>
-                </td>
+                {activeSubTab === 'parishes' && (
+                  <td className="py-5">
+                    <span className="px-3 py-1 bg-gray-100 text-gray-600 rounded-full text-[10px] font-bold uppercase tracking-wider">
+                      {stripVicariatePrefix(item.vicariate)}
+                    </span>
+                  </td>
+                )}
+                {activeSubTab === 'schools' && (
+                  <td className="py-5">
+                    <span className="px-3 py-1 bg-gray-100 text-gray-600 rounded-full text-[10px] font-bold uppercase tracking-wider">
+                      {`Cluster ${item.cluster}`}
+                    </span>
+                  </td>
+                )}
+                {activeSubTab === 'parishes' && (
+                  <td className="py-5">
+                    <span className="px-3 py-1 bg-amber-50 text-amber-700 rounded-full text-[10px] font-bold uppercase tracking-wider">
+                      {item.class || item.entityClass || '-'}
+                    </span>
+                  </td>
+                )}
+                {activeSubTab === 'parishes' && (
+                  <td className="py-5">
+                    <span className="text-xs font-bold text-gray-500">
+                      {item.district || VICARIATE_TO_DISTRICT[item.vicariate] || '-'}
+                    </span>
+                  </td>
+                )}
+                {activeSubTab === 'schools' && (
+                  <td className="py-5">
+                    <span className="text-xs font-bold text-gray-500">{item.level || '-'}</span>
+                  </td>
+                )}
                 <td className="py-5 text-right pr-4">
                   <div className="flex items-center justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                     <button
@@ -2346,7 +2378,7 @@ export function EntityManagementControl({
             ))}
             {filteredData().length === 0 && (
               <tr key="no-entities">
-                <td colSpan={5} className="py-20 text-center">
+                <td colSpan={activeSubTab === 'parishes' ? 5 : activeSubTab === 'schools' ? 4 : 2} className="py-20 text-center">
                   <div className="flex flex-col items-center gap-3">
                     <div className="w-16 h-16 bg-gray-50 rounded-full flex items-center justify-center">
                       <Search className="w-8 h-8 text-gray-300" />
@@ -2368,7 +2400,12 @@ export function EntityManagementControl({
         (() => {
           const kind: 'parishes' | 'seminaries' | 'schools' = viewEntity.__kind || activeSubTab;
           const typeLabel = kind === 'parishes' ? 'Parish' : kind === 'seminaries' ? 'Seminary' : 'School';
-          const KindIcon = kind === 'parishes' ? Building2 : kind === 'seminaries' ? GraduationCap : School;
+          const KindIcon =
+            kind === 'parishes'
+              ? ENTITY_TYPE_ICON.parish
+              : kind === 'seminaries'
+                ? ENTITY_TYPE_ICON.seminary
+                : ENTITY_TYPE_ICON.school;
           const leader =
             kind === 'parishes' ? viewEntity.pastor : kind === 'seminaries' ? viewEntity.rector : viewEntity.principal;
           const leaderLabel = kind === 'parishes' ? 'Pastor' : kind === 'seminaries' ? 'Rector' : 'Principal';
@@ -2451,13 +2488,16 @@ export function EntityManagementControl({
                 {/* Body */}
                 <div className="grid flex-1 grid-cols-1 gap-3 overflow-y-auto p-6 sm:grid-cols-2">
                   <Field icon={MapPin} label="Address" value={viewEntity.address} />
-                  <Field
-                    icon={KindIcon}
-                    label={kind === 'schools' ? 'Cluster' : 'Vicariate'}
-                    value={kind === 'schools' ? `Cluster ${viewEntity.cluster}` : viewEntity.vicariate}
-                  />
-                  {viewEntity.district && <Field icon={Layers} label="District" value={viewEntity.district} />}
-                  <Field icon={Layers} label="Class" value={viewEntity.class} />
+                  {/* Only parishes have vicariate/district/class; schools have a
+                      cluster; seminaries have none of these classifications. */}
+                  {kind === 'parishes' && <Field icon={KindIcon} label="Vicariate" value={viewEntity.vicariate} />}
+                  {kind === 'schools' && (
+                    <Field icon={KindIcon} label="Cluster" value={`Cluster ${viewEntity.cluster}`} />
+                  )}
+                  {kind === 'parishes' && viewEntity.district && (
+                    <Field icon={Layers} label="District" value={viewEntity.district} />
+                  )}
+                  {kind === 'parishes' && <Field icon={Layers} label="Class" value={viewEntity.class} />}
                   <Field icon={Users} label={leaderLabel} value={leader} />
                   <Field icon={Phone} label="Contact Number" value={viewEntity.contactNumber} />
                   <Field icon={Mail} label="Email" value={viewEntity.email} />

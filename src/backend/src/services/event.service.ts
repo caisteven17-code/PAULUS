@@ -110,22 +110,34 @@ export class EventService {
 
     // Auto-register seminary/school/parish institutions not yet in diocese.institutions.
     if (institutionType === 'school' || institutionType === 'seminary' || institutionType === 'parish') {
+      const insertName = institutionName.trim();
       const { data: created, error: insertErr } = await this.db()
         .from('institutions')
-        .insert({ name: institutionName.trim(), institution_type: institutionType, is_active: true })
+        .insert({ name: insertName, institution_type: institutionType, is_active: true })
         .select('id')
         .single();
       if (!insertErr && created?.id) return created.id;
+      if (insertErr) {
+        console.error(
+          `[event.service] auto-register institution failed for "${insertName}" (${institutionType}):`,
+          insertErr.code,
+          insertErr.message,
+        );
+      }
       // If insert failed (duplicate), fetch the existing record.
       const { data: existing } = await this.db()
         .from('institutions')
-        .select('id')
-        .eq('name', institutionName.trim())
+        .select('id, deleted_at')
+        .eq('name', insertName)
         .eq('institution_type', institutionType)
-        .is('deleted_at', null)
         .limit(1)
         .maybeSingle();
-      if (existing?.id) return existing.id;
+      if (existing?.id && !existing.deleted_at) return existing.id;
+      if (existing?.deleted_at) {
+        console.error(
+          `[event.service] institution "${insertName}" (${institutionType}) exists but is archived; restore it in Entity Management to save here.`,
+        );
+      }
     }
 
     return null;
@@ -184,6 +196,18 @@ export class EventService {
     return { scopedInstitutionId, unresolvable: !scopedInstitutionId };
   }
 
+  /** The diocese-level institution id, so its events can fan out to everyone. */
+  private async getDioceseInstitutionId(): Promise<string | null> {
+    const { data } = await this.db()
+      .from('institutions')
+      .select('id')
+      .eq('institution_type', 'diocese')
+      .is('deleted_at', null)
+      .limit(1)
+      .maybeSingle();
+    return data?.id ?? null;
+  }
+
   async getEvents(filters: {
     institutionId?: string;
     institutionName?: string;
@@ -199,7 +223,14 @@ export class EventService {
       .order('start_date', { ascending: true });
 
     if (scopedInstitutionId) {
-      query = query.eq('institution_id', scopedInstitutionId);
+      // An institution sees its own events PLUS diocese-wide events, so events
+      // created at the diocesan level appear in every institution's Event tab.
+      const dioceseId = await this.getDioceseInstitutionId();
+      if (dioceseId && dioceseId !== scopedInstitutionId) {
+        query = query.in('institution_id', [scopedInstitutionId, dioceseId]);
+      } else {
+        query = query.eq('institution_id', scopedInstitutionId);
+      }
     }
 
     const { data, error } = await query;
