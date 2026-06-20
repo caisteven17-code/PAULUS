@@ -4,8 +4,8 @@ Laguna Province Weather Data Validator
 Validates the credibility of collected weather data against two independent
 ground-truth reference sources:
 
-  1. NOAA GSOD  — Global Surface Summary of the Day (temperature)
-                  Nearest weather stations to Laguna Province.
+  1. NOAA GSOD  — Global Surface Summary of the Day (temperature, wind speed,
+                  humidity). Nearest weather stations to Laguna Province.
                   Free, no API key required.
 
   2. CHIRPS     — Climate Hazards Group InfraRed Precipitation with Station data
@@ -17,13 +17,15 @@ ground-truth reference sources:
 
 Validation method:
   The pipeline's per-municipality monthly data is averaged to a province-level
-  monthly figure, then compared against the NOAA GSOD station average (temp)
-  and CHIRPS centroid value (rainfall) for the same month.
+  monthly figure, then compared against the NOAA GSOD station average (temp,
+  wind, humidity) and CHIRPS centroid value (rainfall) for the same month.
   Individual municipality-months that deviate far from the reference are flagged.
 
 Tolerances:
   Temperature : MAE > 2.0 °C        → FAIL
   Rainfall    : relative MAE > 30%  → FAIL
+  Wind speed  : MAE > 1.5 m/s       → FAIL
+  Humidity    : MAE > 10 %RH        → FAIL
 
 Usage:
   python weather_validator.py                        # uses weather_output/laguna_weather_final.json
@@ -36,6 +38,7 @@ from __future__ import annotations
 
 import json
 import logging
+import math
 import time
 import urllib.parse
 import urllib.request
@@ -49,13 +52,17 @@ DEFAULT_OUT_DIR = Path(__file__).resolve().parents[4] / "weather_output"
 
 # ── Tolerances ────────────────────────────────────────────────────────────────
 
-TEMP_MAE_THRESHOLD = 2.0  # °C — MAE above this fails temperature validation
-RAIN_RELMAE_THRESHOLD = 0.30  # 30% relative MAE above this fails rainfall validation
+TEMP_MAE_THRESHOLD = 2.0   # °C      — MAE above this fails temperature validation
+RAIN_RELMAE_THRESHOLD = 0.30  # 30%  — relative MAE above this fails rainfall validation
+WIND_MAE_THRESHOLD = 1.5   # m/s     — MAE above this fails wind speed validation
+HUMID_MAE_THRESHOLD = 10.0  # %RH   — MAE above this fails humidity validation
 
 # Per-record flag threshold (2× the MAE threshold) — individual months flagged
 # in the report even when overall MAE passes, so analysts can inspect outliers.
-TEMP_FLAG_DELTA = TEMP_MAE_THRESHOLD * 2  # °C
+TEMP_FLAG_DELTA = TEMP_MAE_THRESHOLD * 2    # °C
 RAIN_FLAG_RELDELTA = RAIN_RELMAE_THRESHOLD * 2  # relative
+WIND_FLAG_DELTA = WIND_MAE_THRESHOLD * 2    # m/s
+HUMID_FLAG_DELTA = HUMID_MAE_THRESHOLD * 2  # %RH
 
 # ── NOAA GSOD ─────────────────────────────────────────────────────────────────
 # Nearest NOAA weather stations to Laguna Province.
@@ -75,7 +82,7 @@ GSOD_API = "https://www.ncei.noaa.gov/access/services/data/v1"
 def fetch_gsod_monthly(station_id: str, start: date, end: date) -> list[dict]:
     """
     Fetch GSOD daily observations and aggregate to monthly averages.
-    Returns list of {year, month, temp_avg_c, rainfall_mm}.
+    Returns list of {year, month, temp_avg_c, rainfall_mm, wind_speed_ms, humidity_pct}.
     """
     params = urllib.parse.urlencode(
         {
@@ -85,7 +92,7 @@ def fetch_gsod_monthly(station_id: str, start: date, end: date) -> list[dict]:
             "endDate": end.isoformat(),
             "format": "json",
             "units": "metric",
-            "dataTypes": "TEMP,PRCP",
+            "dataTypes": "TEMP,PRCP,WDSP,DEWP",
         }
     )
     url = f"{GSOD_API}?{params}"
@@ -113,7 +120,7 @@ def fetch_gsod_monthly(station_id: str, start: date, end: date) -> list[dict]:
 
         key = (dt.year, dt.month)
         if key not in monthly:
-            monthly[key] = {"temps": [], "rain": []}
+            monthly[key] = {"temps": [], "rain": [], "winds": [], "dewps": []}
 
         try:
             if r.get("TEMP") is not None:
@@ -128,6 +135,28 @@ def fetch_gsod_monthly(station_id: str, start: date, end: date) -> list[dict]:
                 monthly[key]["rain"].append(float(r["PRCP"]) * 25.4)
         except (TypeError, ValueError):
             pass
+        try:
+            if r.get("WDSP") is not None:
+                # WDSP is in knots; convert to m/s (1 knot = 0.514444 m/s).
+                monthly[key]["winds"].append(float(r["WDSP"]) * 0.514444)
+        except (TypeError, ValueError):
+            pass
+        try:
+            if r.get("DEWP") is not None:
+                # DEWP is dew point in °F; convert to °C then to relative humidity
+                # using the August-Roche-Magnus approximation:
+                #   RH = 100 * exp(17.625 * Td / (243.04 + Td))
+                #              / exp(17.625 * T  / (243.04 + T))
+                # where T and Td are in °C.  We store the dew-point °C here and
+                # combine with temp later; simpler to store the daily RH directly.
+                dewp_c = (float(r["DEWP"]) - 32) * 5 / 9
+                # Re-use temp_c from the same record if available, otherwise skip.
+                if r.get("TEMP") is not None:
+                    temp_c = (float(r["TEMP"]) - 32) * 5 / 9
+                    rh = 100 * math.exp(17.625 * dewp_c / (243.04 + dewp_c)) / math.exp(17.625 * temp_c / (243.04 + temp_c))
+                    monthly[key]["dewps"].append(max(0.0, min(100.0, rh)))
+        except (TypeError, ValueError):
+            pass
 
     result = []
     for (year, month), data in sorted(monthly.items()):
@@ -137,6 +166,8 @@ def fetch_gsod_monthly(station_id: str, start: date, end: date) -> list[dict]:
                 "month": month,
                 "temp_avg_c": round(sum(data["temps"]) / len(data["temps"]), 2) if data["temps"] else None,
                 "rainfall_mm": round(sum(data["rain"]), 2) if data["rain"] else None,
+                "wind_speed_ms": round(sum(data["winds"]) / len(data["winds"]), 3) if data["winds"] else None,
+                "humidity_pct": round(sum(data["dewps"]) / len(data["dewps"]), 2) if data["dewps"] else None,
             }
         )
     return result
@@ -295,9 +326,11 @@ def validate(
     Returns a report dict with:
       temperature  — MAE vs NOAA GSOD stations, pass/fail
       rainfall     — relative MAE vs CHIRPS, pass/fail
+      wind_speed   — MAE vs NOAA GSOD stations, pass/fail
+      humidity     — MAE vs NOAA GSOD stations (dew-point derived RH), pass/fail
       typhoon      — note that IBTrACS is already handled upstream
       flagged_records — individual municipality-months with large deviations
-      overall_passed  — True only if both temperature and rainfall pass
+      overall_passed  — True only if temperature, rainfall, wind, and humidity pass
     """
     logger.info("Loading pipeline data from %s", pipeline_path)
     pipeline_data = json.loads(pipeline_path.read_text())
@@ -308,20 +341,28 @@ def validate(
     if end is None:
         end = date.fromisoformat(pipeline_data.get("period_end", "2023-12-31"))
 
-    # ── Step 1: Fetch NOAA GSOD reference temperatures ───────────────────────
-    logger.info("Fetching NOAA GSOD reference temperature (%s → %s)...", start, end)
-    gsod_by_month: dict[tuple[int, int], list[float]] = {}
+    # ── Step 1: Fetch NOAA GSOD reference data (temp, wind, humidity) ────────
+    logger.info("Fetching NOAA GSOD reference data (%s → %s)...", start, end)
+    gsod_temp_by_month: dict[tuple[int, int], list[float]] = {}
+    gsod_wind_by_month: dict[tuple[int, int], list[float]] = {}
+    gsod_humid_by_month: dict[tuple[int, int], list[float]] = {}
 
     for station in GSOD_STATIONS:
         records = fetch_gsod_monthly(station["id"], start, end)
         for r in records:
             key = (r["year"], r["month"])
             if r["temp_avg_c"] is not None:
-                gsod_by_month.setdefault(key, []).append(r["temp_avg_c"])
+                gsod_temp_by_month.setdefault(key, []).append(r["temp_avg_c"])
+            if r["wind_speed_ms"] is not None:
+                gsod_wind_by_month.setdefault(key, []).append(r["wind_speed_ms"])
+            if r["humidity_pct"] is not None:
+                gsod_humid_by_month.setdefault(key, []).append(r["humidity_pct"])
         logger.info("  GSOD %-30s → %d monthly records", station["name"], len(records))
 
     # Average across all stations for each month
-    gsod_ref: dict[tuple[int, int], float] = {k: round(sum(v) / len(v), 2) for k, v in gsod_by_month.items()}
+    gsod_ref: dict[tuple[int, int], float] = {k: round(sum(v) / len(v), 2) for k, v in gsod_temp_by_month.items()}
+    gsod_wind_ref: dict[tuple[int, int], float] = {k: round(sum(v) / len(v), 3) for k, v in gsod_wind_by_month.items()}
+    gsod_humid_ref: dict[tuple[int, int], float] = {k: round(sum(v) / len(v), 2) for k, v in gsod_humid_by_month.items()}
 
     # ── Step 2: Fetch CHIRPS reference rainfall ───────────────────────────────
     logger.info("Fetching CHIRPS reference rainfall (%s → %s)...", start, end)
@@ -332,6 +373,8 @@ def validate(
     # ── Step 3: Build province-level monthly averages from pipeline ───────────
     province_temp: dict[tuple[int, int], list[float]] = {}
     province_rain: dict[tuple[int, int], list[float]] = {}
+    province_wind: dict[tuple[int, int], list[float]] = {}
+    province_humid: dict[tuple[int, int], list[float]] = {}
 
     for muni in municipalities:
         for m in muni.get("monthly_data", []):
@@ -340,13 +383,20 @@ def validate(
                 province_temp.setdefault(key, []).append(float(m["temp_avg_c"]))
             if m.get("rainfall_mm") is not None:
                 province_rain.setdefault(key, []).append(float(m["rainfall_mm"]))
+            if m.get("wind_speed_ms") is not None:
+                province_wind.setdefault(key, []).append(float(m["wind_speed_ms"]))
+            if m.get("humidity_pct") is not None:
+                province_humid.setdefault(key, []).append(float(m["humidity_pct"]))
 
     # ── Step 4: Compare and flag ──────────────────────────────────────────────
     temp_pairs: list[tuple[float, float]] = []
     rain_pairs: list[tuple[float, float]] = []
+    wind_pairs: list[tuple[float, float]] = []
+    humid_pairs: list[tuple[float, float]] = []
     flagged: list[dict] = []
 
-    for key in sorted(set(province_temp) | set(province_rain)):
+    all_keys = sorted(set(province_temp) | set(province_rain) | set(province_wind) | set(province_humid))
+    for key in all_keys:
         year, month = key
 
         # Temperature
@@ -390,12 +440,56 @@ def validate(
                     }
                 )
 
+        # Wind speed
+        if key in province_wind and key in gsod_wind_ref:
+            pipeline_wind = round(sum(province_wind[key]) / len(province_wind[key]), 3)
+            gsod_wind = gsod_wind_ref[key]
+            wind_pairs.append((pipeline_wind, gsod_wind))
+
+            if abs(pipeline_wind - gsod_wind) > WIND_FLAG_DELTA:
+                flagged.append(
+                    {
+                        "year": year,
+                        "month": month,
+                        "type": "wind_speed",
+                        "pipeline_value": pipeline_wind,
+                        "reference_value": gsod_wind,
+                        "reference_source": "NOAA GSOD",
+                        "deviation": round(abs(pipeline_wind - gsod_wind), 3),
+                        "unit": "m/s",
+                    }
+                )
+
+        # Humidity
+        if key in province_humid and key in gsod_humid_ref:
+            pipeline_humid = round(sum(province_humid[key]) / len(province_humid[key]), 2)
+            gsod_humid = gsod_humid_ref[key]
+            humid_pairs.append((pipeline_humid, gsod_humid))
+
+            if abs(pipeline_humid - gsod_humid) > HUMID_FLAG_DELTA:
+                flagged.append(
+                    {
+                        "year": year,
+                        "month": month,
+                        "type": "humidity",
+                        "pipeline_value": pipeline_humid,
+                        "reference_value": gsod_humid,
+                        "reference_source": "NOAA GSOD (dew-point derived RH)",
+                        "deviation": round(abs(pipeline_humid - gsod_humid), 2),
+                        "unit": "%RH",
+                    }
+                )
+
     # ── Step 5: Build report ──────────────────────────────────────────────────
     temp_mae = _mae(temp_pairs)
     rain_relmae = _rel_mae(rain_pairs)
+    wind_mae = _mae(wind_pairs)
+    humid_mae = _mae(humid_pairs)
 
     temp_passed = temp_mae is None or temp_mae <= TEMP_MAE_THRESHOLD
     rain_passed = rain_relmae is None or rain_relmae <= RAIN_RELMAE_THRESHOLD
+    wind_passed = wind_mae is None or wind_mae <= WIND_MAE_THRESHOLD
+    humid_passed = humid_mae is None or humid_mae <= HUMID_MAE_THRESHOLD
 
     if temp_mae is not None:
         status = "PASS" if temp_passed else "FAIL"
@@ -415,6 +509,20 @@ def validate(
         )
     else:
         logger.warning("Rainfall: no comparison data (CHIRPS unreachable or no overlapping months)")
+
+    if wind_mae is not None:
+        status = "PASS" if wind_passed else "FAIL"
+        log = logger.info if wind_passed else logger.warning
+        log("Wind speed MAE: %.3f m/s (threshold %.1f m/s) — %s", wind_mae, WIND_MAE_THRESHOLD, status)
+    else:
+        logger.warning("Wind speed: no comparison data (NOAA GSOD WDSP unreachable or no overlapping months)")
+
+    if humid_mae is not None:
+        status = "PASS" if humid_passed else "FAIL"
+        log = logger.info if humid_passed else logger.warning
+        log("Humidity MAE: %.2f %%RH (threshold %.1f %%RH) — %s", humid_mae, HUMID_MAE_THRESHOLD, status)
+    else:
+        logger.warning("Humidity: no comparison data (NOAA GSOD DEWP unreachable or no overlapping months)")
 
     if flagged:
         logger.warning("%d month(s) flagged for large deviation from reference data", len(flagged))
@@ -439,13 +547,29 @@ def validate(
             "comparison_months": len(rain_pairs),
             "passed": rain_passed,
         },
+        "wind_speed": {
+            "reference_source": "NOAA GSOD (WDSP, knots → m/s)",
+            "stations_used": [s["name"] for s in GSOD_STATIONS],
+            "mae_ms": wind_mae,
+            "threshold_ms": WIND_MAE_THRESHOLD,
+            "comparison_months": len(wind_pairs),
+            "passed": wind_passed,
+        },
+        "humidity": {
+            "reference_source": "NOAA GSOD (DEWP dew-point → %RH via Magnus formula)",
+            "stations_used": [s["name"] for s in GSOD_STATIONS],
+            "mae_pct": humid_mae,
+            "threshold_pct": HUMID_MAE_THRESHOLD,
+            "comparison_months": len(humid_pairs),
+            "passed": humid_passed,
+        },
         "typhoon": {
             "reference_source": "IBTrACS",
             "note": "Validated upstream in weather_ibtracs.py",
             "passed": True,
         },
         "flagged_records": flagged,
-        "overall_passed": temp_passed and rain_passed,
+        "overall_passed": temp_passed and rain_passed and wind_passed and humid_passed,
     }
 
 
@@ -457,7 +581,7 @@ if __name__ == "__main__":
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
 
     parser = argparse.ArgumentParser(
-        description="Validate Laguna weather data against NOAA GSOD (temperature) and CHIRPS (rainfall)"
+        description="Validate Laguna weather data against NOAA GSOD (temperature, wind, humidity) and CHIRPS (rainfall)"
     )
     parser.add_argument(
         "--file",

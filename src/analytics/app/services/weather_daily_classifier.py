@@ -53,6 +53,12 @@ Agreement and confidence — triple collocation / majority rule
 All validators check the same NASA POWER AG value SIMULTANEOUSLY and
 INDEPENDENTLY — no sequential gating. Majority rule (≥ n//2 + 1 of n):
 
+  Exception: WIND uses ECMWF IFS as the source of truth, with NASA POWER AG
+  demoted to a validator. Cross-source kappa analysis showed NASA's wind
+  disagrees with every other independent provider at or below chance
+  agreement, while ECMWF IFS and UKMO (genuinely independent organizations)
+  agree with each other at kappa 0.42-0.65.
+
   validators_agreed = n   → All validators agree    → sources_agree = true
   validators_agreed ≥ maj → Majority agree (k/n)    → sources_agree = true
   validators_agreed < maj → Minority / one / none   → sources_agree = false
@@ -129,6 +135,18 @@ WIND_LIGHT_MIN_MS    = 1.5   # Beaufort Force 2 — WMO Beaufort Scale
 WIND_MODERATE_MIN_MS = 5.5   # Beaufort Force 4 — WMO Beaufort Scale
 WIND_STRONG_MIN_MS   = 10.7  # Beaufort Force 6 — WMO Beaufort Scale
 WIND_STORM_MIN_MS    = 17.2  # Beaufort Force 8 — WMO Beaufort Scale
+
+# Severe-weather-from-wind: DOST-PAGASA's modified Tropical Cyclone Wind
+# Signal (TCWS) sustained-wind thresholds, in effect since 23 March 2022
+# (DOST-PAGASA Press Release No. 108, "PAGASA modifies Tropical Cyclone
+# Wind Signal", https://bagong.pagasa.dost.gov.ph/press-release/108).
+# km/h thresholds converted to m/s (÷3.6); mapped onto the same 5-tier
+# no_severe/light/moderate/severe/extreme scale as classify_severe_from_precip
+# so the two can be combined (TCWS 1→light, 2→moderate, 3-4→severe, 5→extreme).
+SEVERE_WIND_TCWS1_MIN_MS = 10.83   # 39 km/h  — TCWS No. 1 (36 h lead time)
+SEVERE_WIND_TCWS2_MIN_MS = 17.22   # 62 km/h  — TCWS No. 2 (24 h lead time)
+SEVERE_WIND_TCWS3_MIN_MS = 24.72   # 89 km/h  — TCWS No. 3 (18 h lead time)
+SEVERE_WIND_TCWS5_MIN_MS = 51.39   # 185 km/h — TCWS No. 5 (12 h lead time)
 
 # Humidity: standard comfort scale (% RH)
 HUMIDITY_LOW_MAX_PCT      = 71.0  # Below PH monthly minimum avg (71% March) — PAGASA Climatological Normals
@@ -297,6 +315,132 @@ def classify_severe(weathercode: Optional[int]) -> Optional[str]:
     return "light_weather"
 
 
+def classify_severe_from_precip(rainfall_mm: Optional[float]) -> Optional[str]:
+    """
+    Rainfall-intensity proxy for severe weather, onto the same 5-category
+    scale as classify_severe(). PAGASA operational rainfall-intensity
+    criteria (mm/day):
+      no_severe        < 1     trace / no rain
+      light_weather    1-25    light to moderate rain
+      moderate_weather 25-75   heavy rain
+      severe_weather   75-150  intense rain (PAGASA warning level 1-2)
+      extreme_weather  >= 150  torrential / typhoon-level
+
+    This is a DIFFERENT signal from classify_severe() (weathercode-based),
+    not a drop-in replacement: it only captures rainfall intensity, so a
+    high-wind/low-rain event would show as no_severe here even if the
+    weathercode-based classification correctly flags it. It exists because
+    rainfall has 6 validated, mostly-independent sources (mean cross-lineage
+    Cohen's Kappa 0.358, "fair") versus the weathercode approach's 3 sources,
+    all sharing one lineage (no genuine independent check at all without
+    JMA). See compute_confidence_scores' "severe_weather_rain_based" entry.
+    """
+    if rainfall_mm is None:
+        return None
+    v = float(rainfall_mm)
+    if v < 1.0:
+        return "no_severe"
+    if v < 25.0:
+        return "light_weather"
+    if v < 75.0:
+        return "moderate_weather"
+    if v < 150.0:
+        return "severe_weather"
+    return "extreme_weather"
+
+
+_SEVERE_RANK = {
+    "no_severe": 0,
+    "light_weather": 1,
+    "moderate_weather": 2,
+    "severe_weather": 3,
+    "extreme_weather": 4,
+}
+_SEVERE_RANK_NAME = {v: k for k, v in _SEVERE_RANK.items()}
+
+
+def classify_severe_from_wind(wind_ms: Optional[float]) -> Optional[str]:
+    """
+    Wind-intensity proxy for severe weather, onto the same 5-category scale
+    as classify_severe() / classify_severe_from_precip(). Thresholds are
+    DOST-PAGASA's own Tropical Cyclone Wind Signal (TCWS) sustained-wind
+    bands (Press Release No. 108, 23 Mar 2022):
+      no_severe        < 39 km/h   (no signal)
+      light_weather     39-61 km/h (TCWS No. 1)
+      moderate_weather  62-88 km/h (TCWS No. 2)
+      severe_weather    89-184 km/h(TCWS No. 3-4, collapsed into one tier —
+                                     the rain/weathercode scales only have a
+                                     single "severe" tier between "moderate"
+                                     and "extreme")
+      extreme_weather  >= 185 km/h (TCWS No. 5)
+
+    Like classify_severe_from_precip(), this is a single-hazard proxy: a
+    high-rain/low-wind day (e.g. a slow-moving monsoon-enhanced LPA) will
+    read as non-severe here even though it may be genuinely hazardous.
+    See classify_severe_combined() for the merged signal.
+    """
+    if wind_ms is None:
+        return None
+    v = float(wind_ms)
+    if v < SEVERE_WIND_TCWS1_MIN_MS:
+        return "no_severe"
+    if v < SEVERE_WIND_TCWS2_MIN_MS:
+        return "light_weather"
+    if v < SEVERE_WIND_TCWS3_MIN_MS:
+        return "moderate_weather"
+    if v < SEVERE_WIND_TCWS5_MIN_MS:
+        return "severe_weather"
+    return "extreme_weather"
+
+
+def classify_severe_combined(
+    rainfall_mm: Optional[float],
+    wind_ms: Optional[float],
+) -> Optional[str]:
+    """
+    Combined rainfall+wind severe-weather signal: takes the MORE severe of
+    classify_severe_from_precip() and classify_severe_from_wind(), rather
+    than requiring both to agree.
+
+    Rationale (max-of-hazards, not consensus-of-hazards): tropical-cyclone
+    impact studies consistently find that wind and rainfall are partially
+    independent hazard dimensions — a storm can be rain-dominant (slow-moving,
+    weak winds, catastrophic flooding — e.g. the Ondoy/Ketsana 2009 pattern
+    over Laguna/Metro Manila) or wind-dominant (fast-moving, intense winds,
+    comparatively little rain). Requiring both signals to agree would
+    systematically under-flag whichever type doesn't dominate that day.
+      - Czajkowski, J., et al. (2014). Classification of Hurricane Hazards:
+        The Importance of Rainfall. Weather and Forecasting, 29(6), 1271-1305.
+        https://doi.org/10.1175/WAF-D-14-00014.1
+        (rainfall is frequently the dominant damage/death driver and is
+        omitted from wind-only scales — argues against a wind-only signal)
+      - Collins, J., Bloemendaal, N., Mol, J., de Moel, H., & Amasino, D.
+        (2021). Tropical Cyclone Severity Scale. Environmental Research
+        Letters, 16(1), 014046. https://doi.org/10.1088/1748-9326/abd131
+        (multi-hazard severity scale combining wind, rainfall, storm surge)
+      - Ranjan, R. & Karmakar, S. (2024). Compound hazard mapping for
+        tropical cyclone-induced concurrent wind and rainfall extremes over
+        India. npj Natural Hazards, 1, 15.
+        https://doi.org/10.1038/s44304-024-00013-y
+        (wind and rainfall extremes from the same cyclone are only partly
+        co-located/co-occurring — supports treating them as two signals
+        taken at their max, not requiring joint agreement)
+
+    Returns None only if BOTH inputs are None; a single missing input falls
+    back to whichever signal is available.
+    """
+    rain_cls = classify_severe_from_precip(rainfall_mm)
+    wind_cls = classify_severe_from_wind(wind_ms)
+    if rain_cls is None and wind_cls is None:
+        return None
+    if rain_cls is None:
+        return wind_cls
+    if wind_cls is None:
+        return rain_cls
+    rank = max(_SEVERE_RANK[rain_cls], _SEVERE_RANK[wind_cls])
+    return _SEVERE_RANK_NAME[rank]
+
+
 def classify_wind(wind_ms: Optional[float]) -> Optional[str]:
     """
     Classify daily wind speed (m/s) per PAGASA-aligned thresholds.
@@ -353,17 +497,24 @@ def _validate_dimension(
     tolerance: float,
     unit: str,
     classification_value: Optional[float] = None,
+    truth_name: str = "NASA POWER AG",
 ) -> Optional[dict]:
     """
     Apply majority agreement rule (≥ n//2 + 1 of n) for one weather dimension.
 
-    truth_value         : NASA POWER AG raw value (used for validator comparison).
+    truth_value         : source-of-truth raw value (see truth_name), used for
+                          validator comparison.
     validators          : [(name, value), ...] — all checked simultaneously.
     classify_fn         : classification function applied to truth or fallback.
     tolerance           : acceptable absolute difference for agreement.
     unit                : display unit string for reason sentences.
     classification_value: if provided, used for the final classification instead
                           of truth_value (e.g. heat index instead of raw temp).
+    truth_name          : display name of the source of truth, for reason
+                          sentences. Defaults to NASA POWER AG, the SoT for
+                          rainfall/temperature/humidity/severe weather; wind
+                          passes "ECMWF IFS" since NASA disagrees with every
+                          other independent provider at-or-below chance for wind.
 
     Returns None when neither truth nor any validator has data.
     Otherwise returns a dict with classification, validators_agreed,
@@ -390,7 +541,7 @@ def _validate_dimension(
             "agreement_status": status,
             "wmo_quality_flag": _wmo_flag(status),
             "reason": (
-                f"Not cross-checked: NASA POWER AG has no data for this day; "
+                f"Not cross-checked: {truth_name} has no data for this day; "
                 f"classified from {name} alone."
             ),
         }
@@ -406,7 +557,7 @@ def _validate_dimension(
             "wmo_quality_flag": _wmo_flag(status),
             "reason": (
                 f"No validator data available ({', '.join(missing)} all missing). "
-                f"Classified from NASA POWER AG alone (unvalidated)."
+                f"Classified from {truth_name} alone (unvalidated)."
             ),
         }
 
@@ -451,21 +602,21 @@ def _validate_dimension(
 
     if agreed == n_total:
         reason = (
-            f"All {n_total} validators agree: NASA POWER AG {truth_value:.2f} {unit} "
+            f"All {n_total} validators agree: {truth_name} {truth_value:.2f} {unit} "
             f"('{classify_fn(truth_value)}'). {_fmt(agreeing)} — all within the "
-            f"{tol_txt} tolerance or same category. Classified from NASA POWER AG."
+            f"{tol_txt} tolerance or same category. Classified from {truth_name}."
         )
     elif agreed >= majority:
         reason = (
             f"Majority agree ({agreed}/{n_total}): {_fmt(agreeing)} agree with "
-            f"NASA POWER AG {truth_value:.2f} {unit}. "
+            f"{truth_name} {truth_value:.2f} {unit}. "
             + (f"Conflicting: {_fmt(conflicting)}." if conflicting else "")
-            + f" Classified from NASA POWER AG."
+            + f" Classified from {truth_name}."
         )
     elif agreed >= 2:
         reason = (
             f"Minority agree ({agreed}/{n_total}): {_fmt(agreeing)} agree with "
-            f"NASA POWER AG {truth_value:.2f} {unit}, but below majority ({majority}/{n_total}). "
+            f"{truth_name} {truth_value:.2f} {unit}, but below majority ({majority}/{n_total}). "
             + (f"Conflicting: {_fmt(conflicting)}." if conflicting else "")
             + " Classified as inconclusive."
         )
@@ -511,11 +662,12 @@ def classify_day(
     gsmap_nrt_rainfall_mm: Optional[float],
     era5_rainfall_mm: Optional[float],
     ukmo_rainfall_mm: Optional[float],
-    # Severe weather — source of truth (Open-Meteo ERA5-Land) + 3 validators
+    # Severe weather — source of truth (Open-Meteo ERA5-Land) + validators
     open_meteo_weathercode: Optional[int] = None,
     era5_weathercode: Optional[int] = None,
     ecmwf_ifs_weathercode: Optional[int] = None,
     ukmo_weathercode: Optional[int] = None,
+    jma_weathercode: Optional[int] = None,
     # IBTrACS typhoon flags (supplementary — not a validator)
     typhoon_flag: bool = False,
     typhoon_signal: int = 0,
@@ -530,7 +682,8 @@ def classify_day(
     # Humidity validators (source of truth = nasa_rh_pct above)
     open_meteo_rh_pct: Optional[float] = None,
     era5_rh_pct: Optional[float] = None,
-    # Wind — source of truth (NASA POWER AG WS10M) + 4 validators
+    # Wind — source of truth is ECMWF IFS (see _validate_dimension call below);
+    # NASA POWER AG WS10M is one of 4 validators, not the SoT.
     nasa_wind_ms: Optional[float] = None,
     open_meteo_wind_ms: Optional[float] = None,
     era5_wind_ms: Optional[float] = None,
@@ -541,10 +694,10 @@ def classify_day(
     Build rainfall, temperature, and wind daily rows for one (date, municipality).
 
     Rainfall  validators (n=5): CHIRPS, Open-Meteo ERA5-Land, GSMaP NRT, ERA5, UKMO.
-    Severe    validators (n=3): ERA5, ECMWF IFS, UKMO weathercode.
-    Temperature validators (n=4): Open-Meteo ERA5-Land, ERA5, ECMWF IFS, UKMO.
+    Severe    SoT: Open-Meteo ERA5-Land. Validators (n=3): ERA5, ECMWF IFS, JMA weathercode.
+    Temperature SoT: ECMWF IFS. Validators (n=4): NASA POWER AG, Open-Meteo ERA5-Land, ERA5, UKMO.
     Humidity  validators (n=2): Open-Meteo ERA5-Land, ERA5.
-    Wind      validators (n=4): Open-Meteo ERA5-Land, ERA5, ECMWF IFS, UKMO.
+    Wind      SoT: ECMWF IFS. Validators (n=4): NASA POWER AG, Open-Meteo ERA5-Land, ERA5, UKMO.
 
     Returns (rain_row, temp_row, wind_row); any may be None when all sources missing.
     """
@@ -565,30 +718,49 @@ def classify_day(
 
     # ── Severe weather (weathercode — integer agreement, no numeric tolerance) ─
     # Use _validate_dimension with tolerance=0; category match is sufficient.
+    # JMA (Japan Meteorological Agency) is the one validator here that is NOT
+    # ECMWF-lineage — ERA5/ECMWF IFS/Open-Meteo all derive from the same
+    # organization, so without JMA this dimension had zero genuinely
+    # independent confirmation. JMA's weathercode uses the same WMO code
+    # table (verified against ECMWF IFS: same numeric ranges for cloud/
+    # drizzle/rain), so it is a valid, if weakly-agreeing, real validator —
+    # not a convention mismatch like UKMO's (which is why UKMO stays excluded
+    # from severe weather; see commit b925b38).
     severe = _validate_dimension(
         open_meteo_weathercode,
         [
             ("ERA5",      era5_weathercode),
             ("ECMWF IFS", ecmwf_ifs_weathercode),
+            ("JMA",       jma_weathercode),
         ],
         classify_severe,
         0,   # tolerance=0 — agreement is purely by category, not numeric diff
         "code",
+        truth_name="Open-Meteo ERA5-Land",
     )
 
     # ── Temperature (validate raw; classify via heat index) ───────────────────
+    # SoT is ECMWF IFS, not NASA POWER AG: cross-lineage mean Cohen's Kappa
+    # showed ECMWF IFS/Open-Meteo ERA5-Land at 0.497 vs NASA's 0.356 — a real
+    # ~0.14 gap, the same kind of margin that justified the wind SoT switch.
+    # classification_value stays anchored to NASA's heat index (not ECMWF's)
+    # because heat index needs a matched temp+RH pair, and NASA is the only
+    # source with both — humidity's SoT hasn't moved, so there is no ECMWF
+    # heat index to use instead. Agreement is checked on ECMWF's raw temp;
+    # the final reported tier still comes from NASA's temp+RH heat index.
     temp = _validate_dimension(
-        nasa_temp_c,
+        ecmwf_ifs_temp_c,
         [
+            ("NASA POWER AG",        nasa_temp_c),
             ("Open-Meteo ERA5-Land", open_meteo_temp_c),
             ("ERA5 (Full)",          era5_temp_c),
-            ("ECMWF IFS",            ecmwf_ifs_temp_c),
             ("UKMO",                 ukmo_temp_c),
         ],
         classify_temp,
         TEMP_AGREE_TOLERANCE_C,
         "°C",
         classification_value=nasa_heat_index_c,
+        truth_name="ECMWF IFS",
     )
 
     # ── Humidity ──────────────────────────────────────────────────────────────
@@ -604,17 +776,22 @@ def classify_day(
     )
 
     # ── Wind ──────────────────────────────────────────────────────────────────
+    # SoT is ECMWF IFS, not NASA POWER AG: cross-source analysis showed NASA's
+    # wind disagrees with every other independent provider at or below chance
+    # agreement, while ECMWF/UKMO agree with each other reasonably (kappa
+    # 0.42-0.65). NASA is kept on as a validator instead of being dropped.
     wind = _validate_dimension(
-        nasa_wind_ms,
+        ecmwf_ifs_wind_ms,
         [
+            ("NASA POWER AG",        nasa_wind_ms),
             ("Open-Meteo ERA5-Land", open_meteo_wind_ms),
             ("ERA5 (Full)",          era5_wind_ms),
-            ("ECMWF IFS",            ecmwf_ifs_wind_ms),
             ("UKMO",                 ukmo_wind_ms),
         ],
         classify_wind,
         WIND_AGREE_TOLERANCE_MS,
         "m/s",
+        truth_name="ECMWF IFS",
     )
 
     # ── Build rain row ────────────────────────────────────────────────────────
@@ -645,10 +822,18 @@ def classify_day(
             "era5_weathercode":          era5_weathercode,
             "ecmwf_ifs_weathercode":     ecmwf_ifs_weathercode,
             "ukmo_weathercode":          ukmo_weathercode,
+            "jma_weathercode":           jma_weathercode,
             "severe_classification":     sev.get("classification"),
             "severe_validators_agreed":  sev.get("validators_agreed", 0),
             "severe_wmo_quality_flag":   sev.get("wmo_quality_flag"),
             "severe_reason":             sev.get("reason"),
+            # Combined rainfall+wind severe-weather signal (see
+            # classify_severe_combined docstring). Built from the two
+            # per-factor sources of truth: rainfall SoT (NASA POWER AG) and
+            # wind SoT (ECMWF IFS) — not independently cross-validated like
+            # severe_classification / severe_classification_rain_based above,
+            # since rainfall and wind validators live in different row sets.
+            "severe_classification_combined": classify_severe_combined(nasa_rainfall_mm, ecmwf_ifs_wind_ms),
             # IBTrACS
             "typhoon_flag":              typhoon_flag,
             "typhoon_signal":            typhoon_signal,
@@ -669,9 +854,9 @@ def classify_day(
             "era5_temp_c":                 round(era5_temp_c, 2) if era5_temp_c is not None else None,
             "ecmwf_ifs_temp_c":            round(ecmwf_ifs_temp_c, 2) if ecmwf_ifs_temp_c is not None else None,
             "ukmo_temp_c":                 round(ukmo_temp_c, 2) if ukmo_temp_c is not None else None,
+            "nasa_power_temp_classification":  classify_temp(nasa_temp_c),
             "open_meteo_temp_classification":  classify_temp(open_meteo_temp_c),
             "era5_temp_classification":        classify_temp(era5_temp_c),
-            "ecmwf_ifs_temp_classification":   classify_temp(ecmwf_ifs_temp_c),
             "ukmo_temp_classification":        classify_temp(ukmo_temp_c),
             "temp_classification":         temp["classification"],
             "validators_agreed":           temp["validators_agreed"],
@@ -699,9 +884,9 @@ def classify_day(
             "era5_wind_ms":               round(era5_wind_ms, 2) if era5_wind_ms is not None else None,
             "ecmwf_ifs_wind_ms":          round(ecmwf_ifs_wind_ms, 2) if ecmwf_ifs_wind_ms is not None else None,
             "ukmo_wind_ms":               round(ukmo_wind_ms, 2) if ukmo_wind_ms is not None else None,
+            "nasa_power_wind_classification":   classify_wind(nasa_wind_ms),
             "open_meteo_wind_classification":   classify_wind(open_meteo_wind_ms),
             "era5_wind_classification":         classify_wind(era5_wind_ms),
-            "ecmwf_ifs_wind_classification":    classify_wind(ecmwf_ifs_wind_ms),
             "ukmo_wind_classification":         classify_wind(ukmo_wind_ms),
             "wind_classification":        wind["classification"],
             "validators_agreed":          wind["validators_agreed"],
@@ -723,6 +908,7 @@ def build_daily_rows(
     era5_records: Optional[list[dict]] = None,
     ecmwf_ifs_records: Optional[list[dict]] = None,
     ukmo_records: Optional[list[dict]] = None,
+    jma_records: Optional[list[dict]] = None,
     typhoon_flags: Optional[dict[str, dict]] = None,
 ) -> tuple[list[dict], list[dict], list[dict]]:
     """
@@ -735,6 +921,8 @@ def build_daily_rows(
     era5_records      : ERA5 daily dicts (temp, rain, wind, weathercode, rh).
     ecmwf_ifs_records : ECMWF IFS daily dicts (temp, wind, weathercode).
     ukmo_records      : UKMO daily dicts (temp, rain, wind, weathercode).
+    jma_records       : JMA daily dicts (weathercode only used — the one
+                        severe-weather validator that isn't ECMWF-lineage).
     typhoon_flags     : {iso_date: {signal, intensity_class}} from IBTrACS.
 
     Returns (rain_rows, temp_rows, wind_rows).
@@ -744,6 +932,7 @@ def build_daily_rows(
     era5_by_date      = {r["date"]: r for r in (era5_records or [])}
     ecmwf_ifs_by_date = {r["date"]: r for r in (ecmwf_ifs_records or [])}
     ukmo_by_date      = {r["date"]: r for r in (ukmo_records or [])}
+    jma_by_date       = {r["date"]: r for r in (jma_records or [])}
     gsmap_cache       = gsmap_cache or {}
     typhoon_flags     = typhoon_flags or {}
 
@@ -794,11 +983,24 @@ def build_daily_rows(
         ukmo_wind  = ukmo.get("wind_ms")     if ukmo else None
         ukmo_wcode = ukmo.get("weathercode") if ukmo else None
 
+        # JMA (severe-weather validator only)
+        jma       = jma_by_date.get(d)
+        jma_wcode = jma.get("weathercode") if jma else None
+
         # CHIRPS + GSMaP
         chirps_rain = chirps_cache.get(d)
         gsmap_rain  = gsmap_cache.get(d)
 
-        # IBTrACS typhoon flag
+        # IBTrACS typhoon flag — t_signal approximates DOST-PAGASA's
+        # Tropical Cyclone Wind Signal (TCWS) number from the storm's own
+        # peak sustained wind (IBTrACS max_wind_kt), not actual local wind at
+        # Laguna's distance from the storm centre — an upper-bound proxy.
+        # Cutoffs are the official TCWS minimum sustained-wind thresholds
+        # (DOST-PAGASA Press Release No. 108, 23 Mar 2022,
+        # https://bagong.pagasa.dost.gov.ph/press-release/108) converted
+        # km/h -> kt (x0.539957): 39->21, 62->33, 89->48, 118->64, 185->100.
+        # Previously 25/34/48/64/100 — only the TCWS-1 floor (25kt) diverged
+        # meaningfully from the official 21kt; corrected here.
         typhoon = typhoon_flags.get(d)
         t_flag   = typhoon is not None
         t_signal = 0
@@ -810,9 +1012,9 @@ def build_daily_rows(
                 t_signal = 4
             elif wind_kt >= 48:
                 t_signal = 3
-            elif wind_kt >= 34:
+            elif wind_kt >= 33:
                 t_signal = 2
-            elif wind_kt >= 25:
+            elif wind_kt >= 21:
                 t_signal = 1
 
         rain_row, temp_row, wind_row = classify_day(
@@ -827,6 +1029,7 @@ def build_daily_rows(
             era5_weathercode=era5_wcode,
             ecmwf_ifs_weathercode=ecmwf_ifs_wcode,
             ukmo_weathercode=ukmo_wcode,
+            jma_weathercode=jma_wcode,
             typhoon_flag=t_flag,
             typhoon_signal=t_signal,
             nasa_temp_c=nasa_temp,
@@ -1347,17 +1550,96 @@ def _build_items(rows: list[dict], col_map: dict[str, str], classify_fn) -> list
     return items
 
 
+def _cohens_kappa(cats_a: list, cats_b: list) -> Optional[float]:
+    """Cohen's Kappa between exactly two raters' aligned category lists."""
+    pairs = [(a, b) for a, b in zip(cats_a, cats_b) if a is not None and b is not None]
+    n = len(pairs)
+    if n == 0:
+        return None
+    p_o = sum(1 for a, b in pairs if a == b) / n
+    ra: dict[str, int] = {}
+    rb: dict[str, int] = {}
+    for a, b in pairs:
+        ra[a] = ra.get(a, 0) + 1
+        rb[b] = rb.get(b, 0) + 1
+    cats = set(ra) | set(rb)
+    p_e = sum((ra.get(c, 0) / n) * (rb.get(c, 0) / n) for c in cats)
+    if p_e >= 1.0:
+        return 1.0 if p_o == 1.0 else 0.0
+    return round((p_o - p_e) / (1 - p_e), 4)
+
+
+def _lins_ccc(vals_a: list, vals_b: list) -> Optional[float]:
+    """Lin's Concordance Correlation Coefficient between two aligned continuous series."""
+    pairs = [(a, b) for a, b in zip(vals_a, vals_b) if a is not None and b is not None]
+    n = len(pairs)
+    if n < 2:
+        return None
+    xs = [p[0] for p in pairs]
+    ys = [p[1] for p in pairs]
+    mx = sum(xs) / n
+    my = sum(ys) / n
+    var_x = sum((x - mx) ** 2 for x in xs) / n
+    var_y = sum((y - my) ** 2 for y in ys) / n
+    cov_xy = sum((x - mx) * (y - my) for x, y in pairs) / n
+    denom = var_x + var_y + (mx - my) ** 2
+    if denom == 0:
+        return None
+    return round(2 * cov_xy / denom, 4)
+
+
+def _mean_pairwise_kappa(rows: list[dict], col_map: dict[str, str], classify_fn) -> Optional[float]:
+    """Mean Cohen's Kappa across every pair of sources in col_map (pairwise, not multi-rater)."""
+    names = list(col_map.keys())
+    cats = {n: [classify_fn(row.get(col_map[n])) for row in rows] for n in names}
+    ks = []
+    for i, a in enumerate(names):
+        for b in names[i + 1:]:
+            k = _cohens_kappa(cats[a], cats[b])
+            if k is not None:
+                ks.append(k)
+    return round(sum(ks) / len(ks), 4) if ks else None
+
+
+def _mean_pairwise_ccc(rows: list[dict], col_map: dict[str, str]) -> Optional[float]:
+    """Mean Lin's CCC across every pair of sources in col_map, using raw (unclassified) values."""
+    names = list(col_map.keys())
+    vals = {n: [row.get(col_map[n]) for row in rows] for n in names}
+    cs = []
+    for i, a in enumerate(names):
+        for b in names[i + 1:]:
+            c = _lins_ccc(vals[a], vals[b])
+            if c is not None:
+                cs.append(c)
+    return round(sum(cs) / len(cs), 4) if cs else None
+
+
 def compute_confidence_scores(
     rain_rows: list[dict],
     temp_rows: list[dict],
     wind_rows: Optional[list[dict]] = None,
 ) -> dict:
     """
-    Compute dataset-level confidence scores for both weather dimensions.
+    Compute dataset-level confidence scores for every weather dimension.
 
-    Metrics (Fleiss 1971; Landis & Koch 1977):
+    Headline metrics (per factor, and overall as a mean across factors):
 
-    1. Fleiss' Kappa (κ_F) — multi-rater categorical agreement on binned values.
+    1. Cohen's Kappa (κ) — pairwise categorical agreement, averaged across
+       every pair of sources for that factor (_mean_pairwise_kappa). Cohen's
+       Kappa itself only ever compares 2 raters at a time; "mean Cohen's
+       Kappa" here is the average of those one-to-one pairwise values, not a
+       single multi-rater statistic (that's what Fleiss' Kappa is, below).
+       Strength bands (Landis & Koch, 1977): same scale as Fleiss' Kappa.
+
+    2. Lin's CCC — pairwise concordance on the raw (unclassified) continuous
+       values, averaged the same way (_mean_pairwise_ccc). N/A for severe
+       weather (weathercode is nominal, not continuous).
+
+    Legacy metrics (kept, computed in full, nested under "legacy_metrics" —
+    not deleted, just no longer the headline numbers; still consumed by
+    weather_loader.upsert_monthly_fleiss_kappa and the weather_collector log):
+
+    3. Fleiss' Kappa (κ_F) — multi-rater categorical agreement on binned values.
        Each day = one subject; each API with data that day = one rater.
        κ_F = (P_bar − P_e_bar) / (1 − P_e_bar)
          P_bar   = mean per-item proportion of agreeing rater-pairs
@@ -1369,7 +1651,7 @@ def compute_confidence_scores(
          < 0.20 Slight | 0.21-0.40 Fair | 0.41-0.60 Moderate
          0.61-0.80 Substantial | 0.81-1.00 Almost Perfect
 
-    2. Weighted Confidence Index (WCI) — per-day majority-vote weight.
+    4. Weighted Confidence Index (WCI) — per-day majority-vote weight.
        weight_map: {6:1.00, 5:0.83, 4:0.67, 3:0.50, 2:0.33, 1:0.17, 0:0.00}
        WCI = mean(weights) x 100 %
     """
@@ -1393,18 +1675,36 @@ def compute_confidence_scores(
     rain_items = _build_items(rain_rows, rain_col_map, classify_rain)
     rain_fk    = _fleiss_kappa(rain_items)
     rain_wci   = _wci(rain_rows, len(rain_col_map) - 1)  # n=5
+    rain_ck    = _mean_pairwise_kappa(rain_rows, rain_col_map, classify_rain)
+    rain_ccc   = _mean_pairwise_ccc(rain_rows, rain_col_map)
 
     # ── Severe weather ────────────────────────────────────────────────────────
     severe_col_map = {
         "Open-Meteo ERA5-Land": "open_meteo_weathercode",
         "ERA5 (Full)":          "era5_weathercode",
         "ECMWF IFS":            "ecmwf_ifs_weathercode",
+        "JMA":                  "jma_weathercode",
         # UKMO excluded — 62.7% mismatch rate due to different WMO weathercode
-        # conventions for tropical Philippines weather (structural disagreement)
+        # conventions for tropical Philippines weather (structural disagreement).
+        # JMA included instead — same WMO code table as ERA5/ECMWF IFS (verified
+        # empirically), and genuinely independent of the ECMWF lineage, unlike
+        # Open-Meteo ERA5-Land/ERA5/ECMWF IFS which all derive from one org.
     }
-    severe_items = _build_items(rain_rows, severe_col_map, lambda c: classify_severe(int(c)) if c is not None else None)
+    _classify_severe_code = lambda c: classify_severe(int(c)) if c is not None else None
+    severe_items = _build_items(rain_rows, severe_col_map, _classify_severe_code)
     severe_fk    = _fleiss_kappa(severe_items)
-    severe_wci   = _wci(rain_rows, 2, agreed_col="severe_validators_agreed")
+    severe_wci   = _wci(rain_rows, 3, agreed_col="severe_validators_agreed")
+    severe_ck    = _mean_pairwise_kappa(rain_rows, severe_col_map, _classify_severe_code)
+    # No Lin's CCC for severe weather — weathercode is nominal, not continuous.
+
+    # ── Severe weather, rainfall-derived proxy (additional signal, NOT a
+    # replacement — see classify_severe_from_precip docstring for why these
+    # answer slightly different questions). Reuses rain_col_map: 6 sources,
+    # 5 independent lineage groups, vs. the weathercode approach's 3 sources
+    # all sharing one lineage.
+    severe_rain_items = _build_items(rain_rows, rain_col_map, classify_severe_from_precip)
+    severe_rain_fk     = _fleiss_kappa(severe_rain_items)
+    severe_rain_ck      = _mean_pairwise_kappa(rain_rows, rain_col_map, classify_severe_from_precip)
 
     # ── Temperature ───────────────────────────────────────────────────────────
     temp_col_map = {
@@ -1417,6 +1717,8 @@ def compute_confidence_scores(
     temp_items = _build_items(temp_rows, temp_col_map, classify_temp)
     temp_fk    = _fleiss_kappa(temp_items)
     temp_wci   = _wci(temp_rows, len(temp_col_map) - 1)  # n=4
+    temp_ck    = _mean_pairwise_kappa(temp_rows, temp_col_map, classify_temp)
+    temp_ccc   = _mean_pairwise_ccc(temp_rows, temp_col_map)
 
     # ── Humidity ──────────────────────────────────────────────────────────────
     humidity_col_map = {
@@ -1427,6 +1729,8 @@ def compute_confidence_scores(
     humidity_items = _build_items(temp_rows, humidity_col_map, classify_humidity)
     humidity_fk    = _fleiss_kappa(humidity_items)
     humidity_wci   = _wci(temp_rows, 2, agreed_col="humidity_validators_agreed")
+    humidity_ck    = _mean_pairwise_kappa(temp_rows, humidity_col_map, classify_humidity)
+    humidity_ccc   = _mean_pairwise_ccc(temp_rows, humidity_col_map)
 
     # ── Wind ──────────────────────────────────────────────────────────────────
     wind_rows = wind_rows or []
@@ -1440,53 +1744,115 @@ def compute_confidence_scores(
     wind_items = _build_items(wind_rows, wind_col_map, classify_wind)
     wind_fk    = _fleiss_kappa(wind_items)
     wind_wci   = _wci(wind_rows, len(wind_col_map) - 1)  # n=4
+    wind_ck    = _mean_pairwise_kappa(wind_rows, wind_col_map, classify_wind)
+    wind_ccc   = _mean_pairwise_ccc(wind_rows, wind_col_map)
 
     # ── Overall WCI (Option 2: primary×2, secondary×1) / 8 ───────────────────
+    # Legacy aggregate metrics — kept for upsert_monthly_fleiss_kappa() and any
+    # other consumer of the old shape; no longer the headline numbers (see
+    # overall_mean_cohens_kappa below). Not deleted: still computed in full.
     overall_wci = round(
         (rain_wci * 2 + severe_wci * 2 + temp_wci * 2 + wind_wci + humidity_wci) / 8, 2
     )
     fk_scores  = [k for k in [rain_fk, severe_fk, temp_fk, wind_fk, humidity_fk] if k is not None]
     overall_fk = round(sum(fk_scores) / len(fk_scores), 4) if fk_scores else None
 
+    # ── Headline metrics: mean pairwise Cohen's Kappa / Lin's CCC ────────────
+    ck_scores  = [k for k in [rain_ck, severe_ck, temp_ck, wind_ck, humidity_ck] if k is not None]
+    overall_ck = round(sum(ck_scores) / len(ck_scores), 4) if ck_scores else None
+    ccc_scores = [c for c in [rain_ccc, temp_ccc, wind_ccc, humidity_ccc] if c is not None]
+    overall_ccc = round(sum(ccc_scores) / len(ccc_scores), 4) if ccc_scores else None
+
     return {
-        "overall_fleiss_kappa":    overall_fk,
-        "overall_fleiss_strength": _fk_label(overall_fk),
-        "overall_wci_pct":         overall_wci,
+        "overall_mean_cohens_kappa":          overall_ck,
+        "overall_mean_cohens_kappa_strength": _fk_label(overall_ck),
+        "overall_mean_lins_ccc":              overall_ccc,
+        "legacy_metrics": {
+            "overall_fleiss_kappa":    overall_fk,
+            "overall_fleiss_strength": _fk_label(overall_fk),
+            "overall_wci_pct":         overall_wci,
+        },
         "rainfall": {
-            "total_rows":                    len(rain_rows),
-            "n_items_for_kappa":             len(rain_items),
-            "fleiss_kappa":                  rain_fk,
-            "fleiss_strength":               _fk_label(rain_fk),
-            "weighted_confidence_index_pct": rain_wci,
+            "total_rows":          len(rain_rows),
+            "n_items_for_kappa":   len(rain_items),
+            "cohens_kappa":        rain_ck,
+            "cohens_kappa_strength": _fk_label(rain_ck),
+            "lins_ccc":            rain_ccc,
+            "legacy_metrics": {
+                "fleiss_kappa":                  rain_fk,
+                "fleiss_strength":               _fk_label(rain_fk),
+                "weighted_confidence_index_pct": rain_wci,
+            },
         },
         "severe_weather": {
-            "total_rows":                    len(rain_rows),
-            "n_items_for_kappa":             len(severe_items),
-            "fleiss_kappa":                  severe_fk,
-            "fleiss_strength":               _fk_label(severe_fk),
-            "weighted_confidence_index_pct": severe_wci,
+            "total_rows":          len(rain_rows),
+            "n_items_for_kappa":   len(severe_items),
+            "cohens_kappa":        severe_ck,
+            "cohens_kappa_strength": _fk_label(severe_ck),
+            "lins_ccc":            None,
+            "lins_ccc_note":       "N/A — weathercode is nominal, not continuous.",
+            "legacy_metrics": {
+                "fleiss_kappa":                  severe_fk,
+                "fleiss_strength":               _fk_label(severe_fk),
+                "weighted_confidence_index_pct": severe_wci,
+            },
+        },
+        "severe_weather_rain_based": {
+            "note": (
+                "Additional signal, not a replacement for severe_weather above — "
+                "classifies from rainfall intensity (6 sources, 5 independent "
+                "lineage groups) instead of each model's own weathercode (3 "
+                "sources, 1 lineage group). Captures rain-driven severe weather "
+                "only; a high-wind/low-rain event would show as no_severe here "
+                "even if severe_weather (weathercode) correctly flags it."
+            ),
+            "total_rows":            len(rain_rows),
+            "n_items_for_kappa":     len(severe_rain_items),
+            "cohens_kappa":          severe_rain_ck,
+            "cohens_kappa_strength": _fk_label(severe_rain_ck),
+            "lins_ccc":              None,
+            "lins_ccc_note":         "N/A — this is a categorical classification (5-tier), not the raw mm value.",
+            "legacy_metrics": {
+                "fleiss_kappa":    severe_rain_fk,
+                "fleiss_strength": _fk_label(severe_rain_fk),
+            },
         },
         "temperature": {
-            "total_rows":                    len(temp_rows),
-            "n_items_for_kappa":             len(temp_items),
+            "total_rows":          len(temp_rows),
+            "n_items_for_kappa":   len(temp_items),
             "note": "Validation bins raw temp_c; classification uses Rothfusz heat index.",
-            "fleiss_kappa":                  temp_fk,
-            "fleiss_strength":               _fk_label(temp_fk),
-            "weighted_confidence_index_pct": temp_wci,
+            "cohens_kappa":        temp_ck,
+            "cohens_kappa_strength": _fk_label(temp_ck),
+            "lins_ccc":            temp_ccc,
+            "legacy_metrics": {
+                "fleiss_kappa":                  temp_fk,
+                "fleiss_strength":               _fk_label(temp_fk),
+                "weighted_confidence_index_pct": temp_wci,
+            },
         },
         "humidity": {
-            "total_rows":                    len(temp_rows),
-            "n_items_for_kappa":             len(humidity_items),
-            "fleiss_kappa":                  humidity_fk,
-            "fleiss_strength":               _fk_label(humidity_fk),
-            "weighted_confidence_index_pct": humidity_wci,
+            "total_rows":          len(temp_rows),
+            "n_items_for_kappa":   len(humidity_items),
+            "cohens_kappa":        humidity_ck,
+            "cohens_kappa_strength": _fk_label(humidity_ck),
+            "lins_ccc":            humidity_ccc,
+            "legacy_metrics": {
+                "fleiss_kappa":                  humidity_fk,
+                "fleiss_strength":               _fk_label(humidity_fk),
+                "weighted_confidence_index_pct": humidity_wci,
+            },
         },
         "wind": {
-            "total_rows":                    len(wind_rows),
-            "n_items_for_kappa":             len(wind_items),
-            "fleiss_kappa":                  wind_fk,
-            "fleiss_strength":               _fk_label(wind_fk),
-            "weighted_confidence_index_pct": wind_wci,
+            "total_rows":          len(wind_rows),
+            "n_items_for_kappa":   len(wind_items),
+            "cohens_kappa":        wind_ck,
+            "cohens_kappa_strength": _fk_label(wind_ck),
+            "lins_ccc":            wind_ccc,
+            "legacy_metrics": {
+                "fleiss_kappa":                  wind_fk,
+                "fleiss_strength":               _fk_label(wind_fk),
+                "weighted_confidence_index_pct": wind_wci,
+            },
         },
     }
 
@@ -1704,4 +2070,116 @@ def compute_temporal_aggregated_confidence(
             "fleiss_kappa": wind_fk,
             "fleiss_strength": _fk_label(wind_fk),
         },
+    }
+
+
+# ── Lineage-aware pairwise-proximity consensus ────────────────────────────────
+#
+# Diagnostic/alternative consensus method (NOT wired into classify_day /
+# _validate_dimension — that pipeline keeps the majority-vote SoT+validator
+# design). This implements: for each factor, find the two sources closest to
+# each other by mean absolute distance, EXCLUDING any pair that shares a
+# lineage group, then use that pair as primary+validator and drop the rest.
+#
+# The lineage exclusion exists because the naive version of this algorithm
+# (plain closest-pair, no exclusion) always selects Open-Meteo ERA5-Land and
+# ECMWF IFS for temperature/wind (they are the same underlying ECMWF
+# reanalysis delivered through different `model=` params — distance ≈ 0,
+# Cohen's Kappa/Lin's CCC = 1.000), and Open-Meteo + ECMWF IFS for severe
+# weather. That isn't two independent sources confirming each other; it's one
+# source counted twice, while the genuinely independent source (UKMO, NASA,
+# or ERA5) gets discarded as the "outlier" purely because it ISN'T a
+# duplicate. Lineage exclusion prevents that pair from ever being selectable.
+
+SOURCE_LINEAGE: dict[str, str] = {
+    "NASA POWER AG":        "NASA",
+    "CHIRPS":                "CHIRPS",
+    "GSMaP NRT":             "GSMaP",
+    "Open-Meteo ERA5-Land":  "ECMWF",
+    "ERA5 (Full)":           "ECMWF",
+    "ECMWF IFS":             "ECMWF",
+    "UKMO":                  "UKMO",
+    "JMA":                   "JMA",
+}
+
+
+def _mean_abs_distance(
+    vals_a: list[Optional[float]], vals_b: list[Optional[float]]
+) -> Optional[tuple[float, int]]:
+    """Mean absolute difference over rows where both values are present."""
+    pairs = [(a, b) for a, b in zip(vals_a, vals_b) if a is not None and b is not None]
+    if not pairs:
+        return None
+    total = sum(abs(a - b) for a, b in pairs)
+    return total / len(pairs), len(pairs)
+
+
+def resolve_lineage_aware_consensus(
+    rows: list[dict],
+    col_map: dict[str, str],
+    lineage_map: dict[str, str] = SOURCE_LINEAGE,
+) -> dict:
+    """
+    Pairwise-proximity consensus with same-lineage exclusion, for one factor.
+
+    rows        : daily rows containing the raw numeric columns for this factor.
+    col_map     : {display_name: column_name} — 2 or more sources for this factor.
+    lineage_map : display_name -> lineage group; pairs sharing a group are
+                  ineligible for selection (see module note above).
+
+    Returns a dict with:
+      sources          : list of source display names considered.
+      distance_matrix  : {(name_a, name_b): {distance, n, same_lineage} | None}
+      selected_pair     : {primary, validator, distance, n} of the closest
+                          ELIGIBLE (cross-lineage) pair, or None if every pair
+                          shares a lineage group (no valid pair exists).
+      dropped_as_outliers: source names excluded from the consensus.
+      consensus_values  : per-row mean of the two selected sources (falls back
+                          to whichever of the two is present if only one is).
+    """
+    names = list(col_map.keys())
+    values = {name: [row.get(col_map[name]) for row in rows] for name in names}
+
+    matrix: dict[tuple[str, str], Optional[dict]] = {}
+    eligible: list[tuple[float, str, str, int]] = []
+    for i, a in enumerate(names):
+        for b in names[i + 1:]:
+            result = _mean_abs_distance(values[a], values[b])
+            if result is None:
+                matrix[(a, b)] = None
+                continue
+            dist, n = result
+            same_lineage = lineage_map.get(a) == lineage_map.get(b)
+            matrix[(a, b)] = {"distance": round(dist, 4), "n": n, "same_lineage": same_lineage}
+            if not same_lineage:
+                eligible.append((dist, a, b, n))
+
+    if not eligible:
+        return {
+            "sources": names,
+            "distance_matrix": matrix,
+            "selected_pair": None,
+            "dropped_as_outliers": names,
+            "consensus_values": [None] * len(rows),
+            "note": "No eligible cross-lineage pair — every source pair shares a lineage group.",
+        }
+
+    eligible.sort(key=lambda t: t[0])
+    best_dist, primary, validator, n = eligible[0]
+
+    consensus_values: list[Optional[float]] = []
+    for row in rows:
+        a = row.get(col_map[primary])
+        b = row.get(col_map[validator])
+        if a is not None and b is not None:
+            consensus_values.append(round((a + b) / 2, 4))
+        else:
+            consensus_values.append(a if a is not None else b)
+
+    return {
+        "sources": names,
+        "distance_matrix": matrix,
+        "selected_pair": {"primary": primary, "validator": validator, "distance": round(best_dist, 4), "n": n},
+        "dropped_as_outliers": [name for name in names if name not in (primary, validator)],
+        "consensus_values": consensus_values,
     }

@@ -469,11 +469,11 @@ def upsert_monthly_fleiss_kappa(
         upsert_rows.append({
             "year_month":            ym,
             "municipality":          municipality,
-            "rain_fleiss_kappa":     confidence["rainfall"]["fleiss_kappa"],
-            "severe_fleiss_kappa":   confidence["severe_weather"]["fleiss_kappa"],
-            "temp_fleiss_kappa":     confidence["temperature"]["fleiss_kappa"],
-            "humidity_fleiss_kappa": confidence["humidity"]["fleiss_kappa"],
-            "wind_fleiss_kappa":     confidence["wind"]["fleiss_kappa"],
+            "rain_fleiss_kappa":     confidence["rainfall"]["legacy_metrics"]["fleiss_kappa"],
+            "severe_fleiss_kappa":   confidence["severe_weather"]["legacy_metrics"]["fleiss_kappa"],
+            "temp_fleiss_kappa":     confidence["temperature"]["legacy_metrics"]["fleiss_kappa"],
+            "humidity_fleiss_kappa": confidence["humidity"]["legacy_metrics"]["fleiss_kappa"],
+            "wind_fleiss_kappa":     confidence["wind"]["legacy_metrics"]["fleiss_kappa"],
         })
 
     if not upsert_rows:

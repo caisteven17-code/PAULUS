@@ -6,9 +6,10 @@ last N days of weather data from the champion source for each municipality.
 Uses the next-best source as fallback if the champion fails.
 Merges IBTrACS typhoon flags and saves daily records ready for weather_loader.py.
 
-Also classifies each day (NASA POWER AG vs 5 validators each for rainfall
-and temperature — CHIRPS/Open-Meteo/IMERG/ERA5/UKMO and GSOD/Open-Meteo/ERA5/ECMWF IFS/UKMO) into rows for
-reference.weather_rainfall_daily and reference.weather_temperature_daily —
+Also classifies each day (rainfall, temperature, humidity, wind, severe
+weather — see weather_daily_classifier.classify_day for the per-dimension
+source-of-truth/validator lineup) into rows for reference.weather_rainfall_daily,
+reference.weather_temperature_daily, and reference.weather_wind_daily —
 saved to laguna_weather_daily_classified_incremental.json — and, with --load,
 upserts them and rebuilds reference.weather_monthly_summary.
 
@@ -161,12 +162,13 @@ def update(
         MUNICIPALITIES,
         fetch_open_meteo_ecmwf_ifs,
         fetch_open_meteo_era5,
+        fetch_open_meteo_jma,
         fetch_open_meteo_ukmo,
     )
     from app.services.weather_daily_classifier import (
         build_chirps_daily_cache,
         build_daily_rows,
-        build_noaa_gsod_station_caches,
+        build_gsmap_nrt_daily_cache,
     )
     from app.services.weather_ibtracs import get_typhoon_flags
 
@@ -203,12 +205,14 @@ def update(
     # Build name→coords lookup from the canonical MUNICIPALITIES list
     muni_coords = {m["name"]: m for m in MUNICIPALITIES}
 
-    # NOAA GSOD station caches are shared by all municipalities — fetch once.
-    gsod_station_caches = build_noaa_gsod_station_caches(start_date, end_date)
+    # GSMaP NRT is a gridded satellite product covering Laguna uniformly —
+    # fetch once for the window rather than per-municipality.
+    gsmap_daily_cache = build_gsmap_nrt_daily_cache(start_date, end_date)
 
     results: list[dict] = []
     daily_rain_rows: list[dict] = []
     daily_temp_rows: list[dict] = []
+    daily_wind_rows: list[dict] = []
 
     for name, champion in champion_map.items():
         muni = muni_coords.get(name)
@@ -288,28 +292,35 @@ def update(
         except Exception as exc:
             logger.warning("[%s] UKMO fetch failed: %s", name, exc)
             ukmo_records = []
+        try:
+            jma_records = fetch_open_meteo_jma(lat, lon, start_date, end_date)
+        except Exception as exc:
+            logger.warning("[%s] JMA fetch failed: %s", name, exc)
+            jma_records = []
 
-        muni_rain_rows, muni_temp_rows = build_daily_rows(
+        muni_rain_rows, muni_temp_rows, muni_wind_rows = build_daily_rows(
             name,
             start_date,
             end_date,
             nasa_records,
             chirps_daily_cache,
             open_meteo_records=open_meteo_records,
-            gsod_station_caches=gsod_station_caches,
+            gsmap_cache=gsmap_daily_cache,
             era5_records=era5_records,
             ecmwf_ifs_records=ecmwf_ifs_records,
             ukmo_records=ukmo_records,
-            lat=lat,
-            lon=lon,
+            jma_records=jma_records,
+            typhoon_flags=typhoon_flags,
         )
         daily_rain_rows.extend(muni_rain_rows)
         daily_temp_rows.extend(muni_temp_rows)
+        daily_wind_rows.extend(muni_wind_rows)
         logger.info(
-            "[%s] classified %d rain rows, %d temp rows for the split daily tables",
+            "[%s] classified %d rain rows, %d temp rows, %d wind rows for the split daily tables",
             name,
             len(muni_rain_rows),
             len(muni_temp_rows),
+            len(muni_wind_rows),
         )
 
         results.append(
@@ -354,8 +365,10 @@ def update(
                 "period_end": end_date.isoformat(),
                 "rain_row_count": len(daily_rain_rows),
                 "temp_row_count": len(daily_temp_rows),
+                "wind_row_count": len(daily_wind_rows),
                 "rain_rows": daily_rain_rows,
                 "temp_rows": daily_temp_rows,
+                "wind_rows": daily_wind_rows,
             }
         )
     )
@@ -371,11 +384,13 @@ def update(
                 rebuild_monthly_summary,
                 upsert_weather_rainfall_daily,
                 upsert_weather_temperature_daily,
+                upsert_weather_wind_daily,
             )
 
             # New pipeline first: split daily tables + monthly summary
             daily_rows_loaded = upsert_weather_rainfall_daily(daily_rain_rows)
             daily_rows_loaded += upsert_weather_temperature_daily(daily_temp_rows)
+            daily_rows_loaded += upsert_weather_wind_daily(daily_wind_rows)
             rebuild_monthly_summary(start_date.isoformat(), end_date.isoformat())
             logger.info(
                 "Loaded %d rows into reference.weather_rainfall_daily + reference.weather_temperature_daily",
@@ -407,7 +422,7 @@ def update(
         "record_count": sum(len(m["daily_records"]) for m in results),
         "records_loaded": records_loaded,
         "daily_rows_loaded": daily_rows_loaded,
-        "daily_rows_classified": len(daily_rain_rows) + len(daily_temp_rows),
+        "daily_rows_classified": len(daily_rain_rows) + len(daily_temp_rows) + len(daily_wind_rows),
     }
 
 
@@ -446,7 +461,8 @@ if __name__ == "__main__":
     )
     print(
         f"Classified {result['daily_rows_classified']} daily rows for "
-        f"reference.weather_rainfall_daily + reference.weather_temperature_daily"
+        f"reference.weather_rainfall_daily + reference.weather_temperature_daily + "
+        f"reference.weather_wind_daily"
     )
     if args.load:
         print(f"Loaded {result['records_loaded']} records into reference.weather_observations")

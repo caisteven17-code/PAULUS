@@ -671,8 +671,10 @@ def collect(
 
         sources = _run_parallel_sources()
 
-        # Parallel group 2: CHIRPS (separate server) + Open-Meteo validator trio
-        # (same server — keep sequential with 2s gaps to respect rate limits).
+        # Parallel group 2: CHIRPS (separate server) + Open-Meteo validator
+        # quartet (same server — keep sequential with 2s gaps to respect rate
+        # limits). JMA is fetched here too — it's the only severe-weather
+        # validator that isn't ECMWF-lineage (see classify_day's severe block).
         def _run_chirps_and_validators(lat=lat, lon=lon, start=start, end=end):
             with ThreadPoolExecutor(max_workers=1) as chirps_pool:
                 chirps_fut = chirps_pool.submit(build_chirps_daily_cache, lat, lon, start, end)
@@ -683,14 +685,16 @@ def collect(
                 time.sleep(2.0)
                 ukmo_recs  = fetch_open_meteo_ukmo(lat, lon, start, end)
                 time.sleep(2.0)
+                jma_recs   = fetch_open_meteo_jma(lat, lon, start, end)
+                time.sleep(2.0)
                 try:
                     chirps_cache = chirps_fut.result()  # CHIRPS has its own poll timeout
                 except Exception as exc:  # noqa: BLE001
                     logger.warning("CHIRPS fetch failed: %s", exc)
                     chirps_cache = {}
-            return era5_recs, ecmwf_recs, ukmo_recs, chirps_cache
+            return era5_recs, ecmwf_recs, ukmo_recs, jma_recs, chirps_cache
 
-        era5_records, ecmwf_ifs_records, ukmo_records, chirps_daily_cache = (
+        era5_records, ecmwf_ifs_records, ukmo_records, jma_records, chirps_daily_cache = (
             _run_chirps_and_validators()
         )
 
@@ -706,6 +710,7 @@ def collect(
             era5_records=era5_records,
             ecmwf_ifs_records=ecmwf_ifs_records,
             ukmo_records=ukmo_records,
+            jma_records=jma_records,
             typhoon_flags=typhoon_flags,
         )
         daily_rain_rows.extend(muni_rain_rows)
@@ -713,7 +718,7 @@ def collect(
         daily_wind_rows.extend(muni_wind_rows)
         logger.info(
             "  Daily classification: %d rain rows, %d temp rows, %d wind rows "
-            "(CHIRPS %d days, GSMaP %d days, ERA5 %d days, ECMWF IFS %d days, UKMO %d days)",
+            "(CHIRPS %d days, GSMaP %d days, ERA5 %d days, ECMWF IFS %d days, UKMO %d days, JMA %d days)",
             len(muni_rain_rows),
             len(muni_temp_rows),
             len(muni_wind_rows),
@@ -722,6 +727,7 @@ def collect(
             len(era5_records),
             len(ecmwf_ifs_records),
             len(ukmo_records),
+            len(jma_records),
         )
 
         # Score each source
@@ -839,17 +845,21 @@ def collect(
     # Confidence scoring across all municipalities
     confidence = compute_confidence_scores(daily_rain_rows, daily_temp_rows, daily_wind_rows)
     logger.info(
-        "Confidence scores — overall WCI: %.1f%% | Fleiss kappa: %s (%s) | "
-        "rain WCI: %.1f%% | severe WCI: %.1f%% | temp WCI: %.1f%% | "
-        "wind WCI: %.1f%% | humidity WCI: %.1f%%",
-        confidence["overall_wci_pct"],
-        confidence["overall_fleiss_kappa"],
-        confidence["overall_fleiss_strength"],
-        confidence["rainfall"]["weighted_confidence_index_pct"],
-        confidence["severe_weather"]["weighted_confidence_index_pct"],
-        confidence["temperature"]["weighted_confidence_index_pct"],
-        confidence["wind"]["weighted_confidence_index_pct"],
-        confidence["humidity"]["weighted_confidence_index_pct"],
+        "Confidence scores — overall mean Cohen's Kappa: %s (%s) | overall mean Lin's CCC: %s | "
+        "rain κ: %s / CCC: %s | severe κ: %s | temp κ: %s / CCC: %s | "
+        "wind κ: %s / CCC: %s | humidity κ: %s / CCC: %s",
+        confidence["overall_mean_cohens_kappa"],
+        confidence["overall_mean_cohens_kappa_strength"],
+        confidence["overall_mean_lins_ccc"],
+        confidence["rainfall"]["cohens_kappa"],
+        confidence["rainfall"]["lins_ccc"],
+        confidence["severe_weather"]["cohens_kappa"],
+        confidence["temperature"]["cohens_kappa"],
+        confidence["temperature"]["lins_ccc"],
+        confidence["wind"]["cohens_kappa"],
+        confidence["wind"]["lins_ccc"],
+        confidence["humidity"]["cohens_kappa"],
+        confidence["humidity"]["lins_ccc"],
     )
     (out_dir / "laguna_weather_confidence.json").write_text(
         json.dumps(confidence, indent=2)
