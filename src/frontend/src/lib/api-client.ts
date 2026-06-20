@@ -54,15 +54,15 @@ function getUserHeaders(): Record<string, string> {
   const headers: Record<string, string> = {};
   try {
     const sessionUser = auth.currentUser as any;
-    let name = sessionUser?.name;
-    let role = sessionUser?.role;
+    let name = sessionUser?.name || sessionUser?.displayName || sessionUser?.email;
+    let role = sessionUser?.roleId || sessionUser?.accessRole || sessionUser?.role;
 
     if (!name || !role) {
       const stored = localStorage.getItem('currentUser');
       if (stored) {
         const user = JSON.parse(stored);
-        name = name || user?.name;
-        role = role || user?.role;
+        name = name || user?.name || user?.displayName || user?.email;
+        role = role || user?.roleId || user?.accessRole || user?.role;
       }
     }
 

@@ -8,6 +8,8 @@ import { AccessRole, AppRole, getAccessRoleLabel, getAppRole, normalizeAccessRol
 import { supabaseBrowser } from '../lib/supabase';
 import { APP_CONFIG } from '../constants';
 import { clearLoginTransitionPending, markLoginTransitionPending } from '../lib/loginTransition';
+import { auditIdentity, logAuditEvent } from '../lib/audit';
+import type { AuthUser } from '../firebase';
 
 interface LoginProps {
   onLogin: (role: AppRole) => void;
@@ -27,6 +29,7 @@ export function Login({ onLogin }: LoginProps) {
   const [mfaChallengeId, setMfaChallengeId]   = useState('');
   const [mfaCode, setMfaCode]                 = useState('');
   const [pendingRole, setPendingRole]         = useState<AppRole>('bishop');
+  const [pendingAuditUser, setPendingAuditUser] = useState<AuthUser | null>(null);
 
   const completeLogin = (role: AppRole) => {
     setFailedAttempts(0);
@@ -46,14 +49,15 @@ export function Login({ onLogin }: LoginProps) {
         const meta = sbData.session.user.user_metadata ?? {};
         const role = (meta.role as AppRole) ?? 'bishop';
         const accessRole = normalizeAccessRole(meta.role || 'parish_priest');
-        localStorage.setItem('currentUser', JSON.stringify({
+        const currentUser: AuthUser = {
           uid: sbData.session.user.id, email: sbData.session.user.email ?? '',
           displayName: meta.displayName ?? meta.display_name ?? sbData.session.user.email?.split('@')[0] ?? '',
           role, accessRole, roleId: accessRole, roleLabel: getAccessRoleLabel(accessRole),
           entityName: meta.entityName ?? meta.entity_name ?? '',
           entityType: meta.entityType ?? meta.entity_type ?? '',
           entityId: meta.entityId ?? meta.entity_id ?? '', status: 'active',
-        }));
+        };
+        localStorage.setItem('currentUser', JSON.stringify(currentUser));
         const { data: aalData } = await supabaseBrowser.auth.mfa.getAuthenticatorAssuranceLevel();
         if (aalData?.nextLevel === 'aal2' && aalData.currentLevel !== 'aal2') {
           const { data: factorsData } = await supabaseBrowser.auth.mfa.listFactors();
@@ -62,9 +66,17 @@ export function Login({ onLogin }: LoginProps) {
             const { data: challengeData, error: challengeErr } = await supabaseBrowser.auth.mfa.challenge({ factorId: totpFactor.id });
             if (challengeErr) throw challengeErr;
             setMfaFactorId(totpFactor.id); setMfaChallengeId(challengeData.id);
+            setPendingAuditUser(currentUser);
             setPendingRole(role); setStep('mfa'); return;
           }
         }
+        await logAuditEvent({
+          ...auditIdentity(currentUser),
+          category: 'auth',
+          severity: 'success',
+          action: 'Login success',
+          detail: `${currentUser.displayName || currentUser.email} signed in`,
+        });
         completeLogin(role); return;
       }
       const samples: Record<string, { password: string; accessRole: AccessRole; displayName: string; entityName?: string; entityType?: string }> = {
@@ -106,16 +118,33 @@ export function Login({ onLogin }: LoginProps) {
         if (!entityName && role === 'seminary') entityName = "St. Peter's College Seminary";
         if (!entityName && role === 'school')   entityName = 'Liceo de San Pablo';
       }
-      localStorage.setItem('currentUser', JSON.stringify({
+      const currentUser: AuthUser = {
         uid: Math.random().toString(36).substr(2, 9), email, displayName, role, accessRole,
         roleId: accessRole, roleLabel: getAccessRoleLabel(accessRole),
         entityName, entityType, entityId, status: 'active',
-      }));
+      };
+      localStorage.setItem('currentUser', JSON.stringify(currentUser));
+      await logAuditEvent({
+        ...auditIdentity(currentUser),
+        category: 'auth',
+        severity: 'success',
+        action: 'Login success',
+        detail: `${displayName || lowerEmail} signed in`,
+      });
       completeLogin(role);
     } catch {
       clearLoginTransitionPending();
       const nextAttempts = failedAttempts + 1;
       setFailedAttempts(nextAttempts);
+      await logAuditEvent({
+        userName: lowerEmail || 'Unknown',
+        userRole: 'Unknown',
+        category: 'auth',
+        severity: 'warning',
+        action: 'Login failed',
+        detail: `Failed sign-in attempt for ${lowerEmail || 'unknown email'}`,
+        metadata: { failedAttempts: nextAttempts },
+      });
       if (nextAttempts >= 3 && email.trim()) {
         void fetch('/api/auth/security-alert', {
           method: 'POST',
@@ -136,6 +165,13 @@ export function Login({ onLogin }: LoginProps) {
         factorId: mfaFactorId, challengeId: mfaChallengeId, code: mfaCode.trim(),
       });
       if (verifyError) throw verifyError;
+      await logAuditEvent({
+        ...auditIdentity(pendingAuditUser),
+        category: 'auth',
+        severity: 'success',
+        action: 'Login success',
+        detail: `${pendingAuditUser?.displayName || pendingAuditUser?.email || 'User'} signed in with MFA`,
+      });
       completeLogin(pendingRole);
     } catch { setError('Invalid verification code. Please try again.');
     } finally { setIsLoading(false); }
@@ -401,9 +437,14 @@ export function Login({ onLogin }: LoginProps) {
                 top: s.top, right: s.right,
                 width: s.size, height: s.size,
                 background: '#F5D98A',
-                boxShadow: `0 0 ${s.size * 2}px ${s.size}px rgba(245,217,138,0.7)`,
+                zIndex: 4,
+                boxShadow: [
+                  `0 0 ${s.size * 2.4}px ${s.size * 1.2}px rgba(245,217,138,0.78)`,
+                  `0 0 ${s.size * 5.5}px ${s.size * 2}px rgba(212,175,55,0.34)`,
+                ].join(', '),
+                filter: `drop-shadow(0 0 ${s.size * 3}px rgba(255,245,210,0.58))`,
               }}
-              animate={{ opacity: [0, 1, 0], scale: [0.5, 1, 0.5] }}
+              animate={{ opacity: [0.16, 0.82, 0.22], scale: [0.65, 1.25, 0.72] }}
               transition={{ duration: s.dur, repeat: Infinity, ease: 'easeInOut', delay: s.delay }}
             />
           ))}

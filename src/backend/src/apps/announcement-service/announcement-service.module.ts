@@ -5,6 +5,7 @@ import { AnnouncementService } from '../../services/announcement.service';
 import { EventController } from '../../controllers/event.controller';
 import { EventService } from '../../services/event.service';
 import { SupabaseService } from '../../services/supabase.service';
+import { AuditLogService } from '../../services/audit-log.service';
 
 @Module({
   imports: [
@@ -13,6 +14,6 @@ import { SupabaseService } from '../../services/supabase.service';
     }),
   ],
   controllers: [AnnouncementController, EventController],
-  providers: [SupabaseService, AnnouncementService, EventService],
+  providers: [SupabaseService, AnnouncementService, EventService, AuditLogService],
 })
 export class AnnouncementServiceModule {}

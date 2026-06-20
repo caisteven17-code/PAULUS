@@ -17,6 +17,7 @@ import { LiturgicalCalendarGatewayController } from './controllers/liturgical-ca
 import { AuditLogGatewayController } from './controllers/audit-log-gateway.controller';
 import { ScenarioGatewayController } from './controllers/scenario-gateway.controller';
 import { ScenarioService } from '../../services/scenario.service';
+import { AuditLogService } from '../../services/audit-log.service';
 import { SupabaseService } from '../../services/supabase.service';
 
 @Module({
@@ -42,6 +43,6 @@ import { SupabaseService } from '../../services/supabase.service';
     AuditLogGatewayController,
     ScenarioGatewayController,
   ],
-  providers: [ScenarioService, SupabaseService],
+  providers: [ScenarioService, AuditLogService, SupabaseService],
 })
 export class ApiGatewayModule {}

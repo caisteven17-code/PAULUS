@@ -35,6 +35,7 @@ import { hasAnyArchiveAccess } from './lib/archiveAccess';
 import { clearLoginTransitionPending, isLoginTransitionPending } from './lib/loginTransition';
 import { LoadingScreen, SplashTransition, BlackReveal } from './components/ui/LoadingScreen';
 import { usePermissions } from './hooks/usePermissions';
+import { auditIdentity, logAuditEvent } from './lib/audit';
 
 export type Role = 'bishop' | 'admin' | 'priest' | 'school' | 'seminary';
 export type Timeframe = '6m' | '1y' | 'all';
@@ -171,6 +172,52 @@ const appRoleToRole = (appRole: string): Role => {
 
 const wait = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 const LOGOUT_TRANSITION_DURATION = 3;
+const INACTIVITY_TIMEOUT_MS = 5 * 60 * 1000;
+
+const TAB_TO_PATH: Record<string, string> = {
+  home: '/',
+  announcements: '/announcements',
+  events: '/events',
+  budget: '/budget',
+  projects: '/projects',
+  'digital-twin': '/digital-twin',
+  archives: '/archives',
+  'admin-archives': '/admin/archives',
+  consolidated: '/consolidated-financial',
+  profile: '/profile',
+  'audit-log': '/admin/audit-log',
+  settings: '/admin/settings',
+  'admin-user-management': '/admin/user-management',
+  'admin-user-role': '/admin/user-role-control',
+  'admin-entity': '/admin/entity-management',
+  'admin-data': '/admin/data-management',
+  'admin-liturgical': '/admin/liturgical-validator',
+  'parish-dashboard': '/parish/dashboard',
+  'parish-health': '/parish/health',
+  'parish-aitwin': '/parish/simulator',
+  'parish-data-submission': '/parish/data-submission',
+  'priest-dashboard': '/priests',
+  'priest-health': '/priests/health',
+  'priest-aitwin': '/priests/simulator',
+  seminaries: '/seminaries',
+  'seminary-aitwin': '/seminaries/simulator',
+  'seminary-data-submission': '/seminaries/data-submission',
+  school: '/schools',
+  'school-aitwin': '/schools/simulator',
+  'school-data-submission': '/schools/data-submission',
+};
+
+const PATH_TO_TAB = Object.entries(TAB_TO_PATH).reduce<Record<string, string>>((acc, [tab, path]) => {
+  acc[path] = tab;
+  return acc;
+}, {});
+
+const normalizePath = (path: string) => {
+  const cleaned = path.replace(/\/+$/, '');
+  return cleaned === '' ? '/' : cleaned;
+};
+
+const tabFromPath = (path: string) => PATH_TO_TAB[normalizePath(path)] ?? 'home';
 
 export default function App() {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
@@ -185,7 +232,9 @@ export default function App() {
   const [logoutConfirmOpen, setLogoutConfirmOpen] = useState(false);
   const [logoutTransition, setLogoutTransition] = useState(false);
   const [logoutInProgress, setLogoutInProgress] = useState(false);
+  const [inactivityNoticeOpen, setInactivityNoticeOpen] = useState(false);
   const logoutInProgressRef = React.useRef(false);
+  const inactivityTimeoutRef = React.useRef<ReturnType<typeof setTimeout> | null>(null);
   const [roleChangedModal, setRoleChangedModal] = useState(false);
   const trackedRoleRef = React.useRef<string>('');
 
@@ -194,7 +243,9 @@ export default function App() {
     return () => clearTimeout(t);
   }, []);
   const [role, setRole] = useState<Role>('bishop');
-  const [activeTab, setActiveTab] = useState('home');
+  const [activeTab, setActiveTab] = useState(() =>
+    typeof window === 'undefined' ? 'home' : tabFromPath(window.location.pathname),
+  );
   const mainScrollRef = useRef<HTMLElement>(null);
   const { permissions, user, loading: permissionsLoading } = usePermissions();
   const [timeframe, setTimeframe] = useState<Timeframe>('6m');
@@ -280,6 +331,23 @@ export default function App() {
   useEffect(() => {
     mainScrollRef.current?.scrollTo({ top: 0, behavior: 'instant' });
   }, [activeTab]);
+
+  useEffect(() => {
+    if (typeof window === 'undefined' || digitalTwinSession) return;
+    const nextPath = TAB_TO_PATH[activeTab] ?? '/';
+    if (normalizePath(window.location.pathname) !== normalizePath(nextPath)) {
+      window.history.pushState({ tab: activeTab }, '', nextPath);
+    }
+  }, [activeTab, digitalTwinSession]);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const handlePopState = () => {
+      setActiveTab(tabFromPath(window.location.pathname));
+    };
+    window.addEventListener('popstate', handlePopState);
+    return () => window.removeEventListener('popstate', handlePopState);
+  }, []);
 
   // Gate the whole system behind the onboarding form for real Supabase users.
   // Demo / localStorage sessions have no Supabase session and are skipped.
@@ -383,6 +451,74 @@ export default function App() {
     setLogoutInProgress(false);
     logoutInProgressRef.current = false;
   };
+
+  const resetSessionStateAfterLogout = () => {
+    setIsAuthenticated(false);
+    setRole('bishop');
+    setActiveTab('home');
+    setOnboardingUser(null);
+    setOnboardingChecked(false);
+    setDigitalTwinSession(null);
+    setDigitalTwinActiveTab('parish-dashboard');
+    setDtSandboxState(null);
+    setLoginReveal(false);
+    setLogoutConfirmOpen(false);
+    setLogoutTransition(false);
+  };
+
+  const handleInactivityLogout = async () => {
+    if (logoutInProgressRef.current) return;
+    const currentUser = auth.currentUser;
+    if (!currentUser) return;
+
+    logoutInProgressRef.current = true;
+    setLogoutInProgress(true);
+
+    await logAuditEvent({
+      ...auditIdentity(currentUser),
+      category: 'auth',
+      severity: 'info',
+      action: 'Logout due to inactivity',
+      detail: `${currentUser.displayName || currentUser.email || 'User'} was signed out after 5 minutes of inactivity`,
+      entity: currentUser.entityName,
+      metadata: {
+        reason: 'inactivity_timeout',
+        timeoutMinutes: 5,
+      },
+    });
+
+    await auth.signOut({ skipAudit: true });
+    resetSessionStateAfterLogout();
+    setInactivityNoticeOpen(true);
+    setLogoutInProgress(false);
+    logoutInProgressRef.current = false;
+  };
+
+  useEffect(() => {
+    if (!isAuthenticated || !isAuthReady) {
+      if (inactivityTimeoutRef.current) clearTimeout(inactivityTimeoutRef.current);
+      inactivityTimeoutRef.current = null;
+      return;
+    }
+
+    const resetTimer = () => {
+      if (logoutInProgressRef.current) return;
+      if (inactivityTimeoutRef.current) clearTimeout(inactivityTimeoutRef.current);
+      inactivityTimeoutRef.current = setTimeout(() => {
+        void handleInactivityLogout();
+      }, INACTIVITY_TIMEOUT_MS);
+    };
+
+    const activityEvents = ['mousemove', 'mousedown', 'keydown', 'scroll', 'touchstart', 'click'] as const;
+    activityEvents.forEach((eventName) => window.addEventListener(eventName, resetTimer, { passive: true }));
+    resetTimer();
+
+    return () => {
+      if (inactivityTimeoutRef.current) clearTimeout(inactivityTimeoutRef.current);
+      inactivityTimeoutRef.current = null;
+      activityEvents.forEach((eventName) => window.removeEventListener(eventName, resetTimer));
+    };
+  }, [isAuthenticated, isAuthReady, user?.email]);
 
   if (!isAuthReady || !minSplashDone) {
     return <LoadingScreen label="Preparing" />;
@@ -521,6 +657,52 @@ export default function App() {
                 className="w-full rounded-2xl bg-slate-950 px-4 py-3.5 text-sm font-black text-white transition-colors hover:bg-slate-800"
               >
                 Sign Out Now
+              </button>
+            </div>
+          </motion.div>
+        </motion.div>
+      )}
+    </AnimatePresence>
+  );
+
+  const inactivityNoticeModal = (
+    <AnimatePresence>
+      {inactivityNoticeOpen && (
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          transition={{ duration: 0.18 }}
+          className="fixed inset-0 z-[330] flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm"
+        >
+          <motion.div
+            initial={{ opacity: 0, y: 16, scale: 0.96 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: 12, scale: 0.96 }}
+            transition={{ duration: 0.2, ease: 'easeOut' }}
+            className="w-full max-w-sm overflow-hidden rounded-[28px] border border-slate-200 bg-white shadow-2xl"
+          >
+            <div className="flex items-center gap-4 border-b border-slate-100 px-6 py-5">
+              <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-amber-50 text-amber-600">
+                <CalendarClock className="h-5 w-5" />
+              </div>
+              <div>
+                <h2 className="text-lg font-black text-slate-950">Session Expired</h2>
+                <p className="text-xs font-semibold text-slate-400">You were signed out for security.</p>
+              </div>
+            </div>
+            <div className="px-6 py-5">
+              <p className="text-sm leading-relaxed text-slate-600">
+                You were automatically logged out after 5 minutes without activity. Please sign in again to continue.
+              </p>
+            </div>
+            <div className="border-t border-slate-100 px-6 pb-6 pt-4">
+              <button
+                type="button"
+                onClick={() => setInactivityNoticeOpen(false)}
+                className="w-full rounded-2xl bg-slate-950 px-4 py-3.5 text-sm font-black text-white transition-colors hover:bg-slate-800"
+              >
+                Back to Login
               </button>
             </div>
           </motion.div>
@@ -1270,6 +1452,7 @@ export default function App() {
       {loginRevealOverlay}
       {logoutConfirmModal}
       {roleChangedModalEl}
+      {inactivityNoticeModal}
       {logoutTransitionOverlay}
     </>
   );

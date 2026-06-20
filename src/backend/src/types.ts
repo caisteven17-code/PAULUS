@@ -40,6 +40,9 @@ export interface AuthUser {
   roleLabel?: string;
   emergencyContact?: string;
   notes?: string;
+  birthday?: string;
+  avatarUrl?: string;
+  photoURL?: string;
 }
 
 export type EntityClass = 'Class A' | 'Class B' | 'Class C' | 'Class D' | 'Class E';

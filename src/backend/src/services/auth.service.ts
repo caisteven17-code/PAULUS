@@ -322,6 +322,9 @@ export class AppAuthService {
       entityName: meta.entityName ?? meta.entity_name ?? undefined,
       entityType: meta.entityType ?? meta.entity_type ?? undefined,
       displayName: meta.displayName ?? meta.display_name ?? supabaseUser.email ?? '',
+      birthday: meta.birthday ?? meta.birth_date ?? undefined,
+      avatarUrl: meta.avatarUrl ?? meta.avatar_url ?? undefined,
+      photoURL: meta.avatarUrl ?? meta.avatar_url ?? undefined,
       status: 'active',
     };
   }
@@ -352,6 +355,20 @@ export class AppAuthService {
   async listUsers() {
     const { data, error } = await this.supabaseService.supabaseServer.auth.admin.listUsers({ perPage: 1000 });
     if (error) throw error;
+
+    // Map each auth id -> profile photo + birthday (profiles is the source of truth).
+    const avatarByAuthId = new Map<string, string>();
+    const birthdayByAuthId = new Map<string, string>();
+    const { data: profiles } = await this.supabaseService.admin
+      .schema('diocese')
+      .from('profiles')
+      .select('external_auth_id, avatar_url, birthday');
+    for (const p of profiles ?? []) {
+      if (!p.external_auth_id) continue;
+      if (p.avatar_url) avatarByAuthId.set(p.external_auth_id, p.avatar_url);
+      if (p.birthday) birthdayByAuthId.set(p.external_auth_id, p.birthday);
+    }
+
     return (data.users ?? []).map((u) => {
       const meta = u.user_metadata ?? {};
       return {
@@ -363,6 +380,8 @@ export class AppAuthService {
         entityName: (meta.entityName ?? meta.entity_name ?? '') as string,
         entityType: (meta.entityType ?? meta.entity_type ?? 'parish') as string,
         entityId: (meta.entityId ?? meta.entity_id ?? '') as string,
+        avatarUrl: avatarByAuthId.get(u.id) ?? meta.avatarUrl ?? meta.avatar_url ?? null,
+        birthday: birthdayByAuthId.get(u.id) ?? meta.birthday ?? meta.birth_date ?? null,
         status: u.banned_until ? 'archived' : ((meta.status ?? 'active') as string),
         createdAt: u.created_at ?? null,
         lastSignIn: u.last_sign_in_at ?? null,

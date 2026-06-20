@@ -1,5 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { SupabaseService } from './supabase.service';
+import { AuditLogService } from './audit-log.service';
+import { buildFieldChanges } from './field-changes';
 
 export interface DiocesanEvent {
   id: string;
@@ -21,7 +23,10 @@ const DIOCESE_INSTITUTION_NAME = 'Diocese of San Pablo';
 
 @Injectable()
 export class EventService {
-  constructor(private readonly supabaseService: SupabaseService) {}
+  constructor(
+    private readonly supabaseService: SupabaseService,
+    private readonly auditLogService: AuditLogService,
+  ) {}
 
   private db() {
     return this.supabaseService.admin.schema('diocese');
@@ -36,23 +41,22 @@ export class EventService {
     userRole: string;
     action: string;
     detail: string;
+    severity?: 'info' | 'warning' | 'error' | 'success';
+    institutionId?: string;
+    entity?: string;
     metadata?: Record<string, any>;
   }): Promise<void> {
-    const { error } = await this.db()
-      .from('audit_logs')
-      .insert({
-        user_name: payload.userName,
-        user_role: payload.userRole,
-        is_system: false,
-        category: 'system',
-        severity: 'info',
-        action: payload.action,
-        detail: payload.detail,
-        entity: 'event',
-        metadata: payload.metadata ?? null,
-      });
-
-    if (error) console.error('[event.service] writeAuditLog:', error.message);
+    await this.auditLogService.logEvent({
+      userName: payload.userName,
+      userRole: payload.userRole,
+      category: 'events',
+      severity: payload.severity ?? 'info',
+      action: payload.action,
+      detail: payload.detail,
+      institutionId: payload.institutionId,
+      entity: payload.entity,
+      metadata: payload.metadata,
+    });
   }
 
   /**
@@ -278,9 +282,18 @@ export class EventService {
     await this.writeAuditLog({
       userName,
       userRole,
-      action: 'Created Event',
-      detail: `"${event.event_name}" was scheduled for ${event.start_date}`,
-      metadata: { event_id: data.id, institution: institution?.name },
+      action: 'Event Created',
+      detail: `"${event.event_name}" was created and scheduled for ${event.start_date} by ${userName}`,
+      severity: 'success',
+      institutionId,
+      entity: institution?.name,
+      metadata: {
+        event_id: data.id,
+        institutionId,
+        institutionName: institution?.name,
+        institutionType: institution?.institution_type,
+        event_level: event.event_level,
+      },
     });
 
     return this.toEvent(data, institution ?? undefined);
@@ -308,6 +321,14 @@ export class EventService {
     if ('end_date' in patch) updates.end_date = patch.end_date || null;
     if ('notes' in patch) updates.notes = patch.notes || null;
 
+    // Snapshot the row before the update so the audit log can show before -> after.
+    const { data: before } = await this.db()
+      .from('events')
+      .select('*')
+      .eq('id', id)
+      .is('deleted_at', null)
+      .maybeSingle();
+
     const { data, error } = await this.db()
       .from('events')
       .update(updates)
@@ -327,12 +348,23 @@ export class EventService {
       .eq('id', data.institution_id)
       .maybeSingle();
 
+    const changes = buildFieldChanges(before, data, Object.keys(updates));
+
     await this.writeAuditLog({
       userName,
       userRole,
-      action: 'Edited Event',
+      action: 'Event Edited',
       detail: `"${data.event_name}" was edited by ${userName}`,
-      metadata: { event_id: id, changes: patch },
+      severity: 'info',
+      institutionId: data.institution_id,
+      entity: institution?.name,
+      metadata: {
+        event_id: id,
+        institutionId: data.institution_id,
+        institutionName: institution?.name,
+        institutionType: institution?.institution_type,
+        changes,
+      },
     });
 
     return this.toEvent(data, institution ?? undefined);
@@ -344,7 +376,7 @@ export class EventService {
       .update({ deleted_at: new Date().toISOString() })
       .eq('id', id)
       .is('deleted_at', null)
-      .select('event_name')
+      .select('event_name, institution_id')
       .single();
 
     if (error || !data) {
@@ -352,12 +384,27 @@ export class EventService {
       return { ok: false };
     }
 
+    const { data: institution } = await this.db()
+      .from('institutions')
+      .select('name, institution_type')
+      .eq('id', data.institution_id)
+      .maybeSingle();
+
     await this.writeAuditLog({
       userName,
       userRole,
-      action: 'Archived Event',
+      action: 'Event Archived',
       detail: `"${data.event_name}" was archived by ${userName}`,
-      metadata: { event_id: id, archived_by: userName },
+      severity: 'warning',
+      institutionId: data.institution_id,
+      entity: institution?.name,
+      metadata: {
+        event_id: id,
+        institutionId: data.institution_id,
+        institutionName: institution?.name,
+        institutionType: institution?.institution_type,
+        archived_by: userName,
+      },
     });
 
     return { ok: true };
@@ -369,7 +416,7 @@ export class EventService {
       .update({ deleted_at: null })
       .eq('id', id)
       .not('deleted_at', 'is', null)
-      .select('event_name')
+      .select('event_name, institution_id')
       .single();
 
     if (error || !data) {
@@ -377,12 +424,27 @@ export class EventService {
       return { ok: false };
     }
 
+    const { data: institution } = await this.db()
+      .from('institutions')
+      .select('name, institution_type')
+      .eq('id', data.institution_id)
+      .maybeSingle();
+
     await this.writeAuditLog({
       userName,
       userRole,
-      action: 'Restored Archived Event',
+      action: 'Event Restored',
       detail: `"${data.event_name}" was restored from archive by ${userName}`,
-      metadata: { event_id: id, restored_by: userName },
+      severity: 'info',
+      institutionId: data.institution_id,
+      entity: institution?.name,
+      metadata: {
+        event_id: id,
+        institutionId: data.institution_id,
+        institutionName: institution?.name,
+        institutionType: institution?.institution_type,
+        restored_by: userName,
+      },
     });
 
     return { ok: true };

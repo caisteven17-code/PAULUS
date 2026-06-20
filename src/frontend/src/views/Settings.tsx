@@ -8,6 +8,7 @@ import {
   Database,
   ArrowRight,
   Pencil,
+  Camera,
   Search,
   ShieldCheck,
   Eye,
@@ -37,6 +38,7 @@ import {
 import { auth } from '../firebase';
 import { dataService } from '../services/dataService';
 import { supabaseBrowser } from '../lib/supabase';
+import { getInitials } from '../lib/initials';
 
 interface SettingsProps {
   onBack: () => void;
@@ -221,6 +223,7 @@ export function Settings({ onBack, onLogout, onNavigate, role = 'bishop', initia
         entityId: u.entityId,
         entityType: u.entityType,
         birthday: u.birthday || u.birthDate || u.dateOfBirth || u.user_metadata?.birthday || u.user_metadata?.birthDate || '',
+        avatarUrl: u.avatarUrl || u.photoURL || '',
         onboardingCompleted:
           u.onboardingCompleted === true ||
           u.user_metadata?.onboardingCompleted === true ||
@@ -240,6 +243,7 @@ export function Settings({ onBack, onLogout, onNavigate, role = 'bishop', initia
         entityId: u.entityId,
         entityType: u.entityType,
         birthday: u.birthday || u.birthDate || u.dateOfBirth || '',
+        avatarUrl: u.avatarUrl || u.photoURL || '',
         onboardingCompleted: u.onboardingCompleted === true,
       }));
 
@@ -263,6 +267,7 @@ export function Settings({ onBack, onLogout, onNavigate, role = 'bishop', initia
           entityId: u.entityId,
           entityType: u.entityType,
           birthday: u.birthday || u.birthDate || u.dateOfBirth || '',
+          avatarUrl: u.avatarUrl || u.photoURL || '',
           onboardingCompleted: u.onboardingCompleted === true,
         })),
       );
@@ -318,6 +323,71 @@ export function Settings({ onBack, onLogout, onNavigate, role = 'bishop', initia
     error: string;
   }>({ open: false, pendingEmail: '', code: '', sending: false, error: '' });
   const [viewMode, setViewMode] = useState<'active' | 'archived'>('active');
+  const [avatarUrl, setAvatarUrl] = useState<string>(() => {
+    const u: any = auth.currentUser || {};
+    return u.avatarUrl || u.photoURL || '';
+  });
+  const [avatarBusy, setAvatarBusy] = useState(false);
+
+  const currentUserId = (): string => {
+    const u: any = auth.currentUser || {};
+    return u.uid || u.id || u.external_auth_id || '';
+  };
+
+  const persistAvatarLocal = (url: string | null) => {
+    const cur = JSON.parse(localStorage.getItem('currentUser') || '{}');
+    if (url) {
+      cur.avatarUrl = url;
+      cur.photoURL = url;
+    } else {
+      delete cur.avatarUrl;
+      delete cur.photoURL;
+    }
+    localStorage.setItem('currentUser', JSON.stringify(cur));
+  };
+
+  const handleAvatarChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    e.target.value = ''; // allow re-selecting the same file later
+    if (!file) return;
+    if (!file.type.startsWith('image/')) return;
+    if (file.size > 5 * 1024 * 1024) return;
+    const userId = currentUserId();
+    if (!userId) return;
+
+    setAvatarBusy(true);
+    try {
+      const fd = new FormData();
+      fd.append('file', file);
+      fd.append('userId', userId);
+      const res = await fetch('/api/profile/avatar', { method: 'POST', body: fd });
+      const data = await res.json().catch(() => ({}));
+      if (res.ok && data?.avatarUrl) {
+        setAvatarUrl(data.avatarUrl);
+        persistAvatarLocal(data.avatarUrl);
+      }
+    } finally {
+      setAvatarBusy(false);
+    }
+  };
+
+  const handleAvatarRemove = async () => {
+    const userId = currentUserId();
+    if (!userId) return;
+    setAvatarBusy(true);
+    try {
+      await fetch('/api/profile/avatar', {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userId }),
+      });
+      setAvatarUrl('');
+      persistAvatarLocal(null);
+    } finally {
+      setAvatarBusy(false);
+    }
+  };
+
   const [profileForm, setProfileForm] = useState(() => {
     const currentUser = auth.currentUser || {};
     const nameParts = (currentUser.displayName || '').split(' ').filter(Boolean);
@@ -327,6 +397,7 @@ export function Settings({ onBack, onLogout, onNavigate, role = 'bishop', initia
       nickName: currentUser.nickName || '',
       email: currentUser.email || '',
       contactNumber: currentUser.contactNumber || '',
+      birthday: (currentUser.birthday || '').slice(0, 10),
       address: currentUser.address || '',
       position: currentUser.position || currentUser.roleLabel || '',
       entityName: currentUser.entityName || '',
@@ -383,6 +454,7 @@ export function Settings({ onBack, onLogout, onNavigate, role = 'bishop', initia
           lastName: profileForm.lastName,
           nickName: profileForm.nickName,
           contactNumber: profileForm.contactNumber,
+          birthday: profileForm.birthday || null,
           address: profileForm.address,
           position: profileForm.position,
           entityName: profileForm.entityName || currentUser.entityName,
@@ -393,6 +465,23 @@ export function Settings({ onBack, onLogout, onNavigate, role = 'bishop', initia
       .catch(() => {
         /* demo/offline session — ignore */
       });
+
+    // Persist birthday + contact number to diocese.profiles (the database table).
+    const userId = (currentUser as any).uid || (currentUser as any).id || (currentUser as any).external_auth_id;
+    if (userId) {
+      await fetch('/api/profile/details', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          userId,
+          birthday: profileForm.birthday || null,
+          contactNumber: profileForm.contactNumber || '',
+        }),
+      }).catch(() => {
+        /* non-fatal — metadata + localStorage still hold the value */
+      });
+    }
+
     localStorage.setItem('currentUser', JSON.stringify(updatedUser));
   };
 
@@ -405,6 +494,7 @@ export function Settings({ onBack, onLogout, onNavigate, role = 'bishop', initia
       nickName: currentUser.nickName || '',
       email: currentUser.email || '',
       contactNumber: currentUser.contactNumber || '',
+      birthday: (currentUser.birthday || '').slice(0, 10),
       address: currentUser.address || '',
       position: currentUser.position || currentUser.roleLabel || '',
       entityName: currentUser.entityName || '',
@@ -1293,8 +1383,42 @@ export function Settings({ onBack, onLogout, onNavigate, role = 'bishop', initia
                     <div className="pointer-events-none absolute -right-16 -top-16 h-44 w-44 rounded-full bg-[#D4AF37]/15 blur-3xl" />
                     <div className="pointer-events-none absolute bottom-0 left-0 h-px w-full bg-gradient-to-r from-transparent via-[#D4AF37]/60 to-transparent" />
                     <div className="flex items-center gap-4">
-                      <div className="w-16 h-16 rounded-2xl bg-[#D4AF37] text-black flex items-center justify-center text-2xl font-black shadow-lg shadow-[#D4AF37]/25 shrink-0">
-                        {(profileForm.firstName || profileForm.email || 'U').charAt(0).toUpperCase()}
+                      <div className="relative shrink-0">
+                        {avatarUrl ? (
+                          // eslint-disable-next-line @next/next/no-img-element
+                          <img
+                            src={avatarUrl}
+                            alt="Profile"
+                            className="w-16 h-16 rounded-2xl object-cover shadow-lg ring-2 ring-[#D4AF37]/40"
+                          />
+                        ) : (
+                          <div className="w-16 h-16 rounded-2xl bg-[#D4AF37] text-black flex items-center justify-center text-2xl font-black shadow-lg shadow-[#D4AF37]/25">
+                            {getInitials(`${profileForm.firstName} ${profileForm.lastName}`.trim() || profileForm.email)}
+                          </div>
+                        )}
+                        {isEditingProfile && (
+                          <>
+                            <label
+                              htmlFor="profile-photo"
+                              title="Change photo"
+                              className="absolute -bottom-1.5 -right-1.5 flex h-7 w-7 cursor-pointer items-center justify-center rounded-full bg-white text-slate-950 shadow-md transition-colors hover:bg-[#F5D98A]"
+                            >
+                              {avatarBusy ? (
+                                <span className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-slate-400 border-t-transparent" />
+                              ) : (
+                                <Camera className="h-3.5 w-3.5" />
+                              )}
+                            </label>
+                            <input
+                              id="profile-photo"
+                              type="file"
+                              accept="image/png,image/jpeg,image/webp,image/gif"
+                              className="hidden"
+                              onChange={handleAvatarChange}
+                              disabled={avatarBusy}
+                            />
+                          </>
+                        )}
                       </div>
                       <div>
                         <p className="text-[10px] font-black uppercase tracking-[0.22em] text-[#D4AF37]">
@@ -1306,6 +1430,16 @@ export function Settings({ onBack, onLogout, onNavigate, role = 'bishop', initia
                             ? 'Update your personal information and contact details.'
                             : 'Your personal information and contact details.'}
                         </p>
+                        {isEditingProfile && avatarUrl && (
+                          <button
+                            type="button"
+                            onClick={handleAvatarRemove}
+                            disabled={avatarBusy}
+                            className="mt-2 text-[11px] font-bold text-rose-300 hover:text-rose-200 disabled:opacity-50"
+                          >
+                            Remove photo
+                          </button>
+                        )}
                       </div>
                     </div>
                     {!isEditingProfile ? (
@@ -1357,6 +1491,7 @@ export function Settings({ onBack, onLogout, onNavigate, role = 'bishop', initia
                       { id: 'nickName', label: 'Nick Name', type: 'text', placeholder: 'Preferred name' },
                       { id: 'email', label: 'Email Address', type: 'email', placeholder: 'name@diocese.ph' },
                       { id: 'contactNumber', label: 'Contact Number', type: 'tel', placeholder: '+63 900 000 0000' },
+                      { id: 'birthday', label: 'Birthday', type: 'date', placeholder: '' },
                       {
                         id: 'emergencyContact',
                         label: 'Emergency Contact',
@@ -1377,6 +1512,7 @@ export function Settings({ onBack, onLogout, onNavigate, role = 'bishop', initia
                           type={field.type}
                           value={(profileForm as any)[field.id]}
                           disabled={!isEditingProfile}
+                          max={field.type === 'date' ? new Date().toISOString().split('T')[0] : undefined}
                           onChange={(event) => setProfileForm((prev) => ({ ...prev, [field.id]: event.target.value }))}
                           placeholder={field.placeholder}
                           className={`w-full px-5 py-4 rounded-2xl border text-gray-900 transition-all font-medium placeholder:text-gray-300 ${
@@ -2010,9 +2146,9 @@ export function Settings({ onBack, onLogout, onNavigate, role = 'bishop', initia
             {viewAccount &&
               (() => {
                 const isArchived = viewAccount.status === 'archived' || viewAccount.status === 'inactive';
-                const initial = (getFormattedFullName(viewAccount.leader) || viewAccount.email || '?')
-                  .charAt(0)
-                  .toUpperCase();
+                // Use the raw "First Last" name (not the "Last, First" display form) so
+                // initials match the audit log, e.g. "drive justyn" -> "DJ".
+                const initial = getInitials(viewAccount.leader || viewAccount.email);
                 const Field = ({
                   icon: Icon,
                   label,
@@ -2043,9 +2179,18 @@ export function Settings({ onBack, onLogout, onNavigate, role = 'bishop', initia
                       {/* Dark header */}
                       <div className="flex items-start justify-between gap-4 bg-slate-900 p-6 text-white">
                         <div className="flex min-w-0 items-center gap-4">
-                          <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-gold-500 font-serif text-lg font-bold text-black">
-                            {initial}
-                          </div>
+                          {viewAccount.avatarUrl ? (
+                            // eslint-disable-next-line @next/next/no-img-element
+                            <img
+                              src={viewAccount.avatarUrl}
+                              alt={getFormattedFullName(viewAccount.leader) || viewAccount.email}
+                              className="h-12 w-12 shrink-0 rounded-2xl object-cover ring-2 ring-gold-500/40"
+                            />
+                          ) : (
+                            <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-gold-500 font-serif text-lg font-bold text-black">
+                              {initial}
+                            </div>
+                          )}
                           <div className="min-w-0">
                             <div className="flex items-center gap-2">
                               <span className="rounded-md border border-white/15 bg-white/10 px-2 py-0.5 text-[10px] font-black uppercase tracking-wider text-white/70">

@@ -5,6 +5,7 @@ import {
   ArrowLeft,
   ArrowRight,
   Cake,
+  Camera,
   CheckCircle2,
   Eye,
   EyeOff,
@@ -41,10 +42,35 @@ export function OnboardingModal({ user, onComplete, onLogout }: OnboardingModalP
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirm, setShowConfirm] = useState(false);
 
+  const [photoFile, setPhotoFile] = useState<File | null>(null);
+  const [photoPreview, setPhotoPreview] = useState<string>('');
+  const [uploadedAvatarUrl, setUploadedAvatarUrl] = useState<string>('');
+
   const [error, setError] = useState('');
   const [isSending, setIsSending] = useState(false);
   const [otpNote, setOtpNote] = useState('');
   const [otpDevMode, setOtpDevMode] = useState(false);
+
+  const handlePhotoSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (!file.type.startsWith('image/')) {
+      setError('Please choose an image file (JPG, PNG, or WEBP).');
+      return;
+    }
+    if (file.size > 5 * 1024 * 1024) {
+      setError('Image is too large. Please pick one under 5 MB.');
+      return;
+    }
+    setPhotoFile(file);
+    setPhotoPreview(URL.createObjectURL(file));
+    setError('');
+  };
+
+  const removePhoto = () => {
+    setPhotoFile(null);
+    setPhotoPreview('');
+  };
 
   const todayStr = new Date().toISOString().split('T')[0];
   const introSlides = useMemo(
@@ -157,6 +183,20 @@ export function OnboardingModal({ user, onComplete, onLogout }: OnboardingModalP
         return data?.error || 'Failed to save your details. Please try again.';
       }
 
+      // Onboarding saved — the profile now exists, so upload the photo if chosen.
+      if (photoFile) {
+        try {
+          const fd = new FormData();
+          fd.append('file', photoFile);
+          fd.append('userId', user.uid || user.id || '');
+          const up = await fetch('/api/profile/avatar', { method: 'POST', body: fd });
+          const upData = await up.json().catch(() => ({}));
+          if (up.ok && upData?.avatarUrl) setUploadedAvatarUrl(upData.avatarUrl);
+        } catch {
+          /* photo is optional — never block onboarding on it */
+        }
+      }
+
       setStep('success');
       return null;
     } catch {
@@ -175,6 +215,7 @@ export function OnboardingModal({ user, onComplete, onLogout }: OnboardingModalP
         contactNumber: contactNumber.trim(),
         birthday,
         onboardingCompleted: true,
+        ...(uploadedAvatarUrl ? { avatarUrl: uploadedAvatarUrl, photoURL: uploadedAvatarUrl } : {}),
       }),
     );
     onComplete({ email: email.trim().toLowerCase(), contactNumber: contactNumber.trim(), birthday });
@@ -371,6 +412,50 @@ export function OnboardingModal({ user, onComplete, onLogout }: OnboardingModalP
                           <p className="rounded-2xl border border-[#D4AF37]/25 bg-[#FFF8E5] px-4 py-3 text-xs font-semibold leading-relaxed text-slate-600">
                             All fields are required. Your email will receive a verification code before your account is opened.
                           </p>
+
+                          {/* Profile photo (optional) */}
+                          <div className="flex flex-col items-center gap-2">
+                            <div className="relative">
+                              <label htmlFor="onboard-photo" className="block cursor-pointer">
+                                {photoPreview ? (
+                                  // eslint-disable-next-line @next/next/no-img-element
+                                  <img
+                                    src={photoPreview}
+                                    alt="Profile preview"
+                                    className="h-24 w-24 rounded-full object-cover ring-2 ring-[#D4AF37]/50"
+                                  />
+                                ) : (
+                                  <div className="flex h-24 w-24 items-center justify-center rounded-full bg-slate-100 ring-2 ring-slate-200">
+                                    <Camera className="h-7 w-7 text-slate-400" />
+                                  </div>
+                                )}
+                                <span className="absolute -bottom-1 -right-1 flex h-8 w-8 items-center justify-center rounded-full bg-[#D4AF37] text-slate-950 shadow-md">
+                                  <Camera className="h-4 w-4" />
+                                </span>
+                              </label>
+                              <input
+                                id="onboard-photo"
+                                type="file"
+                                accept="image/png,image/jpeg,image/webp,image/gif"
+                                className="hidden"
+                                onChange={handlePhotoSelect}
+                                disabled={isSending}
+                              />
+                            </div>
+                            <p className="text-[11px] font-semibold text-slate-400">
+                              Add a profile photo <span className="text-slate-300">(optional)</span>
+                            </p>
+                            {photoPreview && (
+                              <button
+                                type="button"
+                                onClick={removePhoto}
+                                disabled={isSending}
+                                className="text-[11px] font-bold text-rose-500 hover:text-rose-600 disabled:opacity-50"
+                              >
+                                Remove photo
+                              </button>
+                            )}
+                          </div>
 
                           <SetupField label="Contact Number" icon={Phone} required>
                             <input

@@ -31,7 +31,7 @@ export class AuthController {
         userRole: 'Unknown',
         category: 'auth',
         severity: 'warning',
-        action: 'Login Failed',
+        action: 'Login failed',
         detail: `Failed sign-in attempt for ${email}`,
         ipAddress: clientIp(req),
       });
@@ -44,7 +44,7 @@ export class AuthController {
       userRole: result.user.roleId ?? result.user.role ?? 'unknown',
       category: 'auth',
       severity: 'success',
-      action: 'Logged In',
+      action: 'Login success',
       detail: `${result.user.displayName || email} signed in to the diocesan financial portal`,
       ipAddress: clientIp(req),
     });
@@ -65,7 +65,7 @@ export class AuthController {
       userRole: user?.roleId ?? user?.role ?? 'Unknown',
       category: 'auth',
       severity: 'info',
-      action: 'Logged Out',
+      action: 'Logout',
       detail: `${user?.displayName || 'User'} signed out of the diocesan financial portal`,
       ipAddress: clientIp(req),
     });
@@ -127,7 +127,7 @@ export class AuthController {
         userRole: 'unknown',
         category: 'auth',
         severity: 'info',
-        action: 'OTP Sent',
+        action: purpose === 'onboarding' ? 'OTP sent (onboarding)' : 'OTP sent (password reset)',
         detail: `Verification code sent to ${email} (${purpose === 'onboarding' ? 'onboarding' : 'password reset'})`,
         ipAddress: clientIp(req),
       });
@@ -150,7 +150,7 @@ export class AuthController {
         userRole: 'unknown',
         category: 'auth',
         severity: 'warning',
-        action: 'Failed Login Alert',
+        action: 'Account locked',
         detail: `3 consecutive failed login attempts detected for ${email}`,
         ipAddress: clientIp(req),
       });
@@ -161,7 +161,7 @@ export class AuthController {
   }
 
   @Post('verify-otp')
-  async verifyOtp(@Body() body: any, @Res() res: Response) {
+  async verifyOtp(@Body() body: any, @Req() req: Request, @Res() res: Response) {
     const { email, code, purpose } = body ?? {};
     if (!email || !code || !purpose) {
       return res.status(HttpStatus.BAD_REQUEST).json({ error: 'email, code, and purpose are required.' });
@@ -169,8 +169,26 @@ export class AuthController {
 
     try {
       const result = await this.authService.verifyOtp(email, code, purpose);
+      await this.auditLogService.logEvent({
+        userName: email,
+        userRole: 'unknown',
+        category: 'auth',
+        severity: 'success',
+        action: 'OTP verified',
+        detail: `Verification code accepted for ${email} (${purpose})`,
+        ipAddress: clientIp(req),
+      });
       return res.status(HttpStatus.OK).json(result);
     } catch (err: any) {
+      await this.auditLogService.logEvent({
+        userName: email,
+        userRole: 'unknown',
+        category: 'auth',
+        severity: 'warning',
+        action: 'OTP failed / expired',
+        detail: `Verification code rejected for ${email} (${purpose})`,
+        ipAddress: clientIp(req),
+      });
       return this.otpErrorResponse(res, err);
     }
   }
@@ -229,7 +247,7 @@ export class AuthController {
         userRole: 'unknown',
         category: 'auth',
         severity: 'success',
-        action: 'Password Reset',
+        action: 'Password reset completed',
         detail: `Password was reset via Forgot Password for ${email}`,
         ipAddress: clientIp(req),
       });
@@ -257,7 +275,7 @@ export class AuthController {
         userId: user.id,
         userName: 'Admin',
         userRole: 'admin',
-        category: 'access',
+        category: 'users',
         severity: 'success',
         action: 'User Created',
         detail: `New account provisioned for ${user.displayName} (${user.role})`,
@@ -279,7 +297,7 @@ export class AuthController {
       await this.auditLogService.logEvent({
         userName: 'Admin',
         userRole: 'admin',
-        category: 'access',
+        category: 'users',
         severity: 'info',
         action: 'User Updated',
         detail: `Account updated for ${user.displayName} (${user.role})`,
@@ -301,7 +319,7 @@ export class AuthController {
       await this.auditLogService.logEvent({
         userName: 'Admin',
         userRole: 'admin',
-        category: 'access',
+        category: 'users',
         severity: action === 'archive' ? 'warning' : 'info',
         action: action === 'archive' ? 'User Archived' : 'User Restored',
         detail: `Account ${action === 'archive' ? 'archived' : 'restored'}: ${user.displayName} (${user.email})`,
@@ -336,7 +354,7 @@ export class AuthController {
       await this.auditLogService.logEvent({
         userName: 'Admin',
         userRole: 'admin',
-        category: 'access',
+        category: 'users',
         severity: 'info',
         action: 'Roles Updated',
         detail: `Role permissions updated for ${roles.length} role(s)`,

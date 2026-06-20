@@ -1,5 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { SupabaseService } from './supabase.service';
+import { AuditLogService } from './audit-log.service';
+import { buildFieldChanges } from './field-changes';
 
 export interface Announcement {
   id: string;
@@ -24,7 +26,10 @@ const RETENTION_MS = 365 * 24 * 60 * 60 * 1000; // 1 year
 
 @Injectable()
 export class AnnouncementService {
-  constructor(private readonly supabaseService: SupabaseService) {}
+  constructor(
+    private readonly supabaseService: SupabaseService,
+    private readonly auditLogService: AuditLogService,
+  ) {}
 
   private toAnnouncement(row: any): Announcement {
     return {
@@ -51,24 +56,20 @@ export class AnnouncementService {
     userRole: string;
     action: string;
     detail: string;
+    severity?: 'info' | 'warning' | 'error' | 'success';
+    entity?: string;
     metadata?: Record<string, any>;
   }): Promise<void> {
-    const { error } = await this.supabaseService.admin
-      .schema('diocese')
-      .from('audit_logs')
-      .insert({
-        user_name: payload.userName,
-        user_role: payload.userRole,
-        is_system: false,
-        category: 'system',
-        severity: 'info',
-        action: payload.action,
-        detail: payload.detail,
-        entity: 'announcement',
-        metadata: payload.metadata ?? null,
-      });
-
-    if (error) console.error('[announcement.service] writeAuditLog:', error.message);
+    await this.auditLogService.logEvent({
+      userName: payload.userName,
+      userRole: payload.userRole,
+      category: 'announcements',
+      severity: payload.severity ?? 'info',
+      action: payload.action,
+      detail: payload.detail,
+      entity: payload.entity,
+      metadata: payload.metadata,
+    });
   }
 
   // ── Lazy maintenance jobs (run before returning lists) ──────────────────────
@@ -242,8 +243,9 @@ export class AnnouncementService {
     await this.writeAuditLog({
       userName: body.author,
       userRole: body.authorRole,
-      action: isPublishing ? 'Published Announcement' : 'Saved Announcement as Draft',
-      detail: `"${body.title}" was ${isPublishing ? 'published' : 'saved as draft'}`,
+      action: isPublishing ? 'Announcement Published' : 'Announcement Saved as Draft',
+      detail: `"${body.title}" was ${isPublishing ? 'published' : 'saved as draft'} by ${body.author}`,
+      severity: isPublishing ? 'success' : 'info',
       metadata: { announcement_id: data.id, title: body.title, status: body.status },
     });
 
@@ -270,8 +272,9 @@ export class AnnouncementService {
     await this.writeAuditLog({
       userName,
       userRole,
-      action: 'Published Draft Announcement',
-      detail: `Draft "${data.title}" was published`,
+      action: 'Draft Published',
+      detail: `Draft "${data.title}" was published by ${userName}`,
+      severity: 'success',
       metadata: { announcement_id: id, title: data.title },
     });
 
@@ -324,14 +327,12 @@ export class AnnouncementService {
     await this.writeAuditLog({
       userName,
       userRole,
-      action: isDraft ? 'Deleted Draft Announcement' : 'Permanently Deleted Announcement (Grace Period)',
+      action: isDraft ? 'Announcement Draft Deleted' : 'Announcement Permanently Deleted',
       detail: `"${row.title}" was permanently deleted by ${userName}`,
+      severity: 'warning',
       metadata: {
         announcement_id: id,
         title: row.title,
-        content: row.content,
-        author: row.author,
-        author_role: row.author_role,
         was_draft: isDraft,
         published_at: row.published_at,
         deleted_by: userName,
@@ -362,8 +363,9 @@ export class AnnouncementService {
     await this.writeAuditLog({
       userName,
       userRole,
-      action: 'Archived Announcement',
+      action: 'Announcement Archived',
       detail: `"${data.title}" was archived by ${userName}`,
+      severity: 'warning',
       metadata: { announcement_id: id, archived_by: userName },
     });
 
@@ -388,8 +390,9 @@ export class AnnouncementService {
     await this.writeAuditLog({
       userName,
       userRole,
-      action: 'Restored Archived Announcement',
+      action: 'Announcement Restored',
       detail: `"${data.title}" was restored from archive by ${userName}`,
+      severity: 'info',
       metadata: { announcement_id: id, restored_by: userName },
     });
 
@@ -419,8 +422,9 @@ export class AnnouncementService {
     await this.writeAuditLog({
       userName,
       userRole,
-      action: pinned ? 'Pinned Announcement' : 'Unpinned Announcement',
-      detail: `"${data.title}" was ${pinned ? 'pinned to' : 'unpinned from'} the top of the board by ${userName}`,
+      action: pinned ? 'Announcement Pinned' : 'Announcement Unpinned',
+      detail: `"${data.title}" was ${pinned ? 'pinned to' : 'unpinned from'} the board by ${userName}`,
+      severity: 'info',
       metadata: { announcement_id: id, pinned },
     });
 
@@ -448,6 +452,14 @@ export class AnnouncementService {
     if (body.startDate !== undefined) updates.start_date = body.startDate;
     if ('endDate' in body) updates.end_date = body.endDate ?? null;
 
+    // Snapshot the row before the update so the audit log can show before -> after.
+    const { data: before } = await this.supabaseService.admin
+      .schema('diocese')
+      .from('announcements')
+      .select('*')
+      .eq('id', id)
+      .maybeSingle();
+
     const { data, error } = await this.supabaseService.admin
       .schema('diocese')
       .from('announcements')
@@ -461,12 +473,15 @@ export class AnnouncementService {
       return null;
     }
 
+    const changes = buildFieldChanges(before, data, Object.keys(updates));
+
     await this.writeAuditLog({
       userName,
       userRole,
-      action: 'Edited Announcement',
+      action: 'Announcement Edited',
       detail: `"${data.title}" was edited by ${userName}`,
-      metadata: { announcement_id: id, changes: body },
+      severity: 'info',
+      metadata: { announcement_id: id, changes },
     });
 
     return this.toAnnouncement(data);
