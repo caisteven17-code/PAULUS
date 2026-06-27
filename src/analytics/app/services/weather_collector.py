@@ -1,7 +1,7 @@
 """
 Laguna Province Multi-Source Weather Collector (Enhanced)
 ==========================================================
-Fetches 3 years of historical weather data for all 30 Laguna municipalities
+Fetches historical weather data (2021–present) for all 30 Laguna municipalities
 from three independent sources, scores each source's validity, selects the
 champion (highest score) per municipality, and merges IBTrACS typhoon flags.
 
@@ -107,7 +107,7 @@ REANALYSIS_LAG_DAYS = 7
 
 
 def _default_start() -> date:
-    return date(date.today().year - 3, 1, 1)
+    return date(2021, 1, 1)
 
 
 def _default_end() -> date:
@@ -160,16 +160,39 @@ MUNICIPALITIES: list[dict] = [
 
 # ── HTTP helper with retry + exponential backoff ──────────────────────────────
 
+# Per-host circuit breaker: if a host exhausts retries on 429 this many times
+# in a row, stop hammering it for a cooldown period instead of burning ~3min
+# per call across every remaining municipality (a sustained 429 usually means
+# an hourly/daily quota, which a 60s retry wait can never clear).
+_CIRCUIT_FAIL_THRESHOLD = 2
+_CIRCUIT_COOLDOWN_S = 1200.0
+_circuit_state: dict[str, dict] = {}
+
 
 def _fetch_json(url: str, max_retries: int = 4, base_delay: float = 2.0) -> Optional[dict]:
+    host = urllib.parse.urlparse(url).hostname or url
+    state = _circuit_state.setdefault(host, {"consecutive_429_exhaustions": 0, "open_until": 0.0})
+
+    if time.time() < state["open_until"]:
+        logger.warning(
+            "Circuit open for %s (repeated 429s) — skipping until %.0fs cooldown elapses: %s",
+            host,
+            state["open_until"] - time.time(),
+            url[:80],
+        )
+        return None
+
+    exhausted_on_429 = False
     for attempt in range(max_retries):
         try:
             with urllib.request.urlopen(url, timeout=30) as resp:
+                state["consecutive_429_exhaustions"] = 0
                 return json.loads(resp.read().decode("utf-8"))
         except urllib.error.HTTPError as exc:
             # 429 means the rate-limit window hasn't reset — wait a full minute
             # before retrying rather than the standard exponential backoff.
-            wait = 60.0 if exc.code == 429 else base_delay * (2 ** attempt)
+            is_429 = exc.code == 429
+            wait = 60.0 if is_429 else base_delay * (2 ** attempt)
             if attempt < max_retries - 1:
                 logger.warning(
                     "Fetch failed (%s) — retrying in %.0fs: %s",
@@ -180,6 +203,7 @@ def _fetch_json(url: str, max_retries: int = 4, base_delay: float = 2.0) -> Opti
                 time.sleep(wait)
             else:
                 logger.error("All retries exhausted for %s: %s", url[:80], exc)
+                exhausted_on_429 = is_429
         except Exception as exc:
             wait = base_delay * (2 ** attempt)
             if attempt < max_retries - 1:
@@ -192,6 +216,16 @@ def _fetch_json(url: str, max_retries: int = 4, base_delay: float = 2.0) -> Opti
                 time.sleep(wait)
             else:
                 logger.error("All retries exhausted for %s: %s", url[:80], exc)
+
+    if exhausted_on_429:
+        state["consecutive_429_exhaustions"] += 1
+        if state["consecutive_429_exhaustions"] >= _CIRCUIT_FAIL_THRESHOLD:
+            state["open_until"] = time.time() + _CIRCUIT_COOLDOWN_S
+            logger.error(
+                "Repeated 429s from %s — opening circuit breaker for %.0f minutes",
+                host,
+                _CIRCUIT_COOLDOWN_S / 60,
+            )
     return None
 
 
@@ -680,13 +714,13 @@ def collect(
                 chirps_fut = chirps_pool.submit(build_chirps_daily_cache, lat, lon, start, end)
                 # Stagger Open-Meteo validator calls while CHIRPS job is in flight
                 era5_recs  = fetch_open_meteo_era5(lat, lon, start, end)
-                time.sleep(2.0)
+                time.sleep(8.0)
                 ecmwf_recs = fetch_open_meteo_ecmwf_ifs(lat, lon, start, end)
-                time.sleep(2.0)
+                time.sleep(8.0)
                 ukmo_recs  = fetch_open_meteo_ukmo(lat, lon, start, end)
-                time.sleep(2.0)
+                time.sleep(8.0)
                 jma_recs   = fetch_open_meteo_jma(lat, lon, start, end)
-                time.sleep(2.0)
+                time.sleep(8.0)
                 try:
                     chirps_cache = chirps_fut.result()  # CHIRPS has its own poll timeout
                 except Exception as exc:  # noqa: BLE001
@@ -793,7 +827,7 @@ def collect(
         )
 
         # Polite delay between municipalities to respect rate limits
-        time.sleep(5.0)
+        time.sleep(15.0)
 
     # Save outputs
     master_path = out_dir / "laguna_weather_final.json"
@@ -894,7 +928,7 @@ def collect(
             from app.services.weather_loader import (
                 load_from_file,
                 rebuild_monthly_summary,
-                upsert_monthly_fleiss_kappa,
+                upsert_monthly_confidence,
                 upsert_weather_rainfall_daily,
                 upsert_weather_temperature_daily,
                 upsert_weather_wind_daily,
@@ -905,7 +939,7 @@ def collect(
             daily_rows_loaded += upsert_weather_temperature_daily(daily_temp_rows)
             daily_rows_loaded += upsert_weather_wind_daily(daily_wind_rows)
             rebuild_monthly_summary(start.isoformat(), end.isoformat())
-            upsert_monthly_fleiss_kappa(daily_rain_rows, daily_temp_rows, daily_wind_rows)
+            upsert_monthly_confidence(daily_rain_rows, daily_temp_rows, daily_wind_rows)
             logger.info(
                 "Loaded %d rows into rainfall + temperature + wind daily tables",
                 daily_rows_loaded,
@@ -951,7 +985,7 @@ if __name__ == "__main__":
         "--start",
         type=str,
         default=None,
-        help="Start date YYYY-MM-DD (default: 3 years ago)",
+        help="Start date YYYY-MM-DD (default: 2021-01-01)",
     )
     parser.add_argument(
         "--end",

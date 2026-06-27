@@ -47,13 +47,45 @@ from __future__ import annotations
 import calendar
 import json
 import logging
+import random
+import time
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Optional
 
+import httpx
+
 logger = logging.getLogger(__name__)
 
 DEFAULT_OUT_DIR = Path(__file__).resolve().parents[4] / "weather_output"
+
+# ── Retry helper for Supabase requests ────────────────────────────────────────
+# Bulk loads run for tens of minutes; a single transient network blip
+# (WinError 10054 connection reset, read timeout) shouldn't crash a run that
+# already collected all its data. Real Postgres/API errors (bad payload,
+# constraint violation) are not transient and propagate immediately.
+
+_RETRY_MAX_ATTEMPTS = 5
+_RETRY_BASE_DELAY_S = 1.0
+_RETRY_MAX_DELAY_S = 30.0
+
+
+def _execute_with_retry(query):
+    for attempt in range(_RETRY_MAX_ATTEMPTS):
+        try:
+            return query.execute()
+        except httpx.TransportError as exc:
+            if attempt == _RETRY_MAX_ATTEMPTS - 1:
+                raise
+            delay = (
+                min(_RETRY_BASE_DELAY_S * (2 ** attempt), _RETRY_MAX_DELAY_S)
+                + random.uniform(0, _RETRY_BASE_DELAY_S)
+            )
+            logger.warning(
+                "Supabase request failed (%s: %s) — retrying in %.1fs (attempt %d/%d)",
+                type(exc).__name__, exc, delay, attempt + 1, _RETRY_MAX_ATTEMPTS,
+            )
+            time.sleep(delay)
 
 
 # ── Condition derivation ──────────────────────────────────────────────────────
@@ -140,14 +172,13 @@ def _upsert_batch(rows: list[dict]) -> int:
     page_size = 1000
     offset = 0
     while True:
-        existing_resp = (
+        existing_resp = _execute_with_retry(
             get_table("reference", "weather_observations")
             .select("id, date, location")
             .in_("date", dates)
             .in_("location", locations)
             .is_("institution_id", "null")
             .range(offset, offset + page_size - 1)
-            .execute()
         )
         batch = existing_resp.data or []
         for r in batch:
@@ -166,7 +197,7 @@ def _upsert_batch(rows: list[dict]) -> int:
     total = 0
     for i in range(0, len(tagged), _OBSERVATIONS_CHUNK):
         chunk = tagged[i : i + _OBSERVATIONS_CHUNK]
-        get_table("reference", "weather_observations").upsert(chunk).execute()
+        _execute_with_retry(get_table("reference", "weather_observations").upsert(chunk))
         total += len(chunk)
         logger.info("Upserted %d/%d weather_observations rows", total, len(tagged))
 
@@ -379,9 +410,9 @@ def _upsert_daily_table(table: str, rows: list[dict]) -> int:
     total = 0
     for i in range(0, len(rows), _DAILY_UPSERT_CHUNK):
         chunk = rows[i : i + _DAILY_UPSERT_CHUNK]
-        get_table("reference", table).upsert(
-            chunk, on_conflict="date,municipality"
-        ).execute()
+        _execute_with_retry(
+            get_table("reference", table).upsert(chunk, on_conflict="date,municipality")
+        )
         total += len(chunk)
         logger.info("Upserted %d/%d %s rows", total, len(rows), table)
 
@@ -411,14 +442,13 @@ def rebuild_monthly_summary(period_start: Optional[str] = None, period_end: Opti
     """
     from app.services.supabase_client import get_supabase
 
-    resp = (
+    resp = _execute_with_retry(
         get_supabase()
         .schema("reference")
         .rpc(
             "rebuild_weather_monthly_summary",
             {"p_period_start": period_start, "p_period_end": period_end},
         )
-        .execute()
     )
     try:
         count = int(resp.data)
@@ -428,15 +458,14 @@ def rebuild_monthly_summary(period_start: Optional[str] = None, period_end: Opti
     return count
 
 
-def upsert_monthly_fleiss_kappa(
+def upsert_monthly_confidence(
     daily_rain_rows: list[dict],
     daily_temp_rows: list[dict],
     daily_wind_rows: Optional[list[dict]] = None,
 ) -> int:
     """
-    Compute Fleiss' Kappa per (municipality, month) for all five factors and
-    upsert the kappa columns into weather_monthly_summary.
-    WCI is handled by the SQL rebuild function; this covers the Python-only columns.
+    Compute Cohen's Kappa and Lin's CCC per (municipality, month) for all
+    factors and upsert into weather_monthly_summary.
     """
     from collections import defaultdict
     from app.services.weather_daily_classifier import compute_confidence_scores
@@ -467,25 +496,31 @@ def upsert_monthly_fleiss_kappa(
         wind_rows = wind_by_key.get((municipality, ym), [])
         confidence = compute_confidence_scores(rain_rows, temp_rows, wind_rows)
         upsert_rows.append({
-            "year_month":            ym,
-            "municipality":          municipality,
-            "rain_fleiss_kappa":     confidence["rainfall"]["legacy_metrics"]["fleiss_kappa"],
-            "severe_fleiss_kappa":   confidence["severe_weather"]["legacy_metrics"]["fleiss_kappa"],
-            "temp_fleiss_kappa":     confidence["temperature"]["legacy_metrics"]["fleiss_kappa"],
-            "humidity_fleiss_kappa": confidence["humidity"]["legacy_metrics"]["fleiss_kappa"],
-            "wind_fleiss_kappa":     confidence["wind"]["legacy_metrics"]["fleiss_kappa"],
+            "year_month":          ym,
+            "municipality":        municipality,
+            "rain_cohens_kappa":   confidence["rainfall"]["cohens_kappa"],
+            "rain_lins_ccc":       confidence["rainfall"]["lins_ccc"],
+            "severe_cohens_kappa": confidence["severe_weather"]["cohens_kappa"],
+            "temp_cohens_kappa":   confidence["temperature"]["cohens_kappa"],
+            "temp_lins_ccc":       confidence["temperature"]["lins_ccc"],
+            "humidity_cohens_kappa": confidence["humidity"]["cohens_kappa"],
+            "humidity_lins_ccc":   confidence["humidity"]["lins_ccc"],
+            "wind_cohens_kappa":   confidence["wind"]["cohens_kappa"],
+            "wind_lins_ccc":       confidence["wind"]["lins_ccc"],
         })
 
     if not upsert_rows:
         return 0
 
     sb = get_supabase()
-    sb.schema("reference").table("weather_monthly_summary").upsert(
-        upsert_rows,
-        on_conflict="year_month,municipality",
-    ).execute()
+    _execute_with_retry(
+        sb.schema("reference").table("weather_monthly_summary").upsert(
+            upsert_rows,
+            on_conflict="year_month,municipality",
+        )
+    )
 
-    logger.info("Fleiss Kappa upserted for %d municipality-months (all 5 factors)", len(upsert_rows))
+    logger.info("Cohen's Kappa + Lin's CCC upserted for %d municipality-months", len(upsert_rows))
     return len(upsert_rows)
 
 
@@ -522,7 +557,7 @@ def load_daily_classified(path: Path) -> int:
     )
 
     rebuild_monthly_summary(data.get("period_start"), data.get("period_end"))
-    upsert_monthly_fleiss_kappa(rain_rows, temp_rows, wind_rows)
+    upsert_monthly_confidence(rain_rows, temp_rows, wind_rows)
     return count
 
 

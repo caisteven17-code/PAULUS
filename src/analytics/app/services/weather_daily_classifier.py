@@ -682,6 +682,7 @@ def classify_day(
     # Humidity validators (source of truth = nasa_rh_pct above)
     open_meteo_rh_pct: Optional[float] = None,
     era5_rh_pct: Optional[float] = None,
+    ukmo_rh_pct: Optional[float] = None,
     # Wind — source of truth is ECMWF IFS (see _validate_dimension call below);
     # NASA POWER AG WS10M is one of 4 validators, not the SoT.
     nasa_wind_ms: Optional[float] = None,
@@ -769,6 +770,7 @@ def classify_day(
         [
             ("Open-Meteo ERA5-Land", open_meteo_rh_pct),
             ("ERA5 (Full)",          era5_rh_pct),
+            ("UKMO",                 ukmo_rh_pct),
         ],
         classify_humidity,
         HUMID_AGREE_TOLERANCE_PCT,
@@ -865,8 +867,10 @@ def classify_day(
             # Humidity
             "open_meteo_rh_pct":           round(open_meteo_rh_pct, 2) if open_meteo_rh_pct is not None else None,
             "era5_rh_pct":                 round(era5_rh_pct, 2) if era5_rh_pct is not None else None,
+            "ukmo_rh_pct":                 round(ukmo_rh_pct, 2) if ukmo_rh_pct is not None else None,
             "open_meteo_humidity_classification": classify_humidity(open_meteo_rh_pct),
             "era5_humidity_classification":       classify_humidity(era5_rh_pct),
+            "ukmo_humidity_classification":       classify_humidity(ukmo_rh_pct),
             "humidity_classification":     hum.get("classification"),
             "humidity_validators_agreed":  hum.get("validators_agreed", 0),
             "humidity_wmo_quality_flag":   hum.get("wmo_quality_flag"),
@@ -981,7 +985,8 @@ def build_daily_rows(
         ukmo_rain  = ukmo.get("rainfall_mm") if ukmo else None
         ukmo_temp  = ukmo.get("temp_max_c")  if ukmo else None
         ukmo_wind  = ukmo.get("wind_ms")     if ukmo else None
-        ukmo_wcode = ukmo.get("weathercode") if ukmo else None
+        ukmo_wcode = ukmo.get("weathercode")          if ukmo else None
+        ukmo_rh    = ukmo.get("relativehumidity_pct") if ukmo else None
 
         # JMA (severe-weather validator only)
         jma       = jma_by_date.get(d)
@@ -1041,6 +1046,7 @@ def build_daily_rows(
             ukmo_temp_c=ukmo_temp,
             open_meteo_rh_pct=open_meteo_rh,
             era5_rh_pct=era5_rh,
+            ukmo_rh_pct=ukmo_rh,
             nasa_wind_ms=nasa_wind,
             open_meteo_wind_ms=open_meteo_wind,
             era5_wind_ms=era5_wind,
@@ -1317,8 +1323,25 @@ def build_gsmap_nrt_daily_cache(start: date, end: date) -> dict[str, float]:
     col_min = _col(_GSMAP_LON_MIN)
     col_max = _col(_GSMAP_LON_MAX)
 
+    # GSMaP NRT FTP only retains the last ~90 days — skip older dates entirely
+    # rather than accumulating thousands of guaranteed-to-fail FTP connections.
+    nrt_cutoff = date.today() - timedelta(days=90)
+    nrt_start  = max(start, nrt_cutoff)
+    if nrt_start > end:
+        logger.info(
+            "GSMaP NRT: entire range %s–%s is outside the 90-day retention window — skipping",
+            start, end,
+        )
+        return {}
+    skipped = (nrt_start - start).days
+    if skipped:
+        logger.info(
+            "GSMaP NRT: skipping %d historical dates before %s (outside 90-day retention window)",
+            skipped, nrt_start,
+        )
+
     all_dates: list[date] = []
-    current = start
+    current = nrt_start
     while current <= end:
         all_dates.append(current)
         current += timedelta(days=1)
@@ -1467,60 +1490,7 @@ def build_chirps_daily_cache(lat: float, lon: float, start: date, end: date) -> 
 # ── Confidence scoring ────────────────────────────────────────────────────────
 
 
-def _fleiss_kappa(items: list[dict]) -> Optional[float]:
-    """items: list of {rater_name: category_str}. Raters may differ per item."""
-    if len(items) < 2:
-        return None
-    # Collect all categories across all items
-    all_cats: set[str] = set()
-    for item in items:
-        all_cats.update(item.values())
-    cats = sorted(all_cats)
-    k = len(cats)
-    if k < 2:
-        return None
-
-    # Build count matrix: n_items x n_cats (how many raters assigned each cat per item)
-    n_items = len(items)
-    cat_idx = {c: i for i, c in enumerate(cats)}
-    counts: list[list[int]] = [[0] * k for _ in range(n_items)]
-    n_raters_per_item: list[int] = []
-    for i, item in enumerate(items):
-        rater_count = 0
-        for cat in item.values():
-            counts[i][cat_idx[cat]] += 1
-            rater_count += 1
-        n_raters_per_item.append(rater_count)
-
-    # Filter items with fewer than 2 raters (cannot compute agreement)
-    valid = [(counts[i], n_raters_per_item[i]) for i in range(n_items) if n_raters_per_item[i] >= 2]
-    if len(valid) < 2:
-        return None
-
-    # P_bar: mean per-item agreement proportion
-    p_items = []
-    for cnt, n_j in valid:
-        denom = n_j * (n_j - 1)
-        p_j = sum(c * (c - 1) for c in cnt) / denom if denom > 0 else 0.0
-        p_items.append(p_j)
-    p_bar = sum(p_items) / len(p_items)
-
-    # P_e_bar: sum of squared marginal proportions across all valid items
-    total_ratings = sum(n_j for _, n_j in valid)
-    if total_ratings == 0:
-        return None
-    cat_totals = [0] * k
-    for cnt, _ in valid:
-        for j, c in enumerate(cnt):
-            cat_totals[j] += c
-    p_e_bar = sum((t / total_ratings) ** 2 for t in cat_totals)
-
-    if p_e_bar >= 1.0:
-        return 1.0
-    return round((p_bar - p_e_bar) / (1.0 - p_e_bar), 4)
-
-
-def _fk_label(k: Optional[float]) -> str:
+def _strength_label(k: Optional[float]) -> str:
     if k is None:
         return "insufficient data"
     if k < 0.0:
@@ -1535,19 +1505,6 @@ def _fk_label(k: Optional[float]) -> str:
         return "Substantial"
     return "Almost Perfect"
 
-
-def _build_items(rows: list[dict], col_map: dict[str, str], classify_fn) -> list[dict]:
-    """col_map: {rater_label: row_key}. Returns Fleiss items list."""
-    items = []
-    for row in rows:
-        item: dict[str, str] = {}
-        for label, col in col_map.items():
-            val = row.get(col)
-            if val is not None:
-                item[label] = classify_fn(val)
-        if len(item) >= 2:
-            items.append(item)
-    return items
 
 
 def _cohens_kappa(cats_a: list, cats_b: list) -> Optional[float]:
@@ -1614,6 +1571,7 @@ def _mean_pairwise_ccc(rows: list[dict], col_map: dict[str, str]) -> Optional[fl
     return round(sum(cs) / len(cs), 4) if cs else None
 
 
+
 def compute_confidence_scores(
     rain_rows: list[dict],
     temp_rows: list[dict],
@@ -1655,14 +1613,6 @@ def compute_confidence_scores(
        weight_map: {6:1.00, 5:0.83, 4:0.67, 3:0.50, 2:0.33, 1:0.17, 0:0.00}
        WCI = mean(weights) x 100 %
     """
-    # ── helpers ───────────────────────────────────────────────────────────────
-
-    def _wci(rows: list[dict], n_validators: int, agreed_col: str = "validators_agreed") -> float:
-        if not rows or n_validators == 0:
-            return 0.0
-        weights = [r.get(agreed_col, 0) / n_validators for r in rows]
-        return round(sum(weights) / len(weights) * 100, 2)
-
     # ── Rainfall ─────────────────────────────────────────────────────────────
     rain_col_map = {
         "NASA POWER AG":        "nasa_power_rainfall_mm",
@@ -1672,11 +1622,8 @@ def compute_confidence_scores(
         "ERA5 (Full)":          "era5_rainfall_mm",
         "UKMO":                 "ukmo_rainfall_mm",
     }
-    rain_items = _build_items(rain_rows, rain_col_map, classify_rain)
-    rain_fk    = _fleiss_kappa(rain_items)
-    rain_wci   = _wci(rain_rows, len(rain_col_map) - 1)  # n=5
-    rain_ck    = _mean_pairwise_kappa(rain_rows, rain_col_map, classify_rain)
-    rain_ccc   = _mean_pairwise_ccc(rain_rows, rain_col_map)
+    rain_ck  = _mean_pairwise_kappa(rain_rows, rain_col_map, classify_rain)
+    rain_ccc = _mean_pairwise_ccc(rain_rows, rain_col_map)
 
     # ── Severe weather ────────────────────────────────────────────────────────
     severe_col_map = {
@@ -1687,24 +1634,13 @@ def compute_confidence_scores(
         # UKMO excluded — 62.7% mismatch rate due to different WMO weathercode
         # conventions for tropical Philippines weather (structural disagreement).
         # JMA included instead — same WMO code table as ERA5/ECMWF IFS (verified
-        # empirically), and genuinely independent of the ECMWF lineage, unlike
-        # Open-Meteo ERA5-Land/ERA5/ECMWF IFS which all derive from one org.
+        # empirically), and genuinely independent of the ECMWF lineage.
     }
     _classify_severe_code = lambda c: classify_severe(int(c)) if c is not None else None
-    severe_items = _build_items(rain_rows, severe_col_map, _classify_severe_code)
-    severe_fk    = _fleiss_kappa(severe_items)
-    severe_wci   = _wci(rain_rows, 3, agreed_col="severe_validators_agreed")
-    severe_ck    = _mean_pairwise_kappa(rain_rows, severe_col_map, _classify_severe_code)
-    # No Lin's CCC for severe weather — weathercode is nominal, not continuous.
+    severe_ck = _mean_pairwise_kappa(rain_rows, severe_col_map, _classify_severe_code)
 
-    # ── Severe weather, rainfall-derived proxy (additional signal, NOT a
-    # replacement — see classify_severe_from_precip docstring for why these
-    # answer slightly different questions). Reuses rain_col_map: 6 sources,
-    # 5 independent lineage groups, vs. the weathercode approach's 3 sources
-    # all sharing one lineage.
-    severe_rain_items = _build_items(rain_rows, rain_col_map, classify_severe_from_precip)
-    severe_rain_fk     = _fleiss_kappa(severe_rain_items)
-    severe_rain_ck      = _mean_pairwise_kappa(rain_rows, rain_col_map, classify_severe_from_precip)
+    # ── Severe weather, rainfall-derived proxy ────────────────────────────────
+    severe_rain_ck = _mean_pairwise_kappa(rain_rows, rain_col_map, classify_severe_from_precip)
 
     # ── Temperature ───────────────────────────────────────────────────────────
     temp_col_map = {
@@ -1714,23 +1650,18 @@ def compute_confidence_scores(
         "ECMWF IFS":            "ecmwf_ifs_temp_c",
         "UKMO":                 "ukmo_temp_c",
     }
-    temp_items = _build_items(temp_rows, temp_col_map, classify_temp)
-    temp_fk    = _fleiss_kappa(temp_items)
-    temp_wci   = _wci(temp_rows, len(temp_col_map) - 1)  # n=4
-    temp_ck    = _mean_pairwise_kappa(temp_rows, temp_col_map, classify_temp)
-    temp_ccc   = _mean_pairwise_ccc(temp_rows, temp_col_map)
+    temp_ck  = _mean_pairwise_kappa(temp_rows, temp_col_map, classify_temp)
+    temp_ccc = _mean_pairwise_ccc(temp_rows, temp_col_map)
 
     # ── Humidity ──────────────────────────────────────────────────────────────
     humidity_col_map = {
         "NASA POWER AG":        "nasa_power_rh_pct",
         "Open-Meteo ERA5-Land": "open_meteo_rh_pct",
         "ERA5 (Full)":          "era5_rh_pct",
+        "UKMO":                 "ukmo_rh_pct",
     }
-    humidity_items = _build_items(temp_rows, humidity_col_map, classify_humidity)
-    humidity_fk    = _fleiss_kappa(humidity_items)
-    humidity_wci   = _wci(temp_rows, 2, agreed_col="humidity_validators_agreed")
-    humidity_ck    = _mean_pairwise_kappa(temp_rows, humidity_col_map, classify_humidity)
-    humidity_ccc   = _mean_pairwise_ccc(temp_rows, humidity_col_map)
+    humidity_ck  = _mean_pairwise_kappa(temp_rows, humidity_col_map, classify_humidity)
+    humidity_ccc = _mean_pairwise_ccc(temp_rows, humidity_col_map)
 
     # ── Wind ──────────────────────────────────────────────────────────────────
     wind_rows = wind_rows or []
@@ -1741,61 +1672,31 @@ def compute_confidence_scores(
         "ECMWF IFS":            "ecmwf_ifs_wind_ms",
         "UKMO":                 "ukmo_wind_ms",
     }
-    wind_items = _build_items(wind_rows, wind_col_map, classify_wind)
-    wind_fk    = _fleiss_kappa(wind_items)
-    wind_wci   = _wci(wind_rows, len(wind_col_map) - 1)  # n=4
-    wind_ck    = _mean_pairwise_kappa(wind_rows, wind_col_map, classify_wind)
-    wind_ccc   = _mean_pairwise_ccc(wind_rows, wind_col_map)
+    wind_ck  = _mean_pairwise_kappa(wind_rows, wind_col_map, classify_wind)
+    wind_ccc = _mean_pairwise_ccc(wind_rows, wind_col_map)
 
-    # ── Overall WCI (Option 2: primary×2, secondary×1) / 8 ───────────────────
-    # Legacy aggregate metrics — kept for upsert_monthly_fleiss_kappa() and any
-    # other consumer of the old shape; no longer the headline numbers (see
-    # overall_mean_cohens_kappa below). Not deleted: still computed in full.
-    overall_wci = round(
-        (rain_wci * 2 + severe_wci * 2 + temp_wci * 2 + wind_wci + humidity_wci) / 8, 2
-    )
-    fk_scores  = [k for k in [rain_fk, severe_fk, temp_fk, wind_fk, humidity_fk] if k is not None]
-    overall_fk = round(sum(fk_scores) / len(fk_scores), 4) if fk_scores else None
-
-    # ── Headline metrics: mean pairwise Cohen's Kappa / Lin's CCC ────────────
-    ck_scores  = [k for k in [rain_ck, severe_ck, temp_ck, wind_ck, humidity_ck] if k is not None]
-    overall_ck = round(sum(ck_scores) / len(ck_scores), 4) if ck_scores else None
-    ccc_scores = [c for c in [rain_ccc, temp_ccc, wind_ccc, humidity_ccc] if c is not None]
+    # ── Overall ───────────────────────────────────────────────────────────────
+    ck_scores   = [k for k in [rain_ck, severe_ck, temp_ck, wind_ck, humidity_ck] if k is not None]
+    overall_ck  = round(sum(ck_scores) / len(ck_scores), 4) if ck_scores else None
+    ccc_scores  = [c for c in [rain_ccc, temp_ccc, wind_ccc, humidity_ccc] if c is not None]
     overall_ccc = round(sum(ccc_scores) / len(ccc_scores), 4) if ccc_scores else None
 
     return {
         "overall_mean_cohens_kappa":          overall_ck,
-        "overall_mean_cohens_kappa_strength": _fk_label(overall_ck),
+        "overall_mean_cohens_kappa_strength": _strength_label(overall_ck),
         "overall_mean_lins_ccc":              overall_ccc,
-        "legacy_metrics": {
-            "overall_fleiss_kappa":    overall_fk,
-            "overall_fleiss_strength": _fk_label(overall_fk),
-            "overall_wci_pct":         overall_wci,
-        },
         "rainfall": {
-            "total_rows":          len(rain_rows),
-            "n_items_for_kappa":   len(rain_items),
-            "cohens_kappa":        rain_ck,
-            "cohens_kappa_strength": _fk_label(rain_ck),
-            "lins_ccc":            rain_ccc,
-            "legacy_metrics": {
-                "fleiss_kappa":                  rain_fk,
-                "fleiss_strength":               _fk_label(rain_fk),
-                "weighted_confidence_index_pct": rain_wci,
-            },
+            "total_rows":            len(rain_rows),
+            "cohens_kappa":          rain_ck,
+            "cohens_kappa_strength": _strength_label(rain_ck),
+            "lins_ccc":              rain_ccc,
         },
         "severe_weather": {
-            "total_rows":          len(rain_rows),
-            "n_items_for_kappa":   len(severe_items),
-            "cohens_kappa":        severe_ck,
-            "cohens_kappa_strength": _fk_label(severe_ck),
-            "lins_ccc":            None,
-            "lins_ccc_note":       "N/A — weathercode is nominal, not continuous.",
-            "legacy_metrics": {
-                "fleiss_kappa":                  severe_fk,
-                "fleiss_strength":               _fk_label(severe_fk),
-                "weighted_confidence_index_pct": severe_wci,
-            },
+            "total_rows":            len(rain_rows),
+            "cohens_kappa":          severe_ck,
+            "cohens_kappa_strength": _strength_label(severe_ck),
+            "lins_ccc":              None,
+            "lins_ccc_note":         "N/A — weathercode is nominal, not continuous.",
         },
         "severe_weather_rain_based": {
             "note": (
@@ -1807,52 +1708,29 @@ def compute_confidence_scores(
                 "even if severe_weather (weathercode) correctly flags it."
             ),
             "total_rows":            len(rain_rows),
-            "n_items_for_kappa":     len(severe_rain_items),
             "cohens_kappa":          severe_rain_ck,
-            "cohens_kappa_strength": _fk_label(severe_rain_ck),
+            "cohens_kappa_strength": _strength_label(severe_rain_ck),
             "lins_ccc":              None,
             "lins_ccc_note":         "N/A — this is a categorical classification (5-tier), not the raw mm value.",
-            "legacy_metrics": {
-                "fleiss_kappa":    severe_rain_fk,
-                "fleiss_strength": _fk_label(severe_rain_fk),
-            },
         },
         "temperature": {
-            "total_rows":          len(temp_rows),
-            "n_items_for_kappa":   len(temp_items),
-            "note": "Validation bins raw temp_c; classification uses Rothfusz heat index.",
-            "cohens_kappa":        temp_ck,
-            "cohens_kappa_strength": _fk_label(temp_ck),
-            "lins_ccc":            temp_ccc,
-            "legacy_metrics": {
-                "fleiss_kappa":                  temp_fk,
-                "fleiss_strength":               _fk_label(temp_fk),
-                "weighted_confidence_index_pct": temp_wci,
-            },
+            "total_rows":            len(temp_rows),
+            "note":                  "Validation bins raw temp_c; classification uses Rothfusz heat index.",
+            "cohens_kappa":          temp_ck,
+            "cohens_kappa_strength": _strength_label(temp_ck),
+            "lins_ccc":              temp_ccc,
         },
         "humidity": {
-            "total_rows":          len(temp_rows),
-            "n_items_for_kappa":   len(humidity_items),
-            "cohens_kappa":        humidity_ck,
-            "cohens_kappa_strength": _fk_label(humidity_ck),
-            "lins_ccc":            humidity_ccc,
-            "legacy_metrics": {
-                "fleiss_kappa":                  humidity_fk,
-                "fleiss_strength":               _fk_label(humidity_fk),
-                "weighted_confidence_index_pct": humidity_wci,
-            },
+            "total_rows":            len(temp_rows),
+            "cohens_kappa":          humidity_ck,
+            "cohens_kappa_strength": _strength_label(humidity_ck),
+            "lins_ccc":              humidity_ccc,
         },
         "wind": {
-            "total_rows":          len(wind_rows),
-            "n_items_for_kappa":   len(wind_items),
-            "cohens_kappa":        wind_ck,
-            "cohens_kappa_strength": _fk_label(wind_ck),
-            "lins_ccc":            wind_ccc,
-            "legacy_metrics": {
-                "fleiss_kappa":                  wind_fk,
-                "fleiss_strength":               _fk_label(wind_fk),
-                "weighted_confidence_index_pct": wind_wci,
-            },
+            "total_rows":            len(wind_rows),
+            "cohens_kappa":          wind_ck,
+            "cohens_kappa_strength": _strength_label(wind_ck),
+            "lins_ccc":              wind_ccc,
         },
     }
 
@@ -1923,50 +1801,6 @@ def aggregate_rows_by_period(
     return out
 
 
-_RAIN_SEVERITY_RANK = {"light": 0, "moderate": 1, "heavy": 2}
-_RAIN_RANK_TO_LABEL = {v: k for k, v in _RAIN_SEVERITY_RANK.items()}
-
-
-def _build_rain_peak_items(
-    rows: list[dict],
-    col_map: dict[str, str],
-    period: str,
-    date_col: str = "date",
-    group_col: str = "municipality",
-) -> list[dict]:
-    """
-    Neighborhood-style rainfall items: classify each day per source with the
-    existing (unscaled) classify_rain(), then take each source's MAX-severity
-    day within the window as that source's label for the window. This tests
-    whether sources agree an event of a given severity happened SOMEWHERE in
-    the window — tolerant of which exact day the peak landed on — rather than
-    requiring the summed window total to cross a rescaled threshold (which
-    collapses category diversity; see compute_temporal_aggregated_confidence
-    docstring for why summing was rejected).
-    """
-    buckets: dict[tuple, dict[str, int]] = {}
-    for row in rows:
-        raw_date = row.get(date_col)
-        group_val = row.get(group_col)
-        if raw_date is None or group_val is None:
-            continue
-        key = (group_val, _period_key(raw_date, period))
-        bucket = buckets.setdefault(key, {})
-        for label, col in col_map.items():
-            val = row.get(col)
-            if val is None:
-                continue
-            rank = _RAIN_SEVERITY_RANK[classify_rain(val)]
-            if label not in bucket or rank > bucket[label]:
-                bucket[label] = rank
-
-    items = []
-    for bucket in buckets.values():
-        item = {label: _RAIN_RANK_TO_LABEL[rank] for label, rank in bucket.items()}
-        if len(item) >= 2:
-            items.append(item)
-    return items
-
 
 def compute_temporal_aggregated_confidence(
     daily_rain_rows: list[dict],
@@ -1997,19 +1831,6 @@ def compute_temporal_aggregated_confidence(
     if period not in _PERIOD_WINDOW_DAYS:
         raise ValueError(f"period must be 'W' or 'M', got {period!r}")
 
-    temp_mean_cols = [
-        "nasa_power_temp_c", "open_meteo_temp_c", "era5_temp_c",
-        "ecmwf_ifs_temp_c", "ukmo_temp_c",
-    ]
-    humidity_mean_cols = ["nasa_power_rh_pct", "open_meteo_rh_pct", "era5_rh_pct"]
-    wind_mean_cols = [
-        "nasa_power_wind_ms", "open_meteo_wind_ms", "era5_wind_ms",
-        "ecmwf_ifs_wind_ms", "ukmo_wind_ms",
-    ]
-
-    temp_agg = aggregate_rows_by_period(daily_temp_rows, [], temp_mean_cols + humidity_mean_cols, period)
-    wind_agg = aggregate_rows_by_period(daily_wind_rows or [], [], wind_mean_cols, period)
-
     rain_col_map = {
         "NASA POWER AG": "nasa_power_rainfall_mm", "CHIRPS": "chirps_rainfall_mm",
         "Open-Meteo ERA5-Land": "open_meteo_rainfall_mm", "GSMaP NRT": "gsmap_nrt_rainfall_mm",
@@ -2021,54 +1842,67 @@ def compute_temporal_aggregated_confidence(
     }
     humidity_col_map = {
         "NASA POWER AG": "nasa_power_rh_pct", "Open-Meteo ERA5-Land": "open_meteo_rh_pct",
-        "ERA5 (Full)": "era5_rh_pct",
+        "ERA5 (Full)": "era5_rh_pct", "UKMO": "ukmo_rh_pct",
     }
     wind_col_map = {
         "NASA POWER AG": "nasa_power_wind_ms", "Open-Meteo ERA5-Land": "open_meteo_wind_ms",
         "ERA5 (Full)": "era5_wind_ms", "ECMWF IFS": "ecmwf_ifs_wind_ms", "UKMO": "ukmo_wind_ms",
     }
 
-    rain_items = _build_rain_peak_items(daily_rain_rows, rain_col_map, period)
-    temp_items = _build_items(temp_agg, temp_col_map, classify_temp)
-    humidity_items = _build_items(temp_agg, humidity_col_map, classify_humidity)
-    wind_items = _build_items(wind_agg, wind_col_map, classify_wind)
+    rain_agg = aggregate_rows_by_period(
+        daily_rain_rows, list(rain_col_map.values()), [], period
+    )
+    temp_agg = aggregate_rows_by_period(
+        daily_temp_rows, [],
+        list(temp_col_map.values()) + list(humidity_col_map.values()),
+        period,
+    )
+    wind_agg = aggregate_rows_by_period(
+        daily_wind_rows or [], [], list(wind_col_map.values()), period
+    )
 
-    rain_fk = _fleiss_kappa(rain_items)
-    temp_fk = _fleiss_kappa(temp_items)
-    humidity_fk = _fleiss_kappa(humidity_items)
-    wind_fk = _fleiss_kappa(wind_items)
+    rain_ck      = _mean_pairwise_kappa(rain_agg, rain_col_map, classify_rain)
+    rain_ccc     = _mean_pairwise_ccc(rain_agg, rain_col_map)
+    temp_ck      = _mean_pairwise_kappa(temp_agg, temp_col_map, classify_temp)
+    temp_ccc     = _mean_pairwise_ccc(temp_agg, temp_col_map)
+    humidity_ck  = _mean_pairwise_kappa(temp_agg, humidity_col_map, classify_humidity)
+    humidity_ccc = _mean_pairwise_ccc(temp_agg, humidity_col_map)
+    wind_ck      = _mean_pairwise_kappa(wind_agg, wind_col_map, classify_wind)
+    wind_ccc     = _mean_pairwise_ccc(wind_agg, wind_col_map)
 
-    fk_scores = [k for k in [rain_fk, temp_fk, humidity_fk, wind_fk] if k is not None]
-    overall_fk = round(sum(fk_scores) / len(fk_scores), 4) if fk_scores else None
+    ck_scores   = [k for k in [rain_ck, temp_ck, humidity_ck, wind_ck] if k is not None]
+    overall_ck  = round(sum(ck_scores) / len(ck_scores), 4) if ck_scores else None
+    ccc_scores  = [c for c in [rain_ccc, temp_ccc, humidity_ccc, wind_ccc] if c is not None]
+    overall_ccc = round(sum(ccc_scores) / len(ccc_scores), 4) if ccc_scores else None
 
     return {
         "period": period,
-        "overall_fleiss_kappa": overall_fk,
-        "overall_fleiss_strength": _fk_label(overall_fk),
+        "overall_cohens_kappa":          overall_ck,
+        "overall_cohens_kappa_strength": _strength_label(overall_ck),
+        "overall_lins_ccc":              overall_ccc,
         "rainfall": {
-            "n_periods": len(rain_items),
-            "n_items_for_kappa": len(rain_items),
-            "fleiss_kappa": rain_fk,
-            "fleiss_strength": _fk_label(rain_fk),
-            "note": "Peak-classification: each source's window label is its most severe day in the window (unscaled PAGASA thresholds).",
+            "n_periods":             len(rain_agg),
+            "cohens_kappa":          rain_ck,
+            "cohens_kappa_strength": _strength_label(rain_ck),
+            "lins_ccc":              rain_ccc,
         },
         "temperature": {
-            "n_periods": len(temp_agg),
-            "n_items_for_kappa": len(temp_items),
-            "fleiss_kappa": temp_fk,
-            "fleiss_strength": _fk_label(temp_fk),
+            "n_periods":             len(temp_agg),
+            "cohens_kappa":          temp_ck,
+            "cohens_kappa_strength": _strength_label(temp_ck),
+            "lins_ccc":              temp_ccc,
         },
         "humidity": {
-            "n_periods": len(temp_agg),
-            "n_items_for_kappa": len(humidity_items),
-            "fleiss_kappa": humidity_fk,
-            "fleiss_strength": _fk_label(humidity_fk),
+            "n_periods":             len(temp_agg),
+            "cohens_kappa":          humidity_ck,
+            "cohens_kappa_strength": _strength_label(humidity_ck),
+            "lins_ccc":              humidity_ccc,
         },
         "wind": {
-            "n_periods": len(wind_agg),
-            "n_items_for_kappa": len(wind_items),
-            "fleiss_kappa": wind_fk,
-            "fleiss_strength": _fk_label(wind_fk),
+            "n_periods":             len(wind_agg),
+            "cohens_kappa":          wind_ck,
+            "cohens_kappa_strength": _strength_label(wind_ck),
+            "lins_ccc":              wind_ccc,
         },
     }
 
