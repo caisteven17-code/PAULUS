@@ -30,6 +30,8 @@ import { getArchiveAccess, ArchiveAccess } from '../lib/archiveAccess';
 import { InlineLoader } from '../components/ui/LoadingScreen';
 import { Avatar } from '../components/ui/Avatar';
 import { ENTITY_TYPE_ICON } from '../lib/entityIcons';
+import { FilterModal, FilterField } from '../components/ui/FilterModal';
+import { selectField, dateField } from '../lib/formStyles';
 
 type ArchiveType = 'user' | 'entity' | 'event' | 'announcement' | 'project' | 'health';
 
@@ -74,7 +76,9 @@ export function ArchivesPage() {
 
   const [search, setSearch] = useState('');
   const [typeFilter, setTypeFilter] = useState<'all' | ArchiveType>('all');
-  const [dateRange, setDateRange] = useState<'all' | 'today' | 'week' | 'month'>('all');
+  const [institutionFilter, setInstitutionFilter] = useState('all');
+  const [dateFrom, setDateFrom] = useState('');
+  const [dateTo, setDateTo] = useState('');
   const [sortBy, setSortBy] = useState<'newest' | 'oldest'>('newest');
   const [page, setPage] = useState(1);
 
@@ -269,11 +273,26 @@ export function ArchivesPage() {
     if (typeFilter !== 'all' && !allowedTypes.includes(typeFilter)) setTypeFilter('all');
   }, [allowedTypes, typeFilter]);
 
+  // Institution a record belongs to (entity rows ARE the institution; others
+  // carry it on their raw payload), used by the institution filter.
+  const recordInstitution = (r: ArchivedRecord): string =>
+    (r.type === 'entity' ? r.title : '') ||
+    r.raw?.entityName ||
+    r.raw?.institution_name ||
+    r.raw?.parish ||
+    '';
+
+  const institutionOptions = useMemo(
+    () => Array.from(new Set(records.map(recordInstitution).filter(Boolean))).sort(),
+    [records],
+  );
+
   // ── Filtering ───────────────────────────────────────────────────────────────
   const filtered = useMemo(() => {
     let list = records.slice();
 
     if (typeFilter !== 'all') list = list.filter((r) => r.type === typeFilter);
+    if (institutionFilter !== 'all') list = list.filter((r) => recordInstitution(r) === institutionFilter);
 
     if (search.trim()) {
       const q = search.trim().toLowerCase();
@@ -285,13 +304,10 @@ export function ArchivesPage() {
       );
     }
 
-    if (dateRange !== 'all') {
-      const cutoff = new Date();
-      if (dateRange === 'today') cutoff.setHours(0, 0, 0, 0);
-      else if (dateRange === 'week') cutoff.setDate(cutoff.getDate() - 7);
-      else if (dateRange === 'month') cutoff.setDate(cutoff.getDate() - 30);
-      list = list.filter((r) => new Date(r.archivedAt) >= cutoff);
-    }
+    const fromMs = dateFrom ? new Date(dateFrom).getTime() : null;
+    const toMs = dateTo ? new Date(dateTo + 'T23:59:59').getTime() : null;
+    if (fromMs !== null) list = list.filter((r) => new Date(r.archivedAt).getTime() >= fromMs);
+    if (toMs !== null) list = list.filter((r) => new Date(r.archivedAt).getTime() <= toMs);
 
     list.sort((a, b) => {
       const ta = new Date(a.archivedAt).getTime();
@@ -300,12 +316,27 @@ export function ArchivesPage() {
     });
 
     return list;
-  }, [records, typeFilter, search, dateRange, sortBy]);
+  }, [records, typeFilter, institutionFilter, search, dateFrom, dateTo, sortBy]);
+
+  const archiveFilterCount =
+    (typeFilter !== 'all' ? 1 : 0) +
+    (institutionFilter !== 'all' ? 1 : 0) +
+    (dateFrom ? 1 : 0) +
+    (dateTo ? 1 : 0) +
+    (sortBy !== 'newest' ? 1 : 0);
+
+  const clearArchiveFilters = () => {
+    setTypeFilter('all');
+    setInstitutionFilter('all');
+    setDateFrom('');
+    setDateTo('');
+    setSortBy('newest');
+  };
 
   // Reset to first page whenever the filters change the result set
   useEffect(() => {
     setPage(1);
-  }, [typeFilter, search, dateRange, sortBy]);
+  }, [typeFilter, institutionFilter, search, dateFrom, dateTo, sortBy]);
 
   const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
   const pageItems = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
@@ -413,10 +444,9 @@ export function ArchivesPage() {
           </div>
         </div>
 
-        {/* ── Filter bar ── */}
+        {/* ── Filter bar — search inline, everything else in the modal ── */}
         <div className="mb-6 rounded-3xl border border-slate-200 bg-white p-3 shadow-[0_12px_32px_rgba(15,23,42,0.06)]">
-          <div className="flex flex-col gap-3 lg:flex-row lg:items-center">
-            {/* Search */}
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
             <div className="relative flex-1">
               <Search className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
               <input
@@ -426,48 +456,70 @@ export function ArchivesPage() {
                 className="h-11 w-full rounded-2xl border border-slate-200 bg-slate-50 pl-11 pr-4 text-sm font-semibold text-slate-800 transition-all placeholder:text-slate-400 focus:border-gold-500 focus:bg-white focus:outline-none focus:ring-4 focus:ring-gold-500/10"
               />
             </div>
+            <FilterModal activeCount={archiveFilterCount} onClear={clearArchiveFilters}>
+              <FilterField label="Record type">
+                <select
+                  value={typeFilter}
+                  onChange={(e) => setTypeFilter(e.target.value as any)}
+                  className={selectField(typeFilter !== 'all', 'h-11 w-full rounded-2xl px-4 text-sm font-bold')}
+                >
+                  <option value="all">All types ({counts.all ?? 0})</option>
+                  {allowedTypes.map((t) => (
+                    <option key={t} value={t}>
+                      {TYPE_META[t].label}s ({counts[t] ?? 0})
+                    </option>
+                  ))}
+                </select>
+              </FilterField>
 
-            {/* Type filter — only permitted types are listed */}
-            <div className="relative w-full sm:w-52">
-              <Archive className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
-              <select
-                value={typeFilter}
-                onChange={(e) => setTypeFilter(e.target.value as any)}
-                className="h-11 w-full cursor-pointer appearance-none rounded-2xl border border-slate-200 bg-slate-50 pl-11 pr-10 text-sm font-bold text-slate-700 transition-all focus:border-gold-500 focus:bg-white focus:outline-none focus:ring-4 focus:ring-gold-500/10"
-              >
-                <option value="all">All types ({counts.all ?? 0})</option>
-                {allowedTypes.map((t) => (
-                  <option key={t} value={t}>
-                    {TYPE_META[t].label}s ({counts[t] ?? 0})
-                  </option>
-                ))}
-              </select>
-              <ChevronDown className="pointer-events-none absolute right-4 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
-            </div>
+              {institutionOptions.length > 0 && (
+                <FilterField label="Institution">
+                  <select
+                    value={institutionFilter}
+                    onChange={(e) => setInstitutionFilter(e.target.value)}
+                    className={selectField(institutionFilter !== 'all', 'h-11 w-full rounded-2xl px-4 text-sm font-bold')}
+                  >
+                    <option value="all">All institutions</option>
+                    {institutionOptions.map((name) => (
+                      <option key={name} value={name}>
+                        {name}
+                      </option>
+                    ))}
+                  </select>
+                </FilterField>
+              )}
 
-            {/* Date range */}
-            <div className="relative w-full sm:w-44">
-              <select
-                value={dateRange}
-                onChange={(e) => setDateRange(e.target.value as any)}
-                className="h-11 w-full cursor-pointer appearance-none rounded-2xl border border-slate-200 bg-slate-50 px-4 pr-10 text-sm font-bold text-slate-700 transition-all focus:border-gold-500 focus:bg-white focus:outline-none focus:ring-4 focus:ring-gold-500/10"
-              >
-                <option value="all">All time</option>
-                <option value="today">Today</option>
-                <option value="week">Past 7 days</option>
-                <option value="month">Past 30 days</option>
-              </select>
-              <ChevronDown className="pointer-events-none absolute right-4 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
-            </div>
+              <FilterField label="Sort by">
+                <select
+                  value={sortBy}
+                  onChange={(e) => setSortBy(e.target.value as 'newest' | 'oldest')}
+                  className={selectField(sortBy !== 'newest', 'h-11 w-full rounded-2xl px-4 text-sm font-bold')}
+                >
+                  <option value="newest">Newest first</option>
+                  <option value="oldest">Oldest first</option>
+                </select>
+              </FilterField>
 
-            {/* Sort */}
-            <button
-              onClick={() => setSortBy((p) => (p === 'newest' ? 'oldest' : 'newest'))}
-              className="inline-flex h-11 shrink-0 items-center justify-center gap-2 rounded-2xl border border-slate-200 bg-slate-50 px-4 text-xs font-black uppercase tracking-[0.12em] text-slate-600 transition-all hover:bg-white"
-            >
-              <ArrowUpDown className="h-3.5 w-3.5 text-slate-400" />
-              {sortBy === 'newest' ? 'Newest' : 'Oldest'}
-            </button>
+              <div className="grid grid-cols-2 gap-3">
+                <FilterField label="Archived from">
+                  <input
+                    type="date"
+                    value={dateFrom}
+                    onChange={(e) => setDateFrom(e.target.value)}
+                    className={dateField(Boolean(dateFrom), 'h-11 w-full rounded-2xl px-3 text-sm font-semibold')}
+                  />
+                </FilterField>
+                <FilterField label="Archived to">
+                  <input
+                    type="date"
+                    value={dateTo}
+                    min={dateFrom || undefined}
+                    onChange={(e) => setDateTo(e.target.value)}
+                    className={dateField(Boolean(dateTo), 'h-11 w-full rounded-2xl px-3 text-sm font-semibold')}
+                  />
+                </FilterField>
+              </div>
+            </FilterModal>
           </div>
         </div>
 

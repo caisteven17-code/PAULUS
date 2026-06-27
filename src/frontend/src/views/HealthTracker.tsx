@@ -11,6 +11,8 @@ import { getAccessRoleLabel } from '../lib/access';
 import { InlineLoader } from '../components/ui/LoadingScreen';
 import { getSubmissionStatus, type SubmissionStatus } from '../lib/healthDeadlines';
 import { getPriestHealthReminder, getDioceseHealthSummary } from '../lib/healthAnnouncements';
+import { FilterModal, FilterField } from '../components/ui/FilterModal';
+import { selectField } from '../lib/formStyles';
 
 interface PriestRecord {
   id: string;
@@ -79,6 +81,8 @@ export function HealthTracker() {
   const [filter, setFilter] = useState<'all' | 'birthdays' | 'checkups'>('all');
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState<'all' | 'good' | 'fair' | 'needs-attention'>('all');
+  const [submissionFilter, setSubmissionFilter] = useState<'all' | 'submitted' | 'pending' | 'late' | 'year-late'>('all');
+  const [parishFilter, setParishFilter] = useState('all');
   const [page, setPage] = useState(1);
   const [showHealthNames, setShowHealthNames] = useState(false); // diocesan drill-down modal
   const PAGE_SIZE = 9;
@@ -744,6 +748,15 @@ export function HealthTracker() {
   const isArchived = (p: PriestRecord) => archivedIds.includes(p.id);
   const activePriests = priests.filter((p) => !isArchived(p));
 
+  const parishOptions = Array.from(new Set(activePriests.map((p) => p.parish).filter(Boolean))).sort();
+  const healthFilterCount =
+    (statusFilter !== 'all' ? 1 : 0) + (submissionFilter !== 'all' ? 1 : 0) + (parishFilter !== 'all' ? 1 : 0);
+  const clearHealthFilters = () => {
+    setStatusFilter('all');
+    setSubmissionFilter('all');
+    setParishFilter('all');
+  };
+
   let filteredPriests: PriestRecord[];
   if (filter === 'birthdays') filteredPriests = upcomingBirthdays.filter((p) => !isArchived(p));
   else if (filter === 'checkups') filteredPriests = priestsNeedingCheckup.filter((p) => !isArchived(p));
@@ -751,6 +764,14 @@ export function HealthTracker() {
 
   if (statusFilter !== 'all') {
     filteredPriests = filteredPriests.filter((p) => p.healthStatus === statusFilter);
+  }
+  if (submissionFilter !== 'all') {
+    filteredPriests = filteredPriests.filter(
+      (p) => getSubmissionStatus(p.birthDate, p.lastCheckup).code === submissionFilter,
+    );
+  }
+  if (parishFilter !== 'all') {
+    filteredPriests = filteredPriests.filter((p) => (p.parish || '') === parishFilter);
   }
   if (search.trim()) {
     const q = search.toLowerCase();
@@ -978,19 +999,6 @@ export function HealthTracker() {
             </div>
 
             <div className="flex flex-1 flex-col gap-2 sm:flex-row sm:items-center sm:justify-end">
-              <div className="relative w-full sm:w-44">
-                <select
-                  value={statusFilter}
-                  onChange={(e) => setStatusFilter(e.target.value as any)}
-                  className="h-11 w-full cursor-pointer appearance-none rounded-2xl border border-slate-200 bg-slate-50 px-4 pr-10 text-sm font-bold text-slate-700 transition-all focus:border-rose-400 focus:bg-white focus:outline-none focus:ring-4 focus:ring-rose-400/10"
-                >
-                  <option value="all">All statuses</option>
-                  <option value="good">Good</option>
-                  <option value="fair">Fair</option>
-                  <option value="needs-attention">Needs attention</option>
-                </select>
-                <ChevronDown className="pointer-events-none absolute right-4 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
-              </div>
               <div className="relative w-full sm:max-w-xs sm:flex-1">
                 <Search className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
                 <input
@@ -1001,6 +1009,51 @@ export function HealthTracker() {
                   className="h-11 w-full rounded-2xl border border-slate-200 bg-slate-50 pl-11 pr-4 text-sm font-semibold text-slate-800 transition-all placeholder:text-slate-400 focus:border-rose-400 focus:bg-white focus:outline-none focus:ring-4 focus:ring-rose-400/10"
                 />
               </div>
+              <FilterModal activeCount={healthFilterCount} onClear={clearHealthFilters}>
+                <FilterField label="Submission status">
+                  <select
+                    value={submissionFilter}
+                    onChange={(e) => setSubmissionFilter(e.target.value as any)}
+                    className={selectField(submissionFilter !== 'all', 'h-11 w-full rounded-2xl px-4 text-sm font-bold')}
+                  >
+                    <option value="all">All submissions</option>
+                    <option value="submitted">Submitted</option>
+                    <option value="pending">Pending this month</option>
+                    <option value="late">Late</option>
+                    <option value="year-late">1 year late</option>
+                  </select>
+                </FilterField>
+
+                <FilterField label="Health status">
+                  <select
+                    value={statusFilter}
+                    onChange={(e) => setStatusFilter(e.target.value as any)}
+                    className={selectField(statusFilter !== 'all', 'h-11 w-full rounded-2xl px-4 text-sm font-bold')}
+                  >
+                    <option value="all">All statuses</option>
+                    <option value="good">Good</option>
+                    <option value="fair">Fair</option>
+                    <option value="needs-attention">Needs attention</option>
+                  </select>
+                </FilterField>
+
+                {parishOptions.length > 0 && (
+                  <FilterField label="Parish / institution">
+                    <select
+                      value={parishFilter}
+                      onChange={(e) => setParishFilter(e.target.value)}
+                      className={selectField(parishFilter !== 'all', 'h-11 w-full rounded-2xl px-4 text-sm font-bold')}
+                    >
+                      <option value="all">All parishes</option>
+                      {parishOptions.map((name) => (
+                        <option key={name} value={name}>
+                          {name}
+                        </option>
+                      ))}
+                    </select>
+                  </FilterField>
+                )}
+              </FilterModal>
             </div>
           </div>
         </div>

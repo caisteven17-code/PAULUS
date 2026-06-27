@@ -38,6 +38,9 @@ DEFAULT_SOURCE_DIR = PROJECT_ROOT / "liturgical_calendar_sources"
 DEFAULT_OUT_DIR = PROJECT_ROOT / "liturgical_calendar_output" / "engine"
 SOURCE_YEAR_START = 2023
 SOURCE_YEAR_END = 2032
+APPROVED_REVIEW_STATUSES = ("approved", "approved_with_revisions")
+ENGINE_SOURCE_NAME = "liturgical_engine"
+ENGINE_SOURCE_URL = "engine:approved_db_history"
 
 MANUAL_SPECIAL_KEYS = {
     "ash-wednesday",
@@ -203,15 +206,55 @@ class YearAnchors:
     ordinary_second_start_week: int
 
 
+@dataclass(frozen=True)
+class CorpusInfo:
+    source_mode: str
+    start_year: int
+    end_year: int
+    record_count: int
+
+
 class LiturgicalEngine:
-    def __init__(self, source_dir: Path = DEFAULT_SOURCE_DIR):
+    def __init__(
+        self,
+        source_dir: Path = DEFAULT_SOURCE_DIR,
+        source_rows: Optional[list[dict[str, Any]]] = None,
+        corpus_info: Optional[CorpusInfo] = None,
+    ):
         self.source_dir = source_dir
-        self.source_rows = self._load_source_rows()
+        self.source_rows = source_rows or self._load_source_rows_from_files()
+        self.corpus_info = corpus_info or CorpusInfo(
+            source_mode="filesystem",
+            start_year=SOURCE_YEAR_START,
+            end_year=SOURCE_YEAR_END,
+            record_count=len(self.source_rows),
+        )
         self.metadata_by_key = self._build_metadata()
         self.fixed_rules, self.easter_rules = self._build_primary_rules()
         self.option_fixed_rules, self.option_easter_rules = self._build_option_rules()
 
-    def _load_source_rows(self) -> list[dict[str, Any]]:
+    @classmethod
+    def from_approved_database(
+        cls,
+        *,
+        history_start_year: int = SOURCE_YEAR_START,
+        history_end_year: Optional[int] = None,
+    ) -> "LiturgicalEngine":
+        rows, start_year, end_year = _load_approved_source_rows_from_db(
+            history_start_year=history_start_year,
+            history_end_year=history_end_year,
+        )
+        return cls(
+            source_rows=rows,
+            corpus_info=CorpusInfo(
+                source_mode="approved_database",
+                start_year=start_year,
+                end_year=end_year,
+                record_count=len(rows),
+            ),
+        )
+
+    def _load_source_rows_from_files(self) -> list[dict[str, Any]]:
         rows: list[dict[str, Any]] = []
         for year in range(SOURCE_YEAR_START, SOURCE_YEAR_END + 1):
             path = self.source_dir / f"{year}.json"
@@ -357,9 +400,12 @@ class LiturgicalEngine:
         payload = {
             "year": year,
             "schemaVersion": "engine-v1",
-            "provenance": "source_derived_from_liturgical_calendar_sources_2023_2032",
+            "provenance": (
+                f"source_derived_from_{self.corpus_info.source_mode}_"
+                f"{self.corpus_info.start_year}_{self.corpus_info.end_year}"
+            ),
             "generatedAt": datetime.now(timezone.utc).isoformat(),
-            "validatedThrough": f"{SOURCE_YEAR_END}.json",
+            "validatedThrough": str(self.corpus_info.end_year),
             "contentHash": _content_hash(days),
             "dayCount": len(days),
             "liturgicalYears": liturgical_years,
@@ -453,6 +499,130 @@ class LiturgicalEngine:
             "accuracy_percent": round(exact * 100 / total, 2) if total else 0.0,
             "mismatch_rows": mismatch_rows,
         }
+
+
+def _should_replace_training_candidate(candidate: dict[str, Any], current: dict[str, Any]) -> bool:
+    candidate_source = str(candidate.get("source_name") or "")
+    current_source = str(current.get("source_name") or "")
+
+    if candidate_source == "source_of_truth" and current_source != "source_of_truth":
+        return True
+    if current_source == "source_of_truth" and candidate_source != "source_of_truth":
+        return False
+
+    candidate_updated = str(candidate.get("updated_at") or "")
+    current_updated = str(current.get("updated_at") or "")
+    return candidate_updated > current_updated
+
+
+def _normalize_db_training_row(record: dict[str, Any]) -> Optional[dict[str, Any]]:
+    raw_payload = record.get("raw_payload") or {}
+    if not isinstance(raw_payload, dict):
+        raw_payload = {}
+    raw_celebration = raw_payload.get("celebration") or {}
+    if not isinstance(raw_celebration, dict):
+        raw_celebration = {}
+
+    date_str = record.get("date")
+    if not date_str:
+        return None
+
+    celebration_key = record.get("source_reference") or raw_celebration.get("key")
+    celebration_name = record.get("celebration_name") or (raw_celebration.get("title") or {}).get("en")
+    if not celebration_key or not celebration_name:
+        return None
+
+    title_tl = None
+    raw_title = raw_celebration.get("title")
+    if isinstance(raw_title, dict):
+        title_tl = raw_title.get("tl")
+
+    normalized_day = {
+        "date": date_str,
+        "season": _season_slug(record.get("liturgical_season")),
+        "celebration": {
+            "key": celebration_key,
+            "title": {
+                "en": celebration_name,
+                "tl": title_tl or celebration_name,
+            },
+            "designation": record.get("rank") or raw_celebration.get("designation") or "Weekday / feria",
+        },
+        "options": raw_payload.get("options") if isinstance(raw_payload.get("options"), list) else [],
+    }
+
+    parsed_date = date.fromisoformat(date_str)
+    return {
+        "year": parsed_date.year,
+        "date": parsed_date,
+        "month_day": date_str[5:],
+        "season": normalized_day["season"],
+        "celebration": normalized_day["celebration"],
+        "options": normalized_day["options"],
+        "easter_offset": (parsed_date - _easter_sunday(parsed_date.year)).days,
+    }
+
+
+def _load_approved_source_rows_from_db(
+    *,
+    history_start_year: int = SOURCE_YEAR_START,
+    history_end_year: Optional[int] = None,
+) -> tuple[list[dict[str, Any]], int, int]:
+    from app.services.supabase_client import get_table
+
+    table = get_table("reference", "liturgical_calendar")
+    page_size = 1000
+    start = 0
+    approved_rows: list[dict[str, Any]] = []
+    effective_end_year = history_end_year or date.today().year
+
+    while True:
+        response = (
+            table.select(
+                "date,year,liturgical_season,celebration_name,rank,source_name,source_reference,raw_payload,"
+                "review_status,updated_at"
+            )
+            .gte("year", history_start_year)
+            .lte("year", effective_end_year)
+            .in_("review_status", list(APPROVED_REVIEW_STATUSES))
+            .order("date")
+            .order("updated_at")
+            .range(start, start + page_size - 1)
+            .execute()
+        )
+        page = response.data or []
+        if not page:
+            break
+        approved_rows.extend(page)
+        if len(page) < page_size:
+            break
+        start += page_size
+
+    if not approved_rows:
+        raise RuntimeError(
+            "No approved liturgical calendar rows found in the database for engine training."
+        )
+
+    by_date: dict[str, dict[str, Any]] = {}
+    for record in approved_rows:
+        date_key = str(record["date"])
+        existing = by_date.get(date_key)
+        if existing is None or _should_replace_training_candidate(record, existing):
+            by_date[date_key] = record
+
+    rows: list[dict[str, Any]] = []
+    years: set[int] = set()
+    for date_key in sorted(by_date):
+        normalized = _normalize_db_training_row(by_date[date_key])
+        if not normalized:
+            continue
+        rows.append(normalized)
+        years.add(normalized["year"])
+
+    if not rows:
+        raise RuntimeError("Approved liturgical calendar rows were found, but none could be normalized for training.")
+
+    return rows, min(years), max(years)
 
 
 def _content_hash(days: list[dict[str, Any]]) -> str:
@@ -810,6 +980,35 @@ def _weekday_slug(dt: date) -> str:
     return WEEKDAY_NAMES[dt.weekday()].lower()
 
 
+def _season_slug(value: Optional[str]) -> str:
+    normalized = str(value or "").strip().lower().replace(" ", "_")
+    mapping = {
+        "advent": "advent",
+        "christmas": "christmas",
+        "ordinary_time": "ordinary_time",
+        "ordinarytimefirst": "ordinary_time",
+        "ordinarytimesecond": "ordinary_time",
+        "lent": "lent",
+        "paschal_triduum": "paschal_triduum",
+        "paschaltriduum": "paschal_triduum",
+        "easter": "easter",
+    }
+    return mapping.get(normalized, normalized or "ordinary_time")
+
+
+def _season_display(value: Optional[str]) -> str:
+    slug = _season_slug(value)
+    mapping = {
+        "advent": "Advent",
+        "christmas": "Christmas",
+        "ordinary_time": "Ordinary Time",
+        "lent": "Lent",
+        "paschal_triduum": "Paschal Triduum",
+        "easter": "Easter",
+    }
+    return mapping.get(slug, slug.replace("_", " ").title())
+
+
 def _date_range(start: date, end: date) -> list[date]:
     current = start
     dates: list[date] = []
@@ -928,6 +1127,173 @@ def _write_json(path: Path, payload: dict[str, Any]) -> None:
     path.write_text(json.dumps(payload, indent=2, ensure_ascii=False), encoding="utf-8")
 
 
+def _generated_day_to_record(day: dict[str, Any], payload: dict[str, Any], corpus_info: CorpusInfo) -> dict[str, Any]:
+    parsed = date.fromisoformat(day["date"])
+    celebration = day["celebration"]
+    return {
+        "date": day["date"],
+        "year": parsed.year,
+        "month": parsed.month,
+        "day": parsed.day,
+        "weekday": parsed.strftime("%A"),
+        "celebration_name": celebration["title"]["en"],
+        "rank": celebration["designation"],
+        "liturgical_season": _season_display(day["season"]),
+        "source_name": ENGINE_SOURCE_NAME,
+        "source_url": ENGINE_SOURCE_URL,
+        "source_reference": celebration["key"],
+        "raw_payload": day,
+        "validation_status": "validator_missing",
+        "validation_reason": "Validators not yet applied.",
+        "gcatholic_match_status": "missing",
+        "romcal_match_status": "missing",
+        "litcal_match_status": "not_applied",
+        "gcatholic_celebration_name": None,
+        "romcal_celebration_name": None,
+        "litcal_celebration_name": None,
+        "review_status": "pending",
+        "reviewed_by": None,
+        "reviewed_at": None,
+        "review_notes": "Awaiting validator extraction and human review.",
+        "revision_payload": {
+            "engine": {
+                "schemaVersion": payload["schemaVersion"],
+                "generatedAt": payload["generatedAt"],
+                "contentHash": payload["contentHash"],
+                "provenance": payload["provenance"],
+                "corpus_source_mode": corpus_info.source_mode,
+                "corpus_start_year": corpus_info.start_year,
+                "corpus_end_year": corpus_info.end_year,
+                "corpus_record_count": corpus_info.record_count,
+            }
+        },
+    }
+
+
+def _normalize_generated_records_for_db(
+    payload: dict[str, Any],
+    corpus_info: CorpusInfo,
+) -> list[dict[str, Any]]:
+    return [_generated_day_to_record(day, payload, corpus_info) for day in payload["days"]]
+
+
+def _apply_generated_validator_results(records: list[dict[str, Any]], year: int) -> None:
+    from app.services.liturgical_calendar_collector import (
+        _apply_validator_results,
+        fetch_gcatholic,
+        fetch_litcal,
+        fetch_romcal,
+    )
+
+    try:
+        gcatholic_rows = fetch_gcatholic(year)
+    except Exception as exc:
+        logger.warning("GCatholic unavailable for %s during engine validation: %s", year, exc)
+        gcatholic_rows = []
+
+    try:
+        romcal_rows = fetch_romcal(year)
+    except Exception as exc:
+        logger.warning("Romcal unavailable for %s during engine validation: %s", year, exc)
+        romcal_rows = []
+
+    litcal_rows, litcal_error = fetch_litcal(year)
+    if litcal_error:
+        logger.warning("%s", litcal_error)
+
+    gcatholic_by_date = {row["date"]: row for row in gcatholic_rows}
+    romcal_by_date = {row["date"]: row for row in romcal_rows}
+    litcal_by_date: dict[str, list[dict[str, Any]]] = defaultdict(list)
+    for row in litcal_rows:
+        litcal_by_date[row["date"]].append(row)
+
+    _apply_validator_results(records, gcatholic_by_date, romcal_by_date, litcal_by_date)
+
+    for record in records:
+        record["validation_reason"] = record["validation_reason"].replace("Source of truth:", "Engine output:")
+        if record.get("review_notes"):
+            record["review_notes"] = record["review_notes"].replace("Source of truth", "Engine output")
+        revision_payload = record.get("revision_payload") or {}
+        revision_payload["generated_source"] = ENGINE_SOURCE_NAME
+        revision_payload["generated_year"] = year
+        record["revision_payload"] = revision_payload
+
+
+def _year_exists_in_db(year: int, source_name: str = ENGINE_SOURCE_NAME) -> bool:
+    from app.services.supabase_client import get_table
+
+    response = (
+        get_table("reference", "liturgical_calendar")
+        .select("id")
+        .eq("year", year)
+        .eq("source_name", source_name)
+        .limit(1)
+        .execute()
+    )
+    return bool(response.data)
+
+
+def generate_and_load_year(
+    *,
+    target_year: int,
+    read_approved_db: bool = False,
+    history_start_year: int = SOURCE_YEAR_START,
+    history_end_year: Optional[int] = None,
+    source_dir: Path = DEFAULT_SOURCE_DIR,
+    out_dir: Path = DEFAULT_OUT_DIR,
+    write_json: bool = True,
+    validate: bool = True,
+) -> dict[str, Any]:
+    from app.services.liturgical_calendar_collector import _create_run_record, _update_run_record
+    from app.services.liturgical_calendar_loader import load_records
+
+    if read_approved_db:
+        effective_history_end = history_end_year or (target_year - 1)
+        engine = LiturgicalEngine.from_approved_database(
+            history_start_year=history_start_year,
+            history_end_year=effective_history_end,
+        )
+    else:
+        engine = LiturgicalEngine(source_dir=source_dir)
+
+    payload = engine.build_year_payload(target_year)
+    if write_json:
+        _write_json(out_dir / f"{target_year}.json", payload)
+
+    records = _normalize_generated_records_for_db(payload, engine.corpus_info)
+    if validate:
+        _apply_generated_validator_results(records, target_year)
+
+    run_id = _create_run_record([target_year])
+    loaded = 0
+    try:
+        loaded = load_records(records, include_pending=True, run_id=run_id)
+        _update_run_record(
+            run_id,
+            "success",
+            len([row for row in records if row["validation_status"] != "mismatched_all"]),
+            len([row for row in records if row["review_status"] == "pending"]),
+            completed_years=[target_year],
+        )
+    except Exception as exc:
+        _update_run_record(
+            run_id,
+            "failed",
+            0,
+            len(records),
+            error_detail=str(exc),
+            completed_years=[],
+        )
+        raise
+
+    return {
+        "payload": payload,
+        "records": records,
+        "loaded": loaded,
+        "corpus_info": engine.corpus_info,
+    }
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description="Generate future liturgical calendar years from source-of-truth JSON")
     parser.add_argument("--year", type=int, help="Generate a single year")
@@ -937,25 +1303,107 @@ def main() -> int:
     parser.add_argument("--replay-end", type=int, help="Replay-check known source years (inclusive)")
     parser.add_argument("--source-dir", type=str, default=str(DEFAULT_SOURCE_DIR))
     parser.add_argument("--out", type=str, default=str(DEFAULT_OUT_DIR))
+    parser.add_argument(
+        "--read-approved-db",
+        action="store_true",
+        help="Build engine patterns from approved/approved_with_revisions database rows instead of local source files.",
+    )
+    parser.add_argument("--history-start-year", type=int, default=SOURCE_YEAR_START)
+    parser.add_argument("--history-end-year", type=int, help="Last historical year to use for DB-backed training.")
+    parser.add_argument(
+        "--load",
+        action="store_true",
+        help="Load generated year(s) directly into reference.liturgical_calendar.",
+    )
+    parser.add_argument(
+        "--skip-validators",
+        action="store_true",
+        help="Do not run GCatholic/Romcal/LitCal validation after generation.",
+    )
+    parser.add_argument(
+        "--preload-next-year",
+        action="store_true",
+        help="Generate and optionally load next year, but only when the current month is November.",
+    )
+    parser.add_argument(
+        "--force",
+        action="store_true",
+        help="Allow overwrite-style generation commands to continue when a guard would normally stop them.",
+    )
     args = parser.parse_args()
 
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
-    engine = LiturgicalEngine(source_dir=Path(args.source_dir))
     out_dir = Path(args.out)
 
+    if args.preload_next_year:
+        today = datetime.now().date()
+        if today.month != 11 and not args.force:
+            print(f"Skipped preload: current month is {today.month}, not November.")
+            return 0
+        args.year = today.year + 1
+        if _year_exists_in_db(args.year) and not args.force:
+            print(f"Skipped preload: {args.year} already exists in reference.liturgical_calendar for {ENGINE_SOURCE_NAME}.")
+            return 0
+
     generated_years: list[int] = []
+    loaded_total = 0
+    engine: Optional[LiturgicalEngine] = None
     if args.year:
-        payload = engine.build_year_payload(args.year)
-        _write_json(out_dir / f"{args.year}.json", payload)
+        if args.load:
+            result = generate_and_load_year(
+                target_year=args.year,
+                read_approved_db=args.read_approved_db,
+                history_start_year=args.history_start_year,
+                history_end_year=args.history_end_year,
+                source_dir=Path(args.source_dir),
+                out_dir=out_dir,
+                write_json=True,
+                validate=not args.skip_validators,
+            )
+            payload = result["payload"]
+            loaded_total += result["loaded"]
+        else:
+            engine = (
+                LiturgicalEngine.from_approved_database(
+                    history_start_year=args.history_start_year,
+                    history_end_year=args.history_end_year or (args.year - 1),
+                )
+                if args.read_approved_db
+                else LiturgicalEngine(source_dir=Path(args.source_dir))
+            )
+            payload = engine.build_year_payload(args.year)
+            _write_json(out_dir / f"{args.year}.json", payload)
         generated_years.append(args.year)
     elif args.start_year and args.end_year:
+        engine = (
+            LiturgicalEngine.from_approved_database(
+                history_start_year=args.history_start_year,
+                history_end_year=args.history_end_year or (args.start_year - 1),
+            )
+            if args.read_approved_db
+            else LiturgicalEngine(source_dir=Path(args.source_dir))
+        )
         for year in range(args.start_year, args.end_year + 1):
-            payload = engine.build_year_payload(year)
-            _write_json(out_dir / f"{year}.json", payload)
+            if args.load:
+                result = generate_and_load_year(
+                    target_year=year,
+                    read_approved_db=args.read_approved_db,
+                    history_start_year=args.history_start_year,
+                    history_end_year=args.history_end_year or (year - 1),
+                    source_dir=Path(args.source_dir),
+                    out_dir=out_dir,
+                    write_json=True,
+                    validate=not args.skip_validators,
+                )
+                loaded_total += result["loaded"]
+            else:
+                payload = engine.build_year_payload(year)
+                _write_json(out_dir / f"{year}.json", payload)
             generated_years.append(year)
 
     replay_reports: list[dict[str, Any]] = []
     if args.replay_start and args.replay_end:
+        engine = LiturgicalEngine(source_dir=Path(args.source_dir))
         for year in range(args.replay_start, args.replay_end + 1):
             report = engine.replay_year(year)
             replay_reports.append(report)
@@ -975,6 +1423,8 @@ def main() -> int:
 
     if generated_years:
         print(f"Generated source-derived years: {generated_years}")
+    if loaded_total:
+        print(f"Loaded {loaded_total} generated rows into reference.liturgical_calendar")
     if replay_reports:
         for report in replay_reports:
             print(

@@ -37,6 +37,8 @@ import { usePermissions } from '../hooks/usePermissions';
 import { InlineLoader } from '../components/ui/LoadingScreen';
 import { apiClient } from '../lib/api-client';
 import { getPriestHealthReminder, getDioceseHealthSummary } from '../lib/healthAnnouncements';
+import { FilterModal, FilterField } from '../components/ui/FilterModal';
+import { selectField, dateField } from '../lib/formStyles';
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -80,7 +82,7 @@ const GRACE_PERIOD_MS = 5 * 60 * 1000;
 const TITLE_MAX = 120;
 const CONTENT_MAX = 2000;
 
-const EMPTY_FILTERS = { search: '', category: 'all', priority: 'all' } as const;
+const EMPTY_FILTERS = { search: '', category: 'all', priority: 'all', dateFrom: '', dateTo: '' };
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -184,7 +186,7 @@ export function Announcements() {
 
   // ── UI state ───────────────────────────────────────────────────────────────
   const [tab,                  setTab]                  = useState<Tab>('active');
-  const [filters,              setFilters]              = useState<{ search: string; category: string; priority: string }>(EMPTY_FILTERS);
+  const [filters,              setFilters]              = useState<{ search: string; category: string; priority: string; dateFrom: string; dateTo: string }>(EMPTY_FILTERS);
   const [sort,                 setSort]                 = useState<SortMode>('newest');
   const [selectedAnnouncement, setSelectedAnnouncement] = useState<Announcement | null>(null);
   const [showForm,             setShowForm]             = useState(false);
@@ -603,13 +605,29 @@ export function Announcements() {
     tab === 'past'      ? pastList      : activeList;
 
   const hasActiveFilters =
-    filters.search.trim() !== '' || filters.category !== 'all' || filters.priority !== 'all';
+    filters.search.trim() !== '' ||
+    filters.category !== 'all' ||
+    filters.priority !== 'all' ||
+    filters.dateFrom !== '' ||
+    filters.dateTo !== '';
+
+  // Active filters inside the modal (search stays inline, so it is excluded).
+  const announcementFilterCount =
+    (filters.category !== 'all' ? 1 : 0) +
+    (filters.priority !== 'all' ? 1 : 0) +
+    (filters.dateFrom ? 1 : 0) +
+    (filters.dateTo ? 1 : 0) +
+    (sort !== 'newest' ? 1 : 0);
 
   const displayed = useMemo(() => {
     const q = filters.search.trim().toLowerCase();
+    const fromMs = filters.dateFrom ? new Date(filters.dateFrom).getTime() : null;
+    const toMs = filters.dateTo ? new Date(filters.dateTo + 'T23:59:59').getTime() : null;
     const filtered = currentList.filter((a) =>
       (filters.category === 'all' || a.category === filters.category) &&
       (filters.priority === 'all' || a.priority === filters.priority) &&
+      (fromMs === null || a.createdAt >= fromMs) &&
+      (toMs === null || a.createdAt <= toMs) &&
       (!q || a.title.toLowerCase().includes(q) || a.content.toLowerCase().includes(q) || a.author.toLowerCase().includes(q)),
     );
 
@@ -874,9 +892,9 @@ export function Announcements() {
           )}
 
           <div className="min-w-0">
-        {/* ── Filter bar ── */}
-        <div className="mb-4 grid grid-cols-1 gap-2 rounded-3xl border border-slate-200 bg-white p-3 shadow-[0_12px_32px_rgba(15,23,42,0.05)] xl:grid-cols-[minmax(180px,1fr)_150px_150px_150px_auto_auto]">
-          <div className="relative">
+        {/* ── Filter bar — search inline, everything else in the modal ── */}
+        <div className="mb-4 flex flex-col gap-2 rounded-3xl border border-slate-200 bg-white p-3 shadow-[0_12px_32px_rgba(15,23,42,0.05)] sm:flex-row sm:items-center">
+          <div className="relative flex-1">
             <Search className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
             <input
               type="text"
@@ -886,54 +904,77 @@ export function Announcements() {
               className="h-11 w-full rounded-2xl border border-slate-200 bg-slate-50 pl-11 pr-4 text-sm font-semibold text-slate-800 transition-all placeholder:text-slate-400 focus:border-gold-500 focus:bg-white focus:outline-none focus:ring-4 focus:ring-gold-500/10"
             />
           </div>
-
-          <select
-            value={filters.category}
-            onChange={(e) => setFilters({ ...filters, category: e.target.value })}
-            className="h-11 cursor-pointer rounded-2xl border border-slate-200 bg-slate-50 px-4 text-sm font-semibold text-slate-700 transition-all focus:border-gold-500 focus:bg-white focus:outline-none focus:ring-4 focus:ring-gold-500/10"
-          >
-            <option value="all">All categories</option>
-            <option value="general">General</option>
-            <option value="financial">Financial</option>
-            <option value="administrative">Administrative</option>
-            <option value="event">Event</option>
-          </select>
-
-          <select
-            value={filters.priority}
-            onChange={(e) => setFilters({ ...filters, priority: e.target.value })}
-            className="h-11 cursor-pointer rounded-2xl border border-slate-200 bg-slate-50 px-4 text-sm font-semibold text-slate-700 transition-all focus:border-gold-500 focus:bg-white focus:outline-none focus:ring-4 focus:ring-gold-500/10"
-          >
-            <option value="all">All priorities</option>
-            <option value="high">Urgent</option>
-            <option value="medium">Important</option>
-            <option value="low">Routine</option>
-          </select>
-
-          <select
-            value={sort}
-            onChange={(e) => setSort(e.target.value as SortMode)}
-            className="h-11 cursor-pointer rounded-2xl border border-slate-200 bg-slate-50 px-4 text-sm font-semibold text-slate-700 transition-all focus:border-gold-500 focus:bg-white focus:outline-none focus:ring-4 focus:ring-gold-500/10"
-          >
-            <option value="newest">Newest first</option>
-            <option value="oldest">Oldest first</option>
-            <option value="priority">By priority</option>
-          </select>
-
           {hasActiveFilters && (
-            <>
-              <span className="hidden items-center justify-center rounded-2xl bg-slate-50 px-3 text-xs font-bold text-slate-400 xl:flex">
-                {displayed.length} found
-              </span>
-              <button
-                onClick={() => setFilters(EMPTY_FILTERS)}
-                className="inline-flex h-11 items-center justify-center gap-2 rounded-2xl border border-slate-200 px-4 text-xs font-black uppercase tracking-[0.14em] text-slate-500 transition-all hover:bg-slate-50 hover:text-slate-900"
-              >
-                <X className="h-3.5 w-3.5" />
-                Clear
-              </button>
-            </>
+            <span className="hidden items-center justify-center rounded-2xl bg-slate-50 px-3 text-xs font-bold text-slate-400 sm:flex">
+              {displayed.length} found
+            </span>
           )}
+          <FilterModal
+            activeCount={announcementFilterCount}
+            onClear={() => {
+              setFilters(EMPTY_FILTERS);
+              setSort('newest');
+            }}
+          >
+            <FilterField label="Category">
+              <select
+                value={filters.category}
+                onChange={(e) => setFilters({ ...filters, category: e.target.value })}
+                className={selectField(filters.category !== 'all', 'h-11 w-full rounded-2xl px-4 text-sm font-bold')}
+              >
+                <option value="all">All categories</option>
+                <option value="general">General</option>
+                <option value="financial">Financial</option>
+                <option value="administrative">Administrative</option>
+                <option value="event">Event</option>
+              </select>
+            </FilterField>
+
+            <FilterField label="Priority">
+              <select
+                value={filters.priority}
+                onChange={(e) => setFilters({ ...filters, priority: e.target.value })}
+                className={selectField(filters.priority !== 'all', 'h-11 w-full rounded-2xl px-4 text-sm font-bold')}
+              >
+                <option value="all">All priorities</option>
+                <option value="high">Urgent</option>
+                <option value="medium">Important</option>
+                <option value="low">Routine</option>
+              </select>
+            </FilterField>
+
+            <FilterField label="Sort by">
+              <select
+                value={sort}
+                onChange={(e) => setSort(e.target.value as SortMode)}
+                className={selectField(sort !== 'newest', 'h-11 w-full rounded-2xl px-4 text-sm font-bold')}
+              >
+                <option value="newest">Newest first</option>
+                <option value="oldest">Oldest first</option>
+                <option value="priority">By priority</option>
+              </select>
+            </FilterField>
+
+            <div className="grid grid-cols-2 gap-3">
+              <FilterField label="Posted from">
+                <input
+                  type="date"
+                  value={filters.dateFrom}
+                  onChange={(e) => setFilters({ ...filters, dateFrom: e.target.value })}
+                  className={dateField(Boolean(filters.dateFrom), 'h-11 w-full rounded-2xl px-3 text-sm font-semibold')}
+                />
+              </FilterField>
+              <FilterField label="Posted to">
+                <input
+                  type="date"
+                  value={filters.dateTo}
+                  min={filters.dateFrom || undefined}
+                  onChange={(e) => setFilters({ ...filters, dateTo: e.target.value })}
+                  className={dateField(Boolean(filters.dateTo), 'h-11 w-full rounded-2xl px-3 text-sm font-semibold')}
+                />
+              </FilterField>
+            </div>
+          </FilterModal>
         </div>
 
         {/* ── List ── */}

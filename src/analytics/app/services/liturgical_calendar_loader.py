@@ -206,6 +206,18 @@ def _upsert_batch(rows: list[dict[str, Any]], run_id: Optional[str] = None) -> i
     return len(rows)
 
 
+def load_records(
+    rows: list[dict[str, Any]],
+    include_pending: bool = True,
+    run_id: Optional[str] = None,
+) -> int:
+    if not include_pending:
+        rows = [row for row in rows if row.get("review_status") in {"approved", "approved_with_revisions"}]
+    count = _upsert_batch(rows, run_id=run_id)
+    logger.info("Liturgical calendar direct load complete - %d rows processed.", count)
+    return count
+
+
 def load_from_file(
     path: Path,
     include_pending: bool = True,

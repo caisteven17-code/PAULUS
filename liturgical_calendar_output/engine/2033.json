@@ -1,9 +1,9 @@
 {
   "year": 2033,
   "schemaVersion": "engine-v1",
-  "provenance": "source_derived_from_liturgical_calendar_sources_2023_2032",
-  "generatedAt": "2026-06-16T17:06:57.145670+00:00",
-  "validatedThrough": "2032.json",
+  "provenance": "source_derived_from_approved_database_2023_2032",
+  "generatedAt": "2026-06-27T01:38:19.555797+00:00",
+  "validatedThrough": "2032",
   "contentHash": "b6af73249d125c253fbe04d88e9a2f92e48bba5fc93e6c59faeaa64ec30e1bb5",
   "dayCount": 365,
   "liturgicalYears": [

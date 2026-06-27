@@ -22,6 +22,8 @@ import {
 import { usePermissions } from '../hooks/usePermissions';
 import { apiClient } from '../lib/api-client';
 import { InlineLoader } from '../components/ui/LoadingScreen';
+import { FilterModal, FilterField } from '../components/ui/FilterModal';
+import { selectField, dateField } from '../lib/formStyles';
 
 interface DiocesanEvent {
   id: string;
@@ -348,7 +350,24 @@ export function Events() {
     filters.dateFrom !== '' ||
     filters.dateTo !== '' ||
     filters.type !== 'all' ||
-    filters.level !== 'all';
+    filters.level !== 'all' ||
+    (isOverview && typeFilter !== 'all') ||
+    institutionFilter !== 'all';
+
+  // Active filters inside the modal (search stays inline, so excluded).
+  const eventsFilterCount =
+    (filters.type !== 'all' ? 1 : 0) +
+    (filters.level !== 'all' ? 1 : 0) +
+    (filters.dateFrom ? 1 : 0) +
+    (filters.dateTo ? 1 : 0) +
+    (isOverview && typeFilter !== 'all' ? 1 : 0) +
+    (institutionFilter !== 'all' ? 1 : 0);
+
+  const clearAllEventFilters = () => {
+    setFilters(EMPTY_FILTERS);
+    if (!isSchoolOverseer) setTypeFilter('all');
+    setInstitutionFilter('all');
+  };
 
   // ── Handlers ───────────────────────────────────────────────────────────────
   const openCreateModal = () => {
@@ -519,55 +538,8 @@ export function Events() {
               })}
             </div>
 
-            {/* Cascading institution filter — diocese & oversight roles only */}
+            {/* Institution / type / level / date filters now live in the modal below. */}
             <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
-              {isOverview && (
-                <>
-                  {/* Step 1 — institution type */}
-                  <div className="relative w-full sm:w-44">
-                    <Landmark className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
-                    <select
-                      value={effectiveType}
-                      disabled={isSchoolOverseer}
-                      onChange={(e) => {
-                        setTypeFilter(e.target.value);
-                        setInstitutionFilter('all'); // reset the second step
-                      }}
-                      className="h-11 w-full cursor-pointer appearance-none rounded-2xl border border-slate-200 bg-slate-50 pl-11 pr-10 text-sm font-bold text-slate-700 transition-all focus:border-gold-500 focus:bg-white focus:outline-none focus:ring-4 focus:ring-gold-500/10 disabled:cursor-not-allowed disabled:opacity-70"
-                    >
-                      {!isSchoolOverseer && <option value="all">All types</option>}
-                      {typeOptions.map((t) => (
-                        <option key={t} value={t}>
-                          {TYPE_LABELS[t] ?? t}
-                        </option>
-                      ))}
-                    </select>
-                    <ChevronDown className="pointer-events-none absolute right-4 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
-                  </div>
-
-                  {/* Step 2 — specific institution (appears once a type narrows the list) */}
-                  {institutionOptionsForType.length > 0 && (
-                    <div className="relative w-full sm:w-64">
-                      <Building2 className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
-                      <select
-                        value={institutionFilter}
-                        onChange={(e) => setInstitutionFilter(e.target.value)}
-                        className="h-11 w-full cursor-pointer appearance-none rounded-2xl border border-slate-200 bg-slate-50 pl-11 pr-10 text-sm font-bold text-slate-700 transition-all focus:border-gold-500 focus:bg-white focus:outline-none focus:ring-4 focus:ring-gold-500/10"
-                      >
-                        <option value="all">
-                          {effectiveType === 'all' ? 'All institutions' : `All ${TYPE_LABELS[effectiveType] ?? effectiveType}`}
-                        </option>
-                        {institutionOptionsForType.map((name) => (
-                          <option key={name} value={name}>
-                            {name}
-                          </option>
-                        ))}
-                      </select>
-                      <ChevronDown className="pointer-events-none absolute right-4 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
-                    </div>
-                  )}
-                </>
-              )}
               {canManage && (
                 <button
                   onClick={openCreateModal}
@@ -581,9 +553,9 @@ export function Events() {
           </div>
         </div>
 
-        {/* ── Filter bar ── */}
-        <div className="mb-6 grid grid-cols-1 gap-2 rounded-3xl border border-slate-200 bg-white p-3 shadow-[0_12px_32px_rgba(15,23,42,0.05)] lg:grid-cols-[minmax(220px,1fr)_180px_160px_minmax(310px,auto)_auto]">
-          <div className="relative">
+        {/* ── Filter bar — search inline, everything else in the modal ── */}
+        <div className="mb-6 flex flex-col gap-2 rounded-3xl border border-slate-200 bg-white p-3 shadow-[0_12px_32px_rgba(15,23,42,0.05)] sm:flex-row sm:items-center">
+          <div className="relative flex-1">
             <Search className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
             <input
               type="text"
@@ -593,62 +565,99 @@ export function Events() {
               className="h-11 w-full rounded-2xl border border-slate-200 bg-slate-50 pl-11 pr-4 text-sm font-semibold text-slate-800 transition-all placeholder:text-slate-400 focus:border-gold-500 focus:bg-white focus:outline-none focus:ring-4 focus:ring-gold-500/10"
             />
           </div>
-
-          <select
-            value={filters.type}
-            onChange={(e) => setFilters({ ...filters, type: e.target.value })}
-            className="h-11 cursor-pointer rounded-2xl border border-slate-200 bg-slate-50 px-4 text-sm font-semibold text-slate-700 transition-all focus:border-gold-500 focus:bg-white focus:outline-none focus:ring-4 focus:ring-gold-500/10"
-          >
-            <option value="all">All types</option>
-            {EVENT_TYPES.map((t) => (
-              <option key={t} value={t}>
-                {t}
-              </option>
-            ))}
-          </select>
-
-          <select
-            value={filters.level}
-            onChange={(e) => setFilters({ ...filters, level: e.target.value })}
-            className="h-11 cursor-pointer rounded-2xl border border-slate-200 bg-slate-50 px-4 text-sm font-semibold text-slate-700 transition-all focus:border-gold-500 focus:bg-white focus:outline-none focus:ring-4 focus:ring-gold-500/10"
-          >
-            <option value="all">All levels</option>
-            <option value="Major event">Major event</option>
-            <option value="Minor event">Minor event</option>
-          </select>
-
-          <div className="grid grid-cols-[auto_minmax(0,1fr)_auto_minmax(0,1fr)] items-center gap-2">
-            <span className="text-[10px] font-black uppercase tracking-[0.18em] text-slate-400">From</span>
-            <input
-              type="date"
-              value={filters.dateFrom}
-              onChange={(e) => setFilters({ ...filters, dateFrom: e.target.value })}
-              className="h-11 min-w-0 rounded-2xl border border-slate-200 bg-slate-50 px-4 text-sm font-semibold text-slate-700 transition-all focus:border-gold-500 focus:bg-white focus:outline-none focus:ring-4 focus:ring-gold-500/10"
-            />
-            <span className="text-[10px] font-black uppercase tracking-[0.18em] text-slate-400">To</span>
-            <input
-              type="date"
-              value={filters.dateTo}
-              min={filters.dateFrom || undefined}
-              onChange={(e) => setFilters({ ...filters, dateTo: e.target.value })}
-              className="h-11 min-w-0 rounded-2xl border border-slate-200 bg-slate-50 px-4 text-sm font-semibold text-slate-700 transition-all focus:border-gold-500 focus:bg-white focus:outline-none focus:ring-4 focus:ring-gold-500/10"
-            />
-          </div>
-
           {hasActiveFilters && (
-            <>
-              <span className="hidden items-center justify-center rounded-2xl bg-slate-50 px-3 text-xs font-bold text-slate-400 lg:flex">
-                {displayed.length} found
-              </span>
-              <button
-                onClick={() => setFilters(EMPTY_FILTERS)}
-                className="inline-flex h-11 items-center justify-center gap-2 rounded-2xl border border-slate-200 px-4 text-xs font-black uppercase tracking-[0.14em] text-slate-500 transition-all hover:bg-slate-50 hover:text-slate-900"
-              >
-                <X className="h-3.5 w-3.5" />
-                Clear
-              </button>
-            </>
+            <span className="hidden items-center justify-center rounded-2xl bg-slate-50 px-3 text-xs font-bold text-slate-400 sm:flex">
+              {displayed.length} found
+            </span>
           )}
+          <FilterModal activeCount={eventsFilterCount} onClear={clearAllEventFilters}>
+            {isOverview && (
+              <FilterField label="Institution type">
+                <select
+                  value={effectiveType}
+                  disabled={isSchoolOverseer}
+                  onChange={(e) => {
+                    setTypeFilter(e.target.value);
+                    setInstitutionFilter('all');
+                  }}
+                  className={selectField(effectiveType !== 'all', 'h-11 w-full rounded-2xl px-4 text-sm font-bold disabled:opacity-70')}
+                >
+                  {!isSchoolOverseer && <option value="all">All types</option>}
+                  {typeOptions.map((t) => (
+                    <option key={t} value={t}>
+                      {TYPE_LABELS[t] ?? t}
+                    </option>
+                  ))}
+                </select>
+              </FilterField>
+            )}
+
+            {isOverview && institutionOptionsForType.length > 0 && (
+              <FilterField label="Institution">
+                <select
+                  value={institutionFilter}
+                  onChange={(e) => setInstitutionFilter(e.target.value)}
+                  className={selectField(institutionFilter !== 'all', 'h-11 w-full rounded-2xl px-4 text-sm font-bold')}
+                >
+                  <option value="all">
+                    {effectiveType === 'all' ? 'All institutions' : `All ${TYPE_LABELS[effectiveType] ?? effectiveType}`}
+                  </option>
+                  {institutionOptionsForType.map((name) => (
+                    <option key={name} value={name}>
+                      {name}
+                    </option>
+                  ))}
+                </select>
+              </FilterField>
+            )}
+
+            <FilterField label="Event type">
+              <select
+                value={filters.type}
+                onChange={(e) => setFilters({ ...filters, type: e.target.value })}
+                className={selectField(filters.type !== 'all', 'h-11 w-full rounded-2xl px-4 text-sm font-bold')}
+              >
+                <option value="all">All types</option>
+                {EVENT_TYPES.map((t) => (
+                  <option key={t} value={t}>
+                    {t}
+                  </option>
+                ))}
+              </select>
+            </FilterField>
+
+            <FilterField label="Event level">
+              <select
+                value={filters.level}
+                onChange={(e) => setFilters({ ...filters, level: e.target.value })}
+                className={selectField(filters.level !== 'all', 'h-11 w-full rounded-2xl px-4 text-sm font-bold')}
+              >
+                <option value="all">All levels</option>
+                <option value="Major event">Major event</option>
+                <option value="Minor event">Minor event</option>
+              </select>
+            </FilterField>
+
+            <div className="grid grid-cols-2 gap-3">
+              <FilterField label="From">
+                <input
+                  type="date"
+                  value={filters.dateFrom}
+                  onChange={(e) => setFilters({ ...filters, dateFrom: e.target.value })}
+                  className={dateField(Boolean(filters.dateFrom), 'h-11 w-full rounded-2xl px-3 text-sm font-semibold')}
+                />
+              </FilterField>
+              <FilterField label="To">
+                <input
+                  type="date"
+                  value={filters.dateTo}
+                  min={filters.dateFrom || undefined}
+                  onChange={(e) => setFilters({ ...filters, dateTo: e.target.value })}
+                  className={dateField(Boolean(filters.dateTo), 'h-11 w-full rounded-2xl px-3 text-sm font-semibold')}
+                />
+              </FilterField>
+            </div>
+          </FilterModal>
         </div>
 
         {/* ── Events list ── */}

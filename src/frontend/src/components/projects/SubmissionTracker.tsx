@@ -16,6 +16,8 @@ import {
   Building2,
 } from 'lucide-react';
 import { motion } from 'motion/react';
+import { FilterModal, FilterField } from '../ui/FilterModal';
+import { selectField, dateField } from '../../lib/formStyles';
 
 interface SubmissionRecord {
   id: string;
@@ -80,6 +82,9 @@ export function SubmissionTracker({
   const [searchQuery, setSearchQuery] = useState('');
   const [filterStatus, setFilterStatus] = useState<'all' | SubmissionRecord['status']>('all');
   const [filterType, setFilterType] = useState<'all' | 'parish' | 'school' | 'seminary'>('all');
+  const [filterInstitution, setFilterInstitution] = useState('all'); // specific institution
+  const [dateFrom, setDateFrom] = useState('');
+  const [dateTo, setDateTo] = useState('');
   const [sortBy, setSortBy] = useState<'entity' | 'status' | 'date'>('status');
   const [selectedSubmission, setSelectedSubmission] = useState<SubmissionRecord | null>(null);
   const [behalfDate, setBehalfDate] = useState(() => new Date().toISOString().slice(0, 10));
@@ -93,6 +98,8 @@ export function SubmissionTracker({
   };
 
   const filteredSubmissions = useMemo(() => {
+    const fromMs = dateFrom ? new Date(dateFrom).getTime() : null;
+    const toMs = dateTo ? new Date(dateTo + 'T23:59:59').getTime() : null;
     const filtered = submissions.filter((sub) => {
       const q = searchQuery.toLowerCase();
       const matchesSearch =
@@ -101,7 +108,13 @@ export function SubmissionTracker({
         (sub.vicariate?.toLowerCase().includes(q) ?? false);
       const matchesStatus = filterStatus === 'all' || sub.status === filterStatus;
       const matchesType = filterType === 'all' || sub.entityType === filterType;
-      return matchesSearch && matchesStatus && matchesType;
+      const matchesInstitution = filterInstitution === 'all' || sub.entityName === filterInstitution;
+      let matchesDate = true;
+      if (fromMs !== null || toMs !== null) {
+        const t = sub.lastSubmissionDate ? new Date(sub.lastSubmissionDate).getTime() : null;
+        matchesDate = t !== null && (fromMs === null || t >= fromMs) && (toMs === null || t <= toMs);
+      }
+      return matchesSearch && matchesStatus && matchesType && matchesInstitution && matchesDate;
     });
 
     if (sortBy === 'entity') {
@@ -117,7 +130,37 @@ export function SubmissionTracker({
       });
     }
     return filtered;
-  }, [submissions, searchQuery, filterStatus, filterType, sortBy]);
+  }, [submissions, searchQuery, filterStatus, filterType, filterInstitution, dateFrom, dateTo, sortBy]);
+
+  const institutionOptions = useMemo(
+    () =>
+      Array.from(
+        new Set(
+          submissions
+            .filter((s) => filterType === 'all' || s.entityType === filterType)
+            .map((s) => s.entityName)
+            .filter(Boolean),
+        ),
+      ).sort(),
+    [submissions, filterType],
+  );
+
+  const submissionFilterCount =
+    (filterStatus !== 'all' ? 1 : 0) +
+    (filterType !== 'all' ? 1 : 0) +
+    (filterInstitution !== 'all' ? 1 : 0) +
+    (dateFrom ? 1 : 0) +
+    (dateTo ? 1 : 0) +
+    (sortBy !== 'status' ? 1 : 0);
+
+  const clearSubmissionFilters = () => {
+    setFilterStatus('all');
+    setFilterType('all');
+    setFilterInstitution('all');
+    setDateFrom('');
+    setDateTo('');
+    setSortBy('status');
+  };
 
   const stats = useMemo(
     () => ({
@@ -167,9 +210,9 @@ export function SubmissionTracker({
         )}
       </div>
 
-      {/* Filter bar */}
+      {/* Filter bar — search inline, everything else in the modal */}
       <div className="rounded-2xl border border-slate-200 bg-white p-3">
-        <div className="flex flex-col gap-3 lg:flex-row lg:items-center">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
           <div className="relative flex-1">
             <Search className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
             <input
@@ -180,55 +223,84 @@ export function SubmissionTracker({
               className="h-11 w-full rounded-xl border border-slate-200 bg-slate-50 pl-11 pr-4 text-sm font-semibold text-slate-800 outline-none transition-all placeholder:text-slate-400 focus:border-gold-500 focus:bg-white focus:ring-4 focus:ring-gold-500/10"
             />
           </div>
-          <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
-            {[
-              {
-                value: filterStatus,
-                onChange: (v: string) => setFilterStatus(v as any),
-                options: [
-                  ['all', 'All statuses'],
-                  ['on-time', 'On time'],
-                  ['warning', 'Warning'],
-                  ['action-required', 'Action required'],
-                  ['not-submitted', 'Not submitted'],
-                ],
-              },
-              {
-                value: filterType,
-                onChange: (v: string) => setFilterType(v as any),
-                options: [
-                  ['all', 'All types'],
-                  ['parish', 'Parish'],
-                  ['school', 'School'],
-                  ['seminary', 'Seminary'],
-                ],
-              },
-              {
-                value: sortBy,
-                onChange: (v: string) => setSortBy(v as any),
-                options: [
-                  ['status', 'Sort: Priority'],
-                  ['entity', 'Sort: Name'],
-                  ['date', 'Sort: Last submitted'],
-                ],
-              },
-            ].map((sel, i) => (
-              <div key={i} className="relative">
-                <select
-                  value={sel.value}
-                  onChange={(e) => sel.onChange(e.target.value)}
-                  className="h-11 w-full cursor-pointer appearance-none rounded-xl border border-slate-200 bg-slate-50 px-4 pr-9 text-sm font-bold text-slate-700 outline-none transition-all focus:border-gold-500 focus:bg-white focus:ring-4 focus:ring-gold-500/10"
-                >
-                  {sel.options.map(([v, l]) => (
-                    <option key={v} value={v}>
-                      {l}
-                    </option>
-                  ))}
-                </select>
-                <ChevronDown className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
-              </div>
-            ))}
-          </div>
+          <FilterModal activeCount={submissionFilterCount} onClear={clearSubmissionFilters}>
+            <FilterField label="Status">
+              <select
+                value={filterStatus}
+                onChange={(e) => setFilterStatus(e.target.value as any)}
+                className={selectField(filterStatus !== 'all', 'h-11 w-full rounded-2xl px-4 text-sm font-bold')}
+              >
+                <option value="all">All statuses</option>
+                <option value="on-time">On time</option>
+                <option value="warning">Warning</option>
+                <option value="action-required">Action required</option>
+                <option value="not-submitted">Not submitted</option>
+              </select>
+            </FilterField>
+
+            <FilterField label="Institution type">
+              <select
+                value={filterType}
+                onChange={(e) => {
+                  setFilterType(e.target.value as any);
+                  setFilterInstitution('all');
+                }}
+                className={selectField(filterType !== 'all', 'h-11 w-full rounded-2xl px-4 text-sm font-bold capitalize')}
+              >
+                <option value="all">All types</option>
+                <option value="parish">Parish</option>
+                <option value="school">School</option>
+                <option value="seminary">Seminary</option>
+              </select>
+            </FilterField>
+
+            <FilterField label="Institution">
+              <select
+                value={filterInstitution}
+                onChange={(e) => setFilterInstitution(e.target.value)}
+                className={selectField(filterInstitution !== 'all', 'h-11 w-full rounded-2xl px-4 text-sm font-bold')}
+              >
+                <option value="all">All institutions</option>
+                {institutionOptions.map((name) => (
+                  <option key={name} value={name}>
+                    {name}
+                  </option>
+                ))}
+              </select>
+            </FilterField>
+
+            <FilterField label="Sort by">
+              <select
+                value={sortBy}
+                onChange={(e) => setSortBy(e.target.value as any)}
+                className={selectField(sortBy !== 'status', 'h-11 w-full rounded-2xl px-4 text-sm font-bold')}
+              >
+                <option value="status">Priority</option>
+                <option value="entity">Name</option>
+                <option value="date">Last submitted</option>
+              </select>
+            </FilterField>
+
+            <div className="grid grid-cols-2 gap-3">
+              <FilterField label="Submitted from">
+                <input
+                  type="date"
+                  value={dateFrom}
+                  onChange={(e) => setDateFrom(e.target.value)}
+                  className={dateField(Boolean(dateFrom), 'h-11 w-full rounded-2xl px-3 text-sm font-semibold')}
+                />
+              </FilterField>
+              <FilterField label="Submitted to">
+                <input
+                  type="date"
+                  value={dateTo}
+                  min={dateFrom || undefined}
+                  onChange={(e) => setDateTo(e.target.value)}
+                  className={dateField(Boolean(dateTo), 'h-11 w-full rounded-2xl px-3 text-sm font-semibold')}
+                />
+              </FilterField>
+            </div>
+          </FilterModal>
         </div>
       </div>
 

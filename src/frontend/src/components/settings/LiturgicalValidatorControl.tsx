@@ -17,6 +17,8 @@ import {
 import { apiClient } from '../../lib/api-client';
 import { auth } from '../../firebase';
 import { InlineLoader } from '../ui/LoadingScreen';
+import { FilterModal, FilterField } from '../ui/FilterModal';
+import { selectField } from '../../lib/formStyles';
 
 interface LiturgicalRecord {
   id: string;
@@ -437,99 +439,110 @@ export function LiturgicalValidatorControl() {
         </div>
       )}
 
-      {/* Filter bar — Approve All is scoped to whatever matches these filters */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-3 mb-8">
-        <div className="space-y-1.5">
-          <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest ml-1">Status</label>
-          <select
-            value={statusFilter}
-            onChange={(e) => setStatusFilter(e.target.value)}
-            className="w-full px-4 py-3 bg-gray-50 border border-gray-100 rounded-2xl text-sm font-medium text-gray-900 focus:outline-none focus:border-[#D4AF37] focus:ring-4 focus:ring-[#D4AF37]/10 transition-all"
-          >
-            {STATUS_OPTIONS.map((opt) => (
-              <option key={opt.value} value={opt.value}>
-                {opt.label}
-              </option>
-            ))}
-          </select>
+      {/* Filter bar — Celebration search inline, the rest in a pop-up modal.
+          Approve All stays scoped to whatever matches these filters. */}
+      <div className="mb-8 flex flex-col gap-3 sm:flex-row sm:items-center">
+        <div className="relative flex-1">
+          <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-300" />
+          <input
+            type="text"
+            placeholder="Search celebrations..."
+            value={celebrationQuery}
+            onChange={(e) => setCelebrationQuery(e.target.value)}
+            className="w-full pl-11 pr-4 py-3 bg-gray-50 border border-gray-100 rounded-2xl text-sm font-medium text-gray-900 focus:outline-none focus:border-[#D4AF37] focus:ring-4 focus:ring-[#D4AF37]/10 transition-all placeholder:text-gray-300"
+          />
         </div>
+        <FilterModal
+          activeCount={
+            (statusFilter !== 'pending' ? 1 : 0) +
+            (validationFilter !== 'all' ? 1 : 0) +
+            (seasonFilter !== 'all' ? 1 : 0) +
+            (monthFilter !== 0 ? 1 : 0) +
+            (yearFilter !== 0 ? 1 : 0)
+          }
+          onClear={() => {
+            setStatusFilter('pending');
+            setValidationFilter('all');
+            setSeasonFilter('all');
+            setMonthFilter(0);
+            setYearFilter(0);
+          }}
+        >
+          <FilterField label="Status">
+            <select
+              value={statusFilter}
+              onChange={(e) => setStatusFilter(e.target.value)}
+              className={selectField(statusFilter !== 'pending', 'h-11 w-full rounded-2xl px-4 text-sm font-bold')}
+            >
+              {STATUS_OPTIONS.map((opt) => (
+                <option key={opt.value} value={opt.value}>
+                  {opt.label}
+                </option>
+              ))}
+            </select>
+          </FilterField>
 
-        <div className="space-y-1.5">
-          <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest ml-1">Validation</label>
-          <select
-            value={validationFilter}
-            onChange={(e) => setValidationFilter(e.target.value as typeof validationFilter)}
-            className="w-full px-4 py-3 bg-gray-50 border border-gray-100 rounded-2xl text-sm font-medium text-gray-900 focus:outline-none focus:border-[#D4AF37] focus:ring-4 focus:ring-[#D4AF37]/10 transition-all"
-          >
-            {VALIDATION_FILTER_OPTIONS.map((opt) => (
-              <option key={opt.value} value={opt.value}>
-                {opt.label}
-              </option>
-            ))}
-          </select>
-        </div>
+          <FilterField label="Validation">
+            <select
+              value={validationFilter}
+              onChange={(e) => setValidationFilter(e.target.value as typeof validationFilter)}
+              className={selectField(validationFilter !== 'all', 'h-11 w-full rounded-2xl px-4 text-sm font-bold')}
+            >
+              {VALIDATION_FILTER_OPTIONS.map((opt) => (
+                <option key={opt.value} value={opt.value}>
+                  {opt.label}
+                </option>
+              ))}
+            </select>
+          </FilterField>
 
-        <div className="space-y-1.5">
-          <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest ml-1">Season</label>
-          <select
-            value={seasonFilter}
-            onChange={(e) => setSeasonFilter(e.target.value)}
-            className="w-full px-4 py-3 bg-gray-50 border border-gray-100 rounded-2xl text-sm font-medium text-gray-900 focus:outline-none focus:border-[#D4AF37] focus:ring-4 focus:ring-[#D4AF37]/10 transition-all"
-          >
-            <option value="all">All Seasons</option>
-            {SEASONS.map((season) => (
-              <option key={season} value={season}>
-                {season}
-              </option>
-            ))}
-          </select>
-        </div>
+          <FilterField label="Season">
+            <select
+              value={seasonFilter}
+              onChange={(e) => setSeasonFilter(e.target.value)}
+              className={selectField(seasonFilter !== 'all', 'h-11 w-full rounded-2xl px-4 text-sm font-bold')}
+            >
+              <option value="all">All Seasons</option>
+              {SEASONS.map((season) => (
+                <option key={season} value={season}>
+                  {season}
+                </option>
+              ))}
+            </select>
+          </FilterField>
 
-        <div className="space-y-1.5">
-          <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest ml-1">Month</label>
-          <select
-            value={monthFilter}
-            onChange={(e) => setMonthFilter(Number(e.target.value))}
-            className="w-full px-4 py-3 bg-gray-50 border border-gray-100 rounded-2xl text-sm font-medium text-gray-900 focus:outline-none focus:border-[#D4AF37] focus:ring-4 focus:ring-[#D4AF37]/10 transition-all"
-          >
-            <option value={0}>All Months</option>
-            {MONTHS.map((month, idx) => (
-              <option key={month} value={idx + 1}>
-                {month}
-              </option>
-            ))}
-          </select>
-        </div>
+          <div className="grid grid-cols-2 gap-3">
+            <FilterField label="Month">
+              <select
+                value={monthFilter}
+                onChange={(e) => setMonthFilter(Number(e.target.value))}
+                className={selectField(monthFilter !== 0, 'h-11 w-full rounded-2xl px-4 text-sm font-bold')}
+              >
+                <option value={0}>All Months</option>
+                {MONTHS.map((month, idx) => (
+                  <option key={month} value={idx + 1}>
+                    {month}
+                  </option>
+                ))}
+              </select>
+            </FilterField>
 
-        <div className="space-y-1.5">
-          <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest ml-1">Year</label>
-          <select
-            value={yearFilter}
-            onChange={(e) => setYearFilter(Number(e.target.value))}
-            className="w-full px-4 py-3 bg-gray-50 border border-gray-100 rounded-2xl text-sm font-medium text-gray-900 focus:outline-none focus:border-[#D4AF37] focus:ring-4 focus:ring-[#D4AF37]/10 transition-all"
-          >
-            <option value={0}>All Years</option>
-            {[2023, 2024, 2025, 2026, 2027, 2028, 2029, 2030, 2031, 2032].map((year) => (
-              <option key={year} value={year}>
-                {year}
-              </option>
-            ))}
-          </select>
-        </div>
-
-        <div className="space-y-1.5">
-          <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest ml-1">Celebration</label>
-          <div className="relative">
-            <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-300" />
-            <input
-              type="text"
-              placeholder="Search celebrations..."
-              value={celebrationQuery}
-              onChange={(e) => setCelebrationQuery(e.target.value)}
-              className="w-full pl-11 pr-4 py-3 bg-gray-50 border border-gray-100 rounded-2xl text-sm font-medium text-gray-900 focus:outline-none focus:border-[#D4AF37] focus:ring-4 focus:ring-[#D4AF37]/10 transition-all placeholder:text-gray-300"
-            />
+            <FilterField label="Year">
+              <select
+                value={yearFilter}
+                onChange={(e) => setYearFilter(Number(e.target.value))}
+                className={selectField(yearFilter !== 0, 'h-11 w-full rounded-2xl px-4 text-sm font-bold')}
+              >
+                <option value={0}>All Years</option>
+                {[2023, 2024, 2025, 2026, 2027, 2028, 2029, 2030, 2031, 2032].map((year) => (
+                  <option key={year} value={year}>
+                    {year}
+                  </option>
+                ))}
+              </select>
+            </FilterField>
           </div>
-        </div>
+        </FilterModal>
       </div>
 
       {/* Records table */}
