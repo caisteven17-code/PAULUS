@@ -1,0 +1,110 @@
+{
+  "generated_at": "2026-06-28T17:30:41.490902+00:00",
+  "db_mapping": {
+    "parish": {
+      "schema": "parishes",
+      "table": "financial_records",
+      "receipt_columns": [
+        "mass_intentions_claimed",
+        "confirmation_total",
+        "charge_over_above",
+        "mass_collection_weekday",
+        "mass_collection_sunday",
+        "mass_collection_saturday",
+        "consumable_collections",
+        "other_collections_total",
+        "donations",
+        "interest_income",
+        "subsidy_inflow",
+        "special_collections",
+        "second_collections",
+        "other_receipts",
+        "construction_receipts"
+      ],
+      "expense_columns": [
+        "priest_share",
+        "mass_stipend",
+        "other_pastoral_expenses",
+        "salaries_wages_benefits",
+        "govt_contributions",
+        "utilities",
+        "communications",
+        "other_rectory_expenses",
+        "construction_expenses"
+      ],
+      "normalized_targets": [
+        "total_receipts",
+        "total_expenses",
+        "net_receipts"
+      ]
+    },
+    "school": {
+      "schema": "schools",
+      "table": "financial_records",
+      "receipt_columns": [
+        "tuition_revenues",
+        "miscellaneous_fees",
+        "other_income",
+        "subsidy_inflow"
+      ],
+      "expense_columns": [
+        "faculty_payroll",
+        "admin_staff_payroll",
+        "utilities",
+        "facilities_maintenance",
+        "supplies",
+        "other_expenses"
+      ],
+      "normalized_targets": [
+        "total_receipts",
+        "total_expenses",
+        "net_receipts"
+      ]
+    },
+    "seminary": {
+      "schema": "seminaries",
+      "table": "financial_records",
+      "receipt_columns": [
+        "donations",
+        "seminary_fees",
+        "mass_collections",
+        "other_sources",
+        "subsidy_from_rbscp",
+        "tuition_fees",
+        "board_lodging_fees",
+        "drm_modules",
+        "sra_reading_lab",
+        "retreat",
+        "honorarium_fee",
+        "miscellaneous_fees"
+      ],
+      "expense_columns": [
+        "daily_food",
+        "food_others",
+        "gasoline_seminary",
+        "gasoline_vocation",
+        "permits_licenses",
+        "office_supplies",
+        "kitchen_equipment",
+        "medical_supplies",
+        "liturgical_supplies",
+        "construction_materials",
+        "other_supplies",
+        "lpg",
+        "repairs_maintenance",
+        "equipment_furniture"
+      ],
+      "normalized_targets": [
+        "total_receipts",
+        "total_expenses",
+        "net_receipts"
+      ]
+    }
+  },
+  "summary": {
+    "ok_results": 0,
+    "champions": [],
+    "by_model": []
+  },
+  "results": []
+}

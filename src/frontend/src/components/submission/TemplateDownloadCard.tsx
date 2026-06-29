@@ -5,12 +5,19 @@ import { Database, Download, FileText, Loader2 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '../ui/Card';
 import { SubmissionTemplate } from './types';
 
+interface TemplateFormatOption {
+  format: 'xlsx' | 'csv';
+  onDownload: () => void;
+}
+
 interface TemplateDownloadCardProps {
   template: SubmissionTemplate;
   institutionLabel: string;
   isLoading: boolean;
   onDownload: () => void;
   disabled?: boolean;
+  /** Real admin-uploaded templates, when available — one button per format instead of the generic mock download. */
+  formatOptions?: TemplateFormatOption[];
 }
 
 export function TemplateDownloadCard({
@@ -19,6 +26,7 @@ export function TemplateDownloadCard({
   isLoading,
   onDownload,
   disabled,
+  formatOptions,
 }: TemplateDownloadCardProps) {
   return (
     <Card className="space-y-5">
@@ -65,18 +73,38 @@ export function TemplateDownloadCard({
           </div>
         </div>
 
-        <button
-          onClick={onDownload}
-          disabled={isLoading || disabled}
-          className={`flex w-full items-center justify-center gap-2 rounded-2xl px-4 py-4 text-sm font-bold transition-all disabled:cursor-not-allowed ${
-            disabled
-              ? 'bg-gray-100 text-gray-400 border border-gray-200 shadow-none'
-              : 'bg-gold-500 text-black shadow-lg shadow-gold-500/20 hover:bg-gold-600'
-          }`}
-        >
-          {isLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />}
-          {disabled ? 'Download Disabled' : isLoading ? 'Retrieving Template...' : 'Download Template'}
-        </button>
+        {formatOptions && formatOptions.length > 0 ? (
+          <div className={`grid gap-3 ${formatOptions.length > 1 ? 'grid-cols-2' : 'grid-cols-1'}`}>
+            {formatOptions.map((option) => (
+              <button
+                key={option.format}
+                onClick={option.onDownload}
+                disabled={disabled}
+                className={`flex w-full items-center justify-center gap-2 rounded-2xl px-4 py-4 text-sm font-bold transition-all disabled:cursor-not-allowed ${
+                  disabled
+                    ? 'bg-gray-100 text-gray-400 border border-gray-200 shadow-none'
+                    : 'bg-gold-500 text-black shadow-lg shadow-gold-500/20 hover:bg-gold-600'
+                }`}
+              >
+                <Download className="h-4 w-4" />
+                Download .{option.format}
+              </button>
+            ))}
+          </div>
+        ) : (
+          <button
+            onClick={onDownload}
+            disabled={isLoading || disabled}
+            className={`flex w-full items-center justify-center gap-2 rounded-2xl px-4 py-4 text-sm font-bold transition-all disabled:cursor-not-allowed ${
+              disabled
+                ? 'bg-gray-100 text-gray-400 border border-gray-200 shadow-none'
+                : 'bg-gold-500 text-black shadow-lg shadow-gold-500/20 hover:bg-gold-600'
+            }`}
+          >
+            {isLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />}
+            {disabled ? 'Download Disabled' : isLoading ? 'Retrieving Template...' : 'Download Template'}
+          </button>
+        )}
       </CardContent>
     </Card>
   );

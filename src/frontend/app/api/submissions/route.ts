@@ -32,6 +32,21 @@ export async function POST(req: NextRequest) {
 
     const supabase = makeServiceClient();
 
+    const { data: institutionRow, error: institutionError } = await supabase
+      .schema('diocese')
+      .from('institutions')
+      .select('id')
+      .eq('name', institutionName)
+      .single();
+
+    if (institutionError || !institutionRow) {
+      return NextResponse.json(
+        { error: `No institution found matching "${institutionName}". Cannot record this submission.` },
+        { status: 400 },
+      );
+    }
+    const institutionId = institutionRow.id as string;
+
     // Read file bytes and compute a SHA-256 hash for deduplication
     const arrayBuffer = await file.arrayBuffer();
     const buffer = Buffer.from(arrayBuffer);
@@ -63,6 +78,7 @@ export async function POST(req: NextRequest) {
       .schema('operations')
       .from('submission_batches')
       .insert({
+        institution_id: institutionId,
         institution_type: institutionType,
         report_type: reportType,
         reporting_month: reportingMonth,

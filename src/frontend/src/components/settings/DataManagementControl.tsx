@@ -24,31 +24,61 @@ interface CSVUploadSectionProps {
 }
 
 const TYPE_META: Record<CSVUploadSectionProps['type'], { icon: React.ElementType; label: string }> = {
-  parish: { icon: Church, label: 'Parish CSV Template' },
-  seminary: { icon: BookOpen, label: 'Seminary CSV Template' },
-  school: { icon: GraduationCap, label: 'School CSV Template' },
-  diocese: { icon: Database, label: 'Diocese CSV Template' },
+  parish: { icon: Church, label: 'Parish Template' },
+  seminary: { icon: BookOpen, label: 'Seminary Template' },
+  school: { icon: GraduationCap, label: 'School Template' },
+  diocese: { icon: Database, label: 'Diocese Template' },
 };
 
 function CSVUploadSection({ title, description, type }: CSVUploadSectionProps) {
   const { permissions } = usePermissions();
   const [isUploading, setIsUploading] = useState(false);
   const [isSuccess, setIsSuccess] = useState(false);
+  const [isDownloading, setIsDownloading] = useState(false);
   const [fileName, setFileName] = useState<string | null>(null);
+  const [uploadError, setUploadError] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const canUpload = type === 'diocese' ? permissions.upload_csv_admin === true : permissions.upload_csv_entity === true;
 
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (file) {
-      setFileName(file.name);
-      setIsUploading(true);
-      setTimeout(() => {
-        setIsUploading(false);
-        setIsSuccess(true);
-        setTimeout(() => setIsSuccess(false), 3000);
-      }, 1500);
+    if (!file) return;
+
+    setFileName(file.name);
+    setUploadError(null);
+    setIsUploading(true);
+    try {
+      const fd = new FormData();
+      fd.append('file', file);
+      fd.append('institutionType', type);
+      const res = await fetch('/api/admin/templates', { method: 'POST', body: fd });
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        throw new Error(body?.error ?? `Upload failed (${res.status})`);
+      }
+      setIsSuccess(true);
+      setTimeout(() => setIsSuccess(false), 3000);
+    } catch (err) {
+      setUploadError(err instanceof Error ? err.message : 'Upload failed.');
+    } finally {
+      setIsUploading(false);
+    }
+  };
+
+  const handleDownloadTemplate = async () => {
+    setIsDownloading(true);
+    try {
+      const res = await fetch(`/api/admin/templates?institutionType=${type}`);
+      const urls = (await res.json()) as Partial<Record<'xlsx' | 'csv', string>>;
+      const url = urls.xlsx ?? urls.csv;
+      if (!url) {
+        setUploadError('No template has been uploaded for this institution type yet.');
+        return;
+      }
+      window.open(url, '_blank', 'noopener,noreferrer');
+    } finally {
+      setIsDownloading(false);
     }
   };
 
@@ -72,13 +102,19 @@ function CSVUploadSection({ title, description, type }: CSVUploadSectionProps) {
       <div className="space-y-3">
         <button
           type="button"
-          className="flex w-full items-center justify-center gap-2 rounded-xl border border-slate-200 py-2.5 text-xs font-bold text-slate-600 transition-colors hover:bg-slate-50"
+          onClick={handleDownloadTemplate}
+          disabled={isDownloading}
+          className="flex w-full items-center justify-center gap-2 rounded-xl border border-slate-200 py-2.5 text-xs font-bold text-slate-600 transition-colors hover:bg-slate-50 disabled:opacity-50"
         >
-          <Download className="h-4 w-4 text-slate-400" />
-          Download blank template
+          {isDownloading ? (
+            <Loader2 className="h-4 w-4 animate-spin text-slate-400" />
+          ) : (
+            <Download className="h-4 w-4 text-slate-400" />
+          )}
+          {isDownloading ? 'Retrieving…' : 'Download blank template'}
         </button>
 
-        <input type="file" ref={fileInputRef} onChange={handleFileChange} accept=".csv" className="hidden" />
+        <input type="file" ref={fileInputRef} onChange={handleFileChange} accept=".csv,.xlsx" className="hidden" />
         <button
           onClick={() => fileInputRef.current?.click()}
           disabled={isUploading || !canUpload}
@@ -102,11 +138,12 @@ function CSVUploadSection({ title, description, type }: CSVUploadSectionProps) {
             <>Upload disabled</>
           ) : (
             <>
-              <UploadCloud className="h-4 w-4" /> Upload CSV
+              <UploadCloud className="h-4 w-4" /> Upload CSV / XLSX
             </>
           )}
         </button>
-        {fileName && !isSuccess && !isUploading && (
+        {uploadError && <p className="px-2 text-center text-[10px] font-medium text-red-500">{uploadError}</p>}
+        {fileName && !isSuccess && !isUploading && !uploadError && (
           <p className="truncate px-2 text-center text-[10px] font-medium text-slate-400">{fileName}</p>
         )}
       </div>
@@ -239,7 +276,7 @@ export function DataManagementControl() {
   }, [isDiocese, isParish, isSeminary, isSchool, mockSubmissions]);
 
   const tabs = [
-    { id: 'templates' as const, label: 'CSV Templates', icon: FileSpreadsheet },
+    { id: 'templates' as const, label: 'CSV / XLSX Templates', icon: FileSpreadsheet },
     { id: 'submissions' as const, label: 'Submission Tracking', icon: ClipboardList },
   ];
 
@@ -251,7 +288,7 @@ export function DataManagementControl() {
           <p className="text-[10px] font-black uppercase tracking-[0.24em] text-gold-600">Diocesan Operations</p>
           <h3 className="mt-1 font-serif text-2xl font-bold text-slate-900">Data Management</h3>
           <p className="mt-1 text-sm text-slate-500">
-            Manage financial data templates and track submission status across the diocese.
+            Manage financial data templates (CSV or XLSX) and track submission status across the diocese.
           </p>
         </div>
         <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-slate-900">

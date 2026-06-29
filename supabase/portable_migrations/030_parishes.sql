@@ -90,7 +90,7 @@ CREATE TABLE IF NOT EXISTS parishes.iafr_line_items (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   financial_record_id uuid NOT NULL REFERENCES parishes.financial_records(id) ON DELETE CASCADE,
   account_title_id uuid REFERENCES parishes.iafr_account_titles(id),
-  section_code text NOT NULL CHECK (section_code IN ('A', 'B', 'C', 'D', 'E', 'F')),
+  section_code text NOT NULL CHECK (section_code IN ('B', 'C', 'D', 'E', 'F')),
   subsection_code text,
   item_code text,
   item_label text NOT NULL,

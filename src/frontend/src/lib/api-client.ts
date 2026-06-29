@@ -469,6 +469,26 @@ export const apiClient = {
     return res.json();
   },
 
+  async processSubmission(
+    submissionId: string,
+    storagePath: string,
+  ): Promise<{
+    submissionBatchId: string;
+    validationStatus: 'passed' | 'failed' | 'warning' | 'pending';
+    monthsProcessed: number;
+    rows: Array<{ month: string; year: number; financialRecordId: string }>;
+    summary: { errorCount: number; lineItemCount: number; reconciliationCheckCount?: number };
+  }> {
+    const res = await fetch(`/api/submissions/${submissionId}/process`, {
+      method: 'POST',
+      credentials: 'include',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ storagePath }),
+    });
+    if (!res.ok) throw new Error(`POST /api/submissions/${submissionId}/process → ${res.status}`);
+    return res.json();
+  },
+
   // ----------------------------------------------------------------
   // Digital Twin (bishop sandbox — counterfactual replay + private scenarios)
   // ----------------------------------------------------------------

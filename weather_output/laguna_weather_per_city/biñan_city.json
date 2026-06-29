@@ -7,10 +7,24 @@
   "champion_source": "nasa_power_sb",
   "scores": {
     "open_meteo": {
-      "coverage": 0,
-      "plausibility": 0,
-      "consistency": 0,
-      "composite": 0
+      "coverage": 100.0,
+      "plausibility": 100.0,
+      "consistency": 10.27,
+      "composite": 64.11,
+      "record_count": 730,
+      "rainfall_mismatch_count": 528,
+      "rainfall_mismatches": [
+        "2021-01-01: 0.1mm vs median 19.1mm",
+        "2021-01-04: 1.9mm vs median 13.5mm",
+        "2021-01-05: 0.8mm vs median 4.1mm",
+        "2021-01-06: 0.0mm vs median 2.3mm",
+        "2021-01-07: 0.6mm vs median 3.6mm",
+        "2021-01-09: 1.0mm vs median 6.3mm",
+        "2021-01-10: 0.5mm vs median 5.8mm",
+        "2021-01-11: 4.4mm vs median 0.8mm",
+        "2021-01-12: 0.9mm vs median 0.2mm",
+        "2021-01-13: 1.0mm vs median 2.0mm"
+      ]
     },
     "nasa_power_sb": {
       "coverage": 100.0,
@@ -406,7 +420,7308 @@
     }
   ],
   "raw_by_source": {
-    "open_meteo": [],
+    "open_meteo": [
+      {
+        "date": "2021-01-01",
+        "temp_avg_c": 24.3,
+        "temp_max_c": 25.9,
+        "temp_min_c": 23.0,
+        "rainfall_mm": 0.1,
+        "wind_ms": 7.28,
+        "weathercode": 51,
+        "relativehumidity_pct": 78
+      },
+      {
+        "date": "2021-01-02",
+        "temp_avg_c": 24.5,
+        "temp_max_c": 26.9,
+        "temp_min_c": 23.2,
+        "rainfall_mm": 10.1,
+        "wind_ms": 5.92,
+        "weathercode": 63,
+        "relativehumidity_pct": 83
+      },
+      {
+        "date": "2021-01-03",
+        "temp_avg_c": 24.4,
+        "temp_max_c": 26.0,
+        "temp_min_c": 23.9,
+        "rainfall_mm": 26.2,
+        "wind_ms": 5.12,
+        "weathercode": 65,
+        "relativehumidity_pct": 92
+      },
+      {
+        "date": "2021-01-04",
+        "temp_avg_c": 25.6,
+        "temp_max_c": 28.7,
+        "temp_min_c": 24.0,
+        "rainfall_mm": 1.9,
+        "wind_ms": 6.28,
+        "weathercode": 53,
+        "relativehumidity_pct": 86
+      },
+      {
+        "date": "2021-01-05",
+        "temp_avg_c": 25.5,
+        "temp_max_c": 27.9,
+        "temp_min_c": 24.0,
+        "rainfall_mm": 0.8,
+        "wind_ms": 5.61,
+        "weathercode": 51,
+        "relativehumidity_pct": 87
+      },
+      {
+        "date": "2021-01-06",
+        "temp_avg_c": 25.4,
+        "temp_max_c": 28.5,
+        "temp_min_c": 23.5,
+        "rainfall_mm": 0.0,
+        "wind_ms": 5.5,
+        "weathercode": 3,
+        "relativehumidity_pct": 84
+      },
+      {
+        "date": "2021-01-07",
+        "temp_avg_c": 25.3,
+        "temp_max_c": 28.2,
+        "temp_min_c": 23.4,
+        "rainfall_mm": 0.6,
+        "wind_ms": 5.92,
+        "weathercode": 51,
+        "relativehumidity_pct": 83
+      },
+      {
+        "date": "2021-01-08",
+        "temp_avg_c": 24.9,
+        "temp_max_c": 27.0,
+        "temp_min_c": 23.5,
+        "rainfall_mm": 3.6,
+        "wind_ms": 5.61,
+        "weathercode": 61,
+        "relativehumidity_pct": 83
+      },
+      {
+        "date": "2021-01-09",
+        "temp_avg_c": 23.8,
+        "temp_max_c": 25.6,
+        "temp_min_c": 23.1,
+        "rainfall_mm": 1.0,
+        "wind_ms": 5.8,
+        "weathercode": 53,
+        "relativehumidity_pct": 81
+      },
+      {
+        "date": "2021-01-10",
+        "temp_avg_c": 23.7,
+        "temp_max_c": 25.5,
+        "temp_min_c": 22.7,
+        "rainfall_mm": 0.5,
+        "wind_ms": 7.03,
+        "weathercode": 51,
+        "relativehumidity_pct": 76
+      },
+      {
+        "date": "2021-01-11",
+        "temp_avg_c": 23.6,
+        "temp_max_c": 25.6,
+        "temp_min_c": 21.7,
+        "rainfall_mm": 4.4,
+        "wind_ms": 7.25,
+        "weathercode": 61,
+        "relativehumidity_pct": 75
+      },
+      {
+        "date": "2021-01-12",
+        "temp_avg_c": 23.3,
+        "temp_max_c": 26.0,
+        "temp_min_c": 21.4,
+        "rainfall_mm": 0.9,
+        "wind_ms": 5.55,
+        "weathercode": 51,
+        "relativehumidity_pct": 78
+      },
+      {
+        "date": "2021-01-13",
+        "temp_avg_c": 24.1,
+        "temp_max_c": 26.5,
+        "temp_min_c": 22.3,
+        "rainfall_mm": 1.0,
+        "wind_ms": 5.81,
+        "weathercode": 51,
+        "relativehumidity_pct": 80
+      },
+      {
+        "date": "2021-01-14",
+        "temp_avg_c": 24.9,
+        "temp_max_c": 27.4,
+        "temp_min_c": 23.2,
+        "rainfall_mm": 0.1,
+        "wind_ms": 4.82,
+        "weathercode": 51,
+        "relativehumidity_pct": 81
+      },
+      {
+        "date": "2021-01-15",
+        "temp_avg_c": 25.0,
+        "temp_max_c": 27.7,
+        "temp_min_c": 23.1,
+        "rainfall_mm": 0.2,
+        "wind_ms": 5.71,
+        "weathercode": 51,
+        "relativehumidity_pct": 83
+      },
+      {
+        "date": "2021-01-16",
+        "temp_avg_c": 25.0,
+        "temp_max_c": 27.5,
+        "temp_min_c": 23.0,
+        "rainfall_mm": 1.4,
+        "wind_ms": 6.67,
+        "weathercode": 55,
+        "relativehumidity_pct": 78
+      },
+      {
+        "date": "2021-01-17",
+        "temp_avg_c": 24.0,
+        "temp_max_c": 25.0,
+        "temp_min_c": 23.2,
+        "rainfall_mm": 15.3,
+        "wind_ms": 4.71,
+        "weathercode": 63,
+        "relativehumidity_pct": 86
+      },
+      {
+        "date": "2021-01-18",
+        "temp_avg_c": 24.5,
+        "temp_max_c": 27.0,
+        "temp_min_c": 22.4,
+        "rainfall_mm": 2.9,
+        "wind_ms": 6.56,
+        "weathercode": 53,
+        "relativehumidity_pct": 83
+      },
+      {
+        "date": "2021-01-19",
+        "temp_avg_c": 24.4,
+        "temp_max_c": 26.0,
+        "temp_min_c": 23.7,
+        "rainfall_mm": 5.6,
+        "wind_ms": 5.73,
+        "weathercode": 53,
+        "relativehumidity_pct": 87
+      },
+      {
+        "date": "2021-01-20",
+        "temp_avg_c": 23.7,
+        "temp_max_c": 25.0,
+        "temp_min_c": 22.8,
+        "rainfall_mm": 17.5,
+        "wind_ms": 3.55,
+        "weathercode": 63,
+        "relativehumidity_pct": 94
+      },
+      {
+        "date": "2021-01-21",
+        "temp_avg_c": 24.6,
+        "temp_max_c": 26.5,
+        "temp_min_c": 22.8,
+        "rainfall_mm": 22.4,
+        "wind_ms": 2.86,
+        "weathercode": 63,
+        "relativehumidity_pct": 94
+      },
+      {
+        "date": "2021-01-22",
+        "temp_avg_c": 25.3,
+        "temp_max_c": 28.6,
+        "temp_min_c": 22.9,
+        "rainfall_mm": 3.0,
+        "wind_ms": 4.14,
+        "weathercode": 53,
+        "relativehumidity_pct": 89
+      },
+      {
+        "date": "2021-01-23",
+        "temp_avg_c": 25.7,
+        "temp_max_c": 28.9,
+        "temp_min_c": 22.9,
+        "rainfall_mm": 4.8,
+        "wind_ms": 2.28,
+        "weathercode": 61,
+        "relativehumidity_pct": 88
+      },
+      {
+        "date": "2021-01-24",
+        "temp_avg_c": 25.4,
+        "temp_max_c": 28.1,
+        "temp_min_c": 23.2,
+        "rainfall_mm": 4.3,
+        "wind_ms": 4.4,
+        "weathercode": 61,
+        "relativehumidity_pct": 90
+      },
+      {
+        "date": "2021-01-25",
+        "temp_avg_c": 25.9,
+        "temp_max_c": 28.5,
+        "temp_min_c": 23.9,
+        "rainfall_mm": 0.0,
+        "wind_ms": 4.51,
+        "weathercode": 2,
+        "relativehumidity_pct": 85
+      },
+      {
+        "date": "2021-01-26",
+        "temp_avg_c": 25.7,
+        "temp_max_c": 29.0,
+        "temp_min_c": 23.8,
+        "rainfall_mm": 0.5,
+        "wind_ms": 5.82,
+        "weathercode": 51,
+        "relativehumidity_pct": 84
+      },
+      {
+        "date": "2021-01-27",
+        "temp_avg_c": 25.0,
+        "temp_max_c": 27.6,
+        "temp_min_c": 23.8,
+        "rainfall_mm": 3.2,
+        "wind_ms": 5.63,
+        "weathercode": 53,
+        "relativehumidity_pct": 86
+      },
+      {
+        "date": "2021-01-28",
+        "temp_avg_c": 25.0,
+        "temp_max_c": 28.2,
+        "temp_min_c": 23.5,
+        "rainfall_mm": 0.5,
+        "wind_ms": 5.84,
+        "weathercode": 51,
+        "relativehumidity_pct": 80
+      },
+      {
+        "date": "2021-01-29",
+        "temp_avg_c": 24.4,
+        "temp_max_c": 26.8,
+        "temp_min_c": 22.5,
+        "rainfall_mm": 0.0,
+        "wind_ms": 8.35,
+        "weathercode": 3,
+        "relativehumidity_pct": 71
+      },
+      {
+        "date": "2021-01-30",
+        "temp_avg_c": 23.7,
+        "temp_max_c": 26.1,
+        "temp_min_c": 22.3,
+        "rainfall_mm": 0.0,
+        "wind_ms": 8.76,
+        "weathercode": 3,
+        "relativehumidity_pct": 69
+      },
+      {
+        "date": "2021-01-31",
+        "temp_avg_c": 23.5,
+        "temp_max_c": 26.4,
+        "temp_min_c": 21.8,
+        "rainfall_mm": 0.0,
+        "wind_ms": 7.15,
+        "weathercode": 3,
+        "relativehumidity_pct": 72
+      },
+      {
+        "date": "2021-02-01",
+        "temp_avg_c": 24.0,
+        "temp_max_c": 27.3,
+        "temp_min_c": 21.8,
+        "rainfall_mm": 0.3,
+        "wind_ms": 5.82,
+        "weathercode": 51,
+        "relativehumidity_pct": 77
+      },
+      {
+        "date": "2021-02-02",
+        "temp_avg_c": 24.6,
+        "temp_max_c": 28.2,
+        "temp_min_c": 22.1,
+        "rainfall_mm": 0.0,
+        "wind_ms": 6.11,
+        "weathercode": 3,
+        "relativehumidity_pct": 77
+      },
+      {
+        "date": "2021-02-03",
+        "temp_avg_c": 24.9,
+        "temp_max_c": 27.7,
+        "temp_min_c": 23.1,
+        "rainfall_mm": 0.0,
+        "wind_ms": 6.36,
+        "weathercode": 3,
+        "relativehumidity_pct": 77
+      },
+      {
+        "date": "2021-02-04",
+        "temp_avg_c": 25.0,
+        "temp_max_c": 27.8,
+        "temp_min_c": 23.2,
+        "rainfall_mm": 0.0,
+        "wind_ms": 6.78,
+        "weathercode": 3,
+        "relativehumidity_pct": 76
+      },
+      {
+        "date": "2021-02-05",
+        "temp_avg_c": 24.8,
+        "temp_max_c": 27.6,
+        "temp_min_c": 23.6,
+        "rainfall_mm": 2.4,
+        "wind_ms": 6.28,
+        "weathercode": 55,
+        "relativehumidity_pct": 81
+      },
+      {
+        "date": "2021-02-06",
+        "temp_avg_c": 25.0,
+        "temp_max_c": 28.2,
+        "temp_min_c": 23.0,
+        "rainfall_mm": 4.7,
+        "wind_ms": 5.57,
+        "weathercode": 61,
+        "relativehumidity_pct": 83
+      },
+      {
+        "date": "2021-02-07",
+        "temp_avg_c": 25.7,
+        "temp_max_c": 29.1,
+        "temp_min_c": 23.5,
+        "rainfall_mm": 0.3,
+        "wind_ms": 5.25,
+        "weathercode": 51,
+        "relativehumidity_pct": 82
+      },
+      {
+        "date": "2021-02-08",
+        "temp_avg_c": 25.4,
+        "temp_max_c": 27.5,
+        "temp_min_c": 23.9,
+        "rainfall_mm": 1.0,
+        "wind_ms": 6.62,
+        "weathercode": 51,
+        "relativehumidity_pct": 83
+      },
+      {
+        "date": "2021-02-09",
+        "temp_avg_c": 24.2,
+        "temp_max_c": 25.6,
+        "temp_min_c": 22.9,
+        "rainfall_mm": 12.2,
+        "wind_ms": 6.62,
+        "weathercode": 63,
+        "relativehumidity_pct": 88
+      },
+      {
+        "date": "2021-02-10",
+        "temp_avg_c": 24.8,
+        "temp_max_c": 27.6,
+        "temp_min_c": 22.8,
+        "rainfall_mm": 1.6,
+        "wind_ms": 6.0,
+        "weathercode": 53,
+        "relativehumidity_pct": 82
+      },
+      {
+        "date": "2021-02-11",
+        "temp_avg_c": 25.1,
+        "temp_max_c": 28.6,
+        "temp_min_c": 21.9,
+        "rainfall_mm": 3.7,
+        "wind_ms": 2.94,
+        "weathercode": 55,
+        "relativehumidity_pct": 88
+      },
+      {
+        "date": "2021-02-12",
+        "temp_avg_c": 25.8,
+        "temp_max_c": 29.8,
+        "temp_min_c": 22.8,
+        "rainfall_mm": 0.5,
+        "wind_ms": 4.39,
+        "weathercode": 51,
+        "relativehumidity_pct": 83
+      },
+      {
+        "date": "2021-02-13",
+        "temp_avg_c": 24.2,
+        "temp_max_c": 26.6,
+        "temp_min_c": 22.4,
+        "rainfall_mm": 14.7,
+        "wind_ms": 3.59,
+        "weathercode": 63,
+        "relativehumidity_pct": 91
+      },
+      {
+        "date": "2021-02-14",
+        "temp_avg_c": 25.0,
+        "temp_max_c": 27.9,
+        "temp_min_c": 22.9,
+        "rainfall_mm": 1.9,
+        "wind_ms": 3.59,
+        "weathercode": 51,
+        "relativehumidity_pct": 85
+      },
+      {
+        "date": "2021-02-15",
+        "temp_avg_c": 24.4,
+        "temp_max_c": 27.0,
+        "temp_min_c": 22.0,
+        "rainfall_mm": 1.4,
+        "wind_ms": 4.31,
+        "weathercode": 51,
+        "relativehumidity_pct": 87
+      },
+      {
+        "date": "2021-02-16",
+        "temp_avg_c": 24.6,
+        "temp_max_c": 28.0,
+        "temp_min_c": 22.4,
+        "rainfall_mm": 0.0,
+        "wind_ms": 5.7,
+        "weathercode": 3,
+        "relativehumidity_pct": 80
+      },
+      {
+        "date": "2021-02-17",
+        "temp_avg_c": 24.3,
+        "temp_max_c": 27.8,
+        "temp_min_c": 21.9,
+        "rainfall_mm": 0.2,
+        "wind_ms": 5.8,
+        "weathercode": 51,
+        "relativehumidity_pct": 80
+      },
+      {
+        "date": "2021-02-18",
+        "temp_avg_c": 24.2,
+        "temp_max_c": 27.0,
+        "temp_min_c": 22.4,
+        "rainfall_mm": 0.3,
+        "wind_ms": 6.43,
+        "weathercode": 51,
+        "relativehumidity_pct": 76
+      },
+      {
+        "date": "2021-02-19",
+        "temp_avg_c": 23.0,
+        "temp_max_c": 26.3,
+        "temp_min_c": 21.4,
+        "rainfall_mm": 0.5,
+        "wind_ms": 7.43,
+        "weathercode": 51,
+        "relativehumidity_pct": 74
+      },
+      {
+        "date": "2021-02-20",
+        "temp_avg_c": 22.9,
+        "temp_max_c": 26.0,
+        "temp_min_c": 20.9,
+        "rainfall_mm": 0.0,
+        "wind_ms": 6.96,
+        "weathercode": 3,
+        "relativehumidity_pct": 66
+      },
+      {
+        "date": "2021-02-21",
+        "temp_avg_c": 23.5,
+        "temp_max_c": 26.9,
+        "temp_min_c": 22.0,
+        "rainfall_mm": 3.1,
+        "wind_ms": 7.26,
+        "weathercode": 55,
+        "relativehumidity_pct": 73
+      },
+      {
+        "date": "2021-02-22",
+        "temp_avg_c": 24.1,
+        "temp_max_c": 27.2,
+        "temp_min_c": 21.6,
+        "rainfall_mm": 4.6,
+        "wind_ms": 3.98,
+        "weathercode": 55,
+        "relativehumidity_pct": 89
+      },
+      {
+        "date": "2021-02-23",
+        "temp_avg_c": 24.6,
+        "temp_max_c": 26.8,
+        "temp_min_c": 22.9,
+        "rainfall_mm": 11.7,
+        "wind_ms": 4.34,
+        "weathercode": 63,
+        "relativehumidity_pct": 93
+      },
+      {
+        "date": "2021-02-24",
+        "temp_avg_c": 25.6,
+        "temp_max_c": 28.5,
+        "temp_min_c": 23.5,
+        "rainfall_mm": 1.0,
+        "wind_ms": 5.61,
+        "weathercode": 51,
+        "relativehumidity_pct": 87
+      },
+      {
+        "date": "2021-02-25",
+        "temp_avg_c": 26.1,
+        "temp_max_c": 29.5,
+        "temp_min_c": 24.2,
+        "rainfall_mm": 0.0,
+        "wind_ms": 4.1,
+        "weathercode": 3,
+        "relativehumidity_pct": 81
+      },
+      {
+        "date": "2021-02-26",
+        "temp_avg_c": 25.6,
+        "temp_max_c": 28.5,
+        "temp_min_c": 22.9,
+        "rainfall_mm": 0.8,
+        "wind_ms": 3.72,
+        "weathercode": 51,
+        "relativehumidity_pct": 84
+      },
+      {
+        "date": "2021-02-27",
+        "temp_avg_c": 26.0,
+        "temp_max_c": 28.9,
+        "temp_min_c": 23.0,
+        "rainfall_mm": 0.9,
+        "wind_ms": 4.21,
+        "weathercode": 51,
+        "relativehumidity_pct": 85
+      },
+      {
+        "date": "2021-02-28",
+        "temp_avg_c": 25.9,
+        "temp_max_c": 28.8,
+        "temp_min_c": 24.0,
+        "rainfall_mm": 0.4,
+        "wind_ms": 5.04,
+        "weathercode": 51,
+        "relativehumidity_pct": 85
+      },
+      {
+        "date": "2021-03-01",
+        "temp_avg_c": 26.3,
+        "temp_max_c": 29.3,
+        "temp_min_c": 24.1,
+        "rainfall_mm": 0.1,
+        "wind_ms": 4.6,
+        "weathercode": 51,
+        "relativehumidity_pct": 83
+      },
+      {
+        "date": "2021-03-02",
+        "temp_avg_c": 26.4,
+        "temp_max_c": 30.1,
+        "temp_min_c": 23.5,
+        "rainfall_mm": 0.3,
+        "wind_ms": 4.41,
+        "weathercode": 51,
+        "relativehumidity_pct": 83
+      },
+      {
+        "date": "2021-03-03",
+        "temp_avg_c": 25.8,
+        "temp_max_c": 28.3,
+        "temp_min_c": 24.0,
+        "rainfall_mm": 1.6,
+        "wind_ms": 6.21,
+        "weathercode": 51,
+        "relativehumidity_pct": 83
+      },
+      {
+        "date": "2021-03-04",
+        "temp_avg_c": 26.0,
+        "temp_max_c": 28.5,
+        "temp_min_c": 23.9,
+        "rainfall_mm": 0.1,
+        "wind_ms": 5.81,
+        "weathercode": 51,
+        "relativehumidity_pct": 79
+      },
+      {
+        "date": "2021-03-05",
+        "temp_avg_c": 26.1,
+        "temp_max_c": 29.0,
+        "temp_min_c": 24.0,
+        "rainfall_mm": 0.4,
+        "wind_ms": 5.71,
+        "weathercode": 51,
+        "relativehumidity_pct": 79
+      },
+      {
+        "date": "2021-03-06",
+        "temp_avg_c": 26.0,
+        "temp_max_c": 29.0,
+        "temp_min_c": 23.9,
+        "rainfall_mm": 0.0,
+        "wind_ms": 5.02,
+        "weathercode": 3,
+        "relativehumidity_pct": 77
+      },
+      {
+        "date": "2021-03-07",
+        "temp_avg_c": 25.9,
+        "temp_max_c": 29.1,
+        "temp_min_c": 23.4,
+        "rainfall_mm": 0.1,
+        "wind_ms": 5.73,
+        "weathercode": 51,
+        "relativehumidity_pct": 76
+      },
+      {
+        "date": "2021-03-08",
+        "temp_avg_c": 25.8,
+        "temp_max_c": 28.9,
+        "temp_min_c": 23.6,
+        "rainfall_mm": 0.5,
+        "wind_ms": 5.8,
+        "weathercode": 51,
+        "relativehumidity_pct": 77
+      },
+      {
+        "date": "2021-03-09",
+        "temp_avg_c": 25.4,
+        "temp_max_c": 27.5,
+        "temp_min_c": 23.5,
+        "rainfall_mm": 1.8,
+        "wind_ms": 6.28,
+        "weathercode": 51,
+        "relativehumidity_pct": 80
+      },
+      {
+        "date": "2021-03-10",
+        "temp_avg_c": 25.9,
+        "temp_max_c": 29.3,
+        "temp_min_c": 23.4,
+        "rainfall_mm": 0.3,
+        "wind_ms": 7.12,
+        "weathercode": 51,
+        "relativehumidity_pct": 72
+      },
+      {
+        "date": "2021-03-11",
+        "temp_avg_c": 26.3,
+        "temp_max_c": 29.6,
+        "temp_min_c": 24.2,
+        "rainfall_mm": 0.2,
+        "wind_ms": 6.32,
+        "weathercode": 51,
+        "relativehumidity_pct": 70
+      },
+      {
+        "date": "2021-03-12",
+        "temp_avg_c": 25.4,
+        "temp_max_c": 27.8,
+        "temp_min_c": 24.2,
+        "rainfall_mm": 1.6,
+        "wind_ms": 6.51,
+        "weathercode": 51,
+        "relativehumidity_pct": 80
+      },
+      {
+        "date": "2021-03-13",
+        "temp_avg_c": 24.5,
+        "temp_max_c": 26.8,
+        "temp_min_c": 23.0,
+        "rainfall_mm": 10.0,
+        "wind_ms": 6.13,
+        "weathercode": 63,
+        "relativehumidity_pct": 86
+      },
+      {
+        "date": "2021-03-14",
+        "temp_avg_c": 24.9,
+        "temp_max_c": 27.3,
+        "temp_min_c": 23.2,
+        "rainfall_mm": 5.1,
+        "wind_ms": 5.1,
+        "weathercode": 53,
+        "relativehumidity_pct": 85
+      },
+      {
+        "date": "2021-03-15",
+        "temp_avg_c": 25.0,
+        "temp_max_c": 27.2,
+        "temp_min_c": 23.6,
+        "rainfall_mm": 7.4,
+        "wind_ms": 3.71,
+        "weathercode": 61,
+        "relativehumidity_pct": 90
+      },
+      {
+        "date": "2021-03-16",
+        "temp_avg_c": 26.0,
+        "temp_max_c": 29.9,
+        "temp_min_c": 22.9,
+        "rainfall_mm": 7.8,
+        "wind_ms": 2.51,
+        "weathercode": 61,
+        "relativehumidity_pct": 87
+      },
+      {
+        "date": "2021-03-17",
+        "temp_avg_c": 26.7,
+        "temp_max_c": 30.9,
+        "temp_min_c": 24.4,
+        "rainfall_mm": 7.8,
+        "wind_ms": 2.91,
+        "weathercode": 63,
+        "relativehumidity_pct": 86
+      },
+      {
+        "date": "2021-03-18",
+        "temp_avg_c": 27.0,
+        "temp_max_c": 30.9,
+        "temp_min_c": 23.5,
+        "rainfall_mm": 0.0,
+        "wind_ms": 4.44,
+        "weathercode": 3,
+        "relativehumidity_pct": 82
+      },
+      {
+        "date": "2021-03-19",
+        "temp_avg_c": 27.0,
+        "temp_max_c": 30.5,
+        "temp_min_c": 24.7,
+        "rainfall_mm": 2.1,
+        "wind_ms": 4.34,
+        "weathercode": 61,
+        "relativehumidity_pct": 82
+      },
+      {
+        "date": "2021-03-20",
+        "temp_avg_c": 27.0,
+        "temp_max_c": 30.5,
+        "temp_min_c": 24.5,
+        "rainfall_mm": 0.3,
+        "wind_ms": 4.4,
+        "weathercode": 51,
+        "relativehumidity_pct": 81
+      },
+      {
+        "date": "2021-03-21",
+        "temp_avg_c": 26.8,
+        "temp_max_c": 29.3,
+        "temp_min_c": 24.6,
+        "rainfall_mm": 1.6,
+        "wind_ms": 5.32,
+        "weathercode": 53,
+        "relativehumidity_pct": 83
+      },
+      {
+        "date": "2021-03-22",
+        "temp_avg_c": 26.4,
+        "temp_max_c": 29.1,
+        "temp_min_c": 24.6,
+        "rainfall_mm": 2.5,
+        "wind_ms": 6.82,
+        "weathercode": 53,
+        "relativehumidity_pct": 82
+      },
+      {
+        "date": "2021-03-23",
+        "temp_avg_c": 26.1,
+        "temp_max_c": 28.8,
+        "temp_min_c": 24.3,
+        "rainfall_mm": 2.2,
+        "wind_ms": 7.16,
+        "weathercode": 51,
+        "relativehumidity_pct": 78
+      },
+      {
+        "date": "2021-03-24",
+        "temp_avg_c": 26.5,
+        "temp_max_c": 29.0,
+        "temp_min_c": 24.5,
+        "rainfall_mm": 1.6,
+        "wind_ms": 6.4,
+        "weathercode": 51,
+        "relativehumidity_pct": 79
+      },
+      {
+        "date": "2021-03-25",
+        "temp_avg_c": 26.9,
+        "temp_max_c": 30.5,
+        "temp_min_c": 24.0,
+        "rainfall_mm": 0.0,
+        "wind_ms": 6.11,
+        "weathercode": 3,
+        "relativehumidity_pct": 77
+      },
+      {
+        "date": "2021-03-26",
+        "temp_avg_c": 26.6,
+        "temp_max_c": 29.4,
+        "temp_min_c": 24.4,
+        "rainfall_mm": 0.7,
+        "wind_ms": 6.17,
+        "weathercode": 51,
+        "relativehumidity_pct": 79
+      },
+      {
+        "date": "2021-03-27",
+        "temp_avg_c": 26.8,
+        "temp_max_c": 30.3,
+        "temp_min_c": 24.1,
+        "rainfall_mm": 0.5,
+        "wind_ms": 5.53,
+        "weathercode": 51,
+        "relativehumidity_pct": 80
+      },
+      {
+        "date": "2021-03-28",
+        "temp_avg_c": 27.7,
+        "temp_max_c": 31.7,
+        "temp_min_c": 24.6,
+        "rainfall_mm": 0.2,
+        "wind_ms": 4.52,
+        "weathercode": 51,
+        "relativehumidity_pct": 76
+      },
+      {
+        "date": "2021-03-29",
+        "temp_avg_c": 27.6,
+        "temp_max_c": 31.7,
+        "temp_min_c": 24.6,
+        "rainfall_mm": 0.0,
+        "wind_ms": 4.8,
+        "weathercode": 3,
+        "relativehumidity_pct": 76
+      },
+      {
+        "date": "2021-03-30",
+        "temp_avg_c": 27.8,
+        "temp_max_c": 32.3,
+        "temp_min_c": 24.6,
+        "rainfall_mm": 0.0,
+        "wind_ms": 5.36,
+        "weathercode": 3,
+        "relativehumidity_pct": 76
+      },
+      {
+        "date": "2021-03-31",
+        "temp_avg_c": 27.7,
+        "temp_max_c": 31.1,
+        "temp_min_c": 24.6,
+        "rainfall_mm": 0.0,
+        "wind_ms": 5.5,
+        "weathercode": 2,
+        "relativehumidity_pct": 76
+      },
+      {
+        "date": "2021-04-01",
+        "temp_avg_c": 27.7,
+        "temp_max_c": 31.8,
+        "temp_min_c": 25.0,
+        "rainfall_mm": 0.1,
+        "wind_ms": 7.03,
+        "weathercode": 51,
+        "relativehumidity_pct": 73
+      },
+      {
+        "date": "2021-04-02",
+        "temp_avg_c": 27.6,
+        "temp_max_c": 31.6,
+        "temp_min_c": 24.4,
+        "rainfall_mm": 0.0,
+        "wind_ms": 6.53,
+        "weathercode": 3,
+        "relativehumidity_pct": 70
+      },
+      {
+        "date": "2021-04-03",
+        "temp_avg_c": 27.7,
+        "temp_max_c": 32.0,
+        "temp_min_c": 23.9,
+        "rainfall_mm": 0.0,
+        "wind_ms": 5.22,
+        "weathercode": 1,
+        "relativehumidity_pct": 70
+      },
+      {
+        "date": "2021-04-04",
+        "temp_avg_c": 27.4,
+        "temp_max_c": 31.0,
+        "temp_min_c": 24.3,
+        "rainfall_mm": 0.0,
+        "wind_ms": 6.35,
+        "weathercode": 1,
+        "relativehumidity_pct": 76
+      },
+      {
+        "date": "2021-04-05",
+        "temp_avg_c": 27.2,
+        "temp_max_c": 30.9,
+        "temp_min_c": 24.9,
+        "rainfall_mm": 0.4,
+        "wind_ms": 6.51,
+        "weathercode": 51,
+        "relativehumidity_pct": 75
+      },
+      {
+        "date": "2021-04-06",
+        "temp_avg_c": 27.1,
+        "temp_max_c": 30.5,
+        "temp_min_c": 24.3,
+        "rainfall_mm": 0.0,
+        "wind_ms": 6.73,
+        "weathercode": 2,
+        "relativehumidity_pct": 74
+      },
+      {
+        "date": "2021-04-07",
+        "temp_avg_c": 26.6,
+        "temp_max_c": 29.9,
+        "temp_min_c": 24.0,
+        "rainfall_mm": 0.2,
+        "wind_ms": 6.54,
+        "weathercode": 51,
+        "relativehumidity_pct": 72
+      },
+      {
+        "date": "2021-04-08",
+        "temp_avg_c": 26.9,
+        "temp_max_c": 30.2,
+        "temp_min_c": 23.9,
+        "rainfall_mm": 0.5,
+        "wind_ms": 5.4,
+        "weathercode": 51,
+        "relativehumidity_pct": 71
+      },
+      {
+        "date": "2021-04-09",
+        "temp_avg_c": 27.1,
+        "temp_max_c": 30.5,
+        "temp_min_c": 24.4,
+        "rainfall_mm": 0.4,
+        "wind_ms": 5.84,
+        "weathercode": 51,
+        "relativehumidity_pct": 70
+      },
+      {
+        "date": "2021-04-10",
+        "temp_avg_c": 27.1,
+        "temp_max_c": 30.7,
+        "temp_min_c": 24.5,
+        "rainfall_mm": 0.0,
+        "wind_ms": 6.3,
+        "weathercode": 3,
+        "relativehumidity_pct": 68
+      },
+      {
+        "date": "2021-04-11",
+        "temp_avg_c": 27.0,
+        "temp_max_c": 31.3,
+        "temp_min_c": 23.7,
+        "rainfall_mm": 0.4,
+        "wind_ms": 6.79,
+        "weathercode": 51,
+        "relativehumidity_pct": 69
+      },
+      {
+        "date": "2021-04-12",
+        "temp_avg_c": 27.4,
+        "temp_max_c": 32.0,
+        "temp_min_c": 23.8,
+        "rainfall_mm": 0.0,
+        "wind_ms": 5.61,
+        "weathercode": 3,
+        "relativehumidity_pct": 70
+      },
+      {
+        "date": "2021-04-13",
+        "temp_avg_c": 27.3,
+        "temp_max_c": 31.8,
+        "temp_min_c": 23.8,
+        "rainfall_mm": 0.8,
+        "wind_ms": 4.87,
+        "weathercode": 51,
+        "relativehumidity_pct": 78
+      },
+      {
+        "date": "2021-04-14",
+        "temp_avg_c": 28.0,
+        "temp_max_c": 32.8,
+        "temp_min_c": 24.9,
+        "rainfall_mm": 0.0,
+        "wind_ms": 5.44,
+        "weathercode": 3,
+        "relativehumidity_pct": 74
+      },
+      {
+        "date": "2021-04-15",
+        "temp_avg_c": 27.4,
+        "temp_max_c": 31.0,
+        "temp_min_c": 24.9,
+        "rainfall_mm": 0.7,
+        "wind_ms": 5.9,
+        "weathercode": 51,
+        "relativehumidity_pct": 77
+      },
+      {
+        "date": "2021-04-16",
+        "temp_avg_c": 28.0,
+        "temp_max_c": 32.3,
+        "temp_min_c": 24.8,
+        "rainfall_mm": 0.0,
+        "wind_ms": 5.51,
+        "weathercode": 3,
+        "relativehumidity_pct": 72
+      },
+      {
+        "date": "2021-04-17",
+        "temp_avg_c": 27.9,
+        "temp_max_c": 33.3,
+        "temp_min_c": 23.4,
+        "rainfall_mm": 0.0,
+        "wind_ms": 4.81,
+        "weathercode": 3,
+        "relativehumidity_pct": 68
+      },
+      {
+        "date": "2021-04-18",
+        "temp_avg_c": 28.1,
+        "temp_max_c": 32.8,
+        "temp_min_c": 24.0,
+        "rainfall_mm": 1.4,
+        "wind_ms": 5.25,
+        "weathercode": 53,
+        "relativehumidity_pct": 68
+      },
+      {
+        "date": "2021-04-19",
+        "temp_avg_c": 28.5,
+        "temp_max_c": 34.3,
+        "temp_min_c": 24.2,
+        "rainfall_mm": 2.2,
+        "wind_ms": 5.75,
+        "weathercode": 55,
+        "relativehumidity_pct": 70
+      },
+      {
+        "date": "2021-04-20",
+        "temp_avg_c": 28.2,
+        "temp_max_c": 33.4,
+        "temp_min_c": 24.0,
+        "rainfall_mm": 1.4,
+        "wind_ms": 5.67,
+        "weathercode": 53,
+        "relativehumidity_pct": 73
+      },
+      {
+        "date": "2021-04-21",
+        "temp_avg_c": 28.6,
+        "temp_max_c": 32.5,
+        "temp_min_c": 25.4,
+        "rainfall_mm": 0.6,
+        "wind_ms": 5.65,
+        "weathercode": 51,
+        "relativehumidity_pct": 71
+      },
+      {
+        "date": "2021-04-22",
+        "temp_avg_c": 28.7,
+        "temp_max_c": 33.0,
+        "temp_min_c": 25.4,
+        "rainfall_mm": 2.6,
+        "wind_ms": 5.87,
+        "weathercode": 53,
+        "relativehumidity_pct": 73
+      },
+      {
+        "date": "2021-04-23",
+        "temp_avg_c": 28.5,
+        "temp_max_c": 34.2,
+        "temp_min_c": 24.6,
+        "rainfall_mm": 0.9,
+        "wind_ms": 5.5,
+        "weathercode": 51,
+        "relativehumidity_pct": 71
+      },
+      {
+        "date": "2021-04-24",
+        "temp_avg_c": 28.1,
+        "temp_max_c": 33.5,
+        "temp_min_c": 23.2,
+        "rainfall_mm": 0.3,
+        "wind_ms": 4.71,
+        "weathercode": 51,
+        "relativehumidity_pct": 67
+      },
+      {
+        "date": "2021-04-25",
+        "temp_avg_c": 27.8,
+        "temp_max_c": 33.2,
+        "temp_min_c": 23.8,
+        "rainfall_mm": 0.9,
+        "wind_ms": 4.62,
+        "weathercode": 51,
+        "relativehumidity_pct": 70
+      },
+      {
+        "date": "2021-04-26",
+        "temp_avg_c": 26.4,
+        "temp_max_c": 29.0,
+        "temp_min_c": 24.5,
+        "rainfall_mm": 0.6,
+        "wind_ms": 5.5,
+        "weathercode": 51,
+        "relativehumidity_pct": 74
+      },
+      {
+        "date": "2021-04-27",
+        "temp_avg_c": 26.6,
+        "temp_max_c": 29.5,
+        "temp_min_c": 24.1,
+        "rainfall_mm": 1.2,
+        "wind_ms": 6.6,
+        "weathercode": 51,
+        "relativehumidity_pct": 73
+      },
+      {
+        "date": "2021-04-28",
+        "temp_avg_c": 27.4,
+        "temp_max_c": 31.4,
+        "temp_min_c": 24.4,
+        "rainfall_mm": 0.0,
+        "wind_ms": 5.2,
+        "weathercode": 3,
+        "relativehumidity_pct": 68
+      },
+      {
+        "date": "2021-04-29",
+        "temp_avg_c": 28.2,
+        "temp_max_c": 33.0,
+        "temp_min_c": 24.5,
+        "rainfall_mm": 0.5,
+        "wind_ms": 3.77,
+        "weathercode": 51,
+        "relativehumidity_pct": 67
+      },
+      {
+        "date": "2021-04-30",
+        "temp_avg_c": 28.9,
+        "temp_max_c": 33.6,
+        "temp_min_c": 24.9,
+        "rainfall_mm": 0.7,
+        "wind_ms": 4.83,
+        "weathercode": 51,
+        "relativehumidity_pct": 70
+      },
+      {
+        "date": "2021-05-01",
+        "temp_avg_c": 28.6,
+        "temp_max_c": 33.9,
+        "temp_min_c": 24.6,
+        "rainfall_mm": 0.0,
+        "wind_ms": 5.2,
+        "weathercode": 3,
+        "relativehumidity_pct": 70
+      },
+      {
+        "date": "2021-05-02",
+        "temp_avg_c": 28.4,
+        "temp_max_c": 33.5,
+        "temp_min_c": 24.6,
+        "rainfall_mm": 0.0,
+        "wind_ms": 6.7,
+        "weathercode": 3,
+        "relativehumidity_pct": 70
+      },
+      {
+        "date": "2021-05-03",
+        "temp_avg_c": 28.2,
+        "temp_max_c": 31.8,
+        "temp_min_c": 25.5,
+        "rainfall_mm": 0.0,
+        "wind_ms": 7.03,
+        "weathercode": 3,
+        "relativehumidity_pct": 72
+      },
+      {
+        "date": "2021-05-04",
+        "temp_avg_c": 28.0,
+        "temp_max_c": 31.4,
+        "temp_min_c": 25.5,
+        "rainfall_mm": 0.9,
+        "wind_ms": 7.24,
+        "weathercode": 51,
+        "relativehumidity_pct": 76
+      },
+      {
+        "date": "2021-05-05",
+        "temp_avg_c": 28.8,
+        "temp_max_c": 32.9,
+        "temp_min_c": 25.9,
+        "rainfall_mm": 0.4,
+        "wind_ms": 7.0,
+        "weathercode": 51,
+        "relativehumidity_pct": 74
+      },
+      {
+        "date": "2021-05-06",
+        "temp_avg_c": 28.4,
+        "temp_max_c": 31.8,
+        "temp_min_c": 25.9,
+        "rainfall_mm": 0.2,
+        "wind_ms": 6.87,
+        "weathercode": 51,
+        "relativehumidity_pct": 74
+      },
+      {
+        "date": "2021-05-07",
+        "temp_avg_c": 28.3,
+        "temp_max_c": 31.7,
+        "temp_min_c": 25.8,
+        "rainfall_mm": 0.7,
+        "wind_ms": 6.41,
+        "weathercode": 51,
+        "relativehumidity_pct": 75
+      },
+      {
+        "date": "2021-05-08",
+        "temp_avg_c": 28.6,
+        "temp_max_c": 32.2,
+        "temp_min_c": 25.5,
+        "rainfall_mm": 1.0,
+        "wind_ms": 6.2,
+        "weathercode": 53,
+        "relativehumidity_pct": 76
+      },
+      {
+        "date": "2021-05-09",
+        "temp_avg_c": 29.1,
+        "temp_max_c": 32.8,
+        "temp_min_c": 25.7,
+        "rainfall_mm": 0.1,
+        "wind_ms": 6.53,
+        "weathercode": 51,
+        "relativehumidity_pct": 74
+      },
+      {
+        "date": "2021-05-10",
+        "temp_avg_c": 28.1,
+        "temp_max_c": 31.4,
+        "temp_min_c": 24.7,
+        "rainfall_mm": 2.8,
+        "wind_ms": 6.02,
+        "weathercode": 55,
+        "relativehumidity_pct": 79
+      },
+      {
+        "date": "2021-05-11",
+        "temp_avg_c": 28.0,
+        "temp_max_c": 31.8,
+        "temp_min_c": 24.9,
+        "rainfall_mm": 4.7,
+        "wind_ms": 5.25,
+        "weathercode": 61,
+        "relativehumidity_pct": 80
+      },
+      {
+        "date": "2021-05-12",
+        "temp_avg_c": 28.8,
+        "temp_max_c": 33.2,
+        "temp_min_c": 25.9,
+        "rainfall_mm": 0.5,
+        "wind_ms": 7.0,
+        "weathercode": 51,
+        "relativehumidity_pct": 74
+      },
+      {
+        "date": "2021-05-13",
+        "temp_avg_c": 29.0,
+        "temp_max_c": 33.2,
+        "temp_min_c": 25.9,
+        "rainfall_mm": 0.0,
+        "wind_ms": 7.34,
+        "weathercode": 2,
+        "relativehumidity_pct": 71
+      },
+      {
+        "date": "2021-05-14",
+        "temp_avg_c": 28.5,
+        "temp_max_c": 32.0,
+        "temp_min_c": 25.6,
+        "rainfall_mm": 0.9,
+        "wind_ms": 7.32,
+        "weathercode": 51,
+        "relativehumidity_pct": 74
+      },
+      {
+        "date": "2021-05-15",
+        "temp_avg_c": 28.5,
+        "temp_max_c": 31.8,
+        "temp_min_c": 26.0,
+        "rainfall_mm": 2.5,
+        "wind_ms": 7.42,
+        "weathercode": 53,
+        "relativehumidity_pct": 77
+      },
+      {
+        "date": "2021-05-16",
+        "temp_avg_c": 29.1,
+        "temp_max_c": 33.5,
+        "temp_min_c": 25.9,
+        "rainfall_mm": 0.1,
+        "wind_ms": 6.44,
+        "weathercode": 51,
+        "relativehumidity_pct": 73
+      },
+      {
+        "date": "2021-05-17",
+        "temp_avg_c": 29.2,
+        "temp_max_c": 34.0,
+        "temp_min_c": 26.1,
+        "rainfall_mm": 0.1,
+        "wind_ms": 6.8,
+        "weathercode": 51,
+        "relativehumidity_pct": 72
+      },
+      {
+        "date": "2021-05-18",
+        "temp_avg_c": 28.1,
+        "temp_max_c": 32.0,
+        "temp_min_c": 24.9,
+        "rainfall_mm": 2.1,
+        "wind_ms": 6.75,
+        "weathercode": 53,
+        "relativehumidity_pct": 79
+      },
+      {
+        "date": "2021-05-19",
+        "temp_avg_c": 28.9,
+        "temp_max_c": 33.2,
+        "temp_min_c": 26.0,
+        "rainfall_mm": 0.2,
+        "wind_ms": 6.76,
+        "weathercode": 51,
+        "relativehumidity_pct": 73
+      },
+      {
+        "date": "2021-05-20",
+        "temp_avg_c": 28.8,
+        "temp_max_c": 32.7,
+        "temp_min_c": 26.2,
+        "rainfall_mm": 2.2,
+        "wind_ms": 5.71,
+        "weathercode": 51,
+        "relativehumidity_pct": 75
+      },
+      {
+        "date": "2021-05-21",
+        "temp_avg_c": 28.1,
+        "temp_max_c": 33.6,
+        "temp_min_c": 24.4,
+        "rainfall_mm": 9.5,
+        "wind_ms": 3.34,
+        "weathercode": 63,
+        "relativehumidity_pct": 79
+      },
+      {
+        "date": "2021-05-22",
+        "temp_avg_c": 28.1,
+        "temp_max_c": 33.2,
+        "temp_min_c": 24.8,
+        "rainfall_mm": 16.7,
+        "wind_ms": 2.53,
+        "weathercode": 63,
+        "relativehumidity_pct": 81
+      },
+      {
+        "date": "2021-05-23",
+        "temp_avg_c": 28.2,
+        "temp_max_c": 33.5,
+        "temp_min_c": 24.0,
+        "rainfall_mm": 3.5,
+        "wind_ms": 3.85,
+        "weathercode": 53,
+        "relativehumidity_pct": 78
+      },
+      {
+        "date": "2021-05-24",
+        "temp_avg_c": 27.6,
+        "temp_max_c": 33.5,
+        "temp_min_c": 24.4,
+        "rainfall_mm": 11.5,
+        "wind_ms": 3.75,
+        "weathercode": 63,
+        "relativehumidity_pct": 83
+      },
+      {
+        "date": "2021-05-25",
+        "temp_avg_c": 28.8,
+        "temp_max_c": 34.2,
+        "temp_min_c": 24.0,
+        "rainfall_mm": 0.5,
+        "wind_ms": 6.41,
+        "weathercode": 51,
+        "relativehumidity_pct": 76
+      },
+      {
+        "date": "2021-05-26",
+        "temp_avg_c": 29.9,
+        "temp_max_c": 34.9,
+        "temp_min_c": 25.6,
+        "rainfall_mm": 0.4,
+        "wind_ms": 4.5,
+        "weathercode": 51,
+        "relativehumidity_pct": 68
+      },
+      {
+        "date": "2021-05-27",
+        "temp_avg_c": 29.4,
+        "temp_max_c": 34.3,
+        "temp_min_c": 25.1,
+        "rainfall_mm": 3.6,
+        "wind_ms": 5.32,
+        "weathercode": 53,
+        "relativehumidity_pct": 74
+      },
+      {
+        "date": "2021-05-28",
+        "temp_avg_c": 29.8,
+        "temp_max_c": 34.0,
+        "temp_min_c": 27.0,
+        "rainfall_mm": 1.4,
+        "wind_ms": 3.3,
+        "weathercode": 51,
+        "relativehumidity_pct": 73
+      },
+      {
+        "date": "2021-05-29",
+        "temp_avg_c": 30.2,
+        "temp_max_c": 35.9,
+        "temp_min_c": 26.1,
+        "rainfall_mm": 3.7,
+        "wind_ms": 3.01,
+        "weathercode": 53,
+        "relativehumidity_pct": 72
+      },
+      {
+        "date": "2021-05-30",
+        "temp_avg_c": 29.2,
+        "temp_max_c": 35.3,
+        "temp_min_c": 24.9,
+        "rainfall_mm": 6.5,
+        "wind_ms": 3.74,
+        "weathercode": 61,
+        "relativehumidity_pct": 77
+      },
+      {
+        "date": "2021-05-31",
+        "temp_avg_c": 29.8,
+        "temp_max_c": 35.5,
+        "temp_min_c": 25.2,
+        "rainfall_mm": 4.2,
+        "wind_ms": 3.3,
+        "weathercode": 55,
+        "relativehumidity_pct": 75
+      },
+      {
+        "date": "2021-06-01",
+        "temp_avg_c": 29.5,
+        "temp_max_c": 35.2,
+        "temp_min_c": 25.4,
+        "rainfall_mm": 7.3,
+        "wind_ms": 3.96,
+        "weathercode": 61,
+        "relativehumidity_pct": 77
+      },
+      {
+        "date": "2021-06-02",
+        "temp_avg_c": 26.3,
+        "temp_max_c": 29.8,
+        "temp_min_c": 24.9,
+        "rainfall_mm": 70.4,
+        "wind_ms": 10.49,
+        "weathercode": 65,
+        "relativehumidity_pct": 92
+      },
+      {
+        "date": "2021-06-03",
+        "temp_avg_c": 27.8,
+        "temp_max_c": 31.5,
+        "temp_min_c": 25.0,
+        "rainfall_mm": 16.5,
+        "wind_ms": 6.0,
+        "weathercode": 63,
+        "relativehumidity_pct": 81
+      },
+      {
+        "date": "2021-06-04",
+        "temp_avg_c": 28.2,
+        "temp_max_c": 33.2,
+        "temp_min_c": 25.4,
+        "rainfall_mm": 7.4,
+        "wind_ms": 3.81,
+        "weathercode": 63,
+        "relativehumidity_pct": 80
+      },
+      {
+        "date": "2021-06-05",
+        "temp_avg_c": 28.0,
+        "temp_max_c": 32.2,
+        "temp_min_c": 24.6,
+        "rainfall_mm": 9.0,
+        "wind_ms": 3.21,
+        "weathercode": 63,
+        "relativehumidity_pct": 82
+      },
+      {
+        "date": "2021-06-06",
+        "temp_avg_c": 28.0,
+        "temp_max_c": 31.5,
+        "temp_min_c": 25.0,
+        "rainfall_mm": 1.8,
+        "wind_ms": 3.3,
+        "weathercode": 53,
+        "relativehumidity_pct": 81
+      },
+      {
+        "date": "2021-06-07",
+        "temp_avg_c": 27.2,
+        "temp_max_c": 31.2,
+        "temp_min_c": 25.1,
+        "rainfall_mm": 15.6,
+        "wind_ms": 2.44,
+        "weathercode": 63,
+        "relativehumidity_pct": 87
+      },
+      {
+        "date": "2021-06-08",
+        "temp_avg_c": 26.4,
+        "temp_max_c": 30.6,
+        "temp_min_c": 24.6,
+        "rainfall_mm": 19.0,
+        "wind_ms": 2.4,
+        "weathercode": 63,
+        "relativehumidity_pct": 91
+      },
+      {
+        "date": "2021-06-09",
+        "temp_avg_c": 26.3,
+        "temp_max_c": 30.5,
+        "temp_min_c": 24.5,
+        "rainfall_mm": 13.2,
+        "wind_ms": 2.0,
+        "weathercode": 63,
+        "relativehumidity_pct": 88
+      },
+      {
+        "date": "2021-06-10",
+        "temp_avg_c": 26.9,
+        "temp_max_c": 30.6,
+        "temp_min_c": 24.0,
+        "rainfall_mm": 3.8,
+        "wind_ms": 2.98,
+        "weathercode": 53,
+        "relativehumidity_pct": 86
+      },
+      {
+        "date": "2021-06-11",
+        "temp_avg_c": 26.8,
+        "temp_max_c": 30.5,
+        "temp_min_c": 24.5,
+        "rainfall_mm": 4.0,
+        "wind_ms": 2.48,
+        "weathercode": 53,
+        "relativehumidity_pct": 86
+      },
+      {
+        "date": "2021-06-12",
+        "temp_avg_c": 27.1,
+        "temp_max_c": 30.7,
+        "temp_min_c": 24.6,
+        "rainfall_mm": 8.0,
+        "wind_ms": 4.37,
+        "weathercode": 63,
+        "relativehumidity_pct": 86
+      },
+      {
+        "date": "2021-06-13",
+        "temp_avg_c": 26.1,
+        "temp_max_c": 29.8,
+        "temp_min_c": 24.0,
+        "rainfall_mm": 2.6,
+        "wind_ms": 3.62,
+        "weathercode": 53,
+        "relativehumidity_pct": 89
+      },
+      {
+        "date": "2021-06-14",
+        "temp_avg_c": 26.9,
+        "temp_max_c": 31.0,
+        "temp_min_c": 23.4,
+        "rainfall_mm": 8.6,
+        "wind_ms": 2.75,
+        "weathercode": 63,
+        "relativehumidity_pct": 82
+      },
+      {
+        "date": "2021-06-15",
+        "temp_avg_c": 27.7,
+        "temp_max_c": 32.0,
+        "temp_min_c": 24.0,
+        "rainfall_mm": 0.8,
+        "wind_ms": 3.52,
+        "weathercode": 51,
+        "relativehumidity_pct": 79
+      },
+      {
+        "date": "2021-06-16",
+        "temp_avg_c": 28.5,
+        "temp_max_c": 32.9,
+        "temp_min_c": 24.5,
+        "rainfall_mm": 0.0,
+        "wind_ms": 3.42,
+        "weathercode": 3,
+        "relativehumidity_pct": 77
+      },
+      {
+        "date": "2021-06-17",
+        "temp_avg_c": 28.6,
+        "temp_max_c": 32.7,
+        "temp_min_c": 25.4,
+        "rainfall_mm": 1.6,
+        "wind_ms": 3.16,
+        "weathercode": 53,
+        "relativehumidity_pct": 78
+      },
+      {
+        "date": "2021-06-18",
+        "temp_avg_c": 28.5,
+        "temp_max_c": 32.5,
+        "temp_min_c": 25.1,
+        "rainfall_mm": 0.6,
+        "wind_ms": 4.3,
+        "weathercode": 51,
+        "relativehumidity_pct": 77
+      },
+      {
+        "date": "2021-06-19",
+        "temp_avg_c": 27.8,
+        "temp_max_c": 31.1,
+        "temp_min_c": 25.6,
+        "rainfall_mm": 5.1,
+        "wind_ms": 5.23,
+        "weathercode": 61,
+        "relativehumidity_pct": 81
+      },
+      {
+        "date": "2021-06-20",
+        "temp_avg_c": 27.4,
+        "temp_max_c": 31.1,
+        "temp_min_c": 25.1,
+        "rainfall_mm": 3.5,
+        "wind_ms": 5.35,
+        "weathercode": 61,
+        "relativehumidity_pct": 82
+      },
+      {
+        "date": "2021-06-21",
+        "temp_avg_c": 26.6,
+        "temp_max_c": 30.2,
+        "temp_min_c": 24.9,
+        "rainfall_mm": 3.4,
+        "wind_ms": 5.47,
+        "weathercode": 55,
+        "relativehumidity_pct": 85
+      },
+      {
+        "date": "2021-06-22",
+        "temp_avg_c": 27.2,
+        "temp_max_c": 31.2,
+        "temp_min_c": 24.0,
+        "rainfall_mm": 0.5,
+        "wind_ms": 4.24,
+        "weathercode": 51,
+        "relativehumidity_pct": 79
+      },
+      {
+        "date": "2021-06-23",
+        "temp_avg_c": 27.5,
+        "temp_max_c": 31.8,
+        "temp_min_c": 24.1,
+        "rainfall_mm": 3.2,
+        "wind_ms": 4.0,
+        "weathercode": 55,
+        "relativehumidity_pct": 79
+      },
+      {
+        "date": "2021-06-24",
+        "temp_avg_c": 26.9,
+        "temp_max_c": 31.5,
+        "temp_min_c": 23.9,
+        "rainfall_mm": 18.6,
+        "wind_ms": 3.21,
+        "weathercode": 65,
+        "relativehumidity_pct": 84
+      },
+      {
+        "date": "2021-06-25",
+        "temp_avg_c": 27.0,
+        "temp_max_c": 30.0,
+        "temp_min_c": 24.7,
+        "rainfall_mm": 10.2,
+        "wind_ms": 2.97,
+        "weathercode": 63,
+        "relativehumidity_pct": 85
+      },
+      {
+        "date": "2021-06-26",
+        "temp_avg_c": 27.5,
+        "temp_max_c": 31.0,
+        "temp_min_c": 24.4,
+        "rainfall_mm": 6.7,
+        "wind_ms": 3.32,
+        "weathercode": 63,
+        "relativehumidity_pct": 82
+      },
+      {
+        "date": "2021-06-27",
+        "temp_avg_c": 28.0,
+        "temp_max_c": 32.2,
+        "temp_min_c": 24.7,
+        "rainfall_mm": 3.5,
+        "wind_ms": 3.1,
+        "weathercode": 55,
+        "relativehumidity_pct": 81
+      },
+      {
+        "date": "2021-06-28",
+        "temp_avg_c": 27.3,
+        "temp_max_c": 32.7,
+        "temp_min_c": 24.6,
+        "rainfall_mm": 19.8,
+        "wind_ms": 2.65,
+        "weathercode": 63,
+        "relativehumidity_pct": 84
+      },
+      {
+        "date": "2021-06-29",
+        "temp_avg_c": 27.6,
+        "temp_max_c": 32.3,
+        "temp_min_c": 23.6,
+        "rainfall_mm": 1.0,
+        "wind_ms": 3.13,
+        "weathercode": 51,
+        "relativehumidity_pct": 81
+      },
+      {
+        "date": "2021-06-30",
+        "temp_avg_c": 28.2,
+        "temp_max_c": 32.0,
+        "temp_min_c": 25.1,
+        "rainfall_mm": 3.7,
+        "wind_ms": 2.69,
+        "weathercode": 61,
+        "relativehumidity_pct": 80
+      },
+      {
+        "date": "2021-07-01",
+        "temp_avg_c": 27.9,
+        "temp_max_c": 32.8,
+        "temp_min_c": 24.9,
+        "rainfall_mm": 6.9,
+        "wind_ms": 2.18,
+        "weathercode": 61,
+        "relativehumidity_pct": 82
+      },
+      {
+        "date": "2021-07-02",
+        "temp_avg_c": 27.6,
+        "temp_max_c": 32.8,
+        "temp_min_c": 24.5,
+        "rainfall_mm": 2.7,
+        "wind_ms": 2.92,
+        "weathercode": 53,
+        "relativehumidity_pct": 81
+      },
+      {
+        "date": "2021-07-03",
+        "temp_avg_c": 25.8,
+        "temp_max_c": 29.0,
+        "temp_min_c": 24.6,
+        "rainfall_mm": 24.1,
+        "wind_ms": 3.14,
+        "weathercode": 65,
+        "relativehumidity_pct": 92
+      },
+      {
+        "date": "2021-07-04",
+        "temp_avg_c": 26.5,
+        "temp_max_c": 30.0,
+        "temp_min_c": 24.0,
+        "rainfall_mm": 16.3,
+        "wind_ms": 4.38,
+        "weathercode": 61,
+        "relativehumidity_pct": 88
+      },
+      {
+        "date": "2021-07-05",
+        "temp_avg_c": 27.1,
+        "temp_max_c": 31.6,
+        "temp_min_c": 23.6,
+        "rainfall_mm": 3.1,
+        "wind_ms": 3.09,
+        "weathercode": 55,
+        "relativehumidity_pct": 82
+      },
+      {
+        "date": "2021-07-06",
+        "temp_avg_c": 26.6,
+        "temp_max_c": 30.0,
+        "temp_min_c": 24.9,
+        "rainfall_mm": 6.2,
+        "wind_ms": 3.26,
+        "weathercode": 61,
+        "relativehumidity_pct": 87
+      },
+      {
+        "date": "2021-07-07",
+        "temp_avg_c": 27.3,
+        "temp_max_c": 31.2,
+        "temp_min_c": 23.7,
+        "rainfall_mm": 0.2,
+        "wind_ms": 5.01,
+        "weathercode": 51,
+        "relativehumidity_pct": 82
+      },
+      {
+        "date": "2021-07-08",
+        "temp_avg_c": 27.6,
+        "temp_max_c": 30.4,
+        "temp_min_c": 25.1,
+        "rainfall_mm": 0.7,
+        "wind_ms": 4.94,
+        "weathercode": 51,
+        "relativehumidity_pct": 81
+      },
+      {
+        "date": "2021-07-09",
+        "temp_avg_c": 27.7,
+        "temp_max_c": 30.5,
+        "temp_min_c": 25.1,
+        "rainfall_mm": 1.9,
+        "wind_ms": 5.45,
+        "weathercode": 61,
+        "relativehumidity_pct": 81
+      },
+      {
+        "date": "2021-07-10",
+        "temp_avg_c": 27.3,
+        "temp_max_c": 29.8,
+        "temp_min_c": 25.0,
+        "rainfall_mm": 2.9,
+        "wind_ms": 4.95,
+        "weathercode": 53,
+        "relativehumidity_pct": 82
+      },
+      {
+        "date": "2021-07-11",
+        "temp_avg_c": 27.2,
+        "temp_max_c": 30.2,
+        "temp_min_c": 25.0,
+        "rainfall_mm": 4.8,
+        "wind_ms": 6.02,
+        "weathercode": 55,
+        "relativehumidity_pct": 84
+      },
+      {
+        "date": "2021-07-12",
+        "temp_avg_c": 27.7,
+        "temp_max_c": 31.0,
+        "temp_min_c": 25.1,
+        "rainfall_mm": 2.3,
+        "wind_ms": 5.69,
+        "weathercode": 55,
+        "relativehumidity_pct": 82
+      },
+      {
+        "date": "2021-07-13",
+        "temp_avg_c": 27.2,
+        "temp_max_c": 30.2,
+        "temp_min_c": 24.8,
+        "rainfall_mm": 9.2,
+        "wind_ms": 4.94,
+        "weathercode": 63,
+        "relativehumidity_pct": 84
+      },
+      {
+        "date": "2021-07-14",
+        "temp_avg_c": 27.1,
+        "temp_max_c": 31.3,
+        "temp_min_c": 25.0,
+        "rainfall_mm": 5.8,
+        "wind_ms": 3.1,
+        "weathercode": 61,
+        "relativehumidity_pct": 85
+      },
+      {
+        "date": "2021-07-15",
+        "temp_avg_c": 26.9,
+        "temp_max_c": 31.0,
+        "temp_min_c": 24.2,
+        "rainfall_mm": 11.8,
+        "wind_ms": 3.47,
+        "weathercode": 63,
+        "relativehumidity_pct": 89
+      },
+      {
+        "date": "2021-07-16",
+        "temp_avg_c": 26.9,
+        "temp_max_c": 30.9,
+        "temp_min_c": 24.0,
+        "rainfall_mm": 4.7,
+        "wind_ms": 3.29,
+        "weathercode": 63,
+        "relativehumidity_pct": 85
+      },
+      {
+        "date": "2021-07-17",
+        "temp_avg_c": 27.1,
+        "temp_max_c": 30.8,
+        "temp_min_c": 24.8,
+        "rainfall_mm": 9.5,
+        "wind_ms": 2.28,
+        "weathercode": 61,
+        "relativehumidity_pct": 87
+      },
+      {
+        "date": "2021-07-18",
+        "temp_avg_c": 26.9,
+        "temp_max_c": 30.0,
+        "temp_min_c": 24.5,
+        "rainfall_mm": 7.7,
+        "wind_ms": 3.61,
+        "weathercode": 63,
+        "relativehumidity_pct": 85
+      },
+      {
+        "date": "2021-07-19",
+        "temp_avg_c": 26.7,
+        "temp_max_c": 29.5,
+        "temp_min_c": 25.2,
+        "rainfall_mm": 6.6,
+        "wind_ms": 4.92,
+        "weathercode": 61,
+        "relativehumidity_pct": 85
+      },
+      {
+        "date": "2021-07-20",
+        "temp_avg_c": 25.9,
+        "temp_max_c": 28.0,
+        "temp_min_c": 25.0,
+        "rainfall_mm": 10.0,
+        "wind_ms": 5.5,
+        "weathercode": 61,
+        "relativehumidity_pct": 90
+      },
+      {
+        "date": "2021-07-21",
+        "temp_avg_c": 25.2,
+        "temp_max_c": 27.6,
+        "temp_min_c": 24.5,
+        "rainfall_mm": 59.1,
+        "wind_ms": 6.51,
+        "weathercode": 65,
+        "relativehumidity_pct": 94
+      },
+      {
+        "date": "2021-07-22",
+        "temp_avg_c": 25.6,
+        "temp_max_c": 27.6,
+        "temp_min_c": 24.4,
+        "rainfall_mm": 19.8,
+        "wind_ms": 7.34,
+        "weathercode": 63,
+        "relativehumidity_pct": 91
+      },
+      {
+        "date": "2021-07-23",
+        "temp_avg_c": 25.9,
+        "temp_max_c": 27.9,
+        "temp_min_c": 24.8,
+        "rainfall_mm": 12.9,
+        "wind_ms": 7.43,
+        "weathercode": 61,
+        "relativehumidity_pct": 90
+      },
+      {
+        "date": "2021-07-24",
+        "temp_avg_c": 26.1,
+        "temp_max_c": 28.3,
+        "temp_min_c": 25.0,
+        "rainfall_mm": 15.0,
+        "wind_ms": 7.02,
+        "weathercode": 63,
+        "relativehumidity_pct": 90
+      },
+      {
+        "date": "2021-07-25",
+        "temp_avg_c": 26.7,
+        "temp_max_c": 28.8,
+        "temp_min_c": 25.1,
+        "rainfall_mm": 3.8,
+        "wind_ms": 8.06,
+        "weathercode": 53,
+        "relativehumidity_pct": 86
+      },
+      {
+        "date": "2021-07-26",
+        "temp_avg_c": 28.1,
+        "temp_max_c": 30.6,
+        "temp_min_c": 26.5,
+        "rainfall_mm": 1.2,
+        "wind_ms": 7.93,
+        "weathercode": 51,
+        "relativehumidity_pct": 79
+      },
+      {
+        "date": "2021-07-27",
+        "temp_avg_c": 27.8,
+        "temp_max_c": 30.4,
+        "temp_min_c": 26.5,
+        "rainfall_mm": 4.1,
+        "wind_ms": 8.9,
+        "weathercode": 51,
+        "relativehumidity_pct": 81
+      },
+      {
+        "date": "2021-07-28",
+        "temp_avg_c": 26.8,
+        "temp_max_c": 29.4,
+        "temp_min_c": 25.5,
+        "rainfall_mm": 7.4,
+        "wind_ms": 7.52,
+        "weathercode": 55,
+        "relativehumidity_pct": 86
+      },
+      {
+        "date": "2021-07-29",
+        "temp_avg_c": 26.4,
+        "temp_max_c": 28.9,
+        "temp_min_c": 25.4,
+        "rainfall_mm": 7.9,
+        "wind_ms": 5.26,
+        "weathercode": 61,
+        "relativehumidity_pct": 89
+      },
+      {
+        "date": "2021-07-30",
+        "temp_avg_c": 27.8,
+        "temp_max_c": 31.3,
+        "temp_min_c": 25.5,
+        "rainfall_mm": 1.7,
+        "wind_ms": 5.7,
+        "weathercode": 53,
+        "relativehumidity_pct": 82
+      },
+      {
+        "date": "2021-07-31",
+        "temp_avg_c": 27.7,
+        "temp_max_c": 30.9,
+        "temp_min_c": 26.0,
+        "rainfall_mm": 3.2,
+        "wind_ms": 6.91,
+        "weathercode": 53,
+        "relativehumidity_pct": 82
+      },
+      {
+        "date": "2021-08-01",
+        "temp_avg_c": 27.8,
+        "temp_max_c": 31.0,
+        "temp_min_c": 26.1,
+        "rainfall_mm": 2.0,
+        "wind_ms": 7.65,
+        "weathercode": 51,
+        "relativehumidity_pct": 81
+      },
+      {
+        "date": "2021-08-02",
+        "temp_avg_c": 27.7,
+        "temp_max_c": 30.9,
+        "temp_min_c": 25.5,
+        "rainfall_mm": 3.7,
+        "wind_ms": 8.2,
+        "weathercode": 55,
+        "relativehumidity_pct": 81
+      },
+      {
+        "date": "2021-08-03",
+        "temp_avg_c": 27.7,
+        "temp_max_c": 30.5,
+        "temp_min_c": 26.2,
+        "rainfall_mm": 1.9,
+        "wind_ms": 8.08,
+        "weathercode": 51,
+        "relativehumidity_pct": 81
+      },
+      {
+        "date": "2021-08-04",
+        "temp_avg_c": 27.9,
+        "temp_max_c": 31.0,
+        "temp_min_c": 26.4,
+        "rainfall_mm": 2.0,
+        "wind_ms": 7.44,
+        "weathercode": 51,
+        "relativehumidity_pct": 80
+      },
+      {
+        "date": "2021-08-05",
+        "temp_avg_c": 28.1,
+        "temp_max_c": 30.6,
+        "temp_min_c": 26.6,
+        "rainfall_mm": 4.6,
+        "wind_ms": 8.18,
+        "weathercode": 53,
+        "relativehumidity_pct": 79
+      },
+      {
+        "date": "2021-08-06",
+        "temp_avg_c": 28.1,
+        "temp_max_c": 31.2,
+        "temp_min_c": 26.6,
+        "rainfall_mm": 3.1,
+        "wind_ms": 7.26,
+        "weathercode": 53,
+        "relativehumidity_pct": 78
+      },
+      {
+        "date": "2021-08-07",
+        "temp_avg_c": 28.5,
+        "temp_max_c": 32.2,
+        "temp_min_c": 26.2,
+        "rainfall_mm": 0.5,
+        "wind_ms": 6.34,
+        "weathercode": 51,
+        "relativehumidity_pct": 76
+      },
+      {
+        "date": "2021-08-08",
+        "temp_avg_c": 28.5,
+        "temp_max_c": 33.0,
+        "temp_min_c": 24.9,
+        "rainfall_mm": 0.5,
+        "wind_ms": 5.07,
+        "weathercode": 51,
+        "relativehumidity_pct": 75
+      },
+      {
+        "date": "2021-08-09",
+        "temp_avg_c": 27.7,
+        "temp_max_c": 31.8,
+        "temp_min_c": 24.5,
+        "rainfall_mm": 6.8,
+        "wind_ms": 3.62,
+        "weathercode": 61,
+        "relativehumidity_pct": 81
+      },
+      {
+        "date": "2021-08-10",
+        "temp_avg_c": 26.8,
+        "temp_max_c": 30.0,
+        "temp_min_c": 24.4,
+        "rainfall_mm": 4.3,
+        "wind_ms": 2.91,
+        "weathercode": 55,
+        "relativehumidity_pct": 86
+      },
+      {
+        "date": "2021-08-11",
+        "temp_avg_c": 26.0,
+        "temp_max_c": 28.6,
+        "temp_min_c": 24.5,
+        "rainfall_mm": 5.1,
+        "wind_ms": 2.44,
+        "weathercode": 61,
+        "relativehumidity_pct": 90
+      },
+      {
+        "date": "2021-08-12",
+        "temp_avg_c": 27.2,
+        "temp_max_c": 31.0,
+        "temp_min_c": 23.8,
+        "rainfall_mm": 0.0,
+        "wind_ms": 2.15,
+        "weathercode": 3,
+        "relativehumidity_pct": 82
+      },
+      {
+        "date": "2021-08-13",
+        "temp_avg_c": 27.6,
+        "temp_max_c": 31.6,
+        "temp_min_c": 25.0,
+        "rainfall_mm": 9.6,
+        "wind_ms": 2.82,
+        "weathercode": 63,
+        "relativehumidity_pct": 84
+      },
+      {
+        "date": "2021-08-14",
+        "temp_avg_c": 26.6,
+        "temp_max_c": 30.6,
+        "temp_min_c": 23.5,
+        "rainfall_mm": 5.5,
+        "wind_ms": 3.33,
+        "weathercode": 61,
+        "relativehumidity_pct": 87
+      },
+      {
+        "date": "2021-08-15",
+        "temp_avg_c": 25.3,
+        "temp_max_c": 27.4,
+        "temp_min_c": 24.0,
+        "rainfall_mm": 8.0,
+        "wind_ms": 2.33,
+        "weathercode": 63,
+        "relativehumidity_pct": 93
+      },
+      {
+        "date": "2021-08-16",
+        "temp_avg_c": 27.3,
+        "temp_max_c": 31.1,
+        "temp_min_c": 23.8,
+        "rainfall_mm": 1.4,
+        "wind_ms": 3.14,
+        "weathercode": 51,
+        "relativehumidity_pct": 81
+      },
+      {
+        "date": "2021-08-17",
+        "temp_avg_c": 27.4,
+        "temp_max_c": 30.2,
+        "temp_min_c": 25.0,
+        "rainfall_mm": 3.7,
+        "wind_ms": 4.49,
+        "weathercode": 63,
+        "relativehumidity_pct": 83
+      },
+      {
+        "date": "2021-08-18",
+        "temp_avg_c": 26.8,
+        "temp_max_c": 31.5,
+        "temp_min_c": 24.7,
+        "rainfall_mm": 19.0,
+        "wind_ms": 3.16,
+        "weathercode": 63,
+        "relativehumidity_pct": 86
+      },
+      {
+        "date": "2021-08-19",
+        "temp_avg_c": 26.6,
+        "temp_max_c": 30.8,
+        "temp_min_c": 23.8,
+        "rainfall_mm": 15.8,
+        "wind_ms": 2.47,
+        "weathercode": 63,
+        "relativehumidity_pct": 87
+      },
+      {
+        "date": "2021-08-20",
+        "temp_avg_c": 26.6,
+        "temp_max_c": 31.0,
+        "temp_min_c": 24.0,
+        "rainfall_mm": 20.5,
+        "wind_ms": 1.71,
+        "weathercode": 65,
+        "relativehumidity_pct": 88
+      },
+      {
+        "date": "2021-08-21",
+        "temp_avg_c": 26.2,
+        "temp_max_c": 29.6,
+        "temp_min_c": 24.1,
+        "rainfall_mm": 15.4,
+        "wind_ms": 2.46,
+        "weathercode": 65,
+        "relativehumidity_pct": 90
+      },
+      {
+        "date": "2021-08-22",
+        "temp_avg_c": 26.5,
+        "temp_max_c": 31.1,
+        "temp_min_c": 23.8,
+        "rainfall_mm": 13.6,
+        "wind_ms": 3.18,
+        "weathercode": 63,
+        "relativehumidity_pct": 90
+      },
+      {
+        "date": "2021-08-23",
+        "temp_avg_c": 26.5,
+        "temp_max_c": 30.3,
+        "temp_min_c": 24.1,
+        "rainfall_mm": 8.3,
+        "wind_ms": 2.72,
+        "weathercode": 63,
+        "relativehumidity_pct": 89
+      },
+      {
+        "date": "2021-08-24",
+        "temp_avg_c": 25.8,
+        "temp_max_c": 28.1,
+        "temp_min_c": 23.7,
+        "rainfall_mm": 12.2,
+        "wind_ms": 1.22,
+        "weathercode": 61,
+        "relativehumidity_pct": 91
+      },
+      {
+        "date": "2021-08-25",
+        "temp_avg_c": 26.2,
+        "temp_max_c": 29.1,
+        "temp_min_c": 23.8,
+        "rainfall_mm": 7.9,
+        "wind_ms": 3.6,
+        "weathercode": 61,
+        "relativehumidity_pct": 87
+      },
+      {
+        "date": "2021-08-26",
+        "temp_avg_c": 25.3,
+        "temp_max_c": 27.5,
+        "temp_min_c": 23.7,
+        "rainfall_mm": 8.8,
+        "wind_ms": 4.46,
+        "weathercode": 61,
+        "relativehumidity_pct": 91
+      },
+      {
+        "date": "2021-08-27",
+        "temp_avg_c": 26.3,
+        "temp_max_c": 29.0,
+        "temp_min_c": 24.1,
+        "rainfall_mm": 1.5,
+        "wind_ms": 4.8,
+        "weathercode": 51,
+        "relativehumidity_pct": 85
+      },
+      {
+        "date": "2021-08-28",
+        "temp_avg_c": 26.9,
+        "temp_max_c": 30.5,
+        "temp_min_c": 24.7,
+        "rainfall_mm": 7.5,
+        "wind_ms": 4.95,
+        "weathercode": 63,
+        "relativehumidity_pct": 85
+      },
+      {
+        "date": "2021-08-29",
+        "temp_avg_c": 25.9,
+        "temp_max_c": 28.5,
+        "temp_min_c": 24.3,
+        "rainfall_mm": 29.3,
+        "wind_ms": 4.12,
+        "weathercode": 65,
+        "relativehumidity_pct": 91
+      },
+      {
+        "date": "2021-08-30",
+        "temp_avg_c": 26.0,
+        "temp_max_c": 30.4,
+        "temp_min_c": 24.0,
+        "rainfall_mm": 20.7,
+        "wind_ms": 3.12,
+        "weathercode": 65,
+        "relativehumidity_pct": 90
+      },
+      {
+        "date": "2021-08-31",
+        "temp_avg_c": 26.4,
+        "temp_max_c": 29.5,
+        "temp_min_c": 23.9,
+        "rainfall_mm": 6.8,
+        "wind_ms": 4.05,
+        "weathercode": 61,
+        "relativehumidity_pct": 88
+      },
+      {
+        "date": "2021-09-01",
+        "temp_avg_c": 26.3,
+        "temp_max_c": 29.0,
+        "temp_min_c": 24.1,
+        "rainfall_mm": 9.3,
+        "wind_ms": 3.06,
+        "weathercode": 63,
+        "relativehumidity_pct": 90
+      },
+      {
+        "date": "2021-09-02",
+        "temp_avg_c": 26.3,
+        "temp_max_c": 30.4,
+        "temp_min_c": 23.8,
+        "rainfall_mm": 12.6,
+        "wind_ms": 2.34,
+        "weathercode": 63,
+        "relativehumidity_pct": 89
+      },
+      {
+        "date": "2021-09-03",
+        "temp_avg_c": 26.6,
+        "temp_max_c": 30.9,
+        "temp_min_c": 23.8,
+        "rainfall_mm": 1.0,
+        "wind_ms": 3.02,
+        "weathercode": 51,
+        "relativehumidity_pct": 85
+      },
+      {
+        "date": "2021-09-04",
+        "temp_avg_c": 26.6,
+        "temp_max_c": 30.1,
+        "temp_min_c": 23.5,
+        "rainfall_mm": 4.2,
+        "wind_ms": 3.4,
+        "weathercode": 61,
+        "relativehumidity_pct": 85
+      },
+      {
+        "date": "2021-09-05",
+        "temp_avg_c": 26.8,
+        "temp_max_c": 30.6,
+        "temp_min_c": 24.2,
+        "rainfall_mm": 5.3,
+        "wind_ms": 2.52,
+        "weathercode": 61,
+        "relativehumidity_pct": 86
+      },
+      {
+        "date": "2021-09-06",
+        "temp_avg_c": 26.5,
+        "temp_max_c": 29.8,
+        "temp_min_c": 24.0,
+        "rainfall_mm": 10.2,
+        "wind_ms": 3.16,
+        "weathercode": 63,
+        "relativehumidity_pct": 88
+      },
+      {
+        "date": "2021-09-07",
+        "temp_avg_c": 25.7,
+        "temp_max_c": 28.8,
+        "temp_min_c": 23.9,
+        "rainfall_mm": 22.7,
+        "wind_ms": 2.66,
+        "weathercode": 63,
+        "relativehumidity_pct": 93
+      },
+      {
+        "date": "2021-09-08",
+        "temp_avg_c": 24.6,
+        "temp_max_c": 25.5,
+        "temp_min_c": 24.0,
+        "rainfall_mm": 144.7,
+        "wind_ms": 15.52,
+        "weathercode": 65,
+        "relativehumidity_pct": 95
+      },
+      {
+        "date": "2021-09-09",
+        "temp_avg_c": 26.4,
+        "temp_max_c": 30.8,
+        "temp_min_c": 24.2,
+        "rainfall_mm": 11.1,
+        "wind_ms": 5.41,
+        "weathercode": 63,
+        "relativehumidity_pct": 89
+      },
+      {
+        "date": "2021-09-10",
+        "temp_avg_c": 26.1,
+        "temp_max_c": 29.7,
+        "temp_min_c": 23.6,
+        "rainfall_mm": 12.3,
+        "wind_ms": 4.69,
+        "weathercode": 63,
+        "relativehumidity_pct": 89
+      },
+      {
+        "date": "2021-09-11",
+        "temp_avg_c": 25.3,
+        "temp_max_c": 26.7,
+        "temp_min_c": 24.1,
+        "rainfall_mm": 38.3,
+        "wind_ms": 4.94,
+        "weathercode": 63,
+        "relativehumidity_pct": 93
+      },
+      {
+        "date": "2021-09-12",
+        "temp_avg_c": 26.2,
+        "temp_max_c": 29.0,
+        "temp_min_c": 24.0,
+        "rainfall_mm": 2.2,
+        "wind_ms": 2.92,
+        "weathercode": 51,
+        "relativehumidity_pct": 90
+      },
+      {
+        "date": "2021-09-13",
+        "temp_avg_c": 26.2,
+        "temp_max_c": 30.3,
+        "temp_min_c": 23.4,
+        "rainfall_mm": 12.2,
+        "wind_ms": 2.16,
+        "weathercode": 65,
+        "relativehumidity_pct": 90
+      },
+      {
+        "date": "2021-09-14",
+        "temp_avg_c": 27.2,
+        "temp_max_c": 30.8,
+        "temp_min_c": 24.2,
+        "rainfall_mm": 4.7,
+        "wind_ms": 3.23,
+        "weathercode": 63,
+        "relativehumidity_pct": 84
+      },
+      {
+        "date": "2021-09-15",
+        "temp_avg_c": 27.3,
+        "temp_max_c": 31.1,
+        "temp_min_c": 24.9,
+        "rainfall_mm": 6.5,
+        "wind_ms": 3.35,
+        "weathercode": 63,
+        "relativehumidity_pct": 86
+      },
+      {
+        "date": "2021-09-16",
+        "temp_avg_c": 26.6,
+        "temp_max_c": 29.8,
+        "temp_min_c": 24.5,
+        "rainfall_mm": 13.0,
+        "wind_ms": 2.62,
+        "weathercode": 63,
+        "relativehumidity_pct": 89
+      },
+      {
+        "date": "2021-09-17",
+        "temp_avg_c": 26.4,
+        "temp_max_c": 30.2,
+        "temp_min_c": 24.6,
+        "rainfall_mm": 13.4,
+        "wind_ms": 5.79,
+        "weathercode": 61,
+        "relativehumidity_pct": 89
+      },
+      {
+        "date": "2021-09-18",
+        "temp_avg_c": 27.0,
+        "temp_max_c": 30.6,
+        "temp_min_c": 24.6,
+        "rainfall_mm": 2.8,
+        "wind_ms": 5.0,
+        "weathercode": 51,
+        "relativehumidity_pct": 86
+      },
+      {
+        "date": "2021-09-19",
+        "temp_avg_c": 25.7,
+        "temp_max_c": 27.6,
+        "temp_min_c": 24.8,
+        "rainfall_mm": 11.2,
+        "wind_ms": 4.7,
+        "weathercode": 61,
+        "relativehumidity_pct": 93
+      },
+      {
+        "date": "2021-09-20",
+        "temp_avg_c": 25.9,
+        "temp_max_c": 28.4,
+        "temp_min_c": 24.0,
+        "rainfall_mm": 15.3,
+        "wind_ms": 3.83,
+        "weathercode": 63,
+        "relativehumidity_pct": 92
+      },
+      {
+        "date": "2021-09-21",
+        "temp_avg_c": 26.3,
+        "temp_max_c": 29.5,
+        "temp_min_c": 24.4,
+        "rainfall_mm": 11.8,
+        "wind_ms": 5.06,
+        "weathercode": 63,
+        "relativehumidity_pct": 89
+      },
+      {
+        "date": "2021-09-22",
+        "temp_avg_c": 26.9,
+        "temp_max_c": 30.1,
+        "temp_min_c": 24.2,
+        "rainfall_mm": 1.8,
+        "wind_ms": 5.05,
+        "weathercode": 51,
+        "relativehumidity_pct": 86
+      },
+      {
+        "date": "2021-09-23",
+        "temp_avg_c": 27.2,
+        "temp_max_c": 30.6,
+        "temp_min_c": 24.4,
+        "rainfall_mm": 0.1,
+        "wind_ms": 4.55,
+        "weathercode": 51,
+        "relativehumidity_pct": 83
+      },
+      {
+        "date": "2021-09-24",
+        "temp_avg_c": 26.8,
+        "temp_max_c": 29.6,
+        "temp_min_c": 23.5,
+        "rainfall_mm": 3.8,
+        "wind_ms": 5.56,
+        "weathercode": 61,
+        "relativehumidity_pct": 84
+      },
+      {
+        "date": "2021-09-25",
+        "temp_avg_c": 26.8,
+        "temp_max_c": 29.4,
+        "temp_min_c": 24.2,
+        "rainfall_mm": 7.8,
+        "wind_ms": 4.27,
+        "weathercode": 61,
+        "relativehumidity_pct": 87
+      },
+      {
+        "date": "2021-09-26",
+        "temp_avg_c": 27.6,
+        "temp_max_c": 31.1,
+        "temp_min_c": 25.0,
+        "rainfall_mm": 1.0,
+        "wind_ms": 3.85,
+        "weathercode": 51,
+        "relativehumidity_pct": 83
+      },
+      {
+        "date": "2021-09-27",
+        "temp_avg_c": 26.7,
+        "temp_max_c": 30.0,
+        "temp_min_c": 24.2,
+        "rainfall_mm": 17.3,
+        "wind_ms": 2.78,
+        "weathercode": 63,
+        "relativehumidity_pct": 89
+      },
+      {
+        "date": "2021-09-28",
+        "temp_avg_c": 26.3,
+        "temp_max_c": 30.9,
+        "temp_min_c": 23.4,
+        "rainfall_mm": 15.6,
+        "wind_ms": 1.7,
+        "weathercode": 65,
+        "relativehumidity_pct": 90
+      },
+      {
+        "date": "2021-09-29",
+        "temp_avg_c": 26.9,
+        "temp_max_c": 30.5,
+        "temp_min_c": 24.2,
+        "rainfall_mm": 10.9,
+        "wind_ms": 2.34,
+        "weathercode": 63,
+        "relativehumidity_pct": 91
+      },
+      {
+        "date": "2021-09-30",
+        "temp_avg_c": 26.4,
+        "temp_max_c": 28.9,
+        "temp_min_c": 24.6,
+        "rainfall_mm": 23.0,
+        "wind_ms": 2.67,
+        "weathercode": 65,
+        "relativehumidity_pct": 90
+      },
+      {
+        "date": "2021-10-01",
+        "temp_avg_c": 27.0,
+        "temp_max_c": 30.5,
+        "temp_min_c": 24.5,
+        "rainfall_mm": 2.8,
+        "wind_ms": 2.64,
+        "weathercode": 53,
+        "relativehumidity_pct": 88
+      },
+      {
+        "date": "2021-10-02",
+        "temp_avg_c": 26.6,
+        "temp_max_c": 29.9,
+        "temp_min_c": 24.1,
+        "rainfall_mm": 10.3,
+        "wind_ms": 3.9,
+        "weathercode": 63,
+        "relativehumidity_pct": 89
+      },
+      {
+        "date": "2021-10-03",
+        "temp_avg_c": 26.4,
+        "temp_max_c": 28.5,
+        "temp_min_c": 24.9,
+        "rainfall_mm": 6.5,
+        "wind_ms": 5.2,
+        "weathercode": 61,
+        "relativehumidity_pct": 89
+      },
+      {
+        "date": "2021-10-04",
+        "temp_avg_c": 25.9,
+        "temp_max_c": 28.1,
+        "temp_min_c": 24.4,
+        "rainfall_mm": 6.1,
+        "wind_ms": 5.6,
+        "weathercode": 53,
+        "relativehumidity_pct": 89
+      },
+      {
+        "date": "2021-10-05",
+        "temp_avg_c": 25.4,
+        "temp_max_c": 27.5,
+        "temp_min_c": 24.6,
+        "rainfall_mm": 14.7,
+        "wind_ms": 4.87,
+        "weathercode": 61,
+        "relativehumidity_pct": 94
+      },
+      {
+        "date": "2021-10-06",
+        "temp_avg_c": 25.7,
+        "temp_max_c": 27.2,
+        "temp_min_c": 24.6,
+        "rainfall_mm": 5.8,
+        "wind_ms": 2.97,
+        "weathercode": 53,
+        "relativehumidity_pct": 94
+      },
+      {
+        "date": "2021-10-07",
+        "temp_avg_c": 26.5,
+        "temp_max_c": 29.6,
+        "temp_min_c": 24.7,
+        "rainfall_mm": 10.0,
+        "wind_ms": 2.69,
+        "weathercode": 65,
+        "relativehumidity_pct": 89
+      },
+      {
+        "date": "2021-10-08",
+        "temp_avg_c": 26.7,
+        "temp_max_c": 30.0,
+        "temp_min_c": 24.8,
+        "rainfall_mm": 3.0,
+        "wind_ms": 2.14,
+        "weathercode": 53,
+        "relativehumidity_pct": 87
+      },
+      {
+        "date": "2021-10-09",
+        "temp_avg_c": 26.5,
+        "temp_max_c": 30.2,
+        "temp_min_c": 23.9,
+        "rainfall_mm": 4.0,
+        "wind_ms": 3.18,
+        "weathercode": 61,
+        "relativehumidity_pct": 87
+      },
+      {
+        "date": "2021-10-10",
+        "temp_avg_c": 27.0,
+        "temp_max_c": 30.1,
+        "temp_min_c": 24.6,
+        "rainfall_mm": 5.2,
+        "wind_ms": 5.32,
+        "weathercode": 61,
+        "relativehumidity_pct": 86
+      },
+      {
+        "date": "2021-10-11",
+        "temp_avg_c": 27.2,
+        "temp_max_c": 29.7,
+        "temp_min_c": 25.9,
+        "rainfall_mm": 1.3,
+        "wind_ms": 9.7,
+        "weathercode": 51,
+        "relativehumidity_pct": 84
+      },
+      {
+        "date": "2021-10-12",
+        "temp_avg_c": 26.5,
+        "temp_max_c": 29.0,
+        "temp_min_c": 25.0,
+        "rainfall_mm": 7.7,
+        "wind_ms": 7.4,
+        "weathercode": 55,
+        "relativehumidity_pct": 87
+      },
+      {
+        "date": "2021-10-13",
+        "temp_avg_c": 25.7,
+        "temp_max_c": 28.4,
+        "temp_min_c": 24.4,
+        "rainfall_mm": 27.7,
+        "wind_ms": 2.02,
+        "weathercode": 65,
+        "relativehumidity_pct": 94
+      },
+      {
+        "date": "2021-10-14",
+        "temp_avg_c": 25.7,
+        "temp_max_c": 29.0,
+        "temp_min_c": 23.9,
+        "rainfall_mm": 13.5,
+        "wind_ms": 2.53,
+        "weathercode": 63,
+        "relativehumidity_pct": 92
+      },
+      {
+        "date": "2021-10-15",
+        "temp_avg_c": 25.2,
+        "temp_max_c": 30.4,
+        "temp_min_c": 23.4,
+        "rainfall_mm": 39.2,
+        "wind_ms": 3.47,
+        "weathercode": 65,
+        "relativehumidity_pct": 93
+      },
+      {
+        "date": "2021-10-16",
+        "temp_avg_c": 26.0,
+        "temp_max_c": 29.2,
+        "temp_min_c": 23.4,
+        "rainfall_mm": 4.9,
+        "wind_ms": 5.4,
+        "weathercode": 61,
+        "relativehumidity_pct": 87
+      },
+      {
+        "date": "2021-10-17",
+        "temp_avg_c": 26.3,
+        "temp_max_c": 29.4,
+        "temp_min_c": 24.9,
+        "rainfall_mm": 14.3,
+        "wind_ms": 5.68,
+        "weathercode": 63,
+        "relativehumidity_pct": 87
+      },
+      {
+        "date": "2021-10-18",
+        "temp_avg_c": 25.7,
+        "temp_max_c": 27.0,
+        "temp_min_c": 23.9,
+        "rainfall_mm": 6.6,
+        "wind_ms": 4.4,
+        "weathercode": 63,
+        "relativehumidity_pct": 88
+      },
+      {
+        "date": "2021-10-19",
+        "temp_avg_c": 27.3,
+        "temp_max_c": 30.2,
+        "temp_min_c": 25.0,
+        "rainfall_mm": 0.1,
+        "wind_ms": 5.22,
+        "weathercode": 51,
+        "relativehumidity_pct": 80
+      },
+      {
+        "date": "2021-10-20",
+        "temp_avg_c": 27.0,
+        "temp_max_c": 29.8,
+        "temp_min_c": 25.2,
+        "rainfall_mm": 1.8,
+        "wind_ms": 4.7,
+        "weathercode": 53,
+        "relativehumidity_pct": 82
+      },
+      {
+        "date": "2021-10-21",
+        "temp_avg_c": 26.1,
+        "temp_max_c": 29.5,
+        "temp_min_c": 24.3,
+        "rainfall_mm": 10.4,
+        "wind_ms": 3.6,
+        "weathercode": 63,
+        "relativehumidity_pct": 88
+      },
+      {
+        "date": "2021-10-22",
+        "temp_avg_c": 26.5,
+        "temp_max_c": 30.6,
+        "temp_min_c": 22.9,
+        "rainfall_mm": 1.1,
+        "wind_ms": 5.7,
+        "weathercode": 53,
+        "relativehumidity_pct": 84
+      },
+      {
+        "date": "2021-10-23",
+        "temp_avg_c": 25.9,
+        "temp_max_c": 29.5,
+        "temp_min_c": 24.5,
+        "rainfall_mm": 12.2,
+        "wind_ms": 5.77,
+        "weathercode": 65,
+        "relativehumidity_pct": 88
+      },
+      {
+        "date": "2021-10-24",
+        "temp_avg_c": 25.6,
+        "temp_max_c": 27.8,
+        "temp_min_c": 24.2,
+        "rainfall_mm": 5.8,
+        "wind_ms": 5.39,
+        "weathercode": 61,
+        "relativehumidity_pct": 89
+      },
+      {
+        "date": "2021-10-25",
+        "temp_avg_c": 25.0,
+        "temp_max_c": 26.2,
+        "temp_min_c": 24.0,
+        "rainfall_mm": 14.5,
+        "wind_ms": 3.96,
+        "weathercode": 63,
+        "relativehumidity_pct": 92
+      },
+      {
+        "date": "2021-10-26",
+        "temp_avg_c": 26.4,
+        "temp_max_c": 29.2,
+        "temp_min_c": 24.3,
+        "rainfall_mm": 1.2,
+        "wind_ms": 5.3,
+        "weathercode": 55,
+        "relativehumidity_pct": 84
+      },
+      {
+        "date": "2021-10-27",
+        "temp_avg_c": 26.9,
+        "temp_max_c": 29.6,
+        "temp_min_c": 24.5,
+        "rainfall_mm": 0.1,
+        "wind_ms": 5.97,
+        "weathercode": 51,
+        "relativehumidity_pct": 80
+      },
+      {
+        "date": "2021-10-28",
+        "temp_avg_c": 26.2,
+        "temp_max_c": 28.0,
+        "temp_min_c": 24.8,
+        "rainfall_mm": 2.8,
+        "wind_ms": 6.96,
+        "weathercode": 61,
+        "relativehumidity_pct": 82
+      },
+      {
+        "date": "2021-10-29",
+        "temp_avg_c": 27.0,
+        "temp_max_c": 29.8,
+        "temp_min_c": 24.6,
+        "rainfall_mm": 0.4,
+        "wind_ms": 6.26,
+        "weathercode": 51,
+        "relativehumidity_pct": 74
+      },
+      {
+        "date": "2021-10-30",
+        "temp_avg_c": 26.6,
+        "temp_max_c": 29.5,
+        "temp_min_c": 24.1,
+        "rainfall_mm": 0.3,
+        "wind_ms": 6.02,
+        "weathercode": 51,
+        "relativehumidity_pct": 78
+      },
+      {
+        "date": "2021-10-31",
+        "temp_avg_c": 27.1,
+        "temp_max_c": 30.3,
+        "temp_min_c": 25.0,
+        "rainfall_mm": 0.0,
+        "wind_ms": 6.61,
+        "weathercode": 3,
+        "relativehumidity_pct": 71
+      },
+      {
+        "date": "2021-11-01",
+        "temp_avg_c": 26.5,
+        "temp_max_c": 29.7,
+        "temp_min_c": 24.5,
+        "rainfall_mm": 1.8,
+        "wind_ms": 6.43,
+        "weathercode": 61,
+        "relativehumidity_pct": 79
+      },
+      {
+        "date": "2021-11-02",
+        "temp_avg_c": 26.5,
+        "temp_max_c": 29.4,
+        "temp_min_c": 24.5,
+        "rainfall_mm": 1.0,
+        "wind_ms": 6.82,
+        "weathercode": 51,
+        "relativehumidity_pct": 79
+      },
+      {
+        "date": "2021-11-03",
+        "temp_avg_c": 27.0,
+        "temp_max_c": 30.8,
+        "temp_min_c": 24.8,
+        "rainfall_mm": 0.1,
+        "wind_ms": 6.02,
+        "weathercode": 51,
+        "relativehumidity_pct": 76
+      },
+      {
+        "date": "2021-11-04",
+        "temp_avg_c": 27.2,
+        "temp_max_c": 30.3,
+        "temp_min_c": 25.1,
+        "rainfall_mm": 0.3,
+        "wind_ms": 5.75,
+        "weathercode": 51,
+        "relativehumidity_pct": 78
+      },
+      {
+        "date": "2021-11-05",
+        "temp_avg_c": 26.7,
+        "temp_max_c": 29.0,
+        "temp_min_c": 25.2,
+        "rainfall_mm": 5.7,
+        "wind_ms": 6.33,
+        "weathercode": 63,
+        "relativehumidity_pct": 83
+      },
+      {
+        "date": "2021-11-06",
+        "temp_avg_c": 27.4,
+        "temp_max_c": 30.9,
+        "temp_min_c": 24.6,
+        "rainfall_mm": 0.3,
+        "wind_ms": 4.52,
+        "weathercode": 51,
+        "relativehumidity_pct": 80
+      },
+      {
+        "date": "2021-11-07",
+        "temp_avg_c": 27.2,
+        "temp_max_c": 29.9,
+        "temp_min_c": 24.9,
+        "rainfall_mm": 0.3,
+        "wind_ms": 6.41,
+        "weathercode": 51,
+        "relativehumidity_pct": 82
+      },
+      {
+        "date": "2021-11-08",
+        "temp_avg_c": 26.9,
+        "temp_max_c": 29.4,
+        "temp_min_c": 24.8,
+        "rainfall_mm": 0.7,
+        "wind_ms": 5.64,
+        "weathercode": 51,
+        "relativehumidity_pct": 83
+      },
+      {
+        "date": "2021-11-09",
+        "temp_avg_c": 27.4,
+        "temp_max_c": 30.5,
+        "temp_min_c": 25.1,
+        "rainfall_mm": 0.1,
+        "wind_ms": 6.61,
+        "weathercode": 51,
+        "relativehumidity_pct": 77
+      },
+      {
+        "date": "2021-11-10",
+        "temp_avg_c": 27.5,
+        "temp_max_c": 30.6,
+        "temp_min_c": 25.4,
+        "rainfall_mm": 0.2,
+        "wind_ms": 5.56,
+        "weathercode": 51,
+        "relativehumidity_pct": 76
+      },
+      {
+        "date": "2021-11-11",
+        "temp_avg_c": 27.9,
+        "temp_max_c": 31.0,
+        "temp_min_c": 25.8,
+        "rainfall_mm": 0.0,
+        "wind_ms": 5.64,
+        "weathercode": 3,
+        "relativehumidity_pct": 72
+      },
+      {
+        "date": "2021-11-12",
+        "temp_avg_c": 27.1,
+        "temp_max_c": 29.4,
+        "temp_min_c": 25.2,
+        "rainfall_mm": 0.4,
+        "wind_ms": 5.92,
+        "weathercode": 51,
+        "relativehumidity_pct": 79
+      },
+      {
+        "date": "2021-11-13",
+        "temp_avg_c": 27.0,
+        "temp_max_c": 29.9,
+        "temp_min_c": 24.9,
+        "rainfall_mm": 0.4,
+        "wind_ms": 5.46,
+        "weathercode": 51,
+        "relativehumidity_pct": 80
+      },
+      {
+        "date": "2021-11-14",
+        "temp_avg_c": 27.0,
+        "temp_max_c": 29.3,
+        "temp_min_c": 24.8,
+        "rainfall_mm": 1.2,
+        "wind_ms": 4.7,
+        "weathercode": 53,
+        "relativehumidity_pct": 81
+      },
+      {
+        "date": "2021-11-15",
+        "temp_avg_c": 27.3,
+        "temp_max_c": 30.8,
+        "temp_min_c": 25.3,
+        "rainfall_mm": 3.7,
+        "wind_ms": 4.94,
+        "weathercode": 61,
+        "relativehumidity_pct": 79
+      },
+      {
+        "date": "2021-11-16",
+        "temp_avg_c": 27.0,
+        "temp_max_c": 30.0,
+        "temp_min_c": 24.8,
+        "rainfall_mm": 0.9,
+        "wind_ms": 6.07,
+        "weathercode": 53,
+        "relativehumidity_pct": 80
+      },
+      {
+        "date": "2021-11-17",
+        "temp_avg_c": 26.8,
+        "temp_max_c": 30.4,
+        "temp_min_c": 24.6,
+        "rainfall_mm": 0.5,
+        "wind_ms": 5.92,
+        "weathercode": 51,
+        "relativehumidity_pct": 79
+      },
+      {
+        "date": "2021-11-18",
+        "temp_avg_c": 26.8,
+        "temp_max_c": 30.2,
+        "temp_min_c": 24.0,
+        "rainfall_mm": 1.7,
+        "wind_ms": 4.5,
+        "weathercode": 55,
+        "relativehumidity_pct": 79
+      },
+      {
+        "date": "2021-11-19",
+        "temp_avg_c": 27.1,
+        "temp_max_c": 31.2,
+        "temp_min_c": 23.5,
+        "rainfall_mm": 0.8,
+        "wind_ms": 5.25,
+        "weathercode": 53,
+        "relativehumidity_pct": 80
+      },
+      {
+        "date": "2021-11-20",
+        "temp_avg_c": 26.3,
+        "temp_max_c": 29.1,
+        "temp_min_c": 23.8,
+        "rainfall_mm": 9.2,
+        "wind_ms": 6.11,
+        "weathercode": 63,
+        "relativehumidity_pct": 84
+      },
+      {
+        "date": "2021-11-21",
+        "temp_avg_c": 26.5,
+        "temp_max_c": 30.8,
+        "temp_min_c": 23.6,
+        "rainfall_mm": 10.0,
+        "wind_ms": 3.82,
+        "weathercode": 63,
+        "relativehumidity_pct": 84
+      },
+      {
+        "date": "2021-11-22",
+        "temp_avg_c": 27.4,
+        "temp_max_c": 31.7,
+        "temp_min_c": 24.6,
+        "rainfall_mm": 5.4,
+        "wind_ms": 4.04,
+        "weathercode": 61,
+        "relativehumidity_pct": 81
+      },
+      {
+        "date": "2021-11-23",
+        "temp_avg_c": 26.8,
+        "temp_max_c": 29.6,
+        "temp_min_c": 24.8,
+        "rainfall_mm": 2.9,
+        "wind_ms": 6.84,
+        "weathercode": 61,
+        "relativehumidity_pct": 81
+      },
+      {
+        "date": "2021-11-24",
+        "temp_avg_c": 27.0,
+        "temp_max_c": 30.2,
+        "temp_min_c": 24.5,
+        "rainfall_mm": 0.6,
+        "wind_ms": 6.55,
+        "weathercode": 51,
+        "relativehumidity_pct": 78
+      },
+      {
+        "date": "2021-11-25",
+        "temp_avg_c": 26.7,
+        "temp_max_c": 30.3,
+        "temp_min_c": 25.0,
+        "rainfall_mm": 3.3,
+        "wind_ms": 5.59,
+        "weathercode": 61,
+        "relativehumidity_pct": 80
+      },
+      {
+        "date": "2021-11-26",
+        "temp_avg_c": 25.9,
+        "temp_max_c": 28.0,
+        "temp_min_c": 24.6,
+        "rainfall_mm": 6.2,
+        "wind_ms": 5.1,
+        "weathercode": 61,
+        "relativehumidity_pct": 88
+      },
+      {
+        "date": "2021-11-27",
+        "temp_avg_c": 26.4,
+        "temp_max_c": 29.4,
+        "temp_min_c": 24.9,
+        "rainfall_mm": 1.9,
+        "wind_ms": 6.67,
+        "weathercode": 53,
+        "relativehumidity_pct": 83
+      },
+      {
+        "date": "2021-11-28",
+        "temp_avg_c": 25.7,
+        "temp_max_c": 27.5,
+        "temp_min_c": 24.2,
+        "rainfall_mm": 3.7,
+        "wind_ms": 5.1,
+        "weathercode": 53,
+        "relativehumidity_pct": 85
+      },
+      {
+        "date": "2021-11-29",
+        "temp_avg_c": 27.0,
+        "temp_max_c": 30.4,
+        "temp_min_c": 24.7,
+        "rainfall_mm": 1.2,
+        "wind_ms": 4.1,
+        "weathercode": 53,
+        "relativehumidity_pct": 81
+      },
+      {
+        "date": "2021-11-30",
+        "temp_avg_c": 27.8,
+        "temp_max_c": 32.4,
+        "temp_min_c": 24.0,
+        "rainfall_mm": 0.0,
+        "wind_ms": 2.63,
+        "weathercode": 3,
+        "relativehumidity_pct": 78
+      },
+      {
+        "date": "2021-12-01",
+        "temp_avg_c": 26.9,
+        "temp_max_c": 30.3,
+        "temp_min_c": 24.8,
+        "rainfall_mm": 2.3,
+        "wind_ms": 6.09,
+        "weathercode": 61,
+        "relativehumidity_pct": 78
+      },
+      {
+        "date": "2021-12-02",
+        "temp_avg_c": 26.1,
+        "temp_max_c": 29.2,
+        "temp_min_c": 24.3,
+        "rainfall_mm": 0.0,
+        "wind_ms": 6.51,
+        "weathercode": 3,
+        "relativehumidity_pct": 69
+      },
+      {
+        "date": "2021-12-03",
+        "temp_avg_c": 25.5,
+        "temp_max_c": 28.9,
+        "temp_min_c": 23.4,
+        "rainfall_mm": 0.0,
+        "wind_ms": 6.95,
+        "weathercode": 3,
+        "relativehumidity_pct": 70
+      },
+      {
+        "date": "2021-12-04",
+        "temp_avg_c": 24.7,
+        "temp_max_c": 28.5,
+        "temp_min_c": 22.4,
+        "rainfall_mm": 0.1,
+        "wind_ms": 7.43,
+        "weathercode": 51,
+        "relativehumidity_pct": 73
+      },
+      {
+        "date": "2021-12-05",
+        "temp_avg_c": 25.1,
+        "temp_max_c": 28.8,
+        "temp_min_c": 22.8,
+        "rainfall_mm": 0.0,
+        "wind_ms": 6.67,
+        "weathercode": 3,
+        "relativehumidity_pct": 68
+      },
+      {
+        "date": "2021-12-06",
+        "temp_avg_c": 25.3,
+        "temp_max_c": 29.0,
+        "temp_min_c": 22.8,
+        "rainfall_mm": 1.1,
+        "wind_ms": 5.41,
+        "weathercode": 53,
+        "relativehumidity_pct": 72
+      },
+      {
+        "date": "2021-12-07",
+        "temp_avg_c": 25.0,
+        "temp_max_c": 28.5,
+        "temp_min_c": 22.5,
+        "rainfall_mm": 1.5,
+        "wind_ms": 8.19,
+        "weathercode": 53,
+        "relativehumidity_pct": 77
+      },
+      {
+        "date": "2021-12-08",
+        "temp_avg_c": 25.7,
+        "temp_max_c": 29.0,
+        "temp_min_c": 23.5,
+        "rainfall_mm": 0.0,
+        "wind_ms": 7.08,
+        "weathercode": 3,
+        "relativehumidity_pct": 67
+      },
+      {
+        "date": "2021-12-09",
+        "temp_avg_c": 25.6,
+        "temp_max_c": 28.9,
+        "temp_min_c": 23.6,
+        "rainfall_mm": 0.0,
+        "wind_ms": 7.09,
+        "weathercode": 3,
+        "relativehumidity_pct": 68
+      },
+      {
+        "date": "2021-12-10",
+        "temp_avg_c": 26.0,
+        "temp_max_c": 29.4,
+        "temp_min_c": 23.5,
+        "rainfall_mm": 0.0,
+        "wind_ms": 7.12,
+        "weathercode": 3,
+        "relativehumidity_pct": 69
+      },
+      {
+        "date": "2021-12-11",
+        "temp_avg_c": 25.8,
+        "temp_max_c": 28.3,
+        "temp_min_c": 24.2,
+        "rainfall_mm": 1.1,
+        "wind_ms": 6.61,
+        "weathercode": 53,
+        "relativehumidity_pct": 78
+      },
+      {
+        "date": "2021-12-12",
+        "temp_avg_c": 25.9,
+        "temp_max_c": 28.3,
+        "temp_min_c": 24.4,
+        "rainfall_mm": 0.6,
+        "wind_ms": 6.04,
+        "weathercode": 51,
+        "relativehumidity_pct": 82
+      },
+      {
+        "date": "2021-12-13",
+        "temp_avg_c": 25.8,
+        "temp_max_c": 28.6,
+        "temp_min_c": 23.6,
+        "rainfall_mm": 0.9,
+        "wind_ms": 7.24,
+        "weathercode": 53,
+        "relativehumidity_pct": 78
+      },
+      {
+        "date": "2021-12-14",
+        "temp_avg_c": 25.7,
+        "temp_max_c": 29.0,
+        "temp_min_c": 23.5,
+        "rainfall_mm": 0.2,
+        "wind_ms": 7.81,
+        "weathercode": 51,
+        "relativehumidity_pct": 70
+      },
+      {
+        "date": "2021-12-15",
+        "temp_avg_c": 25.8,
+        "temp_max_c": 29.2,
+        "temp_min_c": 23.8,
+        "rainfall_mm": 0.3,
+        "wind_ms": 6.74,
+        "weathercode": 51,
+        "relativehumidity_pct": 74
+      },
+      {
+        "date": "2021-12-16",
+        "temp_avg_c": 26.1,
+        "temp_max_c": 29.5,
+        "temp_min_c": 23.2,
+        "rainfall_mm": 0.3,
+        "wind_ms": 4.79,
+        "weathercode": 51,
+        "relativehumidity_pct": 76
+      },
+      {
+        "date": "2021-12-17",
+        "temp_avg_c": 25.6,
+        "temp_max_c": 27.0,
+        "temp_min_c": 24.2,
+        "rainfall_mm": 12.4,
+        "wind_ms": 7.08,
+        "weathercode": 61,
+        "relativehumidity_pct": 89
+      },
+      {
+        "date": "2021-12-18",
+        "temp_avg_c": 26.2,
+        "temp_max_c": 29.0,
+        "temp_min_c": 24.0,
+        "rainfall_mm": 7.9,
+        "wind_ms": 7.3,
+        "weathercode": 61,
+        "relativehumidity_pct": 85
+      },
+      {
+        "date": "2021-12-19",
+        "temp_avg_c": 24.8,
+        "temp_max_c": 27.3,
+        "temp_min_c": 23.3,
+        "rainfall_mm": 6.3,
+        "wind_ms": 5.69,
+        "weathercode": 61,
+        "relativehumidity_pct": 91
+      },
+      {
+        "date": "2021-12-20",
+        "temp_avg_c": 25.7,
+        "temp_max_c": 29.2,
+        "temp_min_c": 23.1,
+        "rainfall_mm": 11.3,
+        "wind_ms": 5.02,
+        "weathercode": 63,
+        "relativehumidity_pct": 86
+      },
+      {
+        "date": "2021-12-21",
+        "temp_avg_c": 26.5,
+        "temp_max_c": 29.7,
+        "temp_min_c": 23.9,
+        "rainfall_mm": 0.0,
+        "wind_ms": 4.54,
+        "weathercode": 3,
+        "relativehumidity_pct": 83
+      },
+      {
+        "date": "2021-12-22",
+        "temp_avg_c": 25.6,
+        "temp_max_c": 29.0,
+        "temp_min_c": 24.2,
+        "rainfall_mm": 6.5,
+        "wind_ms": 4.24,
+        "weathercode": 63,
+        "relativehumidity_pct": 88
+      },
+      {
+        "date": "2021-12-23",
+        "temp_avg_c": 26.3,
+        "temp_max_c": 30.0,
+        "temp_min_c": 24.0,
+        "rainfall_mm": 0.0,
+        "wind_ms": 4.62,
+        "weathercode": 3,
+        "relativehumidity_pct": 82
+      },
+      {
+        "date": "2021-12-24",
+        "temp_avg_c": 26.0,
+        "temp_max_c": 29.2,
+        "temp_min_c": 23.8,
+        "rainfall_mm": 0.4,
+        "wind_ms": 4.7,
+        "weathercode": 51,
+        "relativehumidity_pct": 82
+      },
+      {
+        "date": "2021-12-25",
+        "temp_avg_c": 25.7,
+        "temp_max_c": 28.9,
+        "temp_min_c": 24.0,
+        "rainfall_mm": 0.3,
+        "wind_ms": 5.72,
+        "weathercode": 51,
+        "relativehumidity_pct": 82
+      },
+      {
+        "date": "2021-12-26",
+        "temp_avg_c": 25.2,
+        "temp_max_c": 27.8,
+        "temp_min_c": 23.0,
+        "rainfall_mm": 7.5,
+        "wind_ms": 7.08,
+        "weathercode": 63,
+        "relativehumidity_pct": 80
+      },
+      {
+        "date": "2021-12-27",
+        "temp_avg_c": 23.9,
+        "temp_max_c": 25.9,
+        "temp_min_c": 22.9,
+        "rainfall_mm": 13.7,
+        "wind_ms": 6.74,
+        "weathercode": 63,
+        "relativehumidity_pct": 86
+      },
+      {
+        "date": "2021-12-28",
+        "temp_avg_c": 24.4,
+        "temp_max_c": 26.4,
+        "temp_min_c": 23.2,
+        "rainfall_mm": 2.7,
+        "wind_ms": 7.4,
+        "weathercode": 53,
+        "relativehumidity_pct": 79
+      },
+      {
+        "date": "2021-12-29",
+        "temp_avg_c": 24.8,
+        "temp_max_c": 27.0,
+        "temp_min_c": 23.0,
+        "rainfall_mm": 1.1,
+        "wind_ms": 7.43,
+        "weathercode": 51,
+        "relativehumidity_pct": 78
+      },
+      {
+        "date": "2021-12-30",
+        "temp_avg_c": 25.2,
+        "temp_max_c": 28.4,
+        "temp_min_c": 23.3,
+        "rainfall_mm": 0.0,
+        "wind_ms": 7.97,
+        "weathercode": 3,
+        "relativehumidity_pct": 73
+      },
+      {
+        "date": "2021-12-31",
+        "temp_avg_c": 25.2,
+        "temp_max_c": 28.3,
+        "temp_min_c": 23.4,
+        "rainfall_mm": 0.0,
+        "wind_ms": 8.76,
+        "weathercode": 3,
+        "relativehumidity_pct": 67
+      },
+      {
+        "date": "2022-01-01",
+        "temp_avg_c": 24.8,
+        "temp_max_c": 27.6,
+        "temp_min_c": 22.8,
+        "rainfall_mm": 0.1,
+        "wind_ms": 8.43,
+        "weathercode": 51,
+        "relativehumidity_pct": 72
+      },
+      {
+        "date": "2022-01-02",
+        "temp_avg_c": 24.3,
+        "temp_max_c": 26.3,
+        "temp_min_c": 23.0,
+        "rainfall_mm": 0.0,
+        "wind_ms": 7.56,
+        "weathercode": 3,
+        "relativehumidity_pct": 71
+      },
+      {
+        "date": "2022-01-03",
+        "temp_avg_c": 25.0,
+        "temp_max_c": 28.0,
+        "temp_min_c": 22.6,
+        "rainfall_mm": 0.0,
+        "wind_ms": 7.4,
+        "weathercode": 3,
+        "relativehumidity_pct": 68
+      },
+      {
+        "date": "2022-01-04",
+        "temp_avg_c": 25.3,
+        "temp_max_c": 28.3,
+        "temp_min_c": 23.3,
+        "rainfall_mm": 0.0,
+        "wind_ms": 7.4,
+        "weathercode": 3,
+        "relativehumidity_pct": 69
+      },
+      {
+        "date": "2022-01-05",
+        "temp_avg_c": 25.6,
+        "temp_max_c": 29.0,
+        "temp_min_c": 23.0,
+        "rainfall_mm": 0.0,
+        "wind_ms": 6.0,
+        "weathercode": 3,
+        "relativehumidity_pct": 70
+      },
+      {
+        "date": "2022-01-06",
+        "temp_avg_c": 25.6,
+        "temp_max_c": 29.4,
+        "temp_min_c": 23.0,
+        "rainfall_mm": 0.0,
+        "wind_ms": 6.11,
+        "weathercode": 3,
+        "relativehumidity_pct": 71
+      },
+      {
+        "date": "2022-01-07",
+        "temp_avg_c": 25.8,
+        "temp_max_c": 29.6,
+        "temp_min_c": 22.5,
+        "rainfall_mm": 0.0,
+        "wind_ms": 5.26,
+        "weathercode": 2,
+        "relativehumidity_pct": 68
+      },
+      {
+        "date": "2022-01-08",
+        "temp_avg_c": 25.4,
+        "temp_max_c": 29.0,
+        "temp_min_c": 22.5,
+        "rainfall_mm": 1.9,
+        "wind_ms": 4.55,
+        "weathercode": 61,
+        "relativehumidity_pct": 77
+      },
+      {
+        "date": "2022-01-09",
+        "temp_avg_c": 25.7,
+        "temp_max_c": 30.1,
+        "temp_min_c": 22.5,
+        "rainfall_mm": 0.2,
+        "wind_ms": 3.57,
+        "weathercode": 51,
+        "relativehumidity_pct": 76
+      },
+      {
+        "date": "2022-01-10",
+        "temp_avg_c": 25.9,
+        "temp_max_c": 31.0,
+        "temp_min_c": 22.0,
+        "rainfall_mm": 0.2,
+        "wind_ms": 3.23,
+        "weathercode": 51,
+        "relativehumidity_pct": 77
+      },
+      {
+        "date": "2022-01-11",
+        "temp_avg_c": 25.7,
+        "temp_max_c": 30.4,
+        "temp_min_c": 22.5,
+        "rainfall_mm": 0.0,
+        "wind_ms": 4.03,
+        "weathercode": 3,
+        "relativehumidity_pct": 73
+      },
+      {
+        "date": "2022-01-12",
+        "temp_avg_c": 24.8,
+        "temp_max_c": 29.1,
+        "temp_min_c": 22.1,
+        "rainfall_mm": 0.0,
+        "wind_ms": 6.1,
+        "weathercode": 3,
+        "relativehumidity_pct": 74
+      },
+      {
+        "date": "2022-01-13",
+        "temp_avg_c": 24.6,
+        "temp_max_c": 27.9,
+        "temp_min_c": 22.4,
+        "rainfall_mm": 1.0,
+        "wind_ms": 5.89,
+        "weathercode": 51,
+        "relativehumidity_pct": 75
+      },
+      {
+        "date": "2022-01-14",
+        "temp_avg_c": 24.2,
+        "temp_max_c": 27.4,
+        "temp_min_c": 21.7,
+        "rainfall_mm": 0.1,
+        "wind_ms": 6.45,
+        "weathercode": 51,
+        "relativehumidity_pct": 74
+      },
+      {
+        "date": "2022-01-15",
+        "temp_avg_c": 24.7,
+        "temp_max_c": 28.5,
+        "temp_min_c": 22.5,
+        "rainfall_mm": 0.0,
+        "wind_ms": 7.83,
+        "weathercode": 3,
+        "relativehumidity_pct": 66
+      },
+      {
+        "date": "2022-01-16",
+        "temp_avg_c": 25.0,
+        "temp_max_c": 28.0,
+        "temp_min_c": 23.2,
+        "rainfall_mm": 0.1,
+        "wind_ms": 7.86,
+        "weathercode": 51,
+        "relativehumidity_pct": 68
+      },
+      {
+        "date": "2022-01-17",
+        "temp_avg_c": 24.9,
+        "temp_max_c": 28.9,
+        "temp_min_c": 22.5,
+        "rainfall_mm": 0.0,
+        "wind_ms": 7.18,
+        "weathercode": 3,
+        "relativehumidity_pct": 68
+      },
+      {
+        "date": "2022-01-18",
+        "temp_avg_c": 24.8,
+        "temp_max_c": 28.9,
+        "temp_min_c": 21.8,
+        "rainfall_mm": 0.0,
+        "wind_ms": 7.32,
+        "weathercode": 3,
+        "relativehumidity_pct": 67
+      },
+      {
+        "date": "2022-01-19",
+        "temp_avg_c": 25.4,
+        "temp_max_c": 28.9,
+        "temp_min_c": 23.4,
+        "rainfall_mm": 0.8,
+        "wind_ms": 6.24,
+        "weathercode": 53,
+        "relativehumidity_pct": 71
+      },
+      {
+        "date": "2022-01-20",
+        "temp_avg_c": 24.4,
+        "temp_max_c": 27.7,
+        "temp_min_c": 22.5,
+        "rainfall_mm": 10.2,
+        "wind_ms": 5.6,
+        "weathercode": 63,
+        "relativehumidity_pct": 84
+      },
+      {
+        "date": "2022-01-21",
+        "temp_avg_c": 25.2,
+        "temp_max_c": 28.8,
+        "temp_min_c": 23.0,
+        "rainfall_mm": 0.3,
+        "wind_ms": 5.65,
+        "weathercode": 51,
+        "relativehumidity_pct": 80
+      },
+      {
+        "date": "2022-01-22",
+        "temp_avg_c": 25.8,
+        "temp_max_c": 29.8,
+        "temp_min_c": 23.2,
+        "rainfall_mm": 1.0,
+        "wind_ms": 5.67,
+        "weathercode": 51,
+        "relativehumidity_pct": 78
+      },
+      {
+        "date": "2022-01-23",
+        "temp_avg_c": 26.3,
+        "temp_max_c": 30.1,
+        "temp_min_c": 23.4,
+        "rainfall_mm": 0.6,
+        "wind_ms": 5.39,
+        "weathercode": 51,
+        "relativehumidity_pct": 76
+      },
+      {
+        "date": "2022-01-24",
+        "temp_avg_c": 26.4,
+        "temp_max_c": 30.2,
+        "temp_min_c": 23.2,
+        "rainfall_mm": 0.4,
+        "wind_ms": 5.81,
+        "weathercode": 51,
+        "relativehumidity_pct": 77
+      },
+      {
+        "date": "2022-01-25",
+        "temp_avg_c": 26.5,
+        "temp_max_c": 30.4,
+        "temp_min_c": 23.7,
+        "rainfall_mm": 0.0,
+        "wind_ms": 6.95,
+        "weathercode": 3,
+        "relativehumidity_pct": 70
+      },
+      {
+        "date": "2022-01-26",
+        "temp_avg_c": 25.3,
+        "temp_max_c": 27.9,
+        "temp_min_c": 24.1,
+        "rainfall_mm": 5.7,
+        "wind_ms": 5.35,
+        "weathercode": 61,
+        "relativehumidity_pct": 83
+      },
+      {
+        "date": "2022-01-27",
+        "temp_avg_c": 26.4,
+        "temp_max_c": 31.0,
+        "temp_min_c": 24.2,
+        "rainfall_mm": 1.7,
+        "wind_ms": 6.02,
+        "weathercode": 55,
+        "relativehumidity_pct": 81
+      },
+      {
+        "date": "2022-01-28",
+        "temp_avg_c": 26.8,
+        "temp_max_c": 31.4,
+        "temp_min_c": 23.9,
+        "rainfall_mm": 2.9,
+        "wind_ms": 4.88,
+        "weathercode": 53,
+        "relativehumidity_pct": 78
+      },
+      {
+        "date": "2022-01-29",
+        "temp_avg_c": 27.3,
+        "temp_max_c": 33.2,
+        "temp_min_c": 23.0,
+        "rainfall_mm": 2.9,
+        "wind_ms": 2.11,
+        "weathercode": 55,
+        "relativehumidity_pct": 77
+      },
+      {
+        "date": "2022-01-30",
+        "temp_avg_c": 26.8,
+        "temp_max_c": 31.8,
+        "temp_min_c": 23.5,
+        "rainfall_mm": 2.2,
+        "wind_ms": 5.61,
+        "weathercode": 61,
+        "relativehumidity_pct": 79
+      },
+      {
+        "date": "2022-01-31",
+        "temp_avg_c": 26.3,
+        "temp_max_c": 29.9,
+        "temp_min_c": 24.1,
+        "rainfall_mm": 0.0,
+        "wind_ms": 7.3,
+        "weathercode": 3,
+        "relativehumidity_pct": 74
+      },
+      {
+        "date": "2022-02-01",
+        "temp_avg_c": 25.8,
+        "temp_max_c": 29.4,
+        "temp_min_c": 23.5,
+        "rainfall_mm": 0.0,
+        "wind_ms": 6.61,
+        "weathercode": 3,
+        "relativehumidity_pct": 74
+      },
+      {
+        "date": "2022-02-02",
+        "temp_avg_c": 25.6,
+        "temp_max_c": 28.9,
+        "temp_min_c": 23.0,
+        "rainfall_mm": 0.0,
+        "wind_ms": 7.18,
+        "weathercode": 3,
+        "relativehumidity_pct": 72
+      },
+      {
+        "date": "2022-02-03",
+        "temp_avg_c": 25.6,
+        "temp_max_c": 27.6,
+        "temp_min_c": 24.4,
+        "rainfall_mm": 2.7,
+        "wind_ms": 4.88,
+        "weathercode": 53,
+        "relativehumidity_pct": 77
+      },
+      {
+        "date": "2022-02-04",
+        "temp_avg_c": 26.4,
+        "temp_max_c": 30.2,
+        "temp_min_c": 23.5,
+        "rainfall_mm": 0.0,
+        "wind_ms": 6.76,
+        "weathercode": 3,
+        "relativehumidity_pct": 69
+      },
+      {
+        "date": "2022-02-05",
+        "temp_avg_c": 25.8,
+        "temp_max_c": 28.4,
+        "temp_min_c": 24.4,
+        "rainfall_mm": 0.0,
+        "wind_ms": 6.79,
+        "weathercode": 3,
+        "relativehumidity_pct": 71
+      },
+      {
+        "date": "2022-02-06",
+        "temp_avg_c": 25.8,
+        "temp_max_c": 29.5,
+        "temp_min_c": 23.6,
+        "rainfall_mm": 0.0,
+        "wind_ms": 8.53,
+        "weathercode": 3,
+        "relativehumidity_pct": 71
+      },
+      {
+        "date": "2022-02-07",
+        "temp_avg_c": 25.3,
+        "temp_max_c": 28.4,
+        "temp_min_c": 23.4,
+        "rainfall_mm": 1.6,
+        "wind_ms": 7.05,
+        "weathercode": 53,
+        "relativehumidity_pct": 79
+      },
+      {
+        "date": "2022-02-08",
+        "temp_avg_c": 26.4,
+        "temp_max_c": 29.9,
+        "temp_min_c": 24.0,
+        "rainfall_mm": 0.3,
+        "wind_ms": 6.1,
+        "weathercode": 51,
+        "relativehumidity_pct": 76
+      },
+      {
+        "date": "2022-02-09",
+        "temp_avg_c": 26.1,
+        "temp_max_c": 29.6,
+        "temp_min_c": 23.8,
+        "rainfall_mm": 0.0,
+        "wind_ms": 6.65,
+        "weathercode": 3,
+        "relativehumidity_pct": 74
+      },
+      {
+        "date": "2022-02-10",
+        "temp_avg_c": 25.9,
+        "temp_max_c": 30.0,
+        "temp_min_c": 23.5,
+        "rainfall_mm": 0.0,
+        "wind_ms": 6.83,
+        "weathercode": 3,
+        "relativehumidity_pct": 75
+      },
+      {
+        "date": "2022-02-11",
+        "temp_avg_c": 25.8,
+        "temp_max_c": 29.5,
+        "temp_min_c": 23.4,
+        "rainfall_mm": 0.4,
+        "wind_ms": 6.9,
+        "weathercode": 51,
+        "relativehumidity_pct": 75
+      },
+      {
+        "date": "2022-02-12",
+        "temp_avg_c": 25.9,
+        "temp_max_c": 30.4,
+        "temp_min_c": 23.7,
+        "rainfall_mm": 2.4,
+        "wind_ms": 6.73,
+        "weathercode": 55,
+        "relativehumidity_pct": 76
+      },
+      {
+        "date": "2022-02-13",
+        "temp_avg_c": 25.9,
+        "temp_max_c": 29.5,
+        "temp_min_c": 23.8,
+        "rainfall_mm": 0.4,
+        "wind_ms": 5.91,
+        "weathercode": 51,
+        "relativehumidity_pct": 79
+      },
+      {
+        "date": "2022-02-14",
+        "temp_avg_c": 25.9,
+        "temp_max_c": 30.0,
+        "temp_min_c": 23.4,
+        "rainfall_mm": 8.0,
+        "wind_ms": 3.57,
+        "weathercode": 63,
+        "relativehumidity_pct": 81
+      },
+      {
+        "date": "2022-02-15",
+        "temp_avg_c": 26.3,
+        "temp_max_c": 30.1,
+        "temp_min_c": 23.0,
+        "rainfall_mm": 0.5,
+        "wind_ms": 5.89,
+        "weathercode": 51,
+        "relativehumidity_pct": 77
+      },
+      {
+        "date": "2022-02-16",
+        "temp_avg_c": 26.0,
+        "temp_max_c": 29.6,
+        "temp_min_c": 23.2,
+        "rainfall_mm": 1.2,
+        "wind_ms": 5.81,
+        "weathercode": 51,
+        "relativehumidity_pct": 76
+      },
+      {
+        "date": "2022-02-17",
+        "temp_avg_c": 25.7,
+        "temp_max_c": 28.9,
+        "temp_min_c": 23.5,
+        "rainfall_mm": 2.1,
+        "wind_ms": 6.71,
+        "weathercode": 53,
+        "relativehumidity_pct": 78
+      },
+      {
+        "date": "2022-02-18",
+        "temp_avg_c": 26.5,
+        "temp_max_c": 30.2,
+        "temp_min_c": 23.7,
+        "rainfall_mm": 0.6,
+        "wind_ms": 5.81,
+        "weathercode": 51,
+        "relativehumidity_pct": 75
+      },
+      {
+        "date": "2022-02-19",
+        "temp_avg_c": 26.8,
+        "temp_max_c": 31.0,
+        "temp_min_c": 23.6,
+        "rainfall_mm": 0.4,
+        "wind_ms": 5.91,
+        "weathercode": 51,
+        "relativehumidity_pct": 78
+      },
+      {
+        "date": "2022-02-20",
+        "temp_avg_c": 26.8,
+        "temp_max_c": 30.5,
+        "temp_min_c": 23.8,
+        "rainfall_mm": 0.1,
+        "wind_ms": 5.9,
+        "weathercode": 51,
+        "relativehumidity_pct": 74
+      },
+      {
+        "date": "2022-02-21",
+        "temp_avg_c": 26.4,
+        "temp_max_c": 30.1,
+        "temp_min_c": 23.9,
+        "rainfall_mm": 0.3,
+        "wind_ms": 6.74,
+        "weathercode": 51,
+        "relativehumidity_pct": 76
+      },
+      {
+        "date": "2022-02-22",
+        "temp_avg_c": 25.3,
+        "temp_max_c": 28.6,
+        "temp_min_c": 23.9,
+        "rainfall_mm": 6.3,
+        "wind_ms": 6.3,
+        "weathercode": 63,
+        "relativehumidity_pct": 81
+      },
+      {
+        "date": "2022-02-23",
+        "temp_avg_c": 25.9,
+        "temp_max_c": 29.0,
+        "temp_min_c": 24.0,
+        "rainfall_mm": 0.2,
+        "wind_ms": 5.92,
+        "weathercode": 51,
+        "relativehumidity_pct": 76
+      },
+      {
+        "date": "2022-02-24",
+        "temp_avg_c": 26.7,
+        "temp_max_c": 31.4,
+        "temp_min_c": 23.8,
+        "rainfall_mm": 0.0,
+        "wind_ms": 7.07,
+        "weathercode": 2,
+        "relativehumidity_pct": 72
+      },
+      {
+        "date": "2022-02-25",
+        "temp_avg_c": 26.2,
+        "temp_max_c": 29.8,
+        "temp_min_c": 23.8,
+        "rainfall_mm": 0.1,
+        "wind_ms": 7.16,
+        "weathercode": 51,
+        "relativehumidity_pct": 73
+      },
+      {
+        "date": "2022-02-26",
+        "temp_avg_c": 25.7,
+        "temp_max_c": 29.6,
+        "temp_min_c": 23.5,
+        "rainfall_mm": 0.6,
+        "wind_ms": 7.1,
+        "weathercode": 51,
+        "relativehumidity_pct": 75
+      },
+      {
+        "date": "2022-02-27",
+        "temp_avg_c": 26.0,
+        "temp_max_c": 29.7,
+        "temp_min_c": 23.2,
+        "rainfall_mm": 0.5,
+        "wind_ms": 7.06,
+        "weathercode": 51,
+        "relativehumidity_pct": 75
+      },
+      {
+        "date": "2022-02-28",
+        "temp_avg_c": 26.6,
+        "temp_max_c": 31.2,
+        "temp_min_c": 23.9,
+        "rainfall_mm": 0.1,
+        "wind_ms": 8.53,
+        "weathercode": 51,
+        "relativehumidity_pct": 72
+      },
+      {
+        "date": "2022-03-01",
+        "temp_avg_c": 27.0,
+        "temp_max_c": 30.8,
+        "temp_min_c": 24.4,
+        "rainfall_mm": 0.0,
+        "wind_ms": 7.12,
+        "weathercode": 3,
+        "relativehumidity_pct": 66
+      },
+      {
+        "date": "2022-03-02",
+        "temp_avg_c": 26.6,
+        "temp_max_c": 30.3,
+        "temp_min_c": 23.5,
+        "rainfall_mm": 0.1,
+        "wind_ms": 6.77,
+        "weathercode": 51,
+        "relativehumidity_pct": 71
+      },
+      {
+        "date": "2022-03-03",
+        "temp_avg_c": 27.1,
+        "temp_max_c": 31.0,
+        "temp_min_c": 24.3,
+        "rainfall_mm": 0.1,
+        "wind_ms": 6.74,
+        "weathercode": 51,
+        "relativehumidity_pct": 74
+      },
+      {
+        "date": "2022-03-04",
+        "temp_avg_c": 27.2,
+        "temp_max_c": 31.0,
+        "temp_min_c": 24.5,
+        "rainfall_mm": 0.0,
+        "wind_ms": 5.83,
+        "weathercode": 3,
+        "relativehumidity_pct": 73
+      },
+      {
+        "date": "2022-03-05",
+        "temp_avg_c": 27.6,
+        "temp_max_c": 32.7,
+        "temp_min_c": 24.0,
+        "rainfall_mm": 0.0,
+        "wind_ms": 5.28,
+        "weathercode": 3,
+        "relativehumidity_pct": 69
+      },
+      {
+        "date": "2022-03-06",
+        "temp_avg_c": 27.3,
+        "temp_max_c": 32.0,
+        "temp_min_c": 23.8,
+        "rainfall_mm": 0.0,
+        "wind_ms": 7.33,
+        "weathercode": 3,
+        "relativehumidity_pct": 68
+      },
+      {
+        "date": "2022-03-07",
+        "temp_avg_c": 27.6,
+        "temp_max_c": 33.2,
+        "temp_min_c": 24.5,
+        "rainfall_mm": 0.0,
+        "wind_ms": 5.22,
+        "weathercode": 3,
+        "relativehumidity_pct": 60
+      },
+      {
+        "date": "2022-03-08",
+        "temp_avg_c": 27.0,
+        "temp_max_c": 31.7,
+        "temp_min_c": 23.6,
+        "rainfall_mm": 0.0,
+        "wind_ms": 7.16,
+        "weathercode": 3,
+        "relativehumidity_pct": 70
+      },
+      {
+        "date": "2022-03-09",
+        "temp_avg_c": 26.2,
+        "temp_max_c": 29.7,
+        "temp_min_c": 23.7,
+        "rainfall_mm": 0.0,
+        "wind_ms": 7.84,
+        "weathercode": 3,
+        "relativehumidity_pct": 69
+      },
+      {
+        "date": "2022-03-10",
+        "temp_avg_c": 26.9,
+        "temp_max_c": 30.8,
+        "temp_min_c": 24.5,
+        "rainfall_mm": 0.0,
+        "wind_ms": 7.28,
+        "weathercode": 3,
+        "relativehumidity_pct": 65
+      },
+      {
+        "date": "2022-03-11",
+        "temp_avg_c": 27.2,
+        "temp_max_c": 31.6,
+        "temp_min_c": 24.2,
+        "rainfall_mm": 2.2,
+        "wind_ms": 5.07,
+        "weathercode": 53,
+        "relativehumidity_pct": 75
+      },
+      {
+        "date": "2022-03-12",
+        "temp_avg_c": 27.5,
+        "temp_max_c": 33.6,
+        "temp_min_c": 24.0,
+        "rainfall_mm": 3.8,
+        "wind_ms": 4.79,
+        "weathercode": 61,
+        "relativehumidity_pct": 76
+      },
+      {
+        "date": "2022-03-13",
+        "temp_avg_c": 26.4,
+        "temp_max_c": 30.4,
+        "temp_min_c": 22.9,
+        "rainfall_mm": 3.5,
+        "wind_ms": 5.74,
+        "weathercode": 55,
+        "relativehumidity_pct": 82
+      },
+      {
+        "date": "2022-03-14",
+        "temp_avg_c": 27.2,
+        "temp_max_c": 32.1,
+        "temp_min_c": 24.5,
+        "rainfall_mm": 2.4,
+        "wind_ms": 5.11,
+        "weathercode": 53,
+        "relativehumidity_pct": 78
+      },
+      {
+        "date": "2022-03-15",
+        "temp_avg_c": 27.4,
+        "temp_max_c": 32.5,
+        "temp_min_c": 24.5,
+        "rainfall_mm": 1.7,
+        "wind_ms": 4.93,
+        "weathercode": 53,
+        "relativehumidity_pct": 78
+      },
+      {
+        "date": "2022-03-16",
+        "temp_avg_c": 26.8,
+        "temp_max_c": 31.1,
+        "temp_min_c": 24.1,
+        "rainfall_mm": 7.0,
+        "wind_ms": 5.63,
+        "weathercode": 63,
+        "relativehumidity_pct": 84
+      },
+      {
+        "date": "2022-03-17",
+        "temp_avg_c": 27.7,
+        "temp_max_c": 31.2,
+        "temp_min_c": 24.5,
+        "rainfall_mm": 1.5,
+        "wind_ms": 5.51,
+        "weathercode": 61,
+        "relativehumidity_pct": 78
+      },
+      {
+        "date": "2022-03-18",
+        "temp_avg_c": 27.8,
+        "temp_max_c": 33.2,
+        "temp_min_c": 25.0,
+        "rainfall_mm": 3.9,
+        "wind_ms": 4.59,
+        "weathercode": 55,
+        "relativehumidity_pct": 80
+      },
+      {
+        "date": "2022-03-19",
+        "temp_avg_c": 27.7,
+        "temp_max_c": 33.0,
+        "temp_min_c": 23.9,
+        "rainfall_mm": 2.0,
+        "wind_ms": 4.8,
+        "weathercode": 61,
+        "relativehumidity_pct": 78
+      },
+      {
+        "date": "2022-03-20",
+        "temp_avg_c": 28.0,
+        "temp_max_c": 31.9,
+        "temp_min_c": 25.3,
+        "rainfall_mm": 0.3,
+        "wind_ms": 6.21,
+        "weathercode": 51,
+        "relativehumidity_pct": 76
+      },
+      {
+        "date": "2022-03-21",
+        "temp_avg_c": 28.1,
+        "temp_max_c": 32.3,
+        "temp_min_c": 24.7,
+        "rainfall_mm": 0.1,
+        "wind_ms": 6.32,
+        "weathercode": 51,
+        "relativehumidity_pct": 72
+      },
+      {
+        "date": "2022-03-22",
+        "temp_avg_c": 28.6,
+        "temp_max_c": 32.8,
+        "temp_min_c": 25.3,
+        "rainfall_mm": 0.0,
+        "wind_ms": 5.56,
+        "weathercode": 3,
+        "relativehumidity_pct": 72
+      },
+      {
+        "date": "2022-03-23",
+        "temp_avg_c": 29.2,
+        "temp_max_c": 34.2,
+        "temp_min_c": 25.4,
+        "rainfall_mm": 0.2,
+        "wind_ms": 3.7,
+        "weathercode": 51,
+        "relativehumidity_pct": 70
+      },
+      {
+        "date": "2022-03-24",
+        "temp_avg_c": 28.3,
+        "temp_max_c": 32.7,
+        "temp_min_c": 25.1,
+        "rainfall_mm": 0.0,
+        "wind_ms": 6.17,
+        "weathercode": 3,
+        "relativehumidity_pct": 71
+      },
+      {
+        "date": "2022-03-25",
+        "temp_avg_c": 28.6,
+        "temp_max_c": 32.7,
+        "temp_min_c": 25.5,
+        "rainfall_mm": 0.8,
+        "wind_ms": 6.5,
+        "weathercode": 51,
+        "relativehumidity_pct": 70
+      },
+      {
+        "date": "2022-03-26",
+        "temp_avg_c": 28.7,
+        "temp_max_c": 33.3,
+        "temp_min_c": 25.3,
+        "rainfall_mm": 0.2,
+        "wind_ms": 5.45,
+        "weathercode": 51,
+        "relativehumidity_pct": 70
+      },
+      {
+        "date": "2022-03-27",
+        "temp_avg_c": 28.6,
+        "temp_max_c": 33.0,
+        "temp_min_c": 25.2,
+        "rainfall_mm": 0.0,
+        "wind_ms": 6.56,
+        "weathercode": 3,
+        "relativehumidity_pct": 70
+      },
+      {
+        "date": "2022-03-28",
+        "temp_avg_c": 28.3,
+        "temp_max_c": 32.6,
+        "temp_min_c": 25.3,
+        "rainfall_mm": 0.1,
+        "wind_ms": 6.91,
+        "weathercode": 51,
+        "relativehumidity_pct": 69
+      },
+      {
+        "date": "2022-03-29",
+        "temp_avg_c": 27.4,
+        "temp_max_c": 30.8,
+        "temp_min_c": 25.0,
+        "rainfall_mm": 1.7,
+        "wind_ms": 8.23,
+        "weathercode": 53,
+        "relativehumidity_pct": 75
+      },
+      {
+        "date": "2022-03-30",
+        "temp_avg_c": 27.9,
+        "temp_max_c": 31.8,
+        "temp_min_c": 25.5,
+        "rainfall_mm": 1.0,
+        "wind_ms": 7.72,
+        "weathercode": 53,
+        "relativehumidity_pct": 72
+      },
+      {
+        "date": "2022-03-31",
+        "temp_avg_c": 28.0,
+        "temp_max_c": 32.4,
+        "temp_min_c": 24.7,
+        "rainfall_mm": 0.0,
+        "wind_ms": 6.25,
+        "weathercode": 3,
+        "relativehumidity_pct": 73
+      },
+      {
+        "date": "2022-04-01",
+        "temp_avg_c": 27.4,
+        "temp_max_c": 30.5,
+        "temp_min_c": 25.0,
+        "rainfall_mm": 0.8,
+        "wind_ms": 6.41,
+        "weathercode": 51,
+        "relativehumidity_pct": 75
+      },
+      {
+        "date": "2022-04-02",
+        "temp_avg_c": 27.8,
+        "temp_max_c": 31.9,
+        "temp_min_c": 24.6,
+        "rainfall_mm": 0.2,
+        "wind_ms": 7.48,
+        "weathercode": 51,
+        "relativehumidity_pct": 66
+      },
+      {
+        "date": "2022-04-03",
+        "temp_avg_c": 28.1,
+        "temp_max_c": 32.6,
+        "temp_min_c": 25.4,
+        "rainfall_mm": 0.0,
+        "wind_ms": 7.52,
+        "weathercode": 3,
+        "relativehumidity_pct": 60
+      },
+      {
+        "date": "2022-04-04",
+        "temp_avg_c": 28.0,
+        "temp_max_c": 31.8,
+        "temp_min_c": 25.6,
+        "rainfall_mm": 0.0,
+        "wind_ms": 7.59,
+        "weathercode": 3,
+        "relativehumidity_pct": 63
+      },
+      {
+        "date": "2022-04-05",
+        "temp_avg_c": 26.1,
+        "temp_max_c": 28.4,
+        "temp_min_c": 24.5,
+        "rainfall_mm": 2.5,
+        "wind_ms": 6.36,
+        "weathercode": 53,
+        "relativehumidity_pct": 80
+      },
+      {
+        "date": "2022-04-06",
+        "temp_avg_c": 26.7,
+        "temp_max_c": 29.6,
+        "temp_min_c": 24.4,
+        "rainfall_mm": 1.0,
+        "wind_ms": 6.51,
+        "weathercode": 53,
+        "relativehumidity_pct": 78
+      },
+      {
+        "date": "2022-04-07",
+        "temp_avg_c": 26.9,
+        "temp_max_c": 30.2,
+        "temp_min_c": 24.2,
+        "rainfall_mm": 0.9,
+        "wind_ms": 6.91,
+        "weathercode": 51,
+        "relativehumidity_pct": 76
+      },
+      {
+        "date": "2022-04-08",
+        "temp_avg_c": 26.3,
+        "temp_max_c": 29.0,
+        "temp_min_c": 24.4,
+        "rainfall_mm": 13.4,
+        "wind_ms": 5.16,
+        "weathercode": 65,
+        "relativehumidity_pct": 82
+      },
+      {
+        "date": "2022-04-09",
+        "temp_avg_c": 27.5,
+        "temp_max_c": 31.6,
+        "temp_min_c": 24.0,
+        "rainfall_mm": 0.0,
+        "wind_ms": 5.53,
+        "weathercode": 3,
+        "relativehumidity_pct": 74
+      },
+      {
+        "date": "2022-04-10",
+        "temp_avg_c": 26.8,
+        "temp_max_c": 29.8,
+        "temp_min_c": 23.7,
+        "rainfall_mm": 2.7,
+        "wind_ms": 5.12,
+        "weathercode": 61,
+        "relativehumidity_pct": 78
+      },
+      {
+        "date": "2022-04-11",
+        "temp_avg_c": 26.7,
+        "temp_max_c": 30.1,
+        "temp_min_c": 23.9,
+        "rainfall_mm": 0.8,
+        "wind_ms": 3.51,
+        "weathercode": 51,
+        "relativehumidity_pct": 79
+      },
+      {
+        "date": "2022-04-12",
+        "temp_avg_c": 25.9,
+        "temp_max_c": 30.3,
+        "temp_min_c": 23.5,
+        "rainfall_mm": 3.9,
+        "wind_ms": 3.18,
+        "weathercode": 55,
+        "relativehumidity_pct": 85
+      },
+      {
+        "date": "2022-04-13",
+        "temp_avg_c": 26.3,
+        "temp_max_c": 31.5,
+        "temp_min_c": 22.8,
+        "rainfall_mm": 9.1,
+        "wind_ms": 2.58,
+        "weathercode": 63,
+        "relativehumidity_pct": 83
+      },
+      {
+        "date": "2022-04-14",
+        "temp_avg_c": 27.5,
+        "temp_max_c": 33.2,
+        "temp_min_c": 23.6,
+        "rainfall_mm": 0.7,
+        "wind_ms": 4.87,
+        "weathercode": 51,
+        "relativehumidity_pct": 75
+      },
+      {
+        "date": "2022-04-15",
+        "temp_avg_c": 27.4,
+        "temp_max_c": 32.8,
+        "temp_min_c": 22.8,
+        "rainfall_mm": 0.5,
+        "wind_ms": 3.67,
+        "weathercode": 51,
+        "relativehumidity_pct": 74
+      },
+      {
+        "date": "2022-04-16",
+        "temp_avg_c": 27.2,
+        "temp_max_c": 31.1,
+        "temp_min_c": 24.0,
+        "rainfall_mm": 4.8,
+        "wind_ms": 4.6,
+        "weathercode": 61,
+        "relativehumidity_pct": 76
+      },
+      {
+        "date": "2022-04-17",
+        "temp_avg_c": 25.8,
+        "temp_max_c": 27.7,
+        "temp_min_c": 23.9,
+        "rainfall_mm": 10.5,
+        "wind_ms": 5.51,
+        "weathercode": 63,
+        "relativehumidity_pct": 83
+      },
+      {
+        "date": "2022-04-18",
+        "temp_avg_c": 27.4,
+        "temp_max_c": 30.9,
+        "temp_min_c": 24.5,
+        "rainfall_mm": 0.5,
+        "wind_ms": 6.26,
+        "weathercode": 51,
+        "relativehumidity_pct": 72
+      },
+      {
+        "date": "2022-04-19",
+        "temp_avg_c": 27.6,
+        "temp_max_c": 31.2,
+        "temp_min_c": 25.3,
+        "rainfall_mm": 0.1,
+        "wind_ms": 6.53,
+        "weathercode": 51,
+        "relativehumidity_pct": 69
+      },
+      {
+        "date": "2022-04-20",
+        "temp_avg_c": 27.3,
+        "temp_max_c": 31.0,
+        "temp_min_c": 24.5,
+        "rainfall_mm": 1.1,
+        "wind_ms": 6.75,
+        "weathercode": 51,
+        "relativehumidity_pct": 74
+      },
+      {
+        "date": "2022-04-21",
+        "temp_avg_c": 28.3,
+        "temp_max_c": 32.3,
+        "temp_min_c": 24.9,
+        "rainfall_mm": 0.1,
+        "wind_ms": 5.12,
+        "weathercode": 51,
+        "relativehumidity_pct": 73
+      },
+      {
+        "date": "2022-04-22",
+        "temp_avg_c": 28.2,
+        "temp_max_c": 32.0,
+        "temp_min_c": 25.5,
+        "rainfall_mm": 0.9,
+        "wind_ms": 6.59,
+        "weathercode": 53,
+        "relativehumidity_pct": 74
+      },
+      {
+        "date": "2022-04-23",
+        "temp_avg_c": 28.5,
+        "temp_max_c": 32.9,
+        "temp_min_c": 25.0,
+        "rainfall_mm": 0.0,
+        "wind_ms": 6.22,
+        "weathercode": 1,
+        "relativehumidity_pct": 68
+      },
+      {
+        "date": "2022-04-24",
+        "temp_avg_c": 28.2,
+        "temp_max_c": 33.0,
+        "temp_min_c": 25.0,
+        "rainfall_mm": 1.1,
+        "wind_ms": 7.6,
+        "weathercode": 53,
+        "relativehumidity_pct": 72
+      },
+      {
+        "date": "2022-04-25",
+        "temp_avg_c": 28.0,
+        "temp_max_c": 32.2,
+        "temp_min_c": 25.3,
+        "rainfall_mm": 0.6,
+        "wind_ms": 5.94,
+        "weathercode": 53,
+        "relativehumidity_pct": 75
+      },
+      {
+        "date": "2022-04-26",
+        "temp_avg_c": 28.2,
+        "temp_max_c": 32.3,
+        "temp_min_c": 25.8,
+        "rainfall_mm": 0.2,
+        "wind_ms": 6.03,
+        "weathercode": 51,
+        "relativehumidity_pct": 74
+      },
+      {
+        "date": "2022-04-27",
+        "temp_avg_c": 28.1,
+        "temp_max_c": 32.5,
+        "temp_min_c": 25.2,
+        "rainfall_mm": 1.3,
+        "wind_ms": 6.51,
+        "weathercode": 53,
+        "relativehumidity_pct": 75
+      },
+      {
+        "date": "2022-04-28",
+        "temp_avg_c": 27.9,
+        "temp_max_c": 32.3,
+        "temp_min_c": 24.6,
+        "rainfall_mm": 1.8,
+        "wind_ms": 6.3,
+        "weathercode": 51,
+        "relativehumidity_pct": 76
+      },
+      {
+        "date": "2022-04-29",
+        "temp_avg_c": 28.3,
+        "temp_max_c": 31.9,
+        "temp_min_c": 25.7,
+        "rainfall_mm": 1.8,
+        "wind_ms": 6.82,
+        "weathercode": 53,
+        "relativehumidity_pct": 75
+      },
+      {
+        "date": "2022-04-30",
+        "temp_avg_c": 28.2,
+        "temp_max_c": 32.7,
+        "temp_min_c": 24.1,
+        "rainfall_mm": 2.7,
+        "wind_ms": 5.91,
+        "weathercode": 61,
+        "relativehumidity_pct": 74
+      },
+      {
+        "date": "2022-05-01",
+        "temp_avg_c": 28.8,
+        "temp_max_c": 33.3,
+        "temp_min_c": 25.5,
+        "rainfall_mm": 0.2,
+        "wind_ms": 6.75,
+        "weathercode": 51,
+        "relativehumidity_pct": 70
+      },
+      {
+        "date": "2022-05-02",
+        "temp_avg_c": 29.2,
+        "temp_max_c": 33.9,
+        "temp_min_c": 25.6,
+        "rainfall_mm": 0.7,
+        "wind_ms": 4.7,
+        "weathercode": 51,
+        "relativehumidity_pct": 67
+      },
+      {
+        "date": "2022-05-03",
+        "temp_avg_c": 29.0,
+        "temp_max_c": 33.5,
+        "temp_min_c": 24.9,
+        "rainfall_mm": 0.5,
+        "wind_ms": 5.28,
+        "weathercode": 51,
+        "relativehumidity_pct": 68
+      },
+      {
+        "date": "2022-05-04",
+        "temp_avg_c": 29.3,
+        "temp_max_c": 33.9,
+        "temp_min_c": 25.8,
+        "rainfall_mm": 0.0,
+        "wind_ms": 7.47,
+        "weathercode": 3,
+        "relativehumidity_pct": 66
+      },
+      {
+        "date": "2022-05-05",
+        "temp_avg_c": 29.5,
+        "temp_max_c": 34.0,
+        "temp_min_c": 25.6,
+        "rainfall_mm": 0.0,
+        "wind_ms": 5.11,
+        "weathercode": 3,
+        "relativehumidity_pct": 66
+      },
+      {
+        "date": "2022-05-06",
+        "temp_avg_c": 29.7,
+        "temp_max_c": 34.4,
+        "temp_min_c": 26.1,
+        "rainfall_mm": 0.0,
+        "wind_ms": 6.23,
+        "weathercode": 1,
+        "relativehumidity_pct": 67
+      },
+      {
+        "date": "2022-05-07",
+        "temp_avg_c": 29.2,
+        "temp_max_c": 33.5,
+        "temp_min_c": 26.2,
+        "rainfall_mm": 0.7,
+        "wind_ms": 6.58,
+        "weathercode": 51,
+        "relativehumidity_pct": 70
+      },
+      {
+        "date": "2022-05-08",
+        "temp_avg_c": 29.1,
+        "temp_max_c": 33.4,
+        "temp_min_c": 26.0,
+        "rainfall_mm": 0.2,
+        "wind_ms": 7.03,
+        "weathercode": 51,
+        "relativehumidity_pct": 70
+      },
+      {
+        "date": "2022-05-09",
+        "temp_avg_c": 29.1,
+        "temp_max_c": 33.7,
+        "temp_min_c": 25.3,
+        "rainfall_mm": 0.0,
+        "wind_ms": 6.73,
+        "weathercode": 2,
+        "relativehumidity_pct": 67
+      },
+      {
+        "date": "2022-05-10",
+        "temp_avg_c": 29.5,
+        "temp_max_c": 34.0,
+        "temp_min_c": 26.0,
+        "rainfall_mm": 0.0,
+        "wind_ms": 6.14,
+        "weathercode": 3,
+        "relativehumidity_pct": 65
+      },
+      {
+        "date": "2022-05-11",
+        "temp_avg_c": 29.6,
+        "temp_max_c": 33.7,
+        "temp_min_c": 25.9,
+        "rainfall_mm": 0.1,
+        "wind_ms": 5.5,
+        "weathercode": 51,
+        "relativehumidity_pct": 66
+      },
+      {
+        "date": "2022-05-12",
+        "temp_avg_c": 29.4,
+        "temp_max_c": 34.5,
+        "temp_min_c": 25.7,
+        "rainfall_mm": 5.0,
+        "wind_ms": 4.7,
+        "weathercode": 61,
+        "relativehumidity_pct": 69
+      },
+      {
+        "date": "2022-05-13",
+        "temp_avg_c": 29.1,
+        "temp_max_c": 34.9,
+        "temp_min_c": 25.5,
+        "rainfall_mm": 5.9,
+        "wind_ms": 3.83,
+        "weathercode": 63,
+        "relativehumidity_pct": 74
+      },
+      {
+        "date": "2022-05-14",
+        "temp_avg_c": 28.7,
+        "temp_max_c": 35.0,
+        "temp_min_c": 25.6,
+        "rainfall_mm": 4.3,
+        "wind_ms": 4.1,
+        "weathercode": 63,
+        "relativehumidity_pct": 76
+      },
+      {
+        "date": "2022-05-15",
+        "temp_avg_c": 28.0,
+        "temp_max_c": 34.4,
+        "temp_min_c": 25.3,
+        "rainfall_mm": 11.9,
+        "wind_ms": 4.39,
+        "weathercode": 63,
+        "relativehumidity_pct": 80
+      },
+      {
+        "date": "2022-05-16",
+        "temp_avg_c": 26.5,
+        "temp_max_c": 31.8,
+        "temp_min_c": 24.5,
+        "rainfall_mm": 39.3,
+        "wind_ms": 3.81,
+        "weathercode": 65,
+        "relativehumidity_pct": 88
+      },
+      {
+        "date": "2022-05-17",
+        "temp_avg_c": 26.5,
+        "temp_max_c": 31.5,
+        "temp_min_c": 24.3,
+        "rainfall_mm": 19.4,
+        "wind_ms": 3.58,
+        "weathercode": 63,
+        "relativehumidity_pct": 86
+      },
+      {
+        "date": "2022-05-18",
+        "temp_avg_c": 25.9,
+        "temp_max_c": 30.5,
+        "temp_min_c": 23.9,
+        "rainfall_mm": 38.0,
+        "wind_ms": 3.22,
+        "weathercode": 65,
+        "relativehumidity_pct": 91
+      },
+      {
+        "date": "2022-05-19",
+        "temp_avg_c": 26.1,
+        "temp_max_c": 30.2,
+        "temp_min_c": 23.8,
+        "rainfall_mm": 32.5,
+        "wind_ms": 2.79,
+        "weathercode": 65,
+        "relativehumidity_pct": 90
+      },
+      {
+        "date": "2022-05-20",
+        "temp_avg_c": 25.5,
+        "temp_max_c": 29.6,
+        "temp_min_c": 24.0,
+        "rainfall_mm": 16.9,
+        "wind_ms": 3.38,
+        "weathercode": 63,
+        "relativehumidity_pct": 93
+      },
+      {
+        "date": "2022-05-21",
+        "temp_avg_c": 26.0,
+        "temp_max_c": 29.6,
+        "temp_min_c": 23.6,
+        "rainfall_mm": 10.8,
+        "wind_ms": 3.11,
+        "weathercode": 65,
+        "relativehumidity_pct": 89
+      },
+      {
+        "date": "2022-05-22",
+        "temp_avg_c": 25.8,
+        "temp_max_c": 30.8,
+        "temp_min_c": 23.7,
+        "rainfall_mm": 23.3,
+        "wind_ms": 3.07,
+        "weathercode": 65,
+        "relativehumidity_pct": 90
+      },
+      {
+        "date": "2022-05-23",
+        "temp_avg_c": 26.7,
+        "temp_max_c": 31.2,
+        "temp_min_c": 24.0,
+        "rainfall_mm": 9.8,
+        "wind_ms": 3.62,
+        "weathercode": 63,
+        "relativehumidity_pct": 87
+      },
+      {
+        "date": "2022-05-24",
+        "temp_avg_c": 27.7,
+        "temp_max_c": 31.6,
+        "temp_min_c": 23.9,
+        "rainfall_mm": 3.1,
+        "wind_ms": 3.72,
+        "weathercode": 61,
+        "relativehumidity_pct": 82
+      },
+      {
+        "date": "2022-05-25",
+        "temp_avg_c": 27.5,
+        "temp_max_c": 31.9,
+        "temp_min_c": 24.4,
+        "rainfall_mm": 7.2,
+        "wind_ms": 2.39,
+        "weathercode": 63,
+        "relativehumidity_pct": 85
+      },
+      {
+        "date": "2022-05-26",
+        "temp_avg_c": 27.4,
+        "temp_max_c": 31.6,
+        "temp_min_c": 24.5,
+        "rainfall_mm": 2.9,
+        "wind_ms": 3.96,
+        "weathercode": 61,
+        "relativehumidity_pct": 83
+      },
+      {
+        "date": "2022-05-27",
+        "temp_avg_c": 27.5,
+        "temp_max_c": 32.5,
+        "temp_min_c": 23.9,
+        "rainfall_mm": 8.4,
+        "wind_ms": 2.75,
+        "weathercode": 63,
+        "relativehumidity_pct": 81
+      },
+      {
+        "date": "2022-05-28",
+        "temp_avg_c": 25.9,
+        "temp_max_c": 28.1,
+        "temp_min_c": 24.2,
+        "rainfall_mm": 26.8,
+        "wind_ms": 2.14,
+        "weathercode": 65,
+        "relativehumidity_pct": 91
+      },
+      {
+        "date": "2022-05-29",
+        "temp_avg_c": 27.6,
+        "temp_max_c": 32.2,
+        "temp_min_c": 23.8,
+        "rainfall_mm": 1.3,
+        "wind_ms": 3.22,
+        "weathercode": 51,
+        "relativehumidity_pct": 79
+      },
+      {
+        "date": "2022-05-30",
+        "temp_avg_c": 27.1,
+        "temp_max_c": 32.5,
+        "temp_min_c": 24.2,
+        "rainfall_mm": 15.6,
+        "wind_ms": 5.02,
+        "weathercode": 65,
+        "relativehumidity_pct": 83
+      },
+      {
+        "date": "2022-05-31",
+        "temp_avg_c": 26.4,
+        "temp_max_c": 30.1,
+        "temp_min_c": 23.4,
+        "rainfall_mm": 4.3,
+        "wind_ms": 4.83,
+        "weathercode": 61,
+        "relativehumidity_pct": 85
+      },
+      {
+        "date": "2022-06-01",
+        "temp_avg_c": 26.2,
+        "temp_max_c": 29.0,
+        "temp_min_c": 24.1,
+        "rainfall_mm": 11.5,
+        "wind_ms": 4.25,
+        "weathercode": 63,
+        "relativehumidity_pct": 88
+      },
+      {
+        "date": "2022-06-02",
+        "temp_avg_c": 27.6,
+        "temp_max_c": 32.6,
+        "temp_min_c": 24.0,
+        "rainfall_mm": 1.0,
+        "wind_ms": 3.51,
+        "weathercode": 51,
+        "relativehumidity_pct": 79
+      },
+      {
+        "date": "2022-06-03",
+        "temp_avg_c": 27.6,
+        "temp_max_c": 32.0,
+        "temp_min_c": 24.0,
+        "rainfall_mm": 5.2,
+        "wind_ms": 3.26,
+        "weathercode": 63,
+        "relativehumidity_pct": 82
+      },
+      {
+        "date": "2022-06-04",
+        "temp_avg_c": 27.0,
+        "temp_max_c": 31.8,
+        "temp_min_c": 23.2,
+        "rainfall_mm": 7.4,
+        "wind_ms": 3.61,
+        "weathercode": 63,
+        "relativehumidity_pct": 82
+      },
+      {
+        "date": "2022-06-05",
+        "temp_avg_c": 28.0,
+        "temp_max_c": 32.7,
+        "temp_min_c": 23.6,
+        "rainfall_mm": 0.2,
+        "wind_ms": 2.7,
+        "weathercode": 51,
+        "relativehumidity_pct": 74
+      },
+      {
+        "date": "2022-06-06",
+        "temp_avg_c": 28.1,
+        "temp_max_c": 32.7,
+        "temp_min_c": 24.6,
+        "rainfall_mm": 1.8,
+        "wind_ms": 2.7,
+        "weathercode": 61,
+        "relativehumidity_pct": 75
+      },
+      {
+        "date": "2022-06-07",
+        "temp_avg_c": 27.9,
+        "temp_max_c": 31.1,
+        "temp_min_c": 25.1,
+        "rainfall_mm": 10.0,
+        "wind_ms": 2.5,
+        "weathercode": 63,
+        "relativehumidity_pct": 79
+      },
+      {
+        "date": "2022-06-08",
+        "temp_avg_c": 27.0,
+        "temp_max_c": 32.1,
+        "temp_min_c": 23.2,
+        "rainfall_mm": 19.1,
+        "wind_ms": 4.1,
+        "weathercode": 63,
+        "relativehumidity_pct": 83
+      },
+      {
+        "date": "2022-06-09",
+        "temp_avg_c": 28.4,
+        "temp_max_c": 31.9,
+        "temp_min_c": 25.1,
+        "rainfall_mm": 1.3,
+        "wind_ms": 4.38,
+        "weathercode": 53,
+        "relativehumidity_pct": 77
+      },
+      {
+        "date": "2022-06-10",
+        "temp_avg_c": 28.6,
+        "temp_max_c": 32.5,
+        "temp_min_c": 25.2,
+        "rainfall_mm": 4.4,
+        "wind_ms": 3.2,
+        "weathercode": 55,
+        "relativehumidity_pct": 78
+      },
+      {
+        "date": "2022-06-11",
+        "temp_avg_c": 28.1,
+        "temp_max_c": 32.9,
+        "temp_min_c": 23.8,
+        "rainfall_mm": 7.2,
+        "wind_ms": 3.8,
+        "weathercode": 63,
+        "relativehumidity_pct": 78
+      },
+      {
+        "date": "2022-06-12",
+        "temp_avg_c": 27.3,
+        "temp_max_c": 31.3,
+        "temp_min_c": 24.2,
+        "rainfall_mm": 10.1,
+        "wind_ms": 3.72,
+        "weathercode": 63,
+        "relativehumidity_pct": 83
+      },
+      {
+        "date": "2022-06-13",
+        "temp_avg_c": 27.4,
+        "temp_max_c": 32.6,
+        "temp_min_c": 24.4,
+        "rainfall_mm": 13.8,
+        "wind_ms": 3.2,
+        "weathercode": 63,
+        "relativehumidity_pct": 84
+      },
+      {
+        "date": "2022-06-14",
+        "temp_avg_c": 27.3,
+        "temp_max_c": 32.9,
+        "temp_min_c": 24.8,
+        "rainfall_mm": 10.3,
+        "wind_ms": 3.86,
+        "weathercode": 63,
+        "relativehumidity_pct": 83
+      },
+      {
+        "date": "2022-06-15",
+        "temp_avg_c": 27.4,
+        "temp_max_c": 32.0,
+        "temp_min_c": 24.6,
+        "rainfall_mm": 12.7,
+        "wind_ms": 3.31,
+        "weathercode": 63,
+        "relativehumidity_pct": 82
+      },
+      {
+        "date": "2022-06-16",
+        "temp_avg_c": 27.8,
+        "temp_max_c": 31.6,
+        "temp_min_c": 24.3,
+        "rainfall_mm": 3.5,
+        "wind_ms": 3.42,
+        "weathercode": 53,
+        "relativehumidity_pct": 80
+      },
+      {
+        "date": "2022-06-17",
+        "temp_avg_c": 28.9,
+        "temp_max_c": 32.9,
+        "temp_min_c": 25.5,
+        "rainfall_mm": 2.0,
+        "wind_ms": 4.37,
+        "weathercode": 55,
+        "relativehumidity_pct": 75
+      },
+      {
+        "date": "2022-06-18",
+        "temp_avg_c": 27.3,
+        "temp_max_c": 31.9,
+        "temp_min_c": 24.6,
+        "rainfall_mm": 6.3,
+        "wind_ms": 4.4,
+        "weathercode": 63,
+        "relativehumidity_pct": 84
+      },
+      {
+        "date": "2022-06-19",
+        "temp_avg_c": 27.3,
+        "temp_max_c": 32.8,
+        "temp_min_c": 24.0,
+        "rainfall_mm": 4.7,
+        "wind_ms": 2.31,
+        "weathercode": 63,
+        "relativehumidity_pct": 82
+      },
+      {
+        "date": "2022-06-20",
+        "temp_avg_c": 27.6,
+        "temp_max_c": 32.5,
+        "temp_min_c": 24.1,
+        "rainfall_mm": 3.6,
+        "wind_ms": 4.96,
+        "weathercode": 61,
+        "relativehumidity_pct": 79
+      },
+      {
+        "date": "2022-06-21",
+        "temp_avg_c": 27.0,
+        "temp_max_c": 31.1,
+        "temp_min_c": 24.0,
+        "rainfall_mm": 3.2,
+        "wind_ms": 5.92,
+        "weathercode": 61,
+        "relativehumidity_pct": 83
+      },
+      {
+        "date": "2022-06-22",
+        "temp_avg_c": 26.2,
+        "temp_max_c": 29.9,
+        "temp_min_c": 23.5,
+        "rainfall_mm": 22.0,
+        "wind_ms": 5.12,
+        "weathercode": 63,
+        "relativehumidity_pct": 86
+      },
+      {
+        "date": "2022-06-23",
+        "temp_avg_c": 26.4,
+        "temp_max_c": 29.2,
+        "temp_min_c": 24.4,
+        "rainfall_mm": 3.5,
+        "wind_ms": 5.8,
+        "weathercode": 61,
+        "relativehumidity_pct": 85
+      },
+      {
+        "date": "2022-06-24",
+        "temp_avg_c": 26.8,
+        "temp_max_c": 30.7,
+        "temp_min_c": 24.8,
+        "rainfall_mm": 21.9,
+        "wind_ms": 3.18,
+        "weathercode": 65,
+        "relativehumidity_pct": 86
+      },
+      {
+        "date": "2022-06-25",
+        "temp_avg_c": 27.6,
+        "temp_max_c": 30.4,
+        "temp_min_c": 25.4,
+        "rainfall_mm": 5.1,
+        "wind_ms": 3.13,
+        "weathercode": 63,
+        "relativehumidity_pct": 83
+      },
+      {
+        "date": "2022-06-26",
+        "temp_avg_c": 26.9,
+        "temp_max_c": 29.9,
+        "temp_min_c": 24.8,
+        "rainfall_mm": 17.4,
+        "wind_ms": 4.2,
+        "weathercode": 65,
+        "relativehumidity_pct": 86
+      },
+      {
+        "date": "2022-06-27",
+        "temp_avg_c": 25.1,
+        "temp_max_c": 28.3,
+        "temp_min_c": 23.6,
+        "rainfall_mm": 49.0,
+        "wind_ms": 3.35,
+        "weathercode": 65,
+        "relativehumidity_pct": 93
+      },
+      {
+        "date": "2022-06-28",
+        "temp_avg_c": 25.4,
+        "temp_max_c": 28.9,
+        "temp_min_c": 24.0,
+        "rainfall_mm": 31.3,
+        "wind_ms": 4.2,
+        "weathercode": 65,
+        "relativehumidity_pct": 91
+      },
+      {
+        "date": "2022-06-29",
+        "temp_avg_c": 26.0,
+        "temp_max_c": 30.0,
+        "temp_min_c": 23.8,
+        "rainfall_mm": 26.4,
+        "wind_ms": 2.86,
+        "weathercode": 65,
+        "relativehumidity_pct": 90
+      },
+      {
+        "date": "2022-06-30",
+        "temp_avg_c": 27.0,
+        "temp_max_c": 30.8,
+        "temp_min_c": 25.0,
+        "rainfall_mm": 8.7,
+        "wind_ms": 3.68,
+        "weathercode": 63,
+        "relativehumidity_pct": 86
+      },
+      {
+        "date": "2022-07-01",
+        "temp_avg_c": 27.0,
+        "temp_max_c": 30.8,
+        "temp_min_c": 24.8,
+        "rainfall_mm": 1.2,
+        "wind_ms": 4.89,
+        "weathercode": 51,
+        "relativehumidity_pct": 83
+      },
+      {
+        "date": "2022-07-02",
+        "temp_avg_c": 27.5,
+        "temp_max_c": 30.8,
+        "temp_min_c": 24.9,
+        "rainfall_mm": 1.2,
+        "wind_ms": 3.31,
+        "weathercode": 53,
+        "relativehumidity_pct": 80
+      },
+      {
+        "date": "2022-07-03",
+        "temp_avg_c": 27.8,
+        "temp_max_c": 31.5,
+        "temp_min_c": 24.8,
+        "rainfall_mm": 0.7,
+        "wind_ms": 3.06,
+        "weathercode": 51,
+        "relativehumidity_pct": 80
+      },
+      {
+        "date": "2022-07-04",
+        "temp_avg_c": 26.8,
+        "temp_max_c": 31.1,
+        "temp_min_c": 24.7,
+        "rainfall_mm": 13.1,
+        "wind_ms": 2.84,
+        "weathercode": 65,
+        "relativehumidity_pct": 89
+      },
+      {
+        "date": "2022-07-05",
+        "temp_avg_c": 26.4,
+        "temp_max_c": 29.7,
+        "temp_min_c": 24.3,
+        "rainfall_mm": 2.1,
+        "wind_ms": 3.14,
+        "weathercode": 53,
+        "relativehumidity_pct": 89
+      },
+      {
+        "date": "2022-07-06",
+        "temp_avg_c": 26.2,
+        "temp_max_c": 30.8,
+        "temp_min_c": 23.6,
+        "rainfall_mm": 11.4,
+        "wind_ms": 3.74,
+        "weathercode": 63,
+        "relativehumidity_pct": 88
+      },
+      {
+        "date": "2022-07-07",
+        "temp_avg_c": 25.7,
+        "temp_max_c": 28.2,
+        "temp_min_c": 24.1,
+        "rainfall_mm": 41.5,
+        "wind_ms": 2.83,
+        "weathercode": 65,
+        "relativehumidity_pct": 91
+      },
+      {
+        "date": "2022-07-08",
+        "temp_avg_c": 25.8,
+        "temp_max_c": 29.5,
+        "temp_min_c": 24.0,
+        "rainfall_mm": 25.5,
+        "wind_ms": 3.26,
+        "weathercode": 63,
+        "relativehumidity_pct": 92
+      },
+      {
+        "date": "2022-07-09",
+        "temp_avg_c": 26.1,
+        "temp_max_c": 29.8,
+        "temp_min_c": 23.4,
+        "rainfall_mm": 24.9,
+        "wind_ms": 3.16,
+        "weathercode": 63,
+        "relativehumidity_pct": 90
+      },
+      {
+        "date": "2022-07-10",
+        "temp_avg_c": 26.9,
+        "temp_max_c": 30.8,
+        "temp_min_c": 24.3,
+        "rainfall_mm": 14.4,
+        "wind_ms": 3.11,
+        "weathercode": 63,
+        "relativehumidity_pct": 87
+      },
+      {
+        "date": "2022-07-11",
+        "temp_avg_c": 26.5,
+        "temp_max_c": 31.6,
+        "temp_min_c": 24.4,
+        "rainfall_mm": 11.6,
+        "wind_ms": 3.54,
+        "weathercode": 63,
+        "relativehumidity_pct": 89
+      },
+      {
+        "date": "2022-07-12",
+        "temp_avg_c": 26.0,
+        "temp_max_c": 30.0,
+        "temp_min_c": 23.6,
+        "rainfall_mm": 23.2,
+        "wind_ms": 2.51,
+        "weathercode": 63,
+        "relativehumidity_pct": 92
+      },
+      {
+        "date": "2022-07-13",
+        "temp_avg_c": 26.2,
+        "temp_max_c": 29.3,
+        "temp_min_c": 23.8,
+        "rainfall_mm": 1.8,
+        "wind_ms": 1.98,
+        "weathercode": 51,
+        "relativehumidity_pct": 89
+      },
+      {
+        "date": "2022-07-14",
+        "temp_avg_c": 26.9,
+        "temp_max_c": 31.5,
+        "temp_min_c": 24.0,
+        "rainfall_mm": 14.1,
+        "wind_ms": 3.83,
+        "weathercode": 63,
+        "relativehumidity_pct": 88
+      },
+      {
+        "date": "2022-07-15",
+        "temp_avg_c": 27.0,
+        "temp_max_c": 31.6,
+        "temp_min_c": 24.1,
+        "rainfall_mm": 14.6,
+        "wind_ms": 2.91,
+        "weathercode": 63,
+        "relativehumidity_pct": 87
+      },
+      {
+        "date": "2022-07-16",
+        "temp_avg_c": 26.6,
+        "temp_max_c": 31.3,
+        "temp_min_c": 23.9,
+        "rainfall_mm": 16.4,
+        "wind_ms": 2.77,
+        "weathercode": 63,
+        "relativehumidity_pct": 89
+      },
+      {
+        "date": "2022-07-17",
+        "temp_avg_c": 25.9,
+        "temp_max_c": 30.0,
+        "temp_min_c": 23.8,
+        "rainfall_mm": 20.0,
+        "wind_ms": 2.55,
+        "weathercode": 63,
+        "relativehumidity_pct": 91
+      },
+      {
+        "date": "2022-07-18",
+        "temp_avg_c": 25.5,
+        "temp_max_c": 29.9,
+        "temp_min_c": 23.8,
+        "rainfall_mm": 47.0,
+        "wind_ms": 4.18,
+        "weathercode": 65,
+        "relativehumidity_pct": 92
+      },
+      {
+        "date": "2022-07-19",
+        "temp_avg_c": 26.5,
+        "temp_max_c": 30.7,
+        "temp_min_c": 23.5,
+        "rainfall_mm": 11.9,
+        "wind_ms": 3.64,
+        "weathercode": 63,
+        "relativehumidity_pct": 87
+      },
+      {
+        "date": "2022-07-20",
+        "temp_avg_c": 27.1,
+        "temp_max_c": 30.5,
+        "temp_min_c": 24.0,
+        "rainfall_mm": 6.8,
+        "wind_ms": 6.21,
+        "weathercode": 63,
+        "relativehumidity_pct": 85
+      },
+      {
+        "date": "2022-07-21",
+        "temp_avg_c": 26.5,
+        "temp_max_c": 29.2,
+        "temp_min_c": 23.9,
+        "rainfall_mm": 12.1,
+        "wind_ms": 4.5,
+        "weathercode": 63,
+        "relativehumidity_pct": 87
+      },
+      {
+        "date": "2022-07-22",
+        "temp_avg_c": 27.1,
+        "temp_max_c": 30.5,
+        "temp_min_c": 25.1,
+        "rainfall_mm": 4.3,
+        "wind_ms": 4.4,
+        "weathercode": 61,
+        "relativehumidity_pct": 88
+      },
+      {
+        "date": "2022-07-23",
+        "temp_avg_c": 27.6,
+        "temp_max_c": 31.0,
+        "temp_min_c": 23.9,
+        "rainfall_mm": 2.6,
+        "wind_ms": 3.81,
+        "weathercode": 53,
+        "relativehumidity_pct": 84
+      },
+      {
+        "date": "2022-07-24",
+        "temp_avg_c": 27.3,
+        "temp_max_c": 31.8,
+        "temp_min_c": 24.0,
+        "rainfall_mm": 8.6,
+        "wind_ms": 2.84,
+        "weathercode": 63,
+        "relativehumidity_pct": 84
+      },
+      {
+        "date": "2022-07-25",
+        "temp_avg_c": 26.8,
+        "temp_max_c": 31.8,
+        "temp_min_c": 23.8,
+        "rainfall_mm": 6.8,
+        "wind_ms": 3.04,
+        "weathercode": 63,
+        "relativehumidity_pct": 86
+      },
+      {
+        "date": "2022-07-26",
+        "temp_avg_c": 26.7,
+        "temp_max_c": 30.8,
+        "temp_min_c": 23.9,
+        "rainfall_mm": 7.0,
+        "wind_ms": 3.34,
+        "weathercode": 63,
+        "relativehumidity_pct": 88
+      },
+      {
+        "date": "2022-07-27",
+        "temp_avg_c": 26.6,
+        "temp_max_c": 30.6,
+        "temp_min_c": 23.9,
+        "rainfall_mm": 7.7,
+        "wind_ms": 4.14,
+        "weathercode": 63,
+        "relativehumidity_pct": 87
+      },
+      {
+        "date": "2022-07-28",
+        "temp_avg_c": 26.8,
+        "temp_max_c": 30.5,
+        "temp_min_c": 23.9,
+        "rainfall_mm": 3.5,
+        "wind_ms": 4.05,
+        "weathercode": 61,
+        "relativehumidity_pct": 85
+      },
+      {
+        "date": "2022-07-29",
+        "temp_avg_c": 26.5,
+        "temp_max_c": 29.3,
+        "temp_min_c": 24.5,
+        "rainfall_mm": 5.6,
+        "wind_ms": 4.05,
+        "weathercode": 63,
+        "relativehumidity_pct": 86
+      },
+      {
+        "date": "2022-07-30",
+        "temp_avg_c": 25.9,
+        "temp_max_c": 29.6,
+        "temp_min_c": 24.1,
+        "rainfall_mm": 7.5,
+        "wind_ms": 2.91,
+        "weathercode": 63,
+        "relativehumidity_pct": 88
+      },
+      {
+        "date": "2022-07-31",
+        "temp_avg_c": 26.4,
+        "temp_max_c": 30.2,
+        "temp_min_c": 23.8,
+        "rainfall_mm": 7.4,
+        "wind_ms": 1.73,
+        "weathercode": 63,
+        "relativehumidity_pct": 88
+      },
+      {
+        "date": "2022-08-01",
+        "temp_avg_c": 26.0,
+        "temp_max_c": 30.2,
+        "temp_min_c": 24.0,
+        "rainfall_mm": 27.5,
+        "wind_ms": 2.33,
+        "weathercode": 65,
+        "relativehumidity_pct": 91
+      },
+      {
+        "date": "2022-08-02",
+        "temp_avg_c": 26.2,
+        "temp_max_c": 30.3,
+        "temp_min_c": 23.3,
+        "rainfall_mm": 12.9,
+        "wind_ms": 2.25,
+        "weathercode": 65,
+        "relativehumidity_pct": 88
+      },
+      {
+        "date": "2022-08-03",
+        "temp_avg_c": 27.2,
+        "temp_max_c": 30.4,
+        "temp_min_c": 24.6,
+        "rainfall_mm": 19.5,
+        "wind_ms": 3.11,
+        "weathercode": 63,
+        "relativehumidity_pct": 86
+      },
+      {
+        "date": "2022-08-04",
+        "temp_avg_c": 25.9,
+        "temp_max_c": 28.9,
+        "temp_min_c": 24.1,
+        "rainfall_mm": 16.7,
+        "wind_ms": 2.89,
+        "weathercode": 63,
+        "relativehumidity_pct": 91
+      },
+      {
+        "date": "2022-08-05",
+        "temp_avg_c": 24.3,
+        "temp_max_c": 25.9,
+        "temp_min_c": 23.2,
+        "rainfall_mm": 134.6,
+        "wind_ms": 3.41,
+        "weathercode": 65,
+        "relativehumidity_pct": 95
+      },
+      {
+        "date": "2022-08-06",
+        "temp_avg_c": 25.6,
+        "temp_max_c": 29.0,
+        "temp_min_c": 23.7,
+        "rainfall_mm": 28.1,
+        "wind_ms": 3.0,
+        "weathercode": 65,
+        "relativehumidity_pct": 89
+      },
+      {
+        "date": "2022-08-07",
+        "temp_avg_c": 25.4,
+        "temp_max_c": 29.4,
+        "temp_min_c": 23.5,
+        "rainfall_mm": 14.5,
+        "wind_ms": 3.18,
+        "weathercode": 63,
+        "relativehumidity_pct": 93
+      },
+      {
+        "date": "2022-08-08",
+        "temp_avg_c": 25.2,
+        "temp_max_c": 28.2,
+        "temp_min_c": 23.5,
+        "rainfall_mm": 17.2,
+        "wind_ms": 3.24,
+        "weathercode": 63,
+        "relativehumidity_pct": 92
+      },
+      {
+        "date": "2022-08-09",
+        "temp_avg_c": 26.8,
+        "temp_max_c": 31.2,
+        "temp_min_c": 23.7,
+        "rainfall_mm": 3.7,
+        "wind_ms": 3.57,
+        "weathercode": 55,
+        "relativehumidity_pct": 81
+      },
+      {
+        "date": "2022-08-10",
+        "temp_avg_c": 27.0,
+        "temp_max_c": 31.0,
+        "temp_min_c": 23.9,
+        "rainfall_mm": 4.2,
+        "wind_ms": 2.67,
+        "weathercode": 63,
+        "relativehumidity_pct": 81
+      },
+      {
+        "date": "2022-08-11",
+        "temp_avg_c": 26.2,
+        "temp_max_c": 29.2,
+        "temp_min_c": 23.4,
+        "rainfall_mm": 4.8,
+        "wind_ms": 2.7,
+        "weathercode": 63,
+        "relativehumidity_pct": 85
+      },
+      {
+        "date": "2022-08-12",
+        "temp_avg_c": 26.7,
+        "temp_max_c": 30.4,
+        "temp_min_c": 23.5,
+        "rainfall_mm": 6.4,
+        "wind_ms": 2.82,
+        "weathercode": 63,
+        "relativehumidity_pct": 85
+      },
+      {
+        "date": "2022-08-13",
+        "temp_avg_c": 25.8,
+        "temp_max_c": 29.8,
+        "temp_min_c": 23.0,
+        "rainfall_mm": 26.0,
+        "wind_ms": 2.83,
+        "weathercode": 65,
+        "relativehumidity_pct": 90
+      },
+      {
+        "date": "2022-08-14",
+        "temp_avg_c": 25.5,
+        "temp_max_c": 29.0,
+        "temp_min_c": 23.4,
+        "rainfall_mm": 36.1,
+        "wind_ms": 2.92,
+        "weathercode": 65,
+        "relativehumidity_pct": 91
+      },
+      {
+        "date": "2022-08-15",
+        "temp_avg_c": 25.4,
+        "temp_max_c": 28.8,
+        "temp_min_c": 22.8,
+        "rainfall_mm": 8.4,
+        "wind_ms": 3.63,
+        "weathercode": 63,
+        "relativehumidity_pct": 90
+      },
+      {
+        "date": "2022-08-16",
+        "temp_avg_c": 26.6,
+        "temp_max_c": 30.9,
+        "temp_min_c": 23.5,
+        "rainfall_mm": 1.8,
+        "wind_ms": 4.58,
+        "weathercode": 53,
+        "relativehumidity_pct": 83
+      },
+      {
+        "date": "2022-08-17",
+        "temp_avg_c": 26.3,
+        "temp_max_c": 30.0,
+        "temp_min_c": 23.5,
+        "rainfall_mm": 9.5,
+        "wind_ms": 4.43,
+        "weathercode": 63,
+        "relativehumidity_pct": 85
+      },
+      {
+        "date": "2022-08-18",
+        "temp_avg_c": 25.3,
+        "temp_max_c": 28.9,
+        "temp_min_c": 23.9,
+        "rainfall_mm": 56.0,
+        "wind_ms": 2.73,
+        "weathercode": 65,
+        "relativehumidity_pct": 95
+      },
+      {
+        "date": "2022-08-19",
+        "temp_avg_c": 26.1,
+        "temp_max_c": 30.0,
+        "temp_min_c": 23.3,
+        "rainfall_mm": 15.1,
+        "wind_ms": 3.52,
+        "weathercode": 65,
+        "relativehumidity_pct": 89
+      },
+      {
+        "date": "2022-08-20",
+        "temp_avg_c": 25.9,
+        "temp_max_c": 29.4,
+        "temp_min_c": 23.1,
+        "rainfall_mm": 17.4,
+        "wind_ms": 3.63,
+        "weathercode": 65,
+        "relativehumidity_pct": 90
+      },
+      {
+        "date": "2022-08-21",
+        "temp_avg_c": 26.3,
+        "temp_max_c": 29.9,
+        "temp_min_c": 23.5,
+        "rainfall_mm": 4.7,
+        "wind_ms": 3.76,
+        "weathercode": 63,
+        "relativehumidity_pct": 88
+      },
+      {
+        "date": "2022-08-22",
+        "temp_avg_c": 25.2,
+        "temp_max_c": 27.4,
+        "temp_min_c": 23.6,
+        "rainfall_mm": 13.5,
+        "wind_ms": 7.71,
+        "weathercode": 63,
+        "relativehumidity_pct": 91
+      },
+      {
+        "date": "2022-08-23",
+        "temp_avg_c": 24.6,
+        "temp_max_c": 26.6,
+        "temp_min_c": 23.6,
+        "rainfall_mm": 10.0,
+        "wind_ms": 6.5,
+        "weathercode": 61,
+        "relativehumidity_pct": 92
+      },
+      {
+        "date": "2022-08-24",
+        "temp_avg_c": 25.8,
+        "temp_max_c": 29.2,
+        "temp_min_c": 23.5,
+        "rainfall_mm": 2.0,
+        "wind_ms": 3.09,
+        "weathercode": 51,
+        "relativehumidity_pct": 87
+      },
+      {
+        "date": "2022-08-25",
+        "temp_avg_c": 26.6,
+        "temp_max_c": 31.0,
+        "temp_min_c": 23.2,
+        "rainfall_mm": 5.5,
+        "wind_ms": 2.82,
+        "weathercode": 63,
+        "relativehumidity_pct": 86
+      },
+      {
+        "date": "2022-08-26",
+        "temp_avg_c": 26.9,
+        "temp_max_c": 30.5,
+        "temp_min_c": 24.0,
+        "rainfall_mm": 5.9,
+        "wind_ms": 2.52,
+        "weathercode": 63,
+        "relativehumidity_pct": 86
+      },
+      {
+        "date": "2022-08-27",
+        "temp_avg_c": 26.6,
+        "temp_max_c": 29.6,
+        "temp_min_c": 24.4,
+        "rainfall_mm": 5.0,
+        "wind_ms": 4.65,
+        "weathercode": 61,
+        "relativehumidity_pct": 87
+      },
+      {
+        "date": "2022-08-28",
+        "temp_avg_c": 26.3,
+        "temp_max_c": 30.3,
+        "temp_min_c": 23.7,
+        "rainfall_mm": 8.8,
+        "wind_ms": 3.5,
+        "weathercode": 63,
+        "relativehumidity_pct": 88
+      },
+      {
+        "date": "2022-08-29",
+        "temp_avg_c": 26.6,
+        "temp_max_c": 30.6,
+        "temp_min_c": 22.9,
+        "rainfall_mm": 0.8,
+        "wind_ms": 2.41,
+        "weathercode": 53,
+        "relativehumidity_pct": 88
+      },
+      {
+        "date": "2022-08-30",
+        "temp_avg_c": 26.7,
+        "temp_max_c": 29.6,
+        "temp_min_c": 24.5,
+        "rainfall_mm": 0.4,
+        "wind_ms": 2.79,
+        "weathercode": 51,
+        "relativehumidity_pct": 89
+      },
+      {
+        "date": "2022-08-31",
+        "temp_avg_c": 26.4,
+        "temp_max_c": 29.8,
+        "temp_min_c": 24.2,
+        "rainfall_mm": 11.4,
+        "wind_ms": 3.14,
+        "weathercode": 63,
+        "relativehumidity_pct": 88
+      },
+      {
+        "date": "2022-09-01",
+        "temp_avg_c": 26.9,
+        "temp_max_c": 30.6,
+        "temp_min_c": 23.8,
+        "rainfall_mm": 1.3,
+        "wind_ms": 5.46,
+        "weathercode": 51,
+        "relativehumidity_pct": 84
+      },
+      {
+        "date": "2022-09-02",
+        "temp_avg_c": 26.0,
+        "temp_max_c": 28.8,
+        "temp_min_c": 23.9,
+        "rainfall_mm": 4.4,
+        "wind_ms": 6.99,
+        "weathercode": 55,
+        "relativehumidity_pct": 87
+      },
+      {
+        "date": "2022-09-03",
+        "temp_avg_c": 26.0,
+        "temp_max_c": 29.1,
+        "temp_min_c": 24.0,
+        "rainfall_mm": 3.4,
+        "wind_ms": 7.21,
+        "weathercode": 53,
+        "relativehumidity_pct": 88
+      },
+      {
+        "date": "2022-09-04",
+        "temp_avg_c": 27.1,
+        "temp_max_c": 30.9,
+        "temp_min_c": 25.0,
+        "rainfall_mm": 2.7,
+        "wind_ms": 6.55,
+        "weathercode": 55,
+        "relativehumidity_pct": 84
+      },
+      {
+        "date": "2022-09-05",
+        "temp_avg_c": 26.8,
+        "temp_max_c": 30.1,
+        "temp_min_c": 24.6,
+        "rainfall_mm": 1.0,
+        "wind_ms": 3.45,
+        "weathercode": 51,
+        "relativehumidity_pct": 85
+      },
+      {
+        "date": "2022-09-06",
+        "temp_avg_c": 26.6,
+        "temp_max_c": 30.9,
+        "temp_min_c": 24.1,
+        "rainfall_mm": 27.2,
+        "wind_ms": 3.1,
+        "weathercode": 65,
+        "relativehumidity_pct": 89
+      },
+      {
+        "date": "2022-09-07",
+        "temp_avg_c": 27.0,
+        "temp_max_c": 31.1,
+        "temp_min_c": 23.2,
+        "rainfall_mm": 15.2,
+        "wind_ms": 4.4,
+        "weathercode": 65,
+        "relativehumidity_pct": 84
+      },
+      {
+        "date": "2022-09-08",
+        "temp_avg_c": 27.6,
+        "temp_max_c": 31.5,
+        "temp_min_c": 24.3,
+        "rainfall_mm": 6.1,
+        "wind_ms": 2.8,
+        "weathercode": 63,
+        "relativehumidity_pct": 84
+      },
+      {
+        "date": "2022-09-09",
+        "temp_avg_c": 26.1,
+        "temp_max_c": 30.4,
+        "temp_min_c": 23.9,
+        "rainfall_mm": 17.0,
+        "wind_ms": 2.53,
+        "weathercode": 63,
+        "relativehumidity_pct": 90
+      },
+      {
+        "date": "2022-09-10",
+        "temp_avg_c": 25.5,
+        "temp_max_c": 28.1,
+        "temp_min_c": 23.3,
+        "rainfall_mm": 16.6,
+        "wind_ms": 3.76,
+        "weathercode": 63,
+        "relativehumidity_pct": 90
+      },
+      {
+        "date": "2022-09-11",
+        "temp_avg_c": 26.8,
+        "temp_max_c": 30.2,
+        "temp_min_c": 24.1,
+        "rainfall_mm": 0.2,
+        "wind_ms": 4.9,
+        "weathercode": 51,
+        "relativehumidity_pct": 82
+      },
+      {
+        "date": "2022-09-12",
+        "temp_avg_c": 26.6,
+        "temp_max_c": 30.0,
+        "temp_min_c": 24.1,
+        "rainfall_mm": 1.4,
+        "wind_ms": 6.01,
+        "weathercode": 53,
+        "relativehumidity_pct": 83
+      },
+      {
+        "date": "2022-09-13",
+        "temp_avg_c": 26.8,
+        "temp_max_c": 29.9,
+        "temp_min_c": 24.6,
+        "rainfall_mm": 0.9,
+        "wind_ms": 5.9,
+        "weathercode": 51,
+        "relativehumidity_pct": 83
+      },
+      {
+        "date": "2022-09-14",
+        "temp_avg_c": 26.4,
+        "temp_max_c": 29.6,
+        "temp_min_c": 24.4,
+        "rainfall_mm": 2.2,
+        "wind_ms": 6.11,
+        "weathercode": 53,
+        "relativehumidity_pct": 84
+      },
+      {
+        "date": "2022-09-15",
+        "temp_avg_c": 26.5,
+        "temp_max_c": 30.2,
+        "temp_min_c": 24.1,
+        "rainfall_mm": 5.4,
+        "wind_ms": 3.89,
+        "weathercode": 63,
+        "relativehumidity_pct": 84
+      },
+      {
+        "date": "2022-09-16",
+        "temp_avg_c": 26.1,
+        "temp_max_c": 29.3,
+        "temp_min_c": 24.0,
+        "rainfall_mm": 15.2,
+        "wind_ms": 3.85,
+        "weathercode": 63,
+        "relativehumidity_pct": 86
+      },
+      {
+        "date": "2022-09-17",
+        "temp_avg_c": 26.3,
+        "temp_max_c": 30.0,
+        "temp_min_c": 23.7,
+        "rainfall_mm": 2.7,
+        "wind_ms": 4.5,
+        "weathercode": 53,
+        "relativehumidity_pct": 84
+      },
+      {
+        "date": "2022-09-18",
+        "temp_avg_c": 26.5,
+        "temp_max_c": 30.6,
+        "temp_min_c": 24.2,
+        "rainfall_mm": 5.7,
+        "wind_ms": 4.65,
+        "weathercode": 63,
+        "relativehumidity_pct": 84
+      },
+      {
+        "date": "2022-09-19",
+        "temp_avg_c": 25.6,
+        "temp_max_c": 28.7,
+        "temp_min_c": 23.8,
+        "rainfall_mm": 15.3,
+        "wind_ms": 4.75,
+        "weathercode": 63,
+        "relativehumidity_pct": 88
+      },
+      {
+        "date": "2022-09-20",
+        "temp_avg_c": 24.8,
+        "temp_max_c": 27.5,
+        "temp_min_c": 23.6,
+        "rainfall_mm": 24.2,
+        "wind_ms": 3.31,
+        "weathercode": 63,
+        "relativehumidity_pct": 93
+      },
+      {
+        "date": "2022-09-21",
+        "temp_avg_c": 25.0,
+        "temp_max_c": 28.0,
+        "temp_min_c": 23.5,
+        "rainfall_mm": 33.1,
+        "wind_ms": 2.77,
+        "weathercode": 63,
+        "relativehumidity_pct": 93
+      },
+      {
+        "date": "2022-09-22",
+        "temp_avg_c": 25.4,
+        "temp_max_c": 28.0,
+        "temp_min_c": 23.2,
+        "rainfall_mm": 5.5,
+        "wind_ms": 3.6,
+        "weathercode": 61,
+        "relativehumidity_pct": 90
+      },
+      {
+        "date": "2022-09-23",
+        "temp_avg_c": 25.3,
+        "temp_max_c": 29.2,
+        "temp_min_c": 23.0,
+        "rainfall_mm": 15.9,
+        "wind_ms": 3.11,
+        "weathercode": 63,
+        "relativehumidity_pct": 90
+      },
+      {
+        "date": "2022-09-24",
+        "temp_avg_c": 26.0,
+        "temp_max_c": 29.4,
+        "temp_min_c": 22.8,
+        "rainfall_mm": 1.2,
+        "wind_ms": 2.2,
+        "weathercode": 51,
+        "relativehumidity_pct": 87
+      },
+      {
+        "date": "2022-09-25",
+        "temp_avg_c": 25.3,
+        "temp_max_c": 28.0,
+        "temp_min_c": 23.9,
+        "rainfall_mm": 47.2,
+        "wind_ms": 7.96,
+        "weathercode": 65,
+        "relativehumidity_pct": 90
+      },
+      {
+        "date": "2022-09-26",
+        "temp_avg_c": 26.0,
+        "temp_max_c": 29.8,
+        "temp_min_c": 24.2,
+        "rainfall_mm": 23.9,
+        "wind_ms": 6.79,
+        "weathercode": 63,
+        "relativehumidity_pct": 90
+      },
+      {
+        "date": "2022-09-27",
+        "temp_avg_c": 26.1,
+        "temp_max_c": 30.3,
+        "temp_min_c": 23.8,
+        "rainfall_mm": 8.0,
+        "wind_ms": 4.22,
+        "weathercode": 63,
+        "relativehumidity_pct": 90
+      },
+      {
+        "date": "2022-09-28",
+        "temp_avg_c": 25.3,
+        "temp_max_c": 28.8,
+        "temp_min_c": 23.3,
+        "rainfall_mm": 37.6,
+        "wind_ms": 2.65,
+        "weathercode": 65,
+        "relativehumidity_pct": 93
+      },
+      {
+        "date": "2022-09-29",
+        "temp_avg_c": 26.0,
+        "temp_max_c": 29.5,
+        "temp_min_c": 23.5,
+        "rainfall_mm": 5.7,
+        "wind_ms": 4.09,
+        "weathercode": 61,
+        "relativehumidity_pct": 89
+      },
+      {
+        "date": "2022-09-30",
+        "temp_avg_c": 26.0,
+        "temp_max_c": 27.6,
+        "temp_min_c": 24.2,
+        "rainfall_mm": 10.8,
+        "wind_ms": 4.7,
+        "weathercode": 63,
+        "relativehumidity_pct": 87
+      },
+      {
+        "date": "2022-10-01",
+        "temp_avg_c": 26.4,
+        "temp_max_c": 29.8,
+        "temp_min_c": 23.5,
+        "rainfall_mm": 3.0,
+        "wind_ms": 5.1,
+        "weathercode": 53,
+        "relativehumidity_pct": 85
+      },
+      {
+        "date": "2022-10-02",
+        "temp_avg_c": 26.2,
+        "temp_max_c": 28.8,
+        "temp_min_c": 24.9,
+        "rainfall_mm": 1.5,
+        "wind_ms": 5.85,
+        "weathercode": 53,
+        "relativehumidity_pct": 86
+      },
+      {
+        "date": "2022-10-03",
+        "temp_avg_c": 25.9,
+        "temp_max_c": 28.6,
+        "temp_min_c": 23.7,
+        "rainfall_mm": 9.9,
+        "wind_ms": 6.13,
+        "weathercode": 63,
+        "relativehumidity_pct": 88
+      },
+      {
+        "date": "2022-10-04",
+        "temp_avg_c": 26.4,
+        "temp_max_c": 29.7,
+        "temp_min_c": 23.9,
+        "rainfall_mm": 14.6,
+        "wind_ms": 4.37,
+        "weathercode": 65,
+        "relativehumidity_pct": 87
+      },
+      {
+        "date": "2022-10-05",
+        "temp_avg_c": 26.9,
+        "temp_max_c": 30.3,
+        "temp_min_c": 23.8,
+        "rainfall_mm": 5.2,
+        "wind_ms": 5.72,
+        "weathercode": 63,
+        "relativehumidity_pct": 84
+      },
+      {
+        "date": "2022-10-06",
+        "temp_avg_c": 27.0,
+        "temp_max_c": 30.0,
+        "temp_min_c": 24.9,
+        "rainfall_mm": 0.9,
+        "wind_ms": 5.61,
+        "weathercode": 51,
+        "relativehumidity_pct": 83
+      },
+      {
+        "date": "2022-10-07",
+        "temp_avg_c": 26.5,
+        "temp_max_c": 29.8,
+        "temp_min_c": 24.6,
+        "rainfall_mm": 1.5,
+        "wind_ms": 6.2,
+        "weathercode": 55,
+        "relativehumidity_pct": 84
+      },
+      {
+        "date": "2022-10-08",
+        "temp_avg_c": 26.8,
+        "temp_max_c": 29.4,
+        "temp_min_c": 24.8,
+        "rainfall_mm": 1.5,
+        "wind_ms": 5.02,
+        "weathercode": 51,
+        "relativehumidity_pct": 83
+      },
+      {
+        "date": "2022-10-09",
+        "temp_avg_c": 26.8,
+        "temp_max_c": 30.0,
+        "temp_min_c": 24.6,
+        "rainfall_mm": 4.8,
+        "wind_ms": 4.11,
+        "weathercode": 61,
+        "relativehumidity_pct": 83
+      },
+      {
+        "date": "2022-10-10",
+        "temp_avg_c": 26.8,
+        "temp_max_c": 31.1,
+        "temp_min_c": 23.3,
+        "rainfall_mm": 1.0,
+        "wind_ms": 3.77,
+        "weathercode": 53,
+        "relativehumidity_pct": 81
+      },
+      {
+        "date": "2022-10-11",
+        "temp_avg_c": 26.9,
+        "temp_max_c": 31.4,
+        "temp_min_c": 23.0,
+        "rainfall_mm": 1.9,
+        "wind_ms": 3.91,
+        "weathercode": 53,
+        "relativehumidity_pct": 82
+      },
+      {
+        "date": "2022-10-12",
+        "temp_avg_c": 26.9,
+        "temp_max_c": 30.1,
+        "temp_min_c": 23.5,
+        "rainfall_mm": 0.8,
+        "wind_ms": 2.3,
+        "weathercode": 51,
+        "relativehumidity_pct": 85
+      },
+      {
+        "date": "2022-10-13",
+        "temp_avg_c": 27.0,
+        "temp_max_c": 31.2,
+        "temp_min_c": 24.0,
+        "rainfall_mm": 6.3,
+        "wind_ms": 4.26,
+        "weathercode": 61,
+        "relativehumidity_pct": 85
+      },
+      {
+        "date": "2022-10-14",
+        "temp_avg_c": 26.2,
+        "temp_max_c": 29.9,
+        "temp_min_c": 23.5,
+        "rainfall_mm": 24.7,
+        "wind_ms": 4.05,
+        "weathercode": 65,
+        "relativehumidity_pct": 88
+      },
+      {
+        "date": "2022-10-15",
+        "temp_avg_c": 26.6,
+        "temp_max_c": 30.2,
+        "temp_min_c": 23.5,
+        "rainfall_mm": 7.1,
+        "wind_ms": 6.96,
+        "weathercode": 63,
+        "relativehumidity_pct": 84
+      },
+      {
+        "date": "2022-10-16",
+        "temp_avg_c": 26.6,
+        "temp_max_c": 29.6,
+        "temp_min_c": 24.5,
+        "rainfall_mm": 2.5,
+        "wind_ms": 6.51,
+        "weathercode": 53,
+        "relativehumidity_pct": 82
+      },
+      {
+        "date": "2022-10-17",
+        "temp_avg_c": 26.5,
+        "temp_max_c": 29.9,
+        "temp_min_c": 24.2,
+        "rainfall_mm": 2.6,
+        "wind_ms": 4.3,
+        "weathercode": 61,
+        "relativehumidity_pct": 84
+      },
+      {
+        "date": "2022-10-18",
+        "temp_avg_c": 26.0,
+        "temp_max_c": 29.6,
+        "temp_min_c": 23.8,
+        "rainfall_mm": 24.7,
+        "wind_ms": 1.75,
+        "weathercode": 65,
+        "relativehumidity_pct": 89
+      },
+      {
+        "date": "2022-10-19",
+        "temp_avg_c": 25.7,
+        "temp_max_c": 29.5,
+        "temp_min_c": 23.8,
+        "rainfall_mm": 21.0,
+        "wind_ms": 3.32,
+        "weathercode": 63,
+        "relativehumidity_pct": 91
+      },
+      {
+        "date": "2022-10-20",
+        "temp_avg_c": 25.4,
+        "temp_max_c": 28.1,
+        "temp_min_c": 24.2,
+        "rainfall_mm": 15.2,
+        "wind_ms": 2.57,
+        "weathercode": 63,
+        "relativehumidity_pct": 93
+      },
+      {
+        "date": "2022-10-21",
+        "temp_avg_c": 26.3,
+        "temp_max_c": 30.0,
+        "temp_min_c": 23.3,
+        "rainfall_mm": 2.1,
+        "wind_ms": 1.71,
+        "weathercode": 55,
+        "relativehumidity_pct": 89
+      },
+      {
+        "date": "2022-10-22",
+        "temp_avg_c": 27.2,
+        "temp_max_c": 30.1,
+        "temp_min_c": 25.0,
+        "rainfall_mm": 1.8,
+        "wind_ms": 3.22,
+        "weathercode": 53,
+        "relativehumidity_pct": 87
+      },
+      {
+        "date": "2022-10-23",
+        "temp_avg_c": 26.6,
+        "temp_max_c": 29.4,
+        "temp_min_c": 25.0,
+        "rainfall_mm": 8.9,
+        "wind_ms": 3.98,
+        "weathercode": 63,
+        "relativehumidity_pct": 88
+      },
+      {
+        "date": "2022-10-24",
+        "temp_avg_c": 27.1,
+        "temp_max_c": 30.0,
+        "temp_min_c": 24.6,
+        "rainfall_mm": 0.8,
+        "wind_ms": 4.8,
+        "weathercode": 51,
+        "relativehumidity_pct": 84
+      },
+      {
+        "date": "2022-10-25",
+        "temp_avg_c": 25.7,
+        "temp_max_c": 28.2,
+        "temp_min_c": 24.4,
+        "rainfall_mm": 14.0,
+        "wind_ms": 5.2,
+        "weathercode": 63,
+        "relativehumidity_pct": 88
+      },
+      {
+        "date": "2022-10-26",
+        "temp_avg_c": 26.3,
+        "temp_max_c": 29.1,
+        "temp_min_c": 23.9,
+        "rainfall_mm": 5.4,
+        "wind_ms": 5.46,
+        "weathercode": 63,
+        "relativehumidity_pct": 84
+      },
+      {
+        "date": "2022-10-27",
+        "temp_avg_c": 26.8,
+        "temp_max_c": 30.5,
+        "temp_min_c": 23.6,
+        "rainfall_mm": 0.0,
+        "wind_ms": 4.34,
+        "weathercode": 3,
+        "relativehumidity_pct": 79
+      },
+      {
+        "date": "2022-10-28",
+        "temp_avg_c": 25.8,
+        "temp_max_c": 27.3,
+        "temp_min_c": 24.9,
+        "rainfall_mm": 9.9,
+        "wind_ms": 5.91,
+        "weathercode": 63,
+        "relativehumidity_pct": 89
+      },
+      {
+        "date": "2022-10-29",
+        "temp_avg_c": 24.3,
+        "temp_max_c": 25.1,
+        "temp_min_c": 23.8,
+        "rainfall_mm": 259.0,
+        "wind_ms": 11.96,
+        "weathercode": 65,
+        "relativehumidity_pct": 94
+      },
+      {
+        "date": "2022-10-30",
+        "temp_avg_c": 26.0,
+        "temp_max_c": 28.4,
+        "temp_min_c": 24.5,
+        "rainfall_mm": 25.4,
+        "wind_ms": 8.34,
+        "weathercode": 63,
+        "relativehumidity_pct": 91
+      },
+      {
+        "date": "2022-10-31",
+        "temp_avg_c": 26.8,
+        "temp_max_c": 29.6,
+        "temp_min_c": 24.9,
+        "rainfall_mm": 7.2,
+        "wind_ms": 6.1,
+        "weathercode": 63,
+        "relativehumidity_pct": 85
+      },
+      {
+        "date": "2022-11-01",
+        "temp_avg_c": 26.1,
+        "temp_max_c": 28.9,
+        "temp_min_c": 23.6,
+        "rainfall_mm": 2.6,
+        "wind_ms": 3.47,
+        "weathercode": 51,
+        "relativehumidity_pct": 88
+      },
+      {
+        "date": "2022-11-02",
+        "temp_avg_c": 25.9,
+        "temp_max_c": 29.5,
+        "temp_min_c": 22.8,
+        "rainfall_mm": 1.7,
+        "wind_ms": 2.33,
+        "weathercode": 51,
+        "relativehumidity_pct": 88
+      },
+      {
+        "date": "2022-11-03",
+        "temp_avg_c": 25.5,
+        "temp_max_c": 29.1,
+        "temp_min_c": 22.9,
+        "rainfall_mm": 21.9,
+        "wind_ms": 3.0,
+        "weathercode": 65,
+        "relativehumidity_pct": 89
+      },
+      {
+        "date": "2022-11-04",
+        "temp_avg_c": 25.7,
+        "temp_max_c": 28.9,
+        "temp_min_c": 23.0,
+        "rainfall_mm": 6.7,
+        "wind_ms": 4.43,
+        "weathercode": 63,
+        "relativehumidity_pct": 89
+      },
+      {
+        "date": "2022-11-05",
+        "temp_avg_c": 26.1,
+        "temp_max_c": 28.5,
+        "temp_min_c": 24.1,
+        "rainfall_mm": 10.6,
+        "wind_ms": 5.64,
+        "weathercode": 63,
+        "relativehumidity_pct": 86
+      },
+      {
+        "date": "2022-11-06",
+        "temp_avg_c": 26.4,
+        "temp_max_c": 29.0,
+        "temp_min_c": 24.6,
+        "rainfall_mm": 0.7,
+        "wind_ms": 4.6,
+        "weathercode": 53,
+        "relativehumidity_pct": 84
+      },
+      {
+        "date": "2022-11-07",
+        "temp_avg_c": 26.5,
+        "temp_max_c": 29.5,
+        "temp_min_c": 23.9,
+        "rainfall_mm": 1.1,
+        "wind_ms": 5.26,
+        "weathercode": 51,
+        "relativehumidity_pct": 84
+      },
+      {
+        "date": "2022-11-08",
+        "temp_avg_c": 25.9,
+        "temp_max_c": 27.6,
+        "temp_min_c": 24.9,
+        "rainfall_mm": 4.4,
+        "wind_ms": 4.97,
+        "weathercode": 63,
+        "relativehumidity_pct": 87
+      },
+      {
+        "date": "2022-11-09",
+        "temp_avg_c": 26.6,
+        "temp_max_c": 29.1,
+        "temp_min_c": 24.5,
+        "rainfall_mm": 1.3,
+        "wind_ms": 5.33,
+        "weathercode": 53,
+        "relativehumidity_pct": 85
+      },
+      {
+        "date": "2022-11-10",
+        "temp_avg_c": 26.6,
+        "temp_max_c": 29.3,
+        "temp_min_c": 24.5,
+        "rainfall_mm": 1.9,
+        "wind_ms": 5.51,
+        "weathercode": 61,
+        "relativehumidity_pct": 84
+      },
+      {
+        "date": "2022-11-11",
+        "temp_avg_c": 26.3,
+        "temp_max_c": 28.6,
+        "temp_min_c": 24.0,
+        "rainfall_mm": 0.1,
+        "wind_ms": 5.35,
+        "weathercode": 51,
+        "relativehumidity_pct": 85
+      },
+      {
+        "date": "2022-11-12",
+        "temp_avg_c": 26.7,
+        "temp_max_c": 29.0,
+        "temp_min_c": 24.9,
+        "rainfall_mm": 1.5,
+        "wind_ms": 5.18,
+        "weathercode": 55,
+        "relativehumidity_pct": 85
+      },
+      {
+        "date": "2022-11-13",
+        "temp_avg_c": 26.7,
+        "temp_max_c": 29.1,
+        "temp_min_c": 25.4,
+        "rainfall_mm": 7.0,
+        "wind_ms": 5.31,
+        "weathercode": 63,
+        "relativehumidity_pct": 87
+      },
+      {
+        "date": "2022-11-14",
+        "temp_avg_c": 26.8,
+        "temp_max_c": 29.2,
+        "temp_min_c": 24.8,
+        "rainfall_mm": 0.7,
+        "wind_ms": 6.18,
+        "weathercode": 51,
+        "relativehumidity_pct": 84
+      },
+      {
+        "date": "2022-11-15",
+        "temp_avg_c": 26.7,
+        "temp_max_c": 29.2,
+        "temp_min_c": 24.9,
+        "rainfall_mm": 0.9,
+        "wind_ms": 5.38,
+        "weathercode": 51,
+        "relativehumidity_pct": 84
+      },
+      {
+        "date": "2022-11-16",
+        "temp_avg_c": 26.2,
+        "temp_max_c": 29.1,
+        "temp_min_c": 24.0,
+        "rainfall_mm": 0.9,
+        "wind_ms": 6.3,
+        "weathercode": 51,
+        "relativehumidity_pct": 85
+      },
+      {
+        "date": "2022-11-17",
+        "temp_avg_c": 26.2,
+        "temp_max_c": 29.2,
+        "temp_min_c": 24.4,
+        "rainfall_mm": 1.4,
+        "wind_ms": 5.72,
+        "weathercode": 51,
+        "relativehumidity_pct": 85
+      },
+      {
+        "date": "2022-11-18",
+        "temp_avg_c": 25.7,
+        "temp_max_c": 28.2,
+        "temp_min_c": 24.5,
+        "rainfall_mm": 2.5,
+        "wind_ms": 5.95,
+        "weathercode": 51,
+        "relativehumidity_pct": 88
+      },
+      {
+        "date": "2022-11-19",
+        "temp_avg_c": 25.4,
+        "temp_max_c": 28.1,
+        "temp_min_c": 24.0,
+        "rainfall_mm": 25.4,
+        "wind_ms": 5.51,
+        "weathercode": 63,
+        "relativehumidity_pct": 88
+      },
+      {
+        "date": "2022-11-20",
+        "temp_avg_c": 25.5,
+        "temp_max_c": 28.0,
+        "temp_min_c": 23.4,
+        "rainfall_mm": 9.7,
+        "wind_ms": 6.28,
+        "weathercode": 63,
+        "relativehumidity_pct": 89
+      },
+      {
+        "date": "2022-11-21",
+        "temp_avg_c": 25.8,
+        "temp_max_c": 27.6,
+        "temp_min_c": 24.5,
+        "rainfall_mm": 1.7,
+        "wind_ms": 5.94,
+        "weathercode": 51,
+        "relativehumidity_pct": 88
+      },
+      {
+        "date": "2022-11-22",
+        "temp_avg_c": 26.1,
+        "temp_max_c": 28.8,
+        "temp_min_c": 24.5,
+        "rainfall_mm": 3.5,
+        "wind_ms": 5.97,
+        "weathercode": 63,
+        "relativehumidity_pct": 86
+      },
+      {
+        "date": "2022-11-23",
+        "temp_avg_c": 26.3,
+        "temp_max_c": 28.5,
+        "temp_min_c": 24.7,
+        "rainfall_mm": 0.3,
+        "wind_ms": 5.02,
+        "weathercode": 51,
+        "relativehumidity_pct": 85
+      },
+      {
+        "date": "2022-11-24",
+        "temp_avg_c": 26.9,
+        "temp_max_c": 29.7,
+        "temp_min_c": 24.4,
+        "rainfall_mm": 0.2,
+        "wind_ms": 5.4,
+        "weathercode": 51,
+        "relativehumidity_pct": 83
+      },
+      {
+        "date": "2022-11-25",
+        "temp_avg_c": 26.5,
+        "temp_max_c": 29.0,
+        "temp_min_c": 24.8,
+        "rainfall_mm": 0.2,
+        "wind_ms": 5.12,
+        "weathercode": 51,
+        "relativehumidity_pct": 84
+      },
+      {
+        "date": "2022-11-26",
+        "temp_avg_c": 26.9,
+        "temp_max_c": 30.5,
+        "temp_min_c": 24.7,
+        "rainfall_mm": 0.0,
+        "wind_ms": 4.6,
+        "weathercode": 3,
+        "relativehumidity_pct": 83
+      },
+      {
+        "date": "2022-11-27",
+        "temp_avg_c": 26.5,
+        "temp_max_c": 29.7,
+        "temp_min_c": 24.3,
+        "rainfall_mm": 0.0,
+        "wind_ms": 5.33,
+        "weathercode": 1,
+        "relativehumidity_pct": 79
+      },
+      {
+        "date": "2022-11-28",
+        "temp_avg_c": 27.0,
+        "temp_max_c": 30.2,
+        "temp_min_c": 24.8,
+        "rainfall_mm": 0.1,
+        "wind_ms": 5.84,
+        "weathercode": 51,
+        "relativehumidity_pct": 77
+      },
+      {
+        "date": "2022-11-29",
+        "temp_avg_c": 26.9,
+        "temp_max_c": 30.0,
+        "temp_min_c": 24.4,
+        "rainfall_mm": 0.3,
+        "wind_ms": 5.2,
+        "weathercode": 51,
+        "relativehumidity_pct": 83
+      },
+      {
+        "date": "2022-11-30",
+        "temp_avg_c": 26.7,
+        "temp_max_c": 29.7,
+        "temp_min_c": 23.8,
+        "rainfall_mm": 4.3,
+        "wind_ms": 6.06,
+        "weathercode": 63,
+        "relativehumidity_pct": 85
+      },
+      {
+        "date": "2022-12-01",
+        "temp_avg_c": 25.8,
+        "temp_max_c": 29.0,
+        "temp_min_c": 24.1,
+        "rainfall_mm": 0.5,
+        "wind_ms": 6.55,
+        "weathercode": 51,
+        "relativehumidity_pct": 86
+      },
+      {
+        "date": "2022-12-02",
+        "temp_avg_c": 26.6,
+        "temp_max_c": 30.0,
+        "temp_min_c": 24.5,
+        "rainfall_mm": 0.9,
+        "wind_ms": 7.54,
+        "weathercode": 51,
+        "relativehumidity_pct": 81
+      },
+      {
+        "date": "2022-12-03",
+        "temp_avg_c": 26.6,
+        "temp_max_c": 29.6,
+        "temp_min_c": 24.2,
+        "rainfall_mm": 0.3,
+        "wind_ms": 5.61,
+        "weathercode": 51,
+        "relativehumidity_pct": 82
+      },
+      {
+        "date": "2022-12-04",
+        "temp_avg_c": 26.3,
+        "temp_max_c": 29.0,
+        "temp_min_c": 24.2,
+        "rainfall_mm": 0.7,
+        "wind_ms": 5.1,
+        "weathercode": 51,
+        "relativehumidity_pct": 83
+      },
+      {
+        "date": "2022-12-05",
+        "temp_avg_c": 26.2,
+        "temp_max_c": 28.3,
+        "temp_min_c": 24.5,
+        "rainfall_mm": 0.4,
+        "wind_ms": 5.74,
+        "weathercode": 51,
+        "relativehumidity_pct": 84
+      },
+      {
+        "date": "2022-12-06",
+        "temp_avg_c": 26.2,
+        "temp_max_c": 29.1,
+        "temp_min_c": 24.5,
+        "rainfall_mm": 1.1,
+        "wind_ms": 5.52,
+        "weathercode": 53,
+        "relativehumidity_pct": 83
+      },
+      {
+        "date": "2022-12-07",
+        "temp_avg_c": 26.5,
+        "temp_max_c": 29.8,
+        "temp_min_c": 24.1,
+        "rainfall_mm": 0.0,
+        "wind_ms": 4.55,
+        "weathercode": 3,
+        "relativehumidity_pct": 80
+      },
+      {
+        "date": "2022-12-08",
+        "temp_avg_c": 26.7,
+        "temp_max_c": 30.6,
+        "temp_min_c": 23.9,
+        "rainfall_mm": 0.0,
+        "wind_ms": 5.0,
+        "weathercode": 3,
+        "relativehumidity_pct": 80
+      },
+      {
+        "date": "2022-12-09",
+        "temp_avg_c": 25.1,
+        "temp_max_c": 26.6,
+        "temp_min_c": 23.7,
+        "rainfall_mm": 11.9,
+        "wind_ms": 3.31,
+        "weathercode": 63,
+        "relativehumidity_pct": 92
+      },
+      {
+        "date": "2022-12-10",
+        "temp_avg_c": 24.6,
+        "temp_max_c": 27.3,
+        "temp_min_c": 23.3,
+        "rainfall_mm": 22.3,
+        "wind_ms": 2.76,
+        "weathercode": 65,
+        "relativehumidity_pct": 94
+      },
+      {
+        "date": "2022-12-11",
+        "temp_avg_c": 25.4,
+        "temp_max_c": 28.6,
+        "temp_min_c": 22.9,
+        "rainfall_mm": 1.7,
+        "wind_ms": 1.78,
+        "weathercode": 51,
+        "relativehumidity_pct": 88
+      },
+      {
+        "date": "2022-12-12",
+        "temp_avg_c": 25.8,
+        "temp_max_c": 28.5,
+        "temp_min_c": 23.5,
+        "rainfall_mm": 1.6,
+        "wind_ms": 3.63,
+        "weathercode": 51,
+        "relativehumidity_pct": 84
+      },
+      {
+        "date": "2022-12-13",
+        "temp_avg_c": 26.2,
+        "temp_max_c": 28.9,
+        "temp_min_c": 24.2,
+        "rainfall_mm": 2.1,
+        "wind_ms": 5.1,
+        "weathercode": 55,
+        "relativehumidity_pct": 84
+      },
+      {
+        "date": "2022-12-14",
+        "temp_avg_c": 26.1,
+        "temp_max_c": 28.8,
+        "temp_min_c": 24.5,
+        "rainfall_mm": 0.9,
+        "wind_ms": 5.8,
+        "weathercode": 51,
+        "relativehumidity_pct": 85
+      },
+      {
+        "date": "2022-12-15",
+        "temp_avg_c": 26.1,
+        "temp_max_c": 28.5,
+        "temp_min_c": 24.1,
+        "rainfall_mm": 1.3,
+        "wind_ms": 6.03,
+        "weathercode": 53,
+        "relativehumidity_pct": 85
+      },
+      {
+        "date": "2022-12-16",
+        "temp_avg_c": 26.5,
+        "temp_max_c": 29.9,
+        "temp_min_c": 24.5,
+        "rainfall_mm": 0.6,
+        "wind_ms": 5.63,
+        "weathercode": 51,
+        "relativehumidity_pct": 83
+      },
+      {
+        "date": "2022-12-17",
+        "temp_avg_c": 26.3,
+        "temp_max_c": 29.4,
+        "temp_min_c": 24.8,
+        "rainfall_mm": 5.1,
+        "wind_ms": 5.87,
+        "weathercode": 61,
+        "relativehumidity_pct": 84
+      },
+      {
+        "date": "2022-12-18",
+        "temp_avg_c": 25.5,
+        "temp_max_c": 28.0,
+        "temp_min_c": 24.2,
+        "rainfall_mm": 1.3,
+        "wind_ms": 8.08,
+        "weathercode": 51,
+        "relativehumidity_pct": 80
+      },
+      {
+        "date": "2022-12-19",
+        "temp_avg_c": 24.6,
+        "temp_max_c": 26.1,
+        "temp_min_c": 23.4,
+        "rainfall_mm": 5.2,
+        "wind_ms": 6.43,
+        "weathercode": 53,
+        "relativehumidity_pct": 85
+      },
+      {
+        "date": "2022-12-20",
+        "temp_avg_c": 23.9,
+        "temp_max_c": 25.5,
+        "temp_min_c": 23.1,
+        "rainfall_mm": 22.4,
+        "wind_ms": 4.51,
+        "weathercode": 63,
+        "relativehumidity_pct": 94
+      },
+      {
+        "date": "2022-12-21",
+        "temp_avg_c": 25.0,
+        "temp_max_c": 28.5,
+        "temp_min_c": 22.5,
+        "rainfall_mm": 5.2,
+        "wind_ms": 2.82,
+        "weathercode": 61,
+        "relativehumidity_pct": 90
+      },
+      {
+        "date": "2022-12-22",
+        "temp_avg_c": 24.9,
+        "temp_max_c": 28.5,
+        "temp_min_c": 22.6,
+        "rainfall_mm": 1.4,
+        "wind_ms": 4.3,
+        "weathercode": 51,
+        "relativehumidity_pct": 85
+      },
+      {
+        "date": "2022-12-23",
+        "temp_avg_c": 24.5,
+        "temp_max_c": 26.5,
+        "temp_min_c": 23.6,
+        "rainfall_mm": 0.0,
+        "wind_ms": 6.85,
+        "weathercode": 3,
+        "relativehumidity_pct": 76
+      },
+      {
+        "date": "2022-12-24",
+        "temp_avg_c": 23.6,
+        "temp_max_c": 25.3,
+        "temp_min_c": 22.6,
+        "rainfall_mm": 0.1,
+        "wind_ms": 6.23,
+        "weathercode": 51,
+        "relativehumidity_pct": 74
+      },
+      {
+        "date": "2022-12-25",
+        "temp_avg_c": 23.3,
+        "temp_max_c": 25.1,
+        "temp_min_c": 22.2,
+        "rainfall_mm": 0.1,
+        "wind_ms": 7.28,
+        "weathercode": 51,
+        "relativehumidity_pct": 73
+      },
+      {
+        "date": "2022-12-26",
+        "temp_avg_c": 23.9,
+        "temp_max_c": 26.1,
+        "temp_min_c": 22.0,
+        "rainfall_mm": 0.0,
+        "wind_ms": 8.01,
+        "weathercode": 3,
+        "relativehumidity_pct": 68
+      },
+      {
+        "date": "2022-12-27",
+        "temp_avg_c": 23.6,
+        "temp_max_c": 25.6,
+        "temp_min_c": 22.2,
+        "rainfall_mm": 0.1,
+        "wind_ms": 6.36,
+        "weathercode": 51,
+        "relativehumidity_pct": 76
+      },
+      {
+        "date": "2022-12-28",
+        "temp_avg_c": 24.5,
+        "temp_max_c": 27.3,
+        "temp_min_c": 22.4,
+        "rainfall_mm": 0.2,
+        "wind_ms": 7.02,
+        "weathercode": 51,
+        "relativehumidity_pct": 76
+      },
+      {
+        "date": "2022-12-29",
+        "temp_avg_c": 24.1,
+        "temp_max_c": 26.5,
+        "temp_min_c": 22.1,
+        "rainfall_mm": 9.2,
+        "wind_ms": 4.54,
+        "weathercode": 61,
+        "relativehumidity_pct": 88
+      },
+      {
+        "date": "2022-12-30",
+        "temp_avg_c": 25.2,
+        "temp_max_c": 28.3,
+        "temp_min_c": 23.0,
+        "rainfall_mm": 2.0,
+        "wind_ms": 5.61,
+        "weathercode": 53,
+        "relativehumidity_pct": 86
+      },
+      {
+        "date": "2022-12-31",
+        "temp_avg_c": 25.4,
+        "temp_max_c": 26.9,
+        "temp_min_c": 24.2,
+        "rainfall_mm": 1.2,
+        "wind_ms": 5.02,
+        "weathercode": 51,
+        "relativehumidity_pct": 80
+      }
+    ],
     "nasa_power_sb": [
       {
         "date": "2021-01-01",

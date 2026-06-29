@@ -524,6 +524,52 @@ def upsert_monthly_confidence(
     return len(upsert_rows)
 
 
+def _fetch_all_daily_rows(table: str) -> list[dict]:
+    """Paginate through every row in a reference daily table and return them all."""
+    from app.services.supabase_client import get_table
+
+    page_size = 1000
+    offset = 0
+    all_rows: list[dict] = []
+    while True:
+        resp = _execute_with_retry(
+            get_table("reference", table)
+            .select("*")
+            .order("date")
+            .range(offset, offset + page_size - 1)
+        )
+        batch = resp.data or []
+        all_rows.extend(batch)
+        if len(batch) < page_size:
+            break
+        offset += page_size
+    return all_rows
+
+
+def confidence_from_db() -> int:
+    """
+    Fetch all daily rows from the DB and recompute Cohen's Kappa + Lin's CCC
+    from the full dataset (all 30 municipalities, all years). Writes results
+    to weather_monthly_summary. Use this when the JSON on disk is stale or
+    only covers a subset of municipalities.
+    """
+    logger.info("Fetching all rows from weather_rainfall_daily…")
+    rain_rows = _fetch_all_daily_rows("weather_rainfall_daily")
+    logger.info("  → %d rainfall rows", len(rain_rows))
+
+    logger.info("Fetching all rows from weather_temperature_daily…")
+    temp_rows = _fetch_all_daily_rows("weather_temperature_daily")
+    logger.info("  → %d temperature rows", len(temp_rows))
+
+    logger.info("Fetching all rows from weather_wind_daily…")
+    wind_rows = _fetch_all_daily_rows("weather_wind_daily")
+    logger.info("  → %d wind rows", len(wind_rows))
+
+    count = upsert_monthly_confidence(rain_rows, temp_rows, wind_rows)
+    logger.info("Confidence scores updated for %d municipality-months from full DB dataset", count)
+    return count
+
+
 def load_daily_classified(path: Path) -> int:
     """
     Load classified daily rows (written by weather_collector.py or
@@ -589,13 +635,25 @@ if __name__ == "__main__":
         ),
     )
     parser.add_argument(
+        "--confidence-from-db",
+        action="store_true",
+        help=(
+            "Recompute Cohen's Kappa + Lin's CCC from ALL rows in the DB "
+            "(all municipalities, all years) and write to weather_monthly_summary. "
+            "Use this instead of --daily-classified when the JSON on disk is stale."
+        ),
+    )
+    parser.add_argument(
         "--out", type=str, default=str(DEFAULT_OUT_DIR), help="Directory containing the JSON output files"
     )
     args = parser.parse_args()
 
     out_dir = Path(args.out)
 
-    if args.daily_classified:
+    if args.confidence_from_db:
+        count = confidence_from_db()
+        print(f"Confidence scores updated for {count} municipality-months from full DB dataset")
+    elif args.daily_classified:
         target = Path(args.file) if args.file else out_dir / "laguna_weather_daily_classified.json"
         count = load_daily_classified(target)
         print(

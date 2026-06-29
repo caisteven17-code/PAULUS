@@ -1,10 +1,11 @@
 {
-  "generated_at": "2026-06-27T15:31:41.124930Z",
-  "last_fetched_end": "2026-06-20",
+  "generated_at": "2026-06-28T15:29:42.574303Z",
+  "last_fetched_end": "2022-12-31",
   "champions": {
     "Pakil": "nasa_power_sb",
     "Pangil": "nasa_power_sb",
+    "Siniloan": "nasa_power_sb",
     "Famy": "nasa_power_sb",
-    "Rizal": "nasa_power_sb"
+    "Mabitac": "nasa_power_sb"
   }
 }

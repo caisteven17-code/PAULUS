@@ -3,7 +3,7 @@ import os
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.routers import analytics, descriptive, diagnostic, health, predictive, prescriptive
+from app.routers import analytics, descriptive, diagnostic, health, iafr, predictive, prescriptive
 
 app = FastAPI(title="Diocese Analytics API", version="2.0.0")
 
@@ -21,6 +21,7 @@ app.add_middleware(
 # Existing routers (unchanged)
 app.include_router(health.router)
 app.include_router(analytics.router, prefix="/analytics")
+app.include_router(iafr.router)
 
 # New 4-tier analytics pipeline routers
 app.include_router(descriptive.router, prefix="/analytics/descriptive")

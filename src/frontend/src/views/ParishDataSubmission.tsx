@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { AlertCircle, ArrowLeft, Clock3, FileText, CheckCircle2, ShieldCheck, Calendar, Zap } from 'lucide-react';
 import { motion } from 'motion/react';
 import { Card, CardContent } from '../components/ui/Card';
@@ -11,8 +11,8 @@ import { UploadConfirmationModal } from '../components/submission/UploadConfirma
 import { SubmissionProgress } from '../components/submission/SubmissionProgress';
 import { SubmissionResultModal } from '../components/submission/SubmissionResultModal';
 import {
-  acceptedSubmissionExtensions,
-  acceptedSubmissionFormats,
+  acceptedSubmissionExtensionsByType,
+  acceptedSubmissionFormatsByType,
   formatFileSize,
   institutionDescriptionMap,
   institutionHeadingMap,
@@ -82,6 +82,9 @@ export function ParishDataSubmission({
   const institutionType = useMemo(() => resolveInstitutionType(parishClass), [parishClass]);
   const heading = institutionHeadingMap[institutionType];
   const template = submissionTemplates[institutionType];
+  const acceptedExtensions = acceptedSubmissionExtensionsByType[institutionType];
+  const acceptedFormats = acceptedSubmissionFormatsByType[institutionType];
+  const acceptedFormatsLabel = acceptedExtensions.map((ext) => ext.toUpperCase()).join(', ');
   const deadlineLabel = useMemo(() => {
     const now = new Date();
     const currentMonth = now.getMonth();
@@ -117,8 +120,39 @@ export function ParishDataSubmission({
     filePath: string;
     validationStatus: string;
   } | null>(null);
+  const [processResult, setProcessResult] = useState<Awaited<ReturnType<typeof apiClient.processSubmission>> | null>(
+    null,
+  );
 
   const fileSizeLabel = selectedFile ? formatFileSize(selectedFile.size) : '';
+
+  const [realTemplateUrls, setRealTemplateUrls] = useState<Partial<Record<'xlsx' | 'csv', string>>>({});
+
+  useEffect(() => {
+    let cancelled = false;
+    fetch(`/api/admin/templates?institutionType=${institutionType}`)
+      .then((res) => (res.ok ? res.json() : {}))
+      .then((urls: Partial<Record<'xlsx' | 'csv', string>>) => {
+        if (!cancelled) setRealTemplateUrls(urls ?? {});
+      })
+      .catch(() => {
+        if (!cancelled) setRealTemplateUrls({});
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [institutionType]);
+
+  const templateFormatOptions = useMemo(() => {
+    const options: Array<{ format: 'xlsx' | 'csv'; onDownload: () => void }> = [];
+    if (realTemplateUrls.xlsx) {
+      options.push({ format: 'xlsx', onDownload: () => window.open(realTemplateUrls.xlsx, '_blank', 'noopener,noreferrer') });
+    }
+    if (realTemplateUrls.csv) {
+      options.push({ format: 'csv', onDownload: () => window.open(realTemplateUrls.csv, '_blank', 'noopener,noreferrer') });
+    }
+    return options;
+  }, [realTemplateUrls]);
 
   // What-if calculation for selected month
   const submissionWhatIf = useMemo(() => {
@@ -148,8 +182,8 @@ export function ParishDataSubmission({
     if (!file) return 'Please select a financial report file first.';
 
     const extension = file.name.split('.').pop()?.toLowerCase() ?? '';
-    if (!acceptedSubmissionExtensions.includes(extension)) {
-      return 'Invalid file type. Please upload an XLSX, XLS, CSV, or PDF file.';
+    if (!acceptedExtensions.includes(extension)) {
+      return `Invalid file type. Please upload a ${acceptedFormatsLabel} file.`;
     }
 
     if (file.size > 15 * 1024 * 1024) {
@@ -193,6 +227,7 @@ export function ParishDataSubmission({
     setShowSuccessModal(false);
     setShowWarningModal(false);
     setSubmissionResult(null);
+    setProcessResult(null);
     setStatusMessage(
       keepFile && selectedFile
         ? 'You can review the same file again or replace it before submitting a new report.'
@@ -241,12 +276,50 @@ export function ParishDataSubmission({
       console.error('[ParishDataSubmission] submitReport failed, continuing with mock flow:', err);
     }
 
-    await wait(850);
+    await wait(400);
 
-    // Step 2 — cleaning
+    if (institutionType === 'parish') {
+      if (!apiResult) {
+        setFlowState('error');
+        setStatusMessage('Could not upload the report to diocesan secure storage. Please try again.');
+        setShowWarningModal(true);
+        return;
+      }
+
+      await runStep('cleaning', 'Reading and normalizing the uploaded report...');
+      await runStep('validation', 'Validating structure, totals, and business rules...');
+
+      let processResult: Awaited<ReturnType<typeof apiClient.processSubmission>> | null = null;
+      try {
+        processResult = await apiClient.processSubmission(apiResult.submissionId, apiResult.filePath);
+        setProcessResult(processResult);
+      } catch (err) {
+        console.error('[ParishDataSubmission] processSubmission failed:', err);
+      }
+
+      if (!processResult || processResult.validationStatus === 'failed') {
+        setFlowState('anomaly');
+        setStatusMessage('The report failed validation and was not loaded into the diocesan database.');
+        setShowWarningModal(true);
+        return;
+      }
+
+      await runStep('loading', 'Saving line items to the parish financial record...');
+      await runStep('success', 'Report Submitted Successfully.', 500);
+
+      setFlowState('success');
+      setStatusMessage(
+        processResult.validationStatus === 'warning'
+          ? `Submission recorded with ${processResult.summary.errorCount} warning(s) to review. ${processResult.summary.lineItemCount} line item(s) were saved.`
+          : `Submission recorded successfully. ${processResult.summary.lineItemCount} line item(s) were saved to the parish financial record.`,
+      );
+      onImport?.([]);
+      setShowSuccessModal(true);
+      return;
+    }
+
+    // School / seminary — no cleaner exists yet, keep the original frontend-only simulation.
     await runStep('cleaning', 'Cleaning and preparing uploaded data...');
-
-    // Step 3 — anomaly check (simulation kept intentionally)
     await runStep('anomaly', 'Performing anomaly check on the uploaded report...');
 
     const hasAnomaly = shouldSimulateAnomaly(anomalyMode, selectedFile);
@@ -257,13 +330,8 @@ export function ParishDataSubmission({
       return;
     }
 
-    // Step 4 — validation
     await runStep('validation', 'Validating the uploaded report structure and values...');
-
-    // Step 5 — loading
     await runStep('loading', 'Saving submission record to the database...');
-
-    // Step 6 — success
     await runStep('success', 'Report Submitted Successfully.', 500);
 
     setFlowState('success');
@@ -345,7 +413,7 @@ export function ParishDataSubmission({
                 <div className="rounded-[1.4rem] border border-gray-200 bg-white/90 p-4">
                   <p className="text-[10px] font-black uppercase tracking-[0.18em] text-gray-400">Step 2</p>
                   <p className="mt-2 text-sm font-bold text-church-black">Upload Report</p>
-                  <p className="mt-1 text-[11px] text-gray-500">Choose a completed XLSX, XLS, CSV, or PDF file.</p>
+                  <p className="mt-1 text-[11px] text-gray-500">Choose a completed {acceptedFormatsLabel} file.</p>
                 </div>
                 <div className="rounded-[1.4rem] border border-gray-200 bg-white/90 p-4">
                   <p className="text-[10px] font-black uppercase tracking-[0.18em] text-gray-400">Step 3</p>
@@ -386,7 +454,7 @@ export function ParishDataSubmission({
                     <AlertCircle className="mt-0.5 h-5 w-5 shrink-0 text-blue-600" />
                     <div>
                       <p className="text-sm font-bold text-blue-800">Accepted files</p>
-                      <p className="mt-1 text-sm leading-relaxed text-blue-700">XLSX, XLS, CSV, PDF</p>
+                      <p className="mt-1 text-sm leading-relaxed text-blue-700">{acceptedFormatsLabel}</p>
                     </div>
                   </div>
                 </div>
@@ -582,6 +650,7 @@ export function ParishDataSubmission({
               isLoading={isTemplateLoading}
               onDownload={handleDownloadTemplate}
               disabled={permissions?.download_csv !== true}
+              formatOptions={templateFormatOptions.length > 0 ? templateFormatOptions : undefined}
             />
           </motion.div>
 
@@ -590,7 +659,7 @@ export function ParishDataSubmission({
               file={selectedFile}
               fileSizeLabel={fileSizeLabel}
               validationMessage={validationMessage}
-              acceptedFormats={acceptedSubmissionFormats}
+              acceptedFormats={acceptedFormats}
               isSubmitting={flowState === 'running'}
               anomalyMode={anomalyMode}
               onModeChange={setAnomalyMode}
@@ -630,8 +699,14 @@ export function ParishDataSubmission({
       <SubmissionResultModal
         isOpen={showWarningModal}
         variant="warning"
-        title="Anomaly Detected"
-        message="The uploaded report contains unusual values and needs review. The simulated flow stopped before loading to the database."
+        title={institutionType === 'parish' && processResult ? 'Validation Failed' : 'Anomaly Detected'}
+        message={
+          institutionType === 'parish' && processResult
+            ? `The report failed validation (${processResult.summary.errorCount} issue(s) found) and was not loaded into the diocesan database. Please correct the file and resubmit.`
+            : institutionType === 'parish'
+              ? 'Your report could not be processed. Please check your connection and try again.'
+              : 'The uploaded report contains unusual values and needs review. The simulated flow stopped before loading to the database.'
+        }
         primaryLabel="Replace File"
         onPrimary={() => resetFlow(false)}
         secondaryLabel="Cancel Submission"

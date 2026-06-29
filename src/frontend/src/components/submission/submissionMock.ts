@@ -86,9 +86,20 @@ export const institutionDescriptionMap: Record<SubmissionInstitutionType, string
     'Download the school template and simulate a frontend-only report submission for finance review and validation.',
 };
 
-export const acceptedSubmissionFormats = '.xlsx,.xls,.csv,.pdf';
+// Parish IAFR uploads go through the real cleaning pipeline (iafr_cleaner.py),
+// which only has extraction front-ends for .xlsx and .csv — no .xls/.pdf parser
+// exists. School/seminary stay on the original frontend-only mock flow.
+export const acceptedSubmissionExtensionsByType: Record<SubmissionInstitutionType, string[]> = {
+  parish: ['xlsx', 'csv'],
+  seminary: ['xlsx', 'xls', 'csv', 'pdf'],
+  school: ['xlsx', 'xls', 'csv', 'pdf'],
+};
 
-export const acceptedSubmissionExtensions = ['xlsx', 'xls', 'csv', 'pdf'];
+export const acceptedSubmissionFormatsByType: Record<SubmissionInstitutionType, string> = {
+  parish: '.xlsx,.csv',
+  seminary: '.xlsx,.xls,.csv,.pdf',
+  school: '.xlsx,.xls,.csv,.pdf',
+};
 
 export function formatFileSize(bytes: number) {
   if (bytes < 1024) return `${bytes} B`;

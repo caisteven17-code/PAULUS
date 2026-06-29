@@ -126,4 +126,13 @@ export class AnalyticsGatewayController {
     const subPath = req.path.replace(/^\/api\/analytics/, '/analytics');
     return proxyToPython(req, res, subPath, 'POST');
   }
+
+  // ------------------------------------------------------------------
+  // IAFR cleaning pass-through (Python service root, not under /analytics)
+  // ------------------------------------------------------------------
+
+  @Post('iafr/clean-submission')
+  async cleanIafrSubmission(@Req() req: Request, @Res({ passthrough: true }) res: Response) {
+    return proxyToPython(req, res, '/iafr/clean-submission', 'POST');
+  }
 }
