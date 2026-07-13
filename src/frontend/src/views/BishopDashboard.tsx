@@ -2210,7 +2210,7 @@ export function BishopDashboard({
                               </h4>
                               <div className="h-px flex-1 bg-gradient-to-r from-gray-100 to-transparent mx-4"></div>
                             </div>
-                            <HealthDimensionBar label="Liquidity" score={averageDimensions.liquidity} weight={30} />
+                            <HealthDimensionBar label="Liquidity" score={averageDimensions.liquidity} weight={25} />
                             <HealthDimensionBar
                               label="Sustainability"
                               score={averageDimensions.sustainability}
@@ -2219,7 +2219,7 @@ export function BishopDashboard({
                             <HealthDimensionBar label="Efficiency" score={averageDimensions.efficiency} weight={20} />
                             <HealthDimensionBar label="Stability" score={averageDimensions.stability} weight={15} />
                             <div className="sm:col-span-2">
-                              <HealthDimensionBar label="Growth" score={averageDimensions.growth} weight={10} />
+                              <HealthDimensionBar label="Reporting" score={averageDimensions.growth} weight={15} />
                             </div>
                           </div>
 
@@ -2234,8 +2234,8 @@ export function BishopDashboard({
                               </h5>
                               <p className="text-sm text-gray-600 leading-relaxed font-medium">
                                 "While overall health is strong, the{' '}
-                                <span className="text-church-green font-black">Growth</span> dimension has dipped by 3%
-                                this quarter. Consider reviewing the vicariate contribution trends in the Diagnostic
+                                <span className="text-church-green font-black">Reporting</span> dimension needs
+                                continued monitoring. Consider reviewing late or incomplete submissions in the Diagnostic
                                 tab."
                               </p>
                             </div>

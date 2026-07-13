@@ -1313,16 +1313,25 @@ export function PriestDashboard({
       const isOverBudget = priest.avgDisbursements > priest.avgCollections;
       const margin = priest.avgCollections - priest.avgDisbursements;
       const marginRate = priest.avgCollections > 0 ? (margin / priest.avgCollections) * 100 : 0;
-      const collectionScore = clamp((priest.avgCollections / 1_200_000) * 100);
       const trendScore = clamp(70 + priest.collectionChange);
       const marginScore = clamp(60 + marginRate);
-      const tenureScore = priest.monthsAssigned > 60 ? 70 : priest.monthsAssigned > 48 ? 78 : 88;
+      const financialImprovementScore = clamp(trendScore * 0.6 + marginScore * 0.4);
+      const reportingDisciplineScore = clamp(priest.disciplineScore);
+      const financeCouncilScore = clamp(priest.disciplineScore + (marginRate >= 0 ? 5 : -8) - (isOverBudget ? 10 : 0));
+      const pastoralStabilityScore =
+        priest.monthsAssigned >= 24 && priest.monthsAssigned <= 60 ? 90 : priest.monthsAssigned > 60 ? 78 : 72;
+      const contextAdjustedScore = clamp(
+        financialImprovementScore +
+          (priest.avgCollections < 800_000 ? 10 : 0) +
+          (isOverBudget ? 8 : 0) +
+          (priest.collectionChange < 0 ? 7 : 0),
+      );
       const healthScore = Math.round(
-        collectionScore * 0.3 +
-          priest.disciplineScore * 0.3 +
-          trendScore * 0.2 +
-          marginScore * 0.15 +
-          tenureScore * 0.05,
+        financialImprovementScore * 0.25 +
+          reportingDisciplineScore * 0.25 +
+          financeCouncilScore * 0.2 +
+          pastoralStabilityScore * 0.15 +
+          contextAdjustedScore * 0.15,
       );
       const band =
         healthScore >= 85 ? 'excellent' : healthScore >= 70 ? 'healthy' : healthScore >= 55 ? 'support' : 'critical';
@@ -1332,10 +1341,13 @@ export function PriestDashboard({
         isOverBudget,
         margin,
         marginRate,
-        collectionScore,
+        financialImprovementScore,
+        reportingDisciplineScore,
+        financeCouncilScore,
+        pastoralStabilityScore,
+        contextAdjustedScore,
         trendScore,
         marginScore,
-        tenureScore,
         healthScore,
         band,
       };
@@ -2698,10 +2710,10 @@ export function PriestDashboard({
               <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-200">
                 <div className="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-4 mb-6">
                   <div>
-                    <h3 className="text-lg font-bold text-church-green">Priest Performance Health Score</h3>
+                    <h3 className="text-lg font-bold text-church-green">Priest Stewardship Score</h3>
                     <p className="text-xs text-gray-500 mt-1 max-w-3xl">
-                      Scores summarize financial performance, reporting discipline, collection trend, budget margin, and
-                      assignment tenure.
+                      Scores summarize assignment financial improvement, reporting discipline, budget stewardship,
+                      pastoral stability, and context-adjusted parish difficulty.
                     </p>
                   </div>
                   <div className="grid grid-cols-2 gap-2 min-w-[260px]">
@@ -2722,7 +2734,7 @@ export function PriestDashboard({
                   <div className="rounded-2xl border border-gray-100 bg-gray-50 p-5">
                     <div className="flex items-center justify-between mb-4">
                       <p className="text-[10px] font-black uppercase tracking-[0.2em] text-gray-400">
-                        Health Score Bands
+                        Stewardship Score Bands
                       </p>
                       <p className="text-[10px] font-bold text-gray-400">{diocesanStats.total} total</p>
                     </div>
@@ -2734,7 +2746,7 @@ export function PriestDashboard({
                             trigger: 'axis',
                             formatter: (params: any[]) => {
                               const p = params[0];
-                              return `<div style="font-size:11px"><strong>${p.axisValue} health score band</strong><br/>${p.value} priest${p.value !== 1 ? 's' : ''}</div>`;
+                              return `<div style="font-size:11px"><strong>${p.axisValue} stewardship band</strong><br/>${p.value} priest${p.value !== 1 ? 's' : ''}</div>`;
                             },
                             extraCssText: 'border-radius:12px;border:none;box-shadow:0 10px 25px -5px rgba(0,0,0,0.1)',
                           },
@@ -2790,10 +2802,10 @@ export function PriestDashboard({
                     <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3 mb-4">
                       <div>
                         <p className="text-[10px] font-black uppercase tracking-[0.2em] text-gray-400">
-                          Collection Growth vs Health Score
+                          Collection Growth vs Stewardship Score
                         </p>
                         <p className="text-xs text-gray-500 mt-1">
-                          Each point compares priest collection growth rate with the computed health score.
+                          Each point compares priest collection growth rate with the computed stewardship score.
                         </p>
                       </div>
                       <div className="flex items-center gap-4 text-[10px] font-bold uppercase tracking-wide text-gray-500">
@@ -2816,7 +2828,7 @@ export function PriestDashboard({
                             trigger: 'item',
                             formatter: (params: any) => {
                               const d = params.data;
-                              return `<div style="font-size:11px"><strong>${d[2]}</strong><br/>Collection Growth: ${d[0]}%<br/>Health Score: ${d[1]}/100</div>`;
+                              return `<div style="font-size:11px"><strong>${d[2]}</strong><br/>Collection Growth: ${d[0]}%<br/>Stewardship Score: ${d[1]}/100</div>`;
                             },
                             extraCssText: 'border-radius:12px;border:none;box-shadow:0 10px 25px -5px rgba(0,0,0,0.1)',
                           },
@@ -2833,7 +2845,7 @@ export function PriestDashboard({
                           },
                           yAxis: {
                             type: 'value',
-                            name: 'Health Score',
+                            name: 'Stewardship Score',
                             min: 0,
                             max: 100,
                             axisLine: { show: false },

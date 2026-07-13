@@ -63,7 +63,7 @@ def _score_from_records(
     df: pd.DataFrame,
     receipt_cols: list[str],
     expense_cols: list[str],
-    consumable_col: str,
+    _consumable_col: str,
     entity_type: str,
 ) -> HealthScoreResponse | None:
     if df.empty:
@@ -81,26 +81,36 @@ def _score_from_records(
 
     df["total_receipts"] = df[receipt_cols].sum(axis=1)
     df["total_expenses"] = df[expense_cols].sum(axis=1)
-    df["consumable"] = pd.to_numeric(df.get(consumable_col, 0), errors="coerce").fillna(0.0)
-
     avg_receipts = df["total_receipts"].mean()
     avg_expenses = df["total_expenses"].mean()
-    avg_consumable = df["consumable"].mean()
 
-    liquidity = _clamp(_safe_div(avg_receipts, avg_expenses or 1) * 100 - 50)
-    sustainability = _clamp((_safe_div(avg_consumable, avg_expenses or 1) - 0.4) * 125)
-    efficiency = _clamp(100 - (_safe_div(avg_expenses, avg_receipts or 1) - 0.5) * 100)
+    operating_margin = _safe_div(avg_receipts - avg_expenses, avg_receipts or 1)
+    expense_ratio = _safe_div(avg_expenses, avg_receipts or 1)
+
+    liquidity = _clamp(_safe_div(avg_receipts, avg_expenses or 1) * 100)
+    sustainability = _clamp(50 + operating_margin * 200)
+    efficiency = _clamp(100 - max(0.0, expense_ratio - 0.75) * 200)
 
     std_dev = float(df["total_receipts"].std(ddof=0))
-    stability = _clamp(100 - _safe_div(std_dev, avg_receipts or 1) * 250)
+    revenue_stability = _clamp(100 - _safe_div(std_dev, avg_receipts or 1) * 250)
 
     last = df["total_receipts"].iloc[-1]
     prev = df["total_receipts"].iloc[-2] if len(df) > 1 else last
     growth_rate = _safe_div(last - prev, prev or 1)
-    growth = _clamp(50 + growth_rate * 500)
+    growth_stability = _clamp(50 + growth_rate * 250)
+    stability = round(revenue_stability * 0.7 + growth_stability * 0.3)
+
+    expected_periods = max(12, len(df))
+    reporting_compliance = _clamp(_safe_div(len(df), expected_periods) * 100)
 
     composite = round(
-        _clamp(liquidity * 0.30 + sustainability * 0.25 + efficiency * 0.20 + stability * 0.15 + growth * 0.10)
+        _clamp(
+            liquidity * 0.25
+            + sustainability * 0.25
+            + efficiency * 0.20
+            + stability * 0.15
+            + reporting_compliance * 0.15
+        )
     )
 
     trend = "up" if composite > 70 else ("down" if composite < 40 else "stable")
@@ -115,7 +125,7 @@ def _score_from_records(
             sustainability=round(sustainability),
             efficiency=round(efficiency),
             stability=round(stability),
-            growth=round(growth),
+            growth=round(reporting_compliance),
         ),
         trend=trend,
         percentage_change=round(growth_rate * 100, 2),

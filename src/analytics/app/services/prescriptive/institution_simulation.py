@@ -17,10 +17,13 @@ from app.services.supabase_client import get_table
 
 
 def _compute_health_score(avg_receipts: float, avg_expenses: float, avg_consumable: float) -> float:
-    liquidity = max(0.0, min(100.0, safe_div(avg_receipts, avg_expenses or 1) * 100 - 50))
-    sustainability = max(0.0, min(100.0, (safe_div(avg_consumable, avg_expenses or 1) - 0.4) * 125))
-    efficiency = max(0.0, min(100.0, 100 - (safe_div(avg_expenses, avg_receipts or 1) - 0.5) * 100))
-    return round(liquidity * 0.30 + sustainability * 0.25 + efficiency * 0.45, 2)
+    operating_margin = safe_div(avg_receipts - avg_expenses, avg_receipts or 1)
+    expense_ratio = safe_div(avg_expenses, avg_receipts or 1)
+    liquidity = max(0.0, min(100.0, safe_div(avg_receipts, avg_expenses or 1) * 100))
+    sustainability = max(0.0, min(100.0, 50 + operating_margin * 200))
+    efficiency = max(0.0, min(100.0, 100 - max(0.0, expense_ratio - 0.75) * 200))
+    reporting_compliance = 100.0
+    return round(liquidity * 0.25 + sustainability * 0.25 + efficiency * 0.35 + reporting_compliance * 0.15, 2)
 
 
 def _run_simulation(

@@ -101,27 +101,36 @@ export class AnalyticsService {
 
     const totalCollections = records.reduce((s, r) => s + r.collections, 0);
     const totalDisbursements = records.reduce((s, r) => s + r.disbursements, 0);
-    const totalConsumable = records.reduce((s, r) => s + r.consumableCollections, 0);
 
     const avgCollections = totalCollections / records.length;
     const avgDisbursements = totalDisbursements / records.length;
-    const avgConsumable = totalConsumable / records.length;
 
     const latest = records[records.length - 1];
     const prev = records.length > 1 ? records[records.length - 2] : latest;
 
-    const liquidity = this.clamp((avgCollections / (avgDisbursements || 1) - 0.5) * 100);
-    const sustainability = this.clamp((avgConsumable / (avgDisbursements || 1) - 0.4) * 125);
-    const efficiency = this.clamp(100 - (avgDisbursements / (avgCollections || 1) - 0.5) * 100);
+    const operatingMargin = (avgCollections - avgDisbursements) / (avgCollections || 1);
+    const expenseRatio = avgDisbursements / (avgCollections || 1);
+
+    const liquidity = this.clamp((avgCollections / (avgDisbursements || 1)) * 100);
+    const sustainability = this.clamp(50 + operatingMargin * 200);
+    const efficiency = this.clamp(100 - Math.max(0, expenseRatio - 0.75) * 200);
 
     const stdDev = Math.sqrt(records.reduce((s, r) => s + (r.collections - avgCollections) ** 2, 0) / records.length);
-    const stability = this.clamp(100 - (stdDev / (avgCollections || 1)) * 250);
+    const revenueStability = this.clamp(100 - (stdDev / (avgCollections || 1)) * 250);
 
     const growthRate = (latest.collections - prev.collections) / (prev.collections || 1);
-    const growth = this.clamp(50 + growthRate * 500);
+    const growthStability = this.clamp(50 + growthRate * 250);
+    const stability = Math.round(revenueStability * 0.7 + growthStability * 0.3);
+    const reportingCompliance = this.clamp((records.length / Math.max(12, records.length)) * 100);
 
     const compositeScore = Math.round(
-      this.clamp(liquidity * 0.3 + sustainability * 0.25 + efficiency * 0.2 + stability * 0.15 + growth * 0.1),
+      this.clamp(
+        liquidity * 0.25 +
+          sustainability * 0.25 +
+          efficiency * 0.2 +
+          stability * 0.15 +
+          reportingCompliance * 0.15,
+      ),
     );
 
     const { analysis, recommendations } = this.buildAnalysis(
@@ -142,7 +151,7 @@ export class AnalyticsService {
         sustainability: Math.round(sustainability),
         efficiency: Math.round(efficiency),
         stability: Math.round(stability),
-        growth: Math.round(growth),
+        growth: Math.round(reportingCompliance),
       },
       trend: compositeScore > 70 ? 'up' : compositeScore < 40 ? 'down' : 'stable',
       percentageChange: growthRate * 100,
