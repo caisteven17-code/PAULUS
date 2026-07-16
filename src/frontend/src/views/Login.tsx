@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState } from 'react';
-import { Eye, EyeOff, LogIn, KeyRound, Mail, Lock } from 'lucide-react';
+import { Eye, EyeOff, LogIn, KeyRound, Mail, Lock, Upload } from 'lucide-react';
 import { motion } from 'motion/react';
 import { ForgotPasswordModal } from '../components/auth/ForgotPasswordModal';
 import { AccessRole, AppRole, getAccessRoleLabel, getAppRole, normalizeAccessRole } from '../lib/access';
@@ -13,9 +13,10 @@ import type { AuthUser } from '../firebase';
 
 interface LoginProps {
   onLogin: (role: AppRole) => void;
+  onPusher?: () => void;
 }
 
-export function Login({ onLogin }: LoginProps) {
+export function Login({ onLogin, onPusher }: LoginProps) {
   const [email, setEmail]                     = useState('');
   const [password, setPassword]               = useState('');
   const [showPassword, setShowPassword]       = useState(false);
@@ -337,6 +338,18 @@ export function Login({ onLogin }: LoginProps) {
                       ? <><span className="h-5 w-5 rounded-full border-2 border-slate-950/30 border-t-slate-950 animate-spin" />Signing in...</>
                       : <><LogIn className="h-5 w-5" />Sign In</>}
                   </button>
+
+                  {onPusher && (
+                    <button
+                      type="button"
+                      onClick={onPusher}
+                      disabled={isLoading}
+                      className="flex w-full items-center justify-center gap-2.5 rounded-2xl border border-[#D4AF37]/35 bg-black/20 py-3.5 text-sm font-black uppercase tracking-[0.18em] text-[#F5D98A] transition-all hover:border-[#D4AF37]/70 hover:bg-[#D4AF37]/10 disabled:opacity-50"
+                    >
+                      <Upload className="h-4 w-4" />
+                      PUSHER
+                    </button>
+                  )}
                 </form>
               </div>
             ) : (

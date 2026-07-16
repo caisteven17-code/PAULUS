@@ -24,6 +24,7 @@ import { HealthTracker } from './views/HealthTracker';
 import { ConsolidatedFinancial } from './views/ConsolidatedFinancial';
 import { AuditLog } from './views/AuditLog';
 import { ParishDataSubmission } from './views/ParishDataSubmission';
+import { Pusher } from './views/Pusher';
 import { BottomNav } from './components/ui/BottomNav';
 import { StewardChatbot } from './components/ui/StewardChatbot';
 import { OnboardingModal } from './components/auth/OnboardingModal';
@@ -220,6 +221,9 @@ const normalizePath = (path: string) => {
 const tabFromPath = (path: string) => PATH_TO_TAB[normalizePath(path)] ?? 'home';
 
 export default function App() {
+  const [showPusher, setShowPusher] = useState(() =>
+    typeof window === 'undefined' ? false : normalizePath(window.location.pathname) === '/pusher',
+  );
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [isAuthReady, setIsAuthReady] = useState(false);
   // After a successful login, a black overlay (with the crest) fades out to
@@ -313,6 +317,20 @@ export default function App() {
     }
   };
 
+  const openPusher = () => {
+    setShowPusher(true);
+    if (typeof window !== 'undefined') {
+      window.history.pushState({ pusher: true }, '', '/pusher');
+    }
+  };
+
+  const closePusher = () => {
+    setShowPusher(false);
+    if (typeof window !== 'undefined') {
+      window.history.pushState({ tab: 'home' }, '', '/');
+    }
+  };
+
   useEffect(() => {
     if (!isAuthReady || !isAuthenticated || permissionsLoading) return;
     if (!canAccessTab(activeTab, role, permissions)) {
@@ -325,17 +343,21 @@ export default function App() {
   }, [activeTab]);
 
   useEffect(() => {
-    if (typeof window === 'undefined' || digitalTwinSession) return;
+    if (typeof window === 'undefined' || digitalTwinSession || showPusher) return;
     const nextPath = TAB_TO_PATH[activeTab] ?? '/';
     if (normalizePath(window.location.pathname) !== normalizePath(nextPath)) {
       window.history.pushState({ tab: activeTab }, '', nextPath);
     }
-  }, [activeTab, digitalTwinSession]);
+  }, [activeTab, digitalTwinSession, showPusher]);
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
     const handlePopState = () => {
-      setActiveTab(tabFromPath(window.location.pathname));
+      const path = normalizePath(window.location.pathname);
+      setShowPusher(path === '/pusher');
+      if (path !== '/pusher') {
+        setActiveTab(tabFromPath(path));
+      }
     };
     window.addEventListener('popstate', handlePopState);
     return () => window.removeEventListener('popstate', handlePopState);
@@ -495,7 +517,7 @@ export default function App() {
   };
 
   useEffect(() => {
-    if (!isAuthenticated || !isAuthReady) {
+    if (!isAuthenticated || !isAuthReady || showPusher) {
       if (inactivityTimeoutRef.current) clearTimeout(inactivityTimeoutRef.current);
       inactivityTimeoutRef.current = null;
       return;
@@ -518,7 +540,7 @@ export default function App() {
       inactivityTimeoutRef.current = null;
       activityEvents.forEach((eventName) => window.removeEventListener(eventName, resetTimer));
     };
-  }, [isAuthenticated, isAuthReady, user?.email]);
+  }, [isAuthenticated, isAuthReady, showPusher, user?.email]);
 
   if (!isAuthReady) {
     return <div className="min-h-screen bg-slate-50" />;
@@ -1402,8 +1424,10 @@ export default function App() {
 
   return (
     <>
-      {!isAuthenticated ? (
-        <Login onLogin={handleLogin} />
+      {showPusher ? (
+        <Pusher onBack={closePusher} />
+      ) : !isAuthenticated ? (
+        <Login onLogin={handleLogin} onPusher={openPusher} />
       ) : onboardingUser ? (
         <OnboardingModal
           user={onboardingUser}
