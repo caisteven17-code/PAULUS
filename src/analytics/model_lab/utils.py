@@ -26,11 +26,16 @@ DEFAULT_WORKBOOK_NAMES = (
 )
 DEFAULT_LITURGICAL_CALENDAR = "liturgical_calendar_rows.csv"
 DEFAULT_LITURGICAL_CALENDAR_NAMES = (
+    "liturgical_calendar_rows.csv",
+    "liturgical_calendar_clean.csv",
     "liturgical_calendar_rows.json",
     "liturgical_calendar_clean.json",
-    "liturgical_calendar_rows.csv",
 )
 DEFAULT_WEATHER_NAMES = (
+    "laguna_weather_final.csv",
+    "laguna_weather_daily_classified.csv",
+    "weather.csv",
+    "weather_rows.csv",
     "laguna_weather_final.json",
     "laguna_weather_daily_classified.json",
     "weather.json",
@@ -260,14 +265,14 @@ def _load_weather_features(weather_path: str) -> pd.DataFrame:
         frames = [
             _load_weather_features(os.path.join(weather_path, filename))
             for filename in sorted(os.listdir(weather_path))
-            if filename.lower().endswith(".json")
+            if filename.lower().endswith((".csv", ".json"))
         ]
         frames = [frame for frame in frames if not frame.empty]
         if not frames:
             return pd.DataFrame()
         return _aggregate_weather_rows(pd.concat(frames, ignore_index=True))
 
-    weather = _read_json_records(weather_path)
+    weather = _read_tabular_file(weather_path)
     if "municipalities" in weather.columns:
         return _load_weather_municipality_payload(weather)
     if "monthly_data" in weather.columns:
@@ -457,19 +462,21 @@ def _extract_json_records(payload):
 
 def _candidate_data_dirs(source_path: str | Sequence[str] | None = None) -> list[str]:
     repo_root = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", ".."))
-    candidate_dirs = [
-        os.path.dirname(__file__),
-        repo_root,
-        os.path.join(repo_root, "weather_output"),
-        os.path.join(repo_root, "liturgical_calendar_output"),
-        os.path.join(repo_root, "liturgical_calendar_sources"),
-    ]
+    candidate_dirs = []
 
     if source_path is not None and not (
         isinstance(source_path, Sequence) and not isinstance(source_path, (str, bytes, os.PathLike))
     ):
         source_text = str(source_path)
         candidate_dirs.append(source_text if os.path.isdir(source_text) else (os.path.dirname(source_text) or "."))
+
+    candidate_dirs.extend([
+        os.path.dirname(__file__),
+        repo_root,
+        os.path.join(repo_root, "weather_output"),
+        os.path.join(repo_root, "liturgical_calendar_output"),
+        os.path.join(repo_root, "liturgical_calendar_sources"),
+    ])
 
     return candidate_dirs
 

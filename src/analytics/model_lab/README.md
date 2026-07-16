@@ -46,12 +46,14 @@ of these array keys: `records`, `data`, `rows`, `items`, or `results`. Rows stil
 need the normalized model columns such as `parish_name`, `year`, and either
 `month` or `month_num`.
 
-Liturgical calendar features are merged automatically from
-`liturgical_calendar_rows.json`, `liturgical_calendar_clean.json`, or
-`liturgical_calendar_rows.csv` when found beside the input, in this folder, or in
-the repo-level `liturgical_calendar_output/` folder. Weather features are merged
-automatically from `weather_output/laguna_weather_per_city/` when present, with
-fallback support for combined files such as `laguna_weather_final.json`.
+Liturgical calendar features are merged automatically from CSV files such as
+`liturgical_calendar_rows.csv` or `liturgical_calendar_clean.csv` when found
+beside the input, in this folder, or in the repo-level
+`liturgical_calendar_output/` folder. Weather features are merged automatically
+from CSV files in `weather_output/laguna_weather_per_city/` when present, with
+fallback support for combined files such as `laguna_weather_final.csv`. JSON
+side-data still works as a fallback, but CSV is the preferred format for weather
+and liturgical calendar data.
 
 > **Note:** `prophet` requires `pystan` or `cmdstan`. If the install fails, try:
 > ```bash
