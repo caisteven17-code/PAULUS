@@ -70,13 +70,13 @@ export class EntityService {
       }
       // Normalize data based on type
       if (entityType === 'school' && data) {
-        return data.map((school: any) => this.normalizeSchoolData(school));
+        return (await this.enrichWithInstitutionCodes(entityType, data)).map((school: any) => this.normalizeSchoolData(school));
       }
       if (entityType === 'parish' && data) {
-        return data.map((parish: any) => this.normalizeEntityResponse(parish));
+        return (await this.enrichWithInstitutionCodes(entityType, data)).map((parish: any) => this.normalizeEntityResponse(parish));
       }
       if (entityType === 'seminary' && data) {
-        return data.map((seminary: any) => this.normalizeEntityResponse(seminary));
+        return (await this.enrichWithInstitutionCodes(entityType, data)).map((seminary: any) => this.normalizeEntityResponse(seminary));
       }
       return data;
     }
@@ -100,10 +100,75 @@ export class EntityService {
     }
 
     return {
-      parishes: (par.data ?? []).map((p: any) => this.normalizeEntityResponse(p)),
-      seminaries: (sem.data ?? []).map((s: any) => this.normalizeEntityResponse(s)),
-      schools: (sch.data ?? []).map((s: any) => this.normalizeSchoolData(s)),
+      parishes: (await this.enrichWithInstitutionCodes('parish', par.data ?? [])).map((p: any) =>
+        this.normalizeEntityResponse(p),
+      ),
+      seminaries: (await this.enrichWithInstitutionCodes('seminary', sem.data ?? [])).map((s: any) =>
+        this.normalizeEntityResponse(s),
+      ),
+      schools: (await this.enrichWithInstitutionCodes('school', sch.data ?? [])).map((s: any) =>
+        this.normalizeSchoolData(s),
+      ),
     };
+  }
+
+  private async enrichWithInstitutionCodes(type: EntityType, rows: any[]): Promise<any[]> {
+    if (!rows.length) return rows;
+
+    const { data: institutions, error } = await this.supabaseService.admin
+      .schema('diocese')
+      .from('institutions')
+      .select('id, name, vicariate, institution_code')
+      .eq('institution_type', this.domainInstitutionType(type))
+      .is('deleted_at', null);
+
+    if (error || !institutions?.length) return rows;
+
+    const byId = new Map<string, any>();
+    const byNameAndVicariate = new Map<string, any>();
+    const byName = new Map<string, any>();
+    const duplicateNames = new Set<string>();
+    const key = (value: any) =>
+      String(value ?? '')
+        .trim()
+        .toLowerCase();
+
+    for (const institution of institutions) {
+      if (institution.id) byId.set(institution.id, institution);
+
+      const nameKey = key(institution.name);
+      const vicariateKey = key(institution.vicariate);
+      if (nameKey && vicariateKey) byNameAndVicariate.set(`${nameKey}|${vicariateKey}`, institution);
+
+      if (nameKey) {
+        if (byName.has(nameKey)) duplicateNames.add(nameKey);
+        else byName.set(nameKey, institution);
+      }
+    }
+
+    for (const duplicateName of duplicateNames) {
+      byName.delete(duplicateName);
+    }
+
+    return rows.map((row) => {
+      const existingCode = row.institution_code ?? row.institutionCode ?? row.iafr_source_code ?? row.iafrSourceCode;
+      if (existingCode) return row;
+
+      const idCandidate = this.isUuid(row.institution_id) ? row.institution_id : this.isUuid(row.id) ? row.id : null;
+      const match =
+        (idCandidate ? byId.get(idCandidate) : null) ??
+        byNameAndVicariate.get(`${key(row.name)}|${key(row.vicariate)}`) ??
+        byName.get(key(row.name));
+
+      const institutionCode = match?.institution_code ?? '';
+      return {
+        ...row,
+        institution_code: institutionCode,
+        institutionCode,
+        iafr_source_code: institutionCode,
+        iafrSourceCode: institutionCode,
+      };
+    });
   }
 
   private async getPortableAdminEntities(type: EntityType, includeAll = false): Promise<any[]> {
@@ -111,7 +176,7 @@ export class EntityService {
       .schema('diocese')
       .from('institutions')
       .select(
-        'id, name, institution_type, vicariate, district, cluster, class, address, contact_number, email, latitude, longitude, is_active, subsidy_type',
+        'id, name, institution_code, institution_type, vicariate, district, cluster, class, address, contact_number, email, latitude, longitude, is_active, subsidy_type',
       )
       .eq('institution_type', this.domainInstitutionType(type))
       .order('name');
@@ -130,6 +195,10 @@ export class EntityService {
     const normalized: any = {
       id: institution.id,
       name: institution.name,
+      institution_code: institution.institution_code ?? '',
+      institutionCode: institution.institution_code ?? '',
+      iafr_source_code: institution.institution_code ?? '',
+      iafrSourceCode: institution.institution_code ?? '',
       vicariate: institution.vicariate ?? '',
       district: institution.district ?? '',
       class: this.fromInstitutionClass(institution.class) ?? institution.class ?? 'Class C',
@@ -208,6 +277,16 @@ export class EntityService {
       normalized.subsidyType = entity.subsidy_type;
     }
 
+    if (entity.institution_code !== undefined) {
+      normalized.institutionCode = entity.institution_code ?? '';
+      normalized.iafrSourceCode = entity.institution_code ?? '';
+      normalized.iafr_source_code = entity.institution_code ?? '';
+    } else if (entity.institutionCode !== undefined) {
+      normalized.institution_code = entity.institutionCode ?? '';
+      normalized.iafrSourceCode = entity.institutionCode ?? '';
+      normalized.iafr_source_code = entity.institutionCode ?? '';
+    }
+
     return normalized;
   }
 
@@ -242,6 +321,11 @@ export class EntityService {
 
     if (institution.latitude !== undefined) response.lat = institution.latitude;
     if (institution.longitude !== undefined) response.lng = institution.longitude;
+    if (institution.institution_code !== undefined) {
+      response.institutionCode = institution.institution_code ?? '';
+      response.iafrSourceCode = institution.institution_code ?? '';
+      response.iafr_source_code = institution.institution_code ?? '';
+    }
 
     const className = this.fromInstitutionClass(institution.class);
     if (className) response.class = className;
@@ -298,20 +382,25 @@ export class EntityService {
 
   private async syncEntityDetails(type: EntityType, institutionId: string, entity: any): Promise<void> {
     const subsidyType = entity?.subsidy_type ?? entity?.subsidyType;
-    if (subsidyType !== 'subsidized' && subsidyType !== 'independent') return;
+    const institutionCode = entity?.iafrSourceCode ?? entity?.iafr_source_code ?? entity?.institutionCode ?? entity?.institution_code;
+    const payload: Record<string, any> = {
+      institution_id: institutionId,
+      updated_at: new Date().toISOString(),
+    };
+
+    if (subsidyType === 'subsidized' || subsidyType === 'independent') payload.subsidy_type = subsidyType;
+    if (type === 'parish' && institutionCode !== undefined) {
+      const normalizedCode = String(institutionCode ?? '').trim().toUpperCase().replace(/\s+/g, '');
+      payload.iafr_source_code = normalizedCode || null;
+    }
+
+    if (Object.keys(payload).length <= 2) return;
 
     try {
       const { error } = await this.supabaseService.admin
         .schema(this.detailSchemaFor(type))
         .from('details')
-        .upsert(
-          {
-            institution_id: institutionId,
-            subsidy_type: subsidyType,
-            updated_at: new Date().toISOString(),
-          },
-          { onConflict: 'institution_id' },
-        );
+        .upsert(payload, { onConflict: 'institution_id' });
 
       if (error) throw error;
     } catch (error) {
@@ -329,6 +418,11 @@ export class EntityService {
     if (entity?.address !== undefined) payload.address = entity.address;
     if (entity?.vicariate !== undefined) payload.vicariate = entity.vicariate;
     if (entity?.district !== undefined) payload.district = entity.district;
+    const institutionCode = entity?.institutionCode ?? entity?.institution_code ?? entity?.iafrSourceCode ?? entity?.iafr_source_code;
+    if (institutionCode !== undefined) {
+      const normalizedCode = String(institutionCode ?? '').trim().toUpperCase().replace(/\s+/g, '');
+      payload.institution_code = normalizedCode || null;
+    }
     if (entity?.class !== undefined) {
       const normalizedClass = this.normalizeInstitutionClass(entity.class);
       if (normalizedClass) payload.class = normalizedClass;
@@ -387,6 +481,10 @@ export class EntityService {
     delete legacyPayload.subsidyType;
     delete legacyPayload.subsidy_type;
     delete legacyPayload.previousName;
+    delete legacyPayload.institutionCode;
+    delete legacyPayload.institution_code;
+    delete legacyPayload.iafrSourceCode;
+    delete legacyPayload.iafr_source_code;
     delete legacyPayload.district;
     delete legacyPayload.lat;
     delete legacyPayload.lng;
@@ -490,6 +588,8 @@ export class EntityService {
     const syncedInstitution = await this.syncInstitutionFields(type, {
       ...updates,
       ...data,
+      id,
+      institution_id: id,
       previousName: updates.previousName ?? existingEntity?.name,
     });
     const updatedInstitutionFields = this.institutionFieldsForResponse(syncedInstitution);

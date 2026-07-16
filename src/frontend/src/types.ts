@@ -47,6 +47,10 @@ export interface FinancialRecord {
 export interface Parish {
   id: string;
   name: string;
+  institutionCode?: string;
+  institution_code?: string;
+  iafrSourceCode?: string;
+  iafr_source_code?: string;
   district?: string;
   vicariate: string;
   class: EntityClass;
@@ -70,6 +74,8 @@ export interface Parish {
 export interface Seminary {
   id: string;
   name: string;
+  institutionCode?: string;
+  institution_code?: string;
   district?: string;
   vicariate: string;
   class: EntityClass;
@@ -91,6 +97,8 @@ export interface Seminary {
 export interface DiocesanSchool {
   id: string;
   name: string;
+  institutionCode?: string;
+  institution_code?: string;
   district?: string;
   vicariate?: string;
   cluster: 1 | 2 | 3;

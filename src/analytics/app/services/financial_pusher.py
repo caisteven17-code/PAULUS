@@ -124,6 +124,18 @@ def normalize_name(value: str | None) -> str:
     return re.sub(r"\s+", " ", text).strip()
 
 
+def normalize_source_code(value: Any) -> str | None:
+    text = str(value or "").strip().upper()
+    if not text:
+        return None
+    text = text.replace("–", "-").replace("—", "-")
+    match = re.match(r"^D\s*(\d+)\s*-?\s*(\d+)$", text)
+    if match:
+        return f"D{int(match.group(1))}-{int(match.group(2))}"
+    text = re.sub(r"\s+", "", text)
+    return text or None
+
+
 def _name_similarity(source: str, candidate: str) -> float:
     base = SequenceMatcher(None, source, candidate).ratio()
     source_tokens = set(source.split())
@@ -600,7 +612,12 @@ def list_parish_institutions() -> list[dict[str, Any]]:
     )
 
 
-def _load_institution_matchers() -> tuple[dict[str, list[dict[str, Any]]], list[dict[str, Any]], dict[tuple[str | None, str], str]]:
+def _load_institution_matchers() -> tuple[
+    dict[str, list[dict[str, Any]]],
+    list[dict[str, Any]],
+    dict[tuple[str | None, str], str],
+    dict[str, list[dict[str, Any]]],
+]:
     try:
         institutions = (
             get_table("diocese", "institutions")
@@ -613,6 +630,20 @@ def _load_institution_matchers() -> tuple[dict[str, list[dict[str, Any]]], list[
         )
     except Exception:
         institutions = []
+
+    institution_by_id = {row.get("id"): row for row in institutions if row.get("id")}
+
+    try:
+        parish_details = (
+            get_table("parishes", "details")
+            .select("institution_id, iafr_source_code")
+            .is_("deleted_at", "null")
+            .execute()
+            .data
+            or []
+        )
+    except Exception:
+        parish_details = []
 
     try:
         aliases = (
@@ -630,21 +661,36 @@ def _load_institution_matchers() -> tuple[dict[str, list[dict[str, Any]]], list[
         aliases = []
 
     exact: dict[str, list[dict[str, Any]]] = defaultdict(list)
+    source_code_lookup: dict[str, list[dict[str, Any]]] = defaultdict(list)
+
+    def add_source_code_candidate(source_code: Any, institution: dict[str, Any] | None) -> None:
+        normalized_code = normalize_source_code(source_code)
+        if not normalized_code or not institution or not institution.get("id"):
+            return
+        candidates = source_code_lookup[normalized_code]
+        if not any(candidate.get("id") == institution.get("id") for candidate in candidates):
+            candidates.append(institution)
+
     for row in institutions:
         if row.get("name"):
             exact[normalize_name(row.get("name"))].append(row)
+        add_source_code_candidate(row.get("institution_code"), row)
+
+    for detail in parish_details:
+        add_source_code_candidate(detail.get("iafr_source_code"), institution_by_id.get(detail.get("institution_id")))
+
     alias_lookup = {
-        (row.get("source_code"), row.get("normalized_source_name")): row["institution_id"]
+        (normalize_source_code(row.get("source_code")), row.get("normalized_source_name")): row["institution_id"]
         for row in aliases
         if row.get("normalized_source_name")
     }
-    return exact, institutions, alias_lookup
+    return exact, institutions, alias_lookup, dict(source_code_lookup)
 
 
 def _parish_review_rows(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
     review: dict[tuple[str | None, str], dict[str, Any]] = {}
     for row in rows:
-        key = (row.get("parish_code"), normalize_name(row.get("parish_name")))
+        key = (normalize_source_code(row.get("parish_code")), normalize_name(row.get("parish_name")))
         if key not in review:
             review[key] = {
                 "sourceCode": row.get("parish_code"),
@@ -677,12 +723,25 @@ def _match_institution(
     exact: dict[str, list[dict[str, Any]]],
     institutions: list[dict[str, Any]],
     aliases: dict[tuple[str | None, str], str],
+    source_codes: dict[str, list[dict[str, Any]]],
 ) -> dict[str, Any]:
+    normalized_code = normalize_source_code(code)
+    if normalized_code and normalized_code in source_codes:
+        candidates = source_codes[normalized_code]
+        candidate = candidates[0]
+        status = "matched" if len(candidates) == 1 else "suggested"
+        return {
+            "institution_id": candidate["id"],
+            "status": status,
+            "confidence": 1.0,
+            "match_name": candidate.get("name"),
+        }
+
     normalized = normalize_name(name)
     source_variants = [normalized]
     if "," in name:
         source_variants.append(normalize_name(name.split(",", 1)[0]))
-    alias_id = aliases.get((code, normalized)) or aliases.get((None, normalized))
+    alias_id = aliases.get((normalized_code, normalized)) or aliases.get((None, normalized))
     if alias_id:
         return {"institution_id": alias_id, "status": "matched", "confidence": 1.0, "match_name": name}
     for variant in source_variants:
@@ -774,7 +833,7 @@ def _source_columns(ws, account_names: dict[str, str]) -> list[SourceColumn]:
 
 def _parse_workbook(file_name: str, file_bytes: bytes) -> dict[str, Any]:
     account_names, _ = _get_account_lookup()
-    exact, institutions, aliases = _load_institution_matchers()
+    exact, institutions, aliases, source_codes = _load_institution_matchers()
     wb = openpyxl.load_workbook(io.BytesIO(file_bytes), data_only=True)
     month_sheets = []
     for sheet_name in wb.sheetnames:
@@ -834,7 +893,7 @@ def _parse_workbook(file_name: str, file_bytes: bytes) -> dict[str, Any]:
                     )
 
             zero_filled += row_zeroes
-            match = _match_institution(parish_code, parish_name_text, exact, institutions, aliases)
+            match = _match_institution(parish_code, parish_name_text, exact, institutions, aliases, source_codes)
             if match["status"] == "unmatched":
                 row_issues.append(
                     {
@@ -1318,7 +1377,7 @@ def commit_batch(
     if not approved:
         raise ValueError("No approved mappings were provided.")
     reviewed_parishes = {
-        (mapping.get("sourceCode"), normalize_name(mapping.get("sourceName"))): mapping.get("institutionId")
+        (normalize_source_code(mapping.get("sourceCode")), normalize_name(mapping.get("sourceName"))): mapping.get("institutionId")
         for mapping in parish_mappings or []
         if mapping.get("institutionId") and mapping.get("sourceName")
     }
@@ -1329,7 +1388,7 @@ def commit_batch(
 
     committed = skipped = blocked = line_items_created = 0
     for row in rows:
-        row_key = (row.get("parish_code"), normalize_name(row.get("parish_name")))
+        row_key = (normalize_source_code(row.get("parish_code")), normalize_name(row.get("parish_name")))
         reviewed_institution_id = reviewed_parishes.get(row_key)
         if reviewed_institution_id:
             row["institution_id"] = reviewed_institution_id

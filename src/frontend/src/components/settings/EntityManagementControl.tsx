@@ -23,6 +23,7 @@ import {
   Archive,
   Users,
   Layers,
+  ArrowUpDown,
 } from 'lucide-react';
 import { Parish, Seminary, DiocesanSchool, EntityClass } from '../../types';
 import { VICARIATES, CLASSES, ALL_PARISHES, INITIAL_PARISHES } from '../../constants';
@@ -45,6 +46,11 @@ interface EntityManagementControlProps {
 }
 
 const stripVicariatePrefix = (name: string) => name.replace('Vicariate of ', '');
+
+const getInstitutionCode = (entity: any) =>
+  String(entity?.iafrSourceCode || entity?.iafr_source_code || entity?.institutionCode || entity?.institution_code || '').trim();
+
+const normalizeInstitutionCode = (value: string) => value.trim().toUpperCase().replace(/\s+/g, '');
 
 const DISTRICTS = ['District I', 'District II', 'District III', 'District IV'];
 
@@ -263,6 +269,10 @@ export function EntityManagementControl({
   const [classFilter, setClassFilter] = useState('all');
   const [districtFilter, setDistrictFilter] = useState('all');
   const [clusterFilter, setClusterFilter] = useState('all');
+  const [sortConfig, setSortConfig] = useState<{ key: 'name' | 'iafrSourceCode'; direction: 'asc' | 'desc' }>({
+    key: 'iafrSourceCode',
+    direction: 'asc',
+  });
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingEntity, setEditingEntity] = useState<any | null>(null);
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
@@ -295,6 +305,10 @@ export function EntityManagementControl({
     setClassFilter('all');
     setDistrictFilter('all');
     setClusterFilter('all');
+    setSortConfig({
+      key: activeSubTab === 'parishes' ? 'iafrSourceCode' : 'name',
+      direction: 'asc',
+    });
   }, [activeSubTab]);
 
   useEffect(() => {
@@ -424,6 +438,7 @@ export function EntityManagementControl({
     cluster: 1 | 2 | 3;
     class: string;
     address: string;
+    iafrSourceCode: string;
     subsidyType: 'subsidized' | 'independent';
     city?: string;
     lat?: number;
@@ -435,6 +450,7 @@ export function EntityManagementControl({
     cluster: 1,
     class: CLASSES[0],
     address: '',
+    iafrSourceCode: '',
     subsidyType: 'subsidized',
     city: '',
     lat: undefined,
@@ -912,6 +928,7 @@ export function EntityManagementControl({
         cluster: entity.cluster || 1,
         class: entity.class || CLASSES[0],
         address: rawAddress,
+        iafrSourceCode: getInstitutionCode(entity),
         subsidyType: entity.subsidyType || 'subsidized',
         city: extractedCity,
         lat: entity.lat !== undefined ? Number(entity.lat) : undefined,
@@ -929,6 +946,7 @@ export function EntityManagementControl({
         cluster: 1,
         class: CLASSES[0],
         address: '',
+        iafrSourceCode: '',
         subsidyType: 'subsidized',
         city: '',
         lat: undefined,
@@ -997,6 +1015,8 @@ export function EntityManagementControl({
       vicariate: formState.vicariate,
       class: formState.class,
       address: formState.address,
+      institutionCode: normalizeInstitutionCode(formState.iafrSourceCode),
+      iafrSourceCode: normalizeInstitutionCode(formState.iafrSourceCode),
     };
 
     let payload: any = { type };
@@ -1015,6 +1035,8 @@ export function EntityManagementControl({
         lat: formState.lat,
         lng: formState.lng,
         district: formState.district,
+        institutionCode: normalizeInstitutionCode(formState.iafrSourceCode),
+        iafrSourceCode: normalizeInstitutionCode(formState.iafrSourceCode),
         subsidy_type: formState.subsidyType,
         status: 'active',
       };
@@ -1076,6 +1098,8 @@ export function EntityManagementControl({
         address: savedEntity.address,
         status: savedEntity.status || 'active',
         district: savedEntity.district,
+        institutionCode: savedEntity.institutionCode || savedEntity.institution_code || savedEntity.iafrSourceCode || savedEntity.iafr_source_code || normalizeInstitutionCode(formState.iafrSourceCode),
+        iafrSourceCode: savedEntity.iafrSourceCode || savedEntity.iafr_source_code || savedEntity.institutionCode || savedEntity.institution_code || normalizeInstitutionCode(formState.iafrSourceCode),
         collections: savedEntity.collections,
         subsidyType: savedEntity.subsidy_type || savedEntity.subsidyType || formState.subsidyType,
         lat: savedEntity.lat !== undefined ? Number(savedEntity.lat) : formState.lat,
@@ -1146,6 +1170,8 @@ export function EntityManagementControl({
           lat: formState.lat,
           lng: formState.lng,
           district: formState.district,
+          institutionCode: normalizeInstitutionCode(formState.iafrSourceCode),
+          iafrSourceCode: normalizeInstitutionCode(formState.iafrSourceCode),
           subsidyType: formState.subsidyType,
         };
         if (editingEntity) {
@@ -1286,28 +1312,43 @@ export function EntityManagementControl({
     const itemDistrict = (item: any) => item.district || VICARIATE_TO_DISTRICT[item.vicariate] || '';
     const matchesQuery = (item: any, fields: any[]) =>
       query.length === 0 || fields.filter(Boolean).some((field) => String(field).toLowerCase().includes(query));
+    const sortItems = (items: any[]) => {
+      const direction = sortConfig.direction === 'asc' ? 1 : -1;
+      return [...items].sort((a, b) => {
+        const left = sortConfig.key === 'iafrSourceCode' ? getInstitutionCode(a) : a.name || '';
+        const right = sortConfig.key === 'iafrSourceCode' ? getInstitutionCode(b) : b.name || '';
+        return String(left).localeCompare(String(right), undefined, { numeric: true, sensitivity: 'base' }) * direction;
+      });
+    };
 
     if (activeSubTab === 'parishes') {
-      return dedupeEntities(parishes)
+      return sortItems(dedupeEntities(parishes)
         .filter((p) => p.status !== 'inactive')
-        .filter((p) => matchesQuery(p, [p.name, p.address, p.vicariate, itemClass(p), itemDistrict(p)]))
+        .filter((p) => matchesQuery(p, [p.name, getInstitutionCode(p), p.address, p.vicariate, itemClass(p), itemDistrict(p)]))
         .filter((p) => vicariateFilter === 'all' || p.vicariate === vicariateFilter)
         .filter((p) => classFilter === 'all' || itemClass(p) === classFilter)
-        .filter((p) => districtFilter === 'all' || itemDistrict(p) === districtFilter);
+        .filter((p) => districtFilter === 'all' || itemDistrict(p) === districtFilter));
     } else if (activeSubTab === 'seminaries') {
-      return dedupeEntities(seminaries)
+      return sortItems(dedupeEntities(seminaries)
         .filter((s) => s.status !== 'inactive')
         .filter((s) => matchesQuery(s, [s.name, s.address, s.vicariate, itemClass(s), itemDistrict(s)]))
         .filter((s) => vicariateFilter === 'all' || s.vicariate === vicariateFilter)
         .filter((s) => classFilter === 'all' || itemClass(s) === classFilter)
-        .filter((s) => districtFilter === 'all' || itemDistrict(s) === districtFilter);
+        .filter((s) => districtFilter === 'all' || itemDistrict(s) === districtFilter));
     } else {
-      return dedupeEntities(schools)
+      return sortItems(dedupeEntities(schools)
         .filter((s) => s.status !== 'inactive')
         .filter((s) => matchesQuery(s, [s.name, s.address, `Cluster ${s.cluster}`, itemClass(s), s.level]))
         .filter((s) => clusterFilter === 'all' || String(s.cluster) === clusterFilter)
-        .filter((s) => classFilter === 'all' || itemClass(s) === classFilter);
+        .filter((s) => classFilter === 'all' || itemClass(s) === classFilter));
     }
+  };
+
+  const toggleSort = (key: 'name' | 'iafrSourceCode') => {
+    setSortConfig((prev) => ({
+      key,
+      direction: prev.key === key && prev.direction === 'asc' ? 'desc' : 'asc',
+    }));
   };
 
   return (
@@ -1546,6 +1587,27 @@ export function EntityManagementControl({
                           </div>
                         )}
                       </div>
+                    </div>
+
+                    <div>
+                      <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-2 ml-1">
+                        IAFR Source Code
+                      </label>
+                      <input
+                        type="text"
+                        value={formState.iafrSourceCode}
+                        onChange={(e) =>
+                          setFormState({
+                            ...formState,
+                            iafrSourceCode: normalizeInstitutionCode(e.target.value),
+                          })
+                        }
+                        placeholder="e.g. D3-67"
+                        className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-gray-900 focus:outline-none focus:border-[#D4AF37] focus:ring-1 focus:ring-[#D4AF37] transition-all placeholder:text-gray-400 font-mono font-bold"
+                      />
+                      <p className="mt-1.5 ml-1 text-[10px] text-gray-400">
+                        Official parish code from the IAFR workbook format.
+                      </p>
                     </div>
 
                     <div>
@@ -2271,8 +2333,27 @@ export function EntityManagementControl({
                 schools have cluster/level (no class), seminaries have neither. */}
             <tr className="border-b border-gray-100">
               <th className="pb-4 text-[10px] font-bold text-gray-400 uppercase tracking-widest pl-4">
-                Name & Address
+                <button
+                  type="button"
+                  onClick={() => toggleSort('name')}
+                  className="inline-flex items-center gap-1.5 hover:text-gray-700 transition-colors"
+                >
+                  Name & Address
+                  <ArrowUpDown className="h-3 w-3" />
+                </button>
               </th>
+              {activeSubTab === 'parishes' && (
+                <th className="pb-4 text-[10px] font-bold text-gray-400 uppercase tracking-widest">
+                  <button
+                    type="button"
+                    onClick={() => toggleSort('iafrSourceCode')}
+                    className="inline-flex items-center gap-1.5 hover:text-gray-700 transition-colors"
+                  >
+                    IAFR Source Code
+                    <ArrowUpDown className="h-3 w-3" />
+                  </button>
+                </th>
+              )}
               {activeSubTab === 'parishes' && (
                 <th className="pb-4 text-[10px] font-bold text-gray-400 uppercase tracking-widest">Vicariate</th>
               )}
@@ -2316,6 +2397,13 @@ export function EntityManagementControl({
                     <span className="text-gray-400 text-[11px] mt-0.5">{item.address}</span>
                   </div>
                 </td>
+                {activeSubTab === 'parishes' && (
+                  <td className="py-5">
+                    <span className="inline-flex min-w-[74px] justify-center rounded-lg border border-emerald-100 bg-emerald-50 px-2.5 py-1 font-mono text-xs font-black text-emerald-700">
+                      {getInstitutionCode(item) || '-'}
+                    </span>
+                  </td>
+                )}
                 {activeSubTab === 'parishes' && (
                   <td className="py-5">
                     <span className="px-3 py-1 bg-gray-100 text-gray-600 rounded-full text-[10px] font-bold uppercase tracking-wider">
@@ -2378,7 +2466,7 @@ export function EntityManagementControl({
             ))}
             {filteredData().length === 0 && (
               <tr key="no-entities">
-                <td colSpan={activeSubTab === 'parishes' ? 5 : activeSubTab === 'schools' ? 4 : 2} className="py-20 text-center">
+                <td colSpan={activeSubTab === 'parishes' ? 6 : activeSubTab === 'schools' ? 4 : 2} className="py-20 text-center">
                   <div className="flex flex-col items-center gap-3">
                     <div className="w-16 h-16 bg-gray-50 rounded-full flex items-center justify-center">
                       <Search className="w-8 h-8 text-gray-300" />
@@ -2488,6 +2576,9 @@ export function EntityManagementControl({
                 {/* Body */}
                 <div className="grid flex-1 grid-cols-1 gap-3 overflow-y-auto p-6 sm:grid-cols-2">
                   <Field icon={MapPin} label="Address" value={viewEntity.address} />
+                  {kind === 'parishes' && (
+                    <Field icon={Database} label="IAFR Source Code" value={getInstitutionCode(viewEntity)} />
+                  )}
                   {/* Only parishes have vicariate/district/class; schools have a
                       cluster; seminaries have none of these classifications. */}
                   {kind === 'parishes' && <Field icon={KindIcon} label="Vicariate" value={viewEntity.vicariate} />}
