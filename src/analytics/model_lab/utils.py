@@ -3,6 +3,7 @@ Shared data loading and feature engineering used by the model scripts.
 """
 
 import os
+import json
 import numpy as np
 import pandas as pd
 from sklearn.preprocessing import LabelEncoder
@@ -24,6 +25,17 @@ DEFAULT_WORKBOOK_NAMES = (
     "2025.xlsx",
 )
 DEFAULT_LITURGICAL_CALENDAR = "liturgical_calendar_rows.csv"
+DEFAULT_LITURGICAL_CALENDAR_NAMES = (
+    "liturgical_calendar_rows.json",
+    "liturgical_calendar_clean.json",
+    "liturgical_calendar_rows.csv",
+)
+DEFAULT_WEATHER_NAMES = (
+    "laguna_weather_final.json",
+    "laguna_weather_daily_classified.json",
+    "weather.json",
+    "weather_rows.json",
+)
 
 LITURGICAL_FEATURE_COLUMNS = [
     "liturgical_solemnity_days",
@@ -39,6 +51,18 @@ LITURGICAL_FEATURE_COLUMNS = [
     "liturgical_ordinary_days",
     "liturgical_major_days",
     "liturgical_penitential_days",
+]
+
+WEATHER_FEATURE_COLUMNS = [
+    "weather_temp_avg_c",
+    "weather_temp_max_c",
+    "weather_temp_min_c",
+    "weather_rainfall_mm",
+    "weather_wind_ms_avg",
+    "weather_typhoon_days_count",
+    "weather_major_events_count",
+    "weather_minor_events_count",
+    "weather_event_month",
 ]
 
 
@@ -87,6 +111,7 @@ def load_data(source_path: str | Sequence[str] | None = None) -> pd.DataFrame:
         df["net_receipts_deficit"] = df["total_receipts_final"] - df["total_expenses_final"]
 
     df = add_liturgical_calendar_features(df, source_path)
+    df = add_weather_features(df, source_path)
 
     return df
 
@@ -106,27 +131,22 @@ def add_liturgical_calendar_features(df: pd.DataFrame,
 
 
 def _find_liturgical_calendar_path(source_path: str | Sequence[str] | None = None) -> str | None:
-    candidate_dirs = [os.path.dirname(__file__)]
-
-    if source_path is not None and not (
-        isinstance(source_path, Sequence) and not isinstance(source_path, (str, bytes, os.PathLike))
-    ):
-        source_text = str(source_path)
-        candidate_dirs.append(source_text if os.path.isdir(source_text) else (os.path.dirname(source_text) or "."))
+    candidate_dirs = _candidate_data_dirs(source_path)
 
     for base_dir in _unique_paths(candidate_dirs):
-        candidate = os.path.join(base_dir, DEFAULT_LITURGICAL_CALENDAR)
-        if os.path.exists(candidate):
-            return candidate
+        for filename in DEFAULT_LITURGICAL_CALENDAR_NAMES:
+            candidate = os.path.join(base_dir, filename)
+            if os.path.exists(candidate):
+                return candidate
     return None
 
 
 def _load_liturgical_calendar_features(calendar_path: str) -> pd.DataFrame:
-    calendar = pd.read_csv(calendar_path)
+    calendar = _read_tabular_file(calendar_path)
     required = {"year", "month", "rank", "liturgical_season"}
     missing = required.difference(calendar.columns)
     if missing:
-        raise KeyError(f"{DEFAULT_LITURGICAL_CALENDAR} is missing columns: {sorted(missing)}")
+        raise KeyError(f"{os.path.basename(calendar_path)} is missing columns: {sorted(missing)}")
 
     calendar = calendar.copy()
     calendar["month_num"] = pd.to_numeric(calendar["month"], errors="coerce")
@@ -177,6 +197,185 @@ def _ensure_liturgical_feature_columns(df: pd.DataFrame) -> pd.DataFrame:
     return df
 
 
+def add_weather_features(df: pd.DataFrame,
+                         source_path: str | Sequence[str] | None = None) -> pd.DataFrame:
+    weather_path = _find_weather_path(source_path)
+    if weather_path is None:
+        return _ensure_weather_feature_columns(df)
+
+    weather_features = _load_weather_features(weather_path)
+    if weather_features.empty:
+        return _ensure_weather_feature_columns(df)
+
+    base = df.copy()
+    base["_weather_municipality"] = base["parish_name"].map(_municipality_from_parish_name)
+    municipality_features = weather_features[weather_features["municipality_key"].notna()].copy()
+    monthly_features = weather_features[weather_features["municipality_key"].isna()].copy()
+
+    if not municipality_features.empty:
+        merged = base.merge(
+            municipality_features,
+            left_on=["year", "month_num", "_weather_municipality"],
+            right_on=["year", "month_num", "municipality_key"],
+            how="left",
+        )
+    else:
+        merged = base
+
+    if not monthly_features.empty:
+        existing_weather_cols = [col for col in WEATHER_FEATURE_COLUMNS if col in merged.columns]
+        monthly_fallback = monthly_features.drop(columns=["municipality_key"], errors="ignore")
+        merged = merged.merge(monthly_fallback, on=["year", "month_num"], how="left", suffixes=("", "_monthly"))
+        for col in WEATHER_FEATURE_COLUMNS:
+            monthly_col = f"{col}_monthly"
+            if col in merged.columns and monthly_col in merged.columns:
+                merged[col] = merged[col].combine_first(merged[monthly_col])
+                merged = merged.drop(columns=[monthly_col])
+            elif monthly_col in merged.columns:
+                merged[col] = merged[monthly_col]
+                merged = merged.drop(columns=[monthly_col])
+        for col in existing_weather_cols:
+            if f"{col}_monthly" in merged.columns:
+                merged = merged.drop(columns=[f"{col}_monthly"])
+
+    merged = merged.drop(columns=["_weather_municipality", "municipality_key"], errors="ignore")
+    return _ensure_weather_feature_columns(merged)
+
+
+def _find_weather_path(source_path: str | Sequence[str] | None = None) -> str | None:
+    for base_dir in _unique_paths(_candidate_data_dirs(source_path)):
+        weather_dir = os.path.join(base_dir, "laguna_weather_per_city")
+        if os.path.isdir(weather_dir):
+            return weather_dir
+
+        for filename in DEFAULT_WEATHER_NAMES:
+            candidate = os.path.join(base_dir, filename)
+            if os.path.exists(candidate):
+                return candidate
+    return None
+
+
+def _load_weather_features(weather_path: str) -> pd.DataFrame:
+    if os.path.isdir(weather_path):
+        frames = [
+            _load_weather_features(os.path.join(weather_path, filename))
+            for filename in sorted(os.listdir(weather_path))
+            if filename.lower().endswith(".json")
+        ]
+        frames = [frame for frame in frames if not frame.empty]
+        if not frames:
+            return pd.DataFrame()
+        return _aggregate_weather_rows(pd.concat(frames, ignore_index=True))
+
+    weather = _read_json_records(weather_path)
+    if "municipalities" in weather.columns:
+        return _load_weather_municipality_payload(weather)
+    if "monthly_data" in weather.columns:
+        return _load_weather_monthly_payload(weather)
+
+    date_cols = {"date", "year", "month"}
+    if "date" in weather.columns or date_cols.intersection(weather.columns):
+        return _aggregate_weather_rows(weather)
+
+    return pd.DataFrame()
+
+
+def _load_weather_municipality_payload(weather: pd.DataFrame) -> pd.DataFrame:
+    rows = []
+    for municipalities in weather["municipalities"].dropna():
+        if not isinstance(municipalities, list):
+            continue
+        for municipality in municipalities:
+            if not isinstance(municipality, dict):
+                continue
+            for monthly in municipality.get("monthly_data", []) or []:
+                row = dict(monthly)
+                row["municipality"] = municipality.get("municipality")
+                rows.append(row)
+    return _aggregate_weather_rows(pd.DataFrame(rows))
+
+
+def _load_weather_monthly_payload(weather: pd.DataFrame) -> pd.DataFrame:
+    rows = []
+    for _, parent in weather.iterrows():
+        municipality = parent.get("municipality")
+        for monthly in parent.get("monthly_data") or []:
+            if isinstance(monthly, dict):
+                row = dict(monthly)
+                row["municipality"] = municipality
+                rows.append(row)
+    return _aggregate_weather_rows(pd.DataFrame(rows))
+
+
+def _aggregate_weather_rows(weather: pd.DataFrame) -> pd.DataFrame:
+    if weather.empty:
+        return pd.DataFrame()
+
+    weather = weather.copy()
+    if "month_num" not in weather.columns:
+        if "month" in weather.columns:
+            weather["month_num"] = pd.to_numeric(weather["month"], errors="coerce")
+        elif "date" in weather.columns:
+            dates = pd.to_datetime(weather["date"], errors="coerce")
+            weather["year"] = dates.dt.year
+            weather["month_num"] = dates.dt.month
+
+    if "year" not in weather.columns and "period" in weather.columns:
+        period = pd.to_datetime(weather["period"].astype(str) + "-01", errors="coerce")
+        weather["year"] = period.dt.year
+        weather["month_num"] = period.dt.month
+
+    weather["year"] = pd.to_numeric(weather.get("year"), errors="coerce")
+    weather["month_num"] = pd.to_numeric(weather.get("month_num"), errors="coerce")
+    if "municipality" in weather.columns:
+        weather["municipality_key"] = weather["municipality"].map(_normalize_municipality)
+    elif "municipality_key" in weather.columns:
+        weather["municipality_key"] = weather["municipality_key"].map(_normalize_municipality)
+    else:
+        weather["municipality_key"] = np.nan
+
+    rename_map = {
+        "temp_avg_c": "weather_temp_avg_c",
+        "temp_max_c": "weather_temp_max_c",
+        "temp_min_c": "weather_temp_min_c",
+        "rainfall_mm": "weather_rainfall_mm",
+        "nasa_power_rainfall_mm": "weather_rainfall_mm",
+        "wind_ms_avg": "weather_wind_ms_avg",
+        "typhoon_days_count": "weather_typhoon_days_count",
+        "major_events_count": "weather_major_events_count",
+        "minor_events_count": "weather_minor_events_count",
+        "has_event": "weather_event_month",
+        "typhoon_flag": "weather_event_month",
+    }
+    for source_col, target_col in rename_map.items():
+        if source_col in weather.columns and target_col not in weather.columns:
+            weather[target_col] = weather[source_col]
+
+    for col in WEATHER_FEATURE_COLUMNS:
+        if col not in weather.columns:
+            weather[col] = np.nan
+        weather[col] = pd.to_numeric(weather[col], errors="coerce")
+
+    grouped = (
+        weather
+        .dropna(subset=["year", "month_num"])
+        .groupby(["year", "month_num", "municipality_key"], dropna=False, as_index=False)[WEATHER_FEATURE_COLUMNS]
+        .mean()
+    )
+    grouped["year"] = grouped["year"].astype(int)
+    grouped["month_num"] = grouped["month_num"].astype(int)
+    return grouped
+
+
+def _ensure_weather_feature_columns(df: pd.DataFrame) -> pd.DataFrame:
+    df = df.copy()
+    for col in WEATHER_FEATURE_COLUMNS:
+        if col not in df.columns:
+            df[col] = 0
+        df[col] = df[col].fillna(0)
+    return df
+
+
 def _load_source_data(source_path: str | Sequence[str] | None = None) -> pd.DataFrame:
     if source_path is None:
         workbook_paths = _find_fallback_workbooks(os.path.dirname(__file__))
@@ -186,7 +385,7 @@ def _load_source_data(source_path: str | Sequence[str] | None = None) -> pd.Data
         return _build_synthetic_model_testing_data()
 
     if isinstance(source_path, Sequence) and not isinstance(source_path, (str, bytes, os.PathLike)):
-        return _load_raw_workbooks([str(path) for path in source_path])
+        return _load_multiple_sources([str(path) for path in source_path])
 
     source_path = str(source_path)
     workbook_paths = _find_fallback_workbooks(source_path)
@@ -195,7 +394,7 @@ def _load_source_data(source_path: str | Sequence[str] | None = None) -> pd.Data
         if source_path.lower().endswith((".xlsx", ".xls")):
             return _load_raw_workbooks([source_path])
 
-        df = pd.read_csv(source_path)
+        df = _read_tabular_file(source_path)
         if "month" in df.columns or "month_num" in df.columns:
             return df
 
@@ -210,6 +409,89 @@ def _load_source_data(source_path: str | Sequence[str] | None = None) -> pd.Data
         )
 
     raise FileNotFoundError(source_path)
+
+
+def _load_multiple_sources(source_paths: Sequence[str]) -> pd.DataFrame:
+    workbook_paths = [path for path in source_paths if path.lower().endswith((".xlsx", ".xls"))]
+    tabular_paths = [path for path in source_paths if not path.lower().endswith((".xlsx", ".xls"))]
+    frames = []
+
+    if workbook_paths:
+        frames.append(_load_raw_workbooks(workbook_paths))
+    for path in tabular_paths:
+        frames.append(_read_tabular_file(path))
+
+    if not frames:
+        raise ValueError("No data sources were provided.")
+    return pd.concat(frames, ignore_index=True).drop_duplicates().reset_index(drop=True)
+
+
+def _read_tabular_file(path: str) -> pd.DataFrame:
+    lower = path.lower()
+    if lower.endswith(".json"):
+        return _read_json_records(path)
+    if lower.endswith((".csv", ".txt")):
+        return pd.read_csv(path)
+    return pd.read_csv(path)
+
+
+def _read_json_records(path: str) -> pd.DataFrame:
+    with open(path, "r", encoding="utf-8-sig") as file:
+        payload = json.load(file)
+
+    records = _extract_json_records(payload)
+    return pd.json_normalize(records)
+
+
+def _extract_json_records(payload):
+    if isinstance(payload, list):
+        return payload
+    if isinstance(payload, dict):
+        for key in ("records", "data", "rows", "items", "results"):
+            value = payload.get(key)
+            if isinstance(value, list):
+                return value
+        return [payload]
+    raise ValueError("JSON input must be an object or a list of row objects.")
+
+
+def _candidate_data_dirs(source_path: str | Sequence[str] | None = None) -> list[str]:
+    repo_root = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", ".."))
+    candidate_dirs = [
+        os.path.dirname(__file__),
+        repo_root,
+        os.path.join(repo_root, "weather_output"),
+        os.path.join(repo_root, "liturgical_calendar_output"),
+        os.path.join(repo_root, "liturgical_calendar_sources"),
+    ]
+
+    if source_path is not None and not (
+        isinstance(source_path, Sequence) and not isinstance(source_path, (str, bytes, os.PathLike))
+    ):
+        source_text = str(source_path)
+        candidate_dirs.append(source_text if os.path.isdir(source_text) else (os.path.dirname(source_text) or "."))
+
+    return candidate_dirs
+
+
+def _municipality_from_parish_name(parish_name) -> str | float:
+    if pd.isna(parish_name):
+        return np.nan
+    parts = str(parish_name).split(",")
+    if len(parts) < 2:
+        return np.nan
+    return _normalize_municipality(parts[-1])
+
+
+def _normalize_municipality(value) -> str | float:
+    if pd.isna(value):
+        return np.nan
+    normalized = str(value).lower()
+    normalized = normalized.replace("ñ", "n")
+    normalized = re.sub(r"[^a-z0-9]+", " ", normalized)
+    normalized = re.sub(r"\b(city|municipality|of)\b", " ", normalized)
+    normalized = re.sub(r"\s+", " ", normalized).strip()
+    return normalized or np.nan
 
 
 def _find_fallback_workbooks(csv_path: str) -> list[str]:

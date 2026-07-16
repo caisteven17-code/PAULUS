@@ -40,6 +40,19 @@ Dataset source: place the three Excel workbooks `2021.xlsx`, `2022.xlsx`, and
 tabs from all three workbooks into one model dataset and writes
 `2023.xlsx, 2024.xlsx, and 2025.xlsx` as a parsed cache for inspection.
 
+The shared loader also accepts normalized `.json` input anywhere a CSV path was
+previously used. JSON can be either an array of row objects or an object with one
+of these array keys: `records`, `data`, `rows`, `items`, or `results`. Rows still
+need the normalized model columns such as `parish_name`, `year`, and either
+`month` or `month_num`.
+
+Liturgical calendar features are merged automatically from
+`liturgical_calendar_rows.json`, `liturgical_calendar_clean.json`, or
+`liturgical_calendar_rows.csv` when found beside the input, in this folder, or in
+the repo-level `liturgical_calendar_output/` folder. Weather features are merged
+automatically from `weather_output/laguna_weather_per_city/` when present, with
+fallback support for combined files such as `laguna_weather_final.json`.
+
 > **Note:** `prophet` requires `pystan` or `cmdstan`. If the install fails, try:
 > ```bash
 > pip install prophet --no-build-isolation
