@@ -34,6 +34,14 @@ class ParishMappingReview(BaseModel):
     institutionId: str
 
 
+class SaveParishMatchRequest(BaseModel):
+    batchId: str
+    sourceCode: str | None = None
+    sourceName: str
+    institutionId: str
+    savedBy: str | None = None
+
+
 class CommitRequest(BaseModel):
     batchId: str
     mappings: list[MappingReview]
@@ -123,6 +131,16 @@ async def commit_progress(batch_id: str):
 async def batch_rows(batch_id: str, status: str | None = None, limit: int = Query(default=500, ge=1, le=2000)):
     try:
         return financial_pusher.list_batch_rows(batch_id, status, limit)
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=str(exc))
+
+
+@router.post("/parish-match")
+async def parish_match(body: SaveParishMatchRequest):
+    try:
+        return financial_pusher.save_parish_match(body.model_dump())
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
     except Exception as exc:
         raise HTTPException(status_code=500, detail=str(exc))
 

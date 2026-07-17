@@ -160,14 +160,14 @@ def parse_money(value: Any) -> tuple[float, bool]:
         return float(value), False
     text = str(value).strip()
     if text.upper() in FORMULA_ERRORS:
-        return 0.0, True
+        return 0.0, False
     negative = text.startswith("(") and text.endswith(")")
     cleaned = text.replace("PHP", "").replace("Php", "").replace("₱", "").replace(",", "").strip()
     cleaned = cleaned.strip("()")
     try:
         number = float(cleaned)
     except ValueError:
-        return 0.0, True
+        return 0.0, False
     return (-number if negative else number), False
 
 
@@ -439,7 +439,7 @@ def _suggest_mapping(parts: list[str], account_names: dict[str, str]) -> tuple[s
     elif "saturday anticipated" in text:
         account, confidence = "B.1.03", 0.98
         reason = "Saturday anticipated mass collection."
-    elif any(k in text for k in ["rentals", "mortuary", "columbary", "kandilaan", "donation boxes", "envelopes", "other sources"]):
+    elif any(k in text for k in ["rentals", "mortuary", "columbary", "kandilaan", "donation boxes", "envelopes", "parking", "other sources"]):
         if "rentals" in text:
             account = "B.2.01"
         elif "mortuary" in text or "columbary" in text:
@@ -450,6 +450,8 @@ def _suggest_mapping(parts: list[str], account_names: dict[str, str]) -> tuple[s
             account = "B.2.04"
         elif "envelopes" in text:
             account = "B.2.05"
+        elif "parking" in text:
+            account = "B.2.07"
         else:
             account = "B.2.06"
         confidence = 0.95
@@ -463,9 +465,9 @@ def _suggest_mapping(parts: list[str], account_names: dict[str, str]) -> tuple[s
     elif "second collections" in text:
         account, confidence, status = "B.3.05", 0.9, "needs_review"
         reason = "Second Collections appears in different source sections across years; review required."
-    elif "special collections" in text and "remittances" not in section:
-        account, confidence = "B.3.04", 0.94
-        reason = "Special collections receipt column."
+    elif ("special collections" in text or "special collection" in text) and "remittances" not in section:
+        account, confidence, status = "B.3.04", 0.94, "needs_review"
+        reason = "Special collections receipt column; review if the source label says Other Special Collection."
     elif "donations" in text and "construction" not in section:
         account, confidence = "B.3.01", 0.96
         reason = "Donation receipt column."
@@ -494,6 +496,9 @@ def _suggest_mapping(parts: list[str], account_names: dict[str, str]) -> tuple[s
             account = "F.2.01"
         confidence = 0.94
         reason = "Bishop's fund share column."
+    elif "remittances" in section and ("other special collections" in text or "other special collection" in text):
+        account, confidence = "F.3.02", 0.96
+        reason = "Other Special Collections remittance column."
     elif "remittances" in section and (
         any(
             k in text
@@ -791,6 +796,22 @@ def _is_parish_data_row(code: Any, parish_name: Any) -> tuple[bool, str | None, 
     return False, None, ""
 
 
+def _column_has_parish_values(ws, column_index: int) -> bool:
+    for row_number in range(1, ws.max_row + 1):
+        code = ws.cell(row_number, 1).value
+        parish_name = ws.cell(row_number, 2).value
+        is_parish_row, _, _ = _is_parish_data_row(code, parish_name)
+        if not is_parish_row:
+            continue
+        cell_value = ws.cell(row_number, column_index).value
+        if cell_value in (None, ""):
+            continue
+        _, had_error = parse_money(cell_value)
+        if not had_error:
+            return True
+    return False
+
+
 def _source_columns(ws, account_names: dict[str, str]) -> list[SourceColumn]:
     grid = _header_grid(ws)
     columns: list[SourceColumn] = []
@@ -801,7 +822,9 @@ def _source_columns(ws, account_names: dict[str, str]) -> list[SourceColumn]:
             value = _clean_header(grid[row - 1][idx - 1])
             if value and value not in parts:
                 parts.append(value)
-        if not _is_financial_value_column(parts):
+        if not parts:
+            continue
+        if not _is_financial_value_column(parts) and not _column_has_parish_values(ws, idx):
             continue
         column_letter = get_column_letter(idx)
         header = parts[-1] if parts else column_letter
@@ -959,6 +982,7 @@ def _parse_workbook(file_name: str, file_bytes: bytes) -> dict[str, Any]:
 
 
 def _persist_preview(file_name: str, file_hash: str, parsed: dict[str, Any], uploaded_by: str | None) -> str | None:
+    batch_id: str | None = None
     try:
         summary = parsed["summary"]
         batch = (
@@ -1024,10 +1048,16 @@ def _persist_preview(file_name: str, file_hash: str, parsed: dict[str, Any], upl
             }
             for row in parsed["rows"]
         ]
-        for i in range(0, len(payload), 500):
-            get_table("operations", "financial_push_rows").insert(payload[i : i + 500]).execute()
+        for i in range(0, len(payload), 50):
+            get_table("operations", "financial_push_rows").insert(payload[i : i + 50]).execute()
         return batch_id
-    except Exception:
+    except Exception as exc:
+        if batch_id:
+            try:
+                get_table("operations", "financial_push_batches").delete().eq("id", batch_id).execute()
+            except Exception:
+                pass
+        print(f"PUSHER preview persistence failed for {file_name}: {exc}")
         return None
 
 
@@ -1249,6 +1279,178 @@ def _count_push_rows(batch_id: str, status: str | None = None) -> int:
     return int(getattr(result, "count", 0) or 0)
 
 
+def _push_row_status_counts(batch_id: str) -> dict[str, int]:
+    return {
+        "ready": _count_push_rows(batch_id, "ready"),
+        "warning": _count_push_rows(batch_id, "warning"),
+        "blocked": _count_push_rows(batch_id, "blocked"),
+        "committed": _count_push_rows(batch_id, "committed"),
+        "skipped": _count_push_rows(batch_id, "skipped"),
+        "total": _count_push_rows(batch_id),
+    }
+
+
+def _row_status_after_issues(issues: list[dict[str, Any]]) -> str:
+    if any(issue.get("severity") in ("blocker", "error") for issue in issues):
+        return "blocked"
+    return "warning" if issues else "ready"
+
+
+def _upsert_parish_alias(
+    source_code: str | None,
+    source_name: str,
+    normalized_source_name: str,
+    institution_id: str,
+    saved_by: str | None = None,
+) -> dict[str, Any]:
+    payload = {
+        "source_code": source_code,
+        "source_name": source_name,
+        "normalized_source_name": normalized_source_name,
+        "institution_id": institution_id,
+        "confidence": 1,
+        "status": "approved",
+        "notes": f"Saved from PUSHER parish review by {saved_by or 'PUSHER user'}.",
+        "deleted_at": None,
+    }
+    if source_code:
+        result = (
+            get_table("operations", "parish_import_aliases")
+            .upsert(payload, on_conflict="source_code,normalized_source_name")
+            .execute()
+        )
+        return (getattr(result, "data", None) or [payload])[0]
+
+    existing = (
+        get_table("operations", "parish_import_aliases")
+        .select("id")
+        .is_("source_code", "null")
+        .eq("normalized_source_name", normalized_source_name)
+        .is_("deleted_at", "null")
+        .limit(1)
+        .execute()
+        .data
+        or []
+    )
+    if existing:
+        result = (
+            get_table("operations", "parish_import_aliases")
+            .update(payload)
+            .eq("id", existing[0]["id"])
+            .execute()
+        )
+        return (getattr(result, "data", None) or [payload])[0]
+    result = get_table("operations", "parish_import_aliases").insert(payload).execute()
+    return (getattr(result, "data", None) or [payload])[0]
+
+
+def save_parish_match(payload: dict[str, Any]) -> dict[str, Any]:
+    batch_id = payload.get("batchId")
+    source_name = (payload.get("sourceName") or "").strip()
+    institution_id = payload.get("institutionId")
+    if not batch_id:
+        raise ValueError("PUSHER batch id is required.")
+    if not source_name:
+        raise ValueError("Source parish name is required.")
+    if not institution_id:
+        raise ValueError("Institution id is required.")
+
+    institution = (
+        get_table("diocese", "institutions")
+        .select("id, name")
+        .eq("id", institution_id)
+        .is_("deleted_at", "null")
+        .maybe_single()
+        .execute()
+    )
+    institution_data = getattr(institution, "data", None)
+    if not institution_data:
+        raise ValueError("Selected institution was not found.")
+
+    batch = (
+        get_table("operations", "financial_push_batches")
+        .select("id, summary")
+        .eq("id", batch_id)
+        .is_("deleted_at", "null")
+        .maybe_single()
+        .execute()
+    )
+    batch_data = getattr(batch, "data", None)
+    if not batch_data:
+        raise ValueError("PUSHER batch was not found.")
+
+    source_code = normalize_source_code(payload.get("sourceCode"))
+    normalized_source_name = normalize_name(source_name)
+    alias = _upsert_parish_alias(
+        source_code,
+        source_name,
+        normalized_source_name,
+        institution_id,
+        payload.get("savedBy"),
+    )
+
+    query = (
+        get_table("operations", "financial_push_rows")
+        .select("id, issues, validation_status")
+        .eq("push_batch_id", batch_id)
+        .eq("parish_name", source_name)
+        .is_("deleted_at", "null")
+    )
+    if source_code:
+        query = query.eq("parish_code", source_code)
+    else:
+        query = query.is_("parish_code", "null")
+    rows = query.execute().data or []
+
+    updated_rows = 0
+    for row in rows:
+        issues = [
+            issue
+            for issue in (row.get("issues") or [])
+            if issue.get("type") != "unmatched_parish"
+        ]
+        validation_status = _row_status_after_issues(issues)
+        get_table("operations", "financial_push_rows").update(
+            {
+                "institution_id": institution_id,
+                "validation_status": validation_status,
+                "issues": issues,
+            }
+        ).eq("id", row["id"]).execute()
+        updated_rows += 1
+
+    counts = _push_row_status_counts(batch_id)
+    summary = batch_data.get("summary") or {}
+    summary.update(
+        {
+            "readyRowCount": counts["ready"],
+            "warningRowCount": counts["warning"],
+            "blockedRowCount": counts["blocked"],
+        }
+    )
+    get_table("operations", "financial_push_batches").update(
+        {
+            "valid_row_count": counts["ready"],
+            "warning_count": counts["warning"] + int(summary.get("mappingReviewCount") or 0),
+            "error_count": counts["blocked"],
+            "summary": summary,
+        }
+    ).eq("id", batch_id).execute()
+
+    return {
+        "batchId": batch_id,
+        "sourceCode": source_code,
+        "sourceName": source_name,
+        "institutionId": institution_id,
+        "institutionName": institution_data.get("name"),
+        "alias": alias,
+        "updatedRows": updated_rows,
+        "readyRowCount": counts["ready"],
+        "warningRowCount": counts["warning"],
+        "blockedRowCount": counts["blocked"],
+    }
+
+
 def _load_push_rows_for_commit(batch_id: str) -> list[dict[str, Any]]:
     rows: list[dict[str, Any]] = []
     page_size = 1000
@@ -1321,7 +1523,7 @@ def list_batch_rows(batch_id: str, status: str | None = None, limit: int = 500) 
     query = (
         get_table("operations", "financial_push_rows")
         .select(
-            "id, parish_code, parish_name, reporting_month, reporting_year, "
+            "id, parish_code, parish_name, source_row_number, reporting_month, reporting_year, "
             "validation_status, financial_record_id, issues"
         )
         .eq("push_batch_id", batch_id)
@@ -1343,6 +1545,7 @@ def list_batch_rows(batch_id: str, status: str | None = None, limit: int = 500) 
                 "id": row.get("id"),
                 "parishCode": row.get("parish_code"),
                 "parishName": row.get("parish_name"),
+                "sourceRowNumber": row.get("source_row_number"),
                 "reportingMonth": row.get("reporting_month"),
                 "reportingMonthLabel": MONTH_TO_SHORT.get(row.get("reporting_month")),
                 "reportingYear": row.get("reporting_year"),
