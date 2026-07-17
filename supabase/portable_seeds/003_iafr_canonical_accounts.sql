@@ -2,15 +2,11 @@
 -- Source planning reference: IAFR SAMPLE.xlsx, 2024-2026 layouts.
 --
 -- This seed is intentionally idempotent:
--- - removes old canonical accounts for a fresh IAFR chart
 -- - inserts missing final IAFR canonical accounts
 -- - updates matching final IAFR account_code values if rerun
 --
--- Run this before importing financial records. If line items already reference
--- old account titles, this delete will be blocked by the foreign key and the
--- safer soft-deactivation approach should be used instead.
-
-DELETE FROM parishes.iafr_account_titles;
+-- This is non-destructive because account titles may already be referenced by
+-- PUSHER column mapping memory or committed line items.
 
 INSERT INTO parishes.iafr_account_titles (
   section_code,
@@ -77,6 +73,7 @@ VALUES
   ('B', 'other_collections', 'B.2.04', 'Donation Boxes', 'receipt', 'parish_fund_receipts', 'B.2', 'IAFR_SAMPLE_2024_2026', 'IAFR SAMPLE.xlsx', true),
   ('B', 'other_collections', 'B.2.05', 'Envelopes', 'receipt', 'parish_fund_receipts', 'B.2', 'IAFR_SAMPLE_2024_2026', 'IAFR SAMPLE.xlsx', true),
   ('B', 'other_collections', 'B.2.06', 'Other Sources', 'receipt', 'parish_fund_receipts', 'B.2', 'IAFR_SAMPLE_2024_2026', 'IAFR SAMPLE.xlsx', true),
+  ('B', 'other_collections', 'B.2.07', 'Receipts from Parking Fees', 'receipt', 'parish_fund_receipts', 'B.2', 'IAFR_SAMPLE_2024_2026', 'IAFR SAMPLE.xlsx', true),
   ('B', 'other_receipts', 'B.3.01', 'Donations', 'receipt', 'parish_fund_receipts', 'B.3', 'IAFR_SAMPLE_2024_2026', 'IAFR SAMPLE.xlsx', true),
   ('B', 'other_receipts', 'B.3.02', 'Interest Income from Bank Accounts', 'receipt', 'parish_fund_receipts', 'B.3', 'IAFR_SAMPLE_2024_2026', 'IAFR SAMPLE.xlsx', true),
   ('B', 'other_receipts', 'B.3.03', 'Subsidy from Diocese', 'receipt', 'parish_fund_receipts', 'B.3', 'IAFR_SAMPLE_2024_2026', 'IAFR SAMPLE.xlsx', true),
@@ -146,7 +143,8 @@ VALUES
   ('F', 'bishops_fund_share', 'F.2.01', 'Confirmation - Bishop''s Share', 'remittance', 'remittance', 'F.2', 'IAFR_SAMPLE_2024_2026', 'IAFR SAMPLE.xlsx', true),
   ('F', 'bishops_fund_share', 'F.2.02', 'Confirmation Minister - Bishop', 'remittance', 'remittance', 'F.2', 'IAFR_SAMPLE_2024_2026', 'IAFR SAMPLE.xlsx', true),
   ('F', 'bishops_fund_share', 'F.2.03', 'Others - Bishop Share', 'remittance', 'remittance', 'F.2', 'IAFR_SAMPLE_2024_2026', 'IAFR SAMPLE.xlsx', true),
-  ('F', 'special_collections', 'F.3.01', 'Special Collections', 'remittance', 'remittance', 'F.3', 'IAFR_SAMPLE_2024_2026', 'IAFR SAMPLE.xlsx', true)
+  ('F', 'special_collections', 'F.3.01', 'Special Collections', 'remittance', 'remittance', 'F.3', 'IAFR_SAMPLE_2024_2026', 'IAFR SAMPLE.xlsx', true),
+  ('F', 'special_collections', 'F.3.02', 'Other Special Collections', 'remittance', 'remittance', 'F.3', 'IAFR_SAMPLE_2024_2026', 'IAFR SAMPLE.xlsx', true)
 ON CONFLICT (account_code) DO UPDATE SET
   section_code = EXCLUDED.section_code,
   subsection_code = EXCLUDED.subsection_code,

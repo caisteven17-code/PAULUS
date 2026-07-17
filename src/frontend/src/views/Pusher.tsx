@@ -127,10 +127,17 @@ type BatchRow = {
   id: string;
   parishCode: string | null;
   parishName: string;
+  sourceRowNumber?: number | null;
   reportingMonth: number;
   reportingMonthLabel?: string | null;
   reportingYear: number;
   validationStatus: string;
+  issues?: Array<{
+    severity?: string;
+    type?: string;
+    message?: string;
+    column?: string;
+  }>;
   reason?: string | null;
 };
 
@@ -140,8 +147,16 @@ interface PusherProps {
 
 const importModes = [
   { id: 'skip_existing', label: 'Skip existing', description: 'Keeps current parish-month records unchanged.' },
-  { id: 'replace_existing', label: 'Replace existing', description: 'Rebuilds line items for matching parish-month records.' },
-  { id: 'version_existing', label: 'Version existing', description: 'Reserved for later versioning; currently behaves like replace.' },
+  {
+    id: 'replace_existing',
+    label: 'Replace existing',
+    description: 'Rebuilds line items for matching parish-month records.',
+  },
+  {
+    id: 'version_existing',
+    label: 'Version existing',
+    description: 'Reserved for later versioning; currently behaves like replace.',
+  },
 ] as const;
 
 const statusStyle: Record<string, string> = {
@@ -160,6 +175,14 @@ function parishKey(match: Pick<ParishMatch, 'sourceCode' | 'sourceName'>) {
 
 function formatNumber(value: number) {
   return new Intl.NumberFormat('en-US').format(value || 0);
+}
+
+function rowIssueMessages(row: BatchRow) {
+  if (!row.issues?.length) return [row.reason || 'Row was blocked by validation.'];
+  return row.issues.map((issue) => {
+    const label = issue.column ? `${issue.column}: ` : '';
+    return `${label}${issue.message || issue.type || 'Validation issue'}`;
+  });
 }
 
 function mappingFromColumn(column: PusherColumn): MappingChoice {
@@ -213,6 +236,11 @@ export function Pusher({ onBack }: PusherProps) {
   const [skippedRowsTotal, setSkippedRowsTotal] = useState(0);
   const [skippedRowsOpen, setSkippedRowsOpen] = useState(false);
   const [isLoadingSkippedRows, setIsLoadingSkippedRows] = useState(false);
+  const [blockedRows, setBlockedRows] = useState<BatchRow[]>([]);
+  const [blockedRowsTotal, setBlockedRowsTotal] = useState(0);
+  const [blockedRowsOpen, setBlockedRowsOpen] = useState(false);
+  const [isLoadingBlockedRows, setIsLoadingBlockedRows] = useState(false);
+  const [savingParishKeys, setSavingParishKeys] = useState<Record<string, boolean>>({});
   const [error, setError] = useState('');
   const [commitMessage, setCommitMessage] = useState('');
   const [importMode, setImportMode] = useState<(typeof importModes)[number]['id']>('skip_existing');
@@ -279,7 +307,9 @@ export function Pusher({ onBack }: PusherProps) {
 
   const parishReviewRows = useMemo(() => {
     if (!activeResult) return [];
-    return activeResult.parishMatches.filter((match) => match.validationStatus !== 'ready' || match.matchStatus !== 'matched');
+    return activeResult.parishMatches.filter(
+      (match) => match.validationStatus !== 'ready' || match.matchStatus !== 'matched',
+    );
   }, [activeResult]);
 
   const unresolvedParishCount = useMemo(() => {
@@ -309,6 +339,9 @@ export function Pusher({ onBack }: PusherProps) {
     setSkippedRows([]);
     setSkippedRowsTotal(0);
     setSkippedRowsOpen(false);
+    setBlockedRows([]);
+    setBlockedRowsTotal(0);
+    setBlockedRowsOpen(false);
     setIsCommitting(false);
     setCommitMessage('');
     setError(next.length ? '' : 'Please choose one or more .xlsx files.');
@@ -326,6 +359,9 @@ export function Pusher({ onBack }: PusherProps) {
     setSkippedRows([]);
     setSkippedRowsTotal(0);
     setSkippedRowsOpen(false);
+    setBlockedRows([]);
+    setBlockedRowsTotal(0);
+    setBlockedRowsOpen(false);
     setIsCommitting(false);
     try {
       const formData = new FormData();
@@ -428,9 +464,109 @@ export function Pusher({ onBack }: PusherProps) {
     }
   };
 
+  const loadBlockedRows = async (batchId: string) => {
+    setIsLoadingBlockedRows(true);
+    setError('');
+    try {
+      const res = await fetch(`/api/pusher/batch-rows/${encodeURIComponent(batchId)}?status=blocked&limit=2000`);
+      const data = await res.json();
+      if (!res.ok) throw new Error(data?.detail || data?.error || 'Could not load blocked rows.');
+      setBlockedRows(data.rows ?? []);
+      setBlockedRowsTotal(data.total ?? 0);
+      setBlockedRowsOpen(true);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Could not load blocked rows.');
+    } finally {
+      setIsLoadingBlockedRows(false);
+    }
+  };
+
+  const toggleBlockedRows = async () => {
+    if (blockedRowsOpen) {
+      setBlockedRowsOpen(false);
+      return;
+    }
+    if (!activeResult?.batchId) {
+      setError('Blocked rows are only available after the validation preview is saved. Re-validate this file first.');
+      return;
+    }
+    await loadBlockedRows(activeResult.batchId);
+  };
+
+  const saveParishMatch = async (match: ParishMatch, institutionId: string) => {
+    if (!activeResult) return;
+    const key = `${activeResult.fileName}:${parishKey(match)}`;
+    setParishChoices((prev) => ({ ...prev, [key]: institutionId }));
+    if (!institutionId) return;
+    if (!activeResult.batchId) {
+      setError('This preview was not saved yet. Re-validate the file before saving parish matches.');
+      return;
+    }
+
+    setSavingParishKeys((prev) => ({ ...prev, [key]: true }));
+    setError('');
+    try {
+      const res = await fetch('/api/pusher/parish-match', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          batchId: activeResult.batchId,
+          sourceCode: match.sourceCode,
+          sourceName: match.sourceName,
+          institutionId,
+          savedBy: 'PUSHER temporary user',
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data?.detail || data?.error || 'Could not save parish match.');
+
+      setResults((prev) =>
+        prev.map((file) =>
+          file.fileName === activeResult.fileName
+            ? {
+                ...file,
+                summary: {
+                  ...file.summary,
+                  readyRowCount: data.readyRowCount ?? file.summary.readyRowCount,
+                  warningRowCount: data.warningRowCount ?? file.summary.warningRowCount,
+                  blockedRowCount: data.blockedRowCount ?? file.summary.blockedRowCount,
+                },
+                parishMatches: file.parishMatches.map((item) =>
+                  parishKey(item) === parishKey(match)
+                    ? {
+                        ...item,
+                        institutionId,
+                        matchStatus: 'matched',
+                        matchName: data.institutionName ?? item.matchName,
+                        confidence: 1,
+                        validationStatus: 'ready',
+                      }
+                    : item,
+                ),
+              }
+            : file,
+        ),
+      );
+      setCommitMessage(`Saved parish match and updated ${formatNumber(data.updatedRows ?? 0)} staged row(s).`);
+      if (blockedRowsOpen) {
+        await loadBlockedRows(activeResult.batchId);
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Could not save parish match.');
+    } finally {
+      setSavingParishKeys((prev) => {
+        const next = { ...prev };
+        delete next[key];
+        return next;
+      });
+    }
+  };
+
   const startProgressPolling = (batchId: string) => {
     stopProgressPolling();
-    void fetchCommitProgress(batchId).catch((err) => setError(err instanceof Error ? err.message : 'Could not read push progress.'));
+    void fetchCommitProgress(batchId).catch((err) =>
+      setError(err instanceof Error ? err.message : 'Could not read push progress.'),
+    );
     progressPollRef.current = setInterval(() => {
       void fetchCommitProgress(batchId).catch((err) => {
         stopProgressPolling();
@@ -449,7 +585,9 @@ export function Pusher({ onBack }: PusherProps) {
       setError('No parish rows were detected in this file. Re-validate after checking the workbook format.');
       return;
     }
-    const mappings = activeResult.columns.map((column) => mappingChoices[`${activeResult.fileName}:${column.key}`] ?? mappingFromColumn(column));
+    const mappings = activeResult.columns.map(
+      (column) => mappingChoices[`${activeResult.fileName}:${column.key}`] ?? mappingFromColumn(column),
+    );
     const unresolved = mappings.filter((mapping) => mapping.action === 'map' && !mapping.canonicalAccountCode).length;
     if (unresolved) {
       setError('Some mapped columns do not have a canonical account yet.');
@@ -472,6 +610,9 @@ export function Pusher({ onBack }: PusherProps) {
     setSkippedRows([]);
     setSkippedRowsTotal(0);
     setSkippedRowsOpen(false);
+    setBlockedRows([]);
+    setBlockedRowsTotal(0);
+    setBlockedRowsOpen(false);
     setError('');
     setCommitMessage('');
     try {
@@ -565,7 +706,7 @@ export function Pusher({ onBack }: PusherProps) {
         const withoutCurrent = prev.filter((account) => account.id !== nextAccount.id);
         return [...withoutCurrent, nextAccount].sort((a, b) => a.account_code.localeCompare(b.account_code));
       });
-        if (draftSource) {
+      if (draftSource) {
         updateChoice(draftSource, {
           action: 'map',
           canonicalAccountCode: nextAccount.account_code,
@@ -573,7 +714,9 @@ export function Pusher({ onBack }: PusherProps) {
           aggregationRule: 'sum',
         });
       }
-      setCommitMessage(`Canonical account ${nextAccount.account_code} was ${editingAccountId ? 'updated' : 'created'}.`);
+      setCommitMessage(
+        `Canonical account ${nextAccount.account_code} was ${editingAccountId ? 'updated' : 'created'}.`,
+      );
       setAccountDraftOpen(false);
       setDraftSource(null);
       setEditingAccountId(null);
@@ -592,7 +735,9 @@ export function Pusher({ onBack }: PusherProps) {
     if (!confirmed) return;
     setError('');
     try {
-      const res = await fetch(`/api/pusher/canonical-account?id=${encodeURIComponent(account.id)}`, { method: 'DELETE' });
+      const res = await fetch(`/api/pusher/canonical-account?id=${encodeURIComponent(account.id)}`, {
+        method: 'DELETE',
+      });
       const deleted = await res.json();
       if (!res.ok) throw new Error(deleted?.detail || deleted?.error || 'Could not delete canonical account.');
       setAccounts((prev) => prev.filter((item) => item.id !== account.id));
@@ -677,7 +822,10 @@ export function Pusher({ onBack }: PusherProps) {
             {selectedFiles.length > 0 && (
               <div className="mt-3 space-y-2">
                 {selectedFiles.map((file) => (
-                  <div key={file.name} className="flex items-center gap-2 rounded-md border border-stone-200 bg-stone-50 px-3 py-2">
+                  <div
+                    key={file.name}
+                    className="flex items-center gap-2 rounded-md border border-stone-200 bg-stone-50 px-3 py-2"
+                  >
                     <FileSpreadsheet className="h-4 w-4 text-emerald-700" />
                     <p className="min-w-0 flex-1 truncate text-sm font-semibold text-slate-700">{file.name}</p>
                   </div>
@@ -702,7 +850,8 @@ export function Pusher({ onBack }: PusherProps) {
               <div>
                 <h2 className="text-sm font-black uppercase tracking-[0.18em] text-slate-900">2. Validate and Clean</h2>
                 <p className="mt-1 text-sm leading-relaxed text-slate-500">
-                  Blank numeric cells are staged as zero. Unknown mappings and parish matches are surfaced before commit.
+                  Blank numeric cells are staged as zero. Unknown mappings and parish matches are surfaced before
+                  commit.
                 </p>
               </div>
             </div>
@@ -738,7 +887,9 @@ export function Pusher({ onBack }: PusherProps) {
                   key={mode.id}
                   onClick={() => setImportMode(mode.id)}
                   className={`rounded-lg border p-3 text-left transition ${
-                    importMode === mode.id ? 'border-slate-900 bg-slate-950 text-white' : 'border-stone-200 bg-white text-slate-700 hover:bg-stone-50'
+                    importMode === mode.id
+                      ? 'border-slate-900 bg-slate-950 text-white'
+                      : 'border-stone-200 bg-white text-slate-700 hover:bg-stone-50'
                   }`}
                 >
                   <p className="text-sm font-bold">{mode.label}</p>
@@ -788,14 +939,16 @@ export function Pusher({ onBack }: PusherProps) {
                     <button
                       type="button"
                       onClick={() =>
-                        skippedRowsOpen
-                          ? setSkippedRowsOpen(false)
-                          : loadSkippedRows(commitProgress.batchId)
+                        skippedRowsOpen ? setSkippedRowsOpen(false) : loadSkippedRows(commitProgress.batchId)
                       }
                       disabled={isLoadingSkippedRows}
                       className="inline-flex items-center gap-2 rounded-md border border-emerald-200 bg-white px-3 py-1.5 text-xs font-black text-emerald-800 transition hover:bg-emerald-50 disabled:cursor-not-allowed disabled:opacity-60"
                     >
-                      {isLoadingSkippedRows ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <ListChecks className="h-3.5 w-3.5" />}
+                      {isLoadingSkippedRows ? (
+                        <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                      ) : (
+                        <ListChecks className="h-3.5 w-3.5" />
+                      )}
                       {skippedRowsOpen ? 'Hide skipped rows' : 'View skipped rows'}
                     </button>
                     {skippedRowsOpen && (
@@ -806,7 +959,10 @@ export function Pusher({ onBack }: PusherProps) {
                           <span>Reason</span>
                         </div>
                         {skippedRows.map((row) => (
-                          <div key={row.id} className="grid grid-cols-[0.8fr_1.5fr_1.4fr] gap-2 border-b border-stone-100 px-3 py-2 text-xs text-slate-600 last:border-b-0">
+                          <div
+                            key={row.id}
+                            className="grid grid-cols-[0.8fr_1.5fr_1.4fr] gap-2 border-b border-stone-100 px-3 py-2 text-xs text-slate-600 last:border-b-0"
+                          >
                             <span className="font-bold text-slate-800">
                               {row.reportingMonthLabel ?? row.reportingMonth} {row.reportingYear}
                             </span>
@@ -819,7 +975,9 @@ export function Pusher({ onBack }: PusherProps) {
                           </div>
                         ))}
                         {skippedRows.length === 0 && (
-                          <div className="px-3 py-4 text-xs font-semibold text-slate-500">No skipped rows found for this batch.</div>
+                          <div className="px-3 py-4 text-xs font-semibold text-slate-500">
+                            No skipped rows found for this batch.
+                          </div>
                         )}
                       </div>
                     )}
@@ -856,7 +1014,9 @@ export function Pusher({ onBack }: PusherProps) {
                   key={file.fileName}
                   onClick={() => setActiveFileName(file.fileName)}
                   className={`rounded-lg px-3 py-2 text-sm font-bold transition ${
-                    activeResult?.fileName === file.fileName ? 'bg-slate-950 text-white' : 'bg-stone-100 text-slate-600 hover:bg-stone-200'
+                    activeResult?.fileName === file.fileName
+                      ? 'bg-slate-950 text-white'
+                      : 'bg-stone-100 text-slate-600 hover:bg-stone-200'
                   }`}
                 >
                   {file.summary.detectedYear ?? 'Mixed'} · {file.fileName}
@@ -869,11 +1029,87 @@ export function Pusher({ onBack }: PusherProps) {
                 <div className="grid grid-cols-2 gap-3 border-b border-stone-200 p-4 md:grid-cols-6">
                   <Metric label="Ready" value={activeResult.summary.readyRowCount} tone="emerald" />
                   <Metric label="Warnings" value={activeResult.summary.warningRowCount} tone="amber" />
-                  <Metric label="Blocked" value={activeResult.summary.blockedRowCount} tone="red" />
+                  <Metric
+                    label="Blocked"
+                    value={activeResult.summary.blockedRowCount}
+                    tone="red"
+                    onClick={activeResult.summary.blockedRowCount > 0 ? toggleBlockedRows : undefined}
+                    active={blockedRowsOpen}
+                  />
                   <Metric label="Columns" value={activeResult.summary.columnCount} />
                   <Metric label="Mapped" value={mappingSummary.mapped} tone="emerald" />
                   <Metric label="Review" value={mappingSummary.review} tone="amber" />
                 </div>
+
+                {activeResult.summary.blockedRowCount > 0 && (
+                  <div className="border-b border-red-100 bg-red-50/70 p-4">
+                    <div className="flex flex-wrap items-center justify-between gap-3">
+                      <div>
+                        <h3 className="text-sm font-black uppercase tracking-[0.18em] text-red-900">Blocked Rows</h3>
+                        <p className="mt-1 text-sm text-red-800">
+                          These parish-month rows will not push until their validation issues are fixed.
+                        </p>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={toggleBlockedRows}
+                        disabled={isLoadingBlockedRows}
+                        className="inline-flex items-center gap-2 rounded-md border border-red-200 bg-white px-3 py-2 text-xs font-black text-red-800 transition hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-60"
+                      >
+                        {isLoadingBlockedRows ? (
+                          <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                        ) : (
+                          <ListChecks className="h-3.5 w-3.5" />
+                        )}
+                        {blockedRowsOpen ? 'Hide blocked rows' : 'View blocked rows'}
+                      </button>
+                    </div>
+
+                    {blockedRowsOpen && (
+                      <div className="mt-3 max-h-80 overflow-auto rounded-lg border border-red-100 bg-white">
+                        <div className="sticky top-0 grid grid-cols-[0.75fr_0.5fr_1.5fr_2fr] gap-2 border-b border-red-100 bg-red-50 px-3 py-2 text-[10px] font-black uppercase tracking-[0.14em] text-red-900">
+                          <span>Month</span>
+                          <span>Row</span>
+                          <span>Parish</span>
+                          <span>Issue</span>
+                        </div>
+                        {blockedRows.map((row) => (
+                          <div
+                            key={row.id}
+                            className="grid grid-cols-[0.75fr_0.5fr_1.5fr_2fr] gap-2 border-b border-stone-100 px-3 py-2 text-xs text-slate-600 last:border-b-0"
+                          >
+                            <span className="font-bold text-slate-800">
+                              {row.reportingMonthLabel ?? row.reportingMonth} {row.reportingYear}
+                            </span>
+                            <span className="font-semibold text-slate-500">{row.sourceRowNumber ?? '-'}</span>
+                            <span>
+                              <b className="text-slate-900">{row.parishCode ?? 'name match'}</b>
+                              <br />
+                              {row.parishName}
+                            </span>
+                            <span className="space-y-1">
+                              {rowIssueMessages(row).map((message, index) => (
+                                <span key={`${row.id}-${index}`} className="block leading-relaxed">
+                                  {message}
+                                </span>
+                              ))}
+                            </span>
+                          </div>
+                        ))}
+                        {blockedRows.length === 0 && (
+                          <div className="px-3 py-4 text-xs font-semibold text-slate-500">
+                            No blocked rows found for this batch.
+                          </div>
+                        )}
+                      </div>
+                    )}
+                    {blockedRowsOpen && blockedRowsTotal > blockedRows.length && (
+                      <p className="mt-2 text-xs font-semibold text-red-800">
+                        Showing {formatNumber(blockedRows.length)} of {formatNumber(blockedRowsTotal)} blocked rows.
+                      </p>
+                    )}
+                  </div>
+                )}
 
                 <div className="grid grid-cols-1 gap-0 xl:grid-cols-[1fr_430px]">
                   <div className="min-w-0 border-b border-stone-200 xl:border-b-0 xl:border-r">
@@ -939,16 +1175,22 @@ export function Pusher({ onBack }: PusherProps) {
                                   <div className="flex items-start gap-3">
                                     <span
                                       className={`rounded-md border px-2 py-1 text-xs font-black ${
-                                        isHidden ? 'border-red-200 bg-red-100 text-red-700' : 'border-stone-200 bg-stone-50 text-slate-600'
+                                        isHidden
+                                          ? 'border-red-200 bg-red-100 text-red-700'
+                                          : 'border-stone-200 bg-stone-50 text-slate-600'
                                       }`}
                                     >
                                       {column.column}
                                     </span>
                                     <div>
-                                      <p className={`font-bold ${isHidden ? 'text-red-900 line-through decoration-red-400' : 'text-slate-900'}`}>
+                                      <p
+                                        className={`font-bold ${isHidden ? 'text-red-900 line-through decoration-red-400' : 'text-slate-900'}`}
+                                      >
                                         {column.source_header}
                                       </p>
-                                      <p className={`mt-1 max-w-[360px] text-xs leading-relaxed ${isHidden ? 'text-red-700/80' : 'text-slate-500'}`}>
+                                      <p
+                                        className={`mt-1 max-w-[360px] text-xs leading-relaxed ${isHidden ? 'text-red-700/80' : 'text-slate-500'}`}
+                                      >
                                         {column.header_path}
                                       </p>
                                     </div>
@@ -972,19 +1214,20 @@ export function Pusher({ onBack }: PusherProps) {
                                 <td className="px-4 py-3">
                                   <select
                                     value={choice.action}
-                                      onChange={(event) =>
-                                        updateChoice(column, {
-                                          action: event.target.value as MappingChoice['action'],
-                                          canonicalAccountCode:
+                                    onChange={(event) =>
+                                      updateChoice(column, {
+                                        action: event.target.value as MappingChoice['action'],
+                                        canonicalAccountCode:
                                           event.target.value === 'map' ? choice.canonicalAccountCode : null,
-                                          aggregationRule:
-                                            event.target.value === 'memo'
-                                                ? 'memo'
-                                                : event.target.value === 'ignore' || event.target.value === 'not_in_template'
-                                                  ? event.target.value
-                                                  : 'sum',
-                                        })
-                                      }
+                                        aggregationRule:
+                                          event.target.value === 'memo'
+                                            ? 'memo'
+                                            : event.target.value === 'ignore' ||
+                                                event.target.value === 'not_in_template'
+                                              ? event.target.value
+                                              : 'sum',
+                                      })
+                                    }
                                     className="w-40 rounded-lg border border-stone-200 bg-white px-3 py-2 text-sm font-semibold outline-none"
                                   >
                                     <option value="map">Map</option>
@@ -998,7 +1241,9 @@ export function Pusher({ onBack }: PusherProps) {
                                     <select
                                       value={choice.canonicalAccountCode ?? ''}
                                       disabled={choice.action !== 'map'}
-                                      onChange={(event) => updateChoice(column, { canonicalAccountCode: event.target.value || null })}
+                                      onChange={(event) =>
+                                        updateChoice(column, { canonicalAccountCode: event.target.value || null })
+                                      }
                                       className="min-w-[280px] rounded-lg border border-stone-200 bg-white px-3 py-2 text-sm outline-none disabled:bg-stone-100 disabled:text-slate-400"
                                     >
                                       <option value="">Choose account</option>
@@ -1023,7 +1268,9 @@ export function Pusher({ onBack }: PusherProps) {
                                   )}
                                 </td>
                                 <td className="px-4 py-3">
-                                  <p className="max-w-[320px] text-xs leading-relaxed text-slate-500">{column.reason}</p>
+                                  <p className="max-w-[320px] text-xs leading-relaxed text-slate-500">
+                                    {column.reason}
+                                  </p>
                                 </td>
                               </tr>
                             );
@@ -1038,7 +1285,9 @@ export function Pusher({ onBack }: PusherProps) {
                       <div className="rounded-lg border border-amber-200 bg-amber-50/60 p-3">
                         <div className="flex items-start justify-between gap-3">
                           <div>
-                            <h3 className="text-sm font-black uppercase tracking-[0.18em] text-amber-900">Parish Review</h3>
+                            <h3 className="text-sm font-black uppercase tracking-[0.18em] text-amber-900">
+                              Parish Review
+                            </h3>
                             <p className="mt-1 text-sm text-amber-800">
                               Confirm suggested or unmatched workbook parish names before pushing.
                             </p>
@@ -1068,31 +1317,24 @@ export function Pusher({ onBack }: PusherProps) {
                                 {match.matchName && (
                                   <div className="mt-2 flex items-center gap-2">
                                     <p className="min-w-0 flex-1 text-xs text-slate-500">
-                                      Suggested: {match.matchName} {match.confidence ? `(${Math.round(match.confidence * 100)}%)` : ''}
+                                      Suggested: {match.matchName}{' '}
+                                      {match.confidence ? `(${Math.round(match.confidence * 100)}%)` : ''}
                                     </p>
                                     {match.institutionId && (
                                       <button
-                                        onClick={() =>
-                                          setParishChoices((prev) => ({
-                                            ...prev,
-                                            [key]: match.institutionId ?? '',
-                                          }))
-                                        }
-                                        className="rounded-md border border-amber-200 bg-amber-50 px-2 py-1 text-xs font-bold text-amber-800 hover:bg-amber-100"
+                                        onClick={() => saveParishMatch(match, match.institutionId ?? '')}
+                                        disabled={savingParishKeys[key]}
+                                        className="rounded-md border border-amber-200 bg-amber-50 px-2 py-1 text-xs font-bold text-amber-800 hover:bg-amber-100 disabled:cursor-not-allowed disabled:opacity-60"
                                       >
-                                        Use
+                                        {savingParishKeys[key] ? 'Saving...' : 'Use'}
                                       </button>
                                     )}
                                   </div>
                                 )}
                                 <select
                                   value={parishChoices[key] ?? ''}
-                                  onChange={(event) =>
-                                    setParishChoices((prev) => ({
-                                      ...prev,
-                                      [key]: event.target.value,
-                                    }))
-                                  }
+                                  onChange={(event) => saveParishMatch(match, event.target.value)}
+                                  disabled={savingParishKeys[key]}
                                   className="mt-2 w-full rounded-lg border border-amber-200 bg-white px-3 py-2 text-sm outline-none focus:border-amber-500"
                                 >
                                   <option value="">Choose institution</option>
@@ -1113,13 +1355,20 @@ export function Pusher({ onBack }: PusherProps) {
 
                     <div>
                       <h3 className="text-sm font-black uppercase tracking-[0.18em] text-slate-800">Sample Rows</h3>
-                      <p className="mt-1 text-sm text-slate-500">A quick check of parish matching and zero-fill behavior.</p>
+                      <p className="mt-1 text-sm text-slate-500">
+                        A quick check of parish matching and zero-fill behavior.
+                      </p>
                     </div>
                     <div className="space-y-2">
                       {activeResult.sampleRows.slice(0, 8).map((row) => (
-                        <div key={`${row.parish_code ?? row.parish_name}-${row.reporting_month_label}`} className="rounded-lg border border-stone-200 bg-stone-50 p-3">
+                        <div
+                          key={`${row.parish_code ?? row.parish_name}-${row.reporting_month_label}`}
+                          className="rounded-lg border border-stone-200 bg-stone-50 p-3"
+                        >
                           <div className="flex items-center gap-2">
-                            <span className="rounded-md bg-white px-2 py-0.5 text-xs font-black text-slate-600">{row.parish_code ?? 'name match'}</span>
+                            <span className="rounded-md bg-white px-2 py-0.5 text-xs font-black text-slate-600">
+                              {row.parish_code ?? 'name match'}
+                            </span>
                             <span
                               className={`rounded-md border px-2 py-0.5 text-xs font-bold ${
                                 statusStyle[row.validation_status] ?? statusStyle.warning
@@ -1157,7 +1406,11 @@ export function Pusher({ onBack }: PusherProps) {
             <div className="flex items-center justify-between border-b border-stone-200 p-4">
               <div>
                 <h3 className="text-lg font-black text-slate-950">
-                  {draftSource ? 'Add Canonical Account' : editingAccountId ? 'Edit Canonical Account' : 'Canonical Account Management'}
+                  {draftSource
+                    ? 'Add Canonical Account'
+                    : editingAccountId
+                      ? 'Edit Canonical Account'
+                      : 'Canonical Account Management'}
                 </h3>
                 <p className="mt-1 text-sm text-slate-500">
                   {draftSource
@@ -1229,7 +1482,8 @@ export function Pusher({ onBack }: PusherProps) {
                         </div>
                         <p className="mt-2 text-sm font-bold text-slate-900">{account.account_name}</p>
                         <p className="mt-1 text-xs text-slate-500">
-                          {[account.account_type, account.classification].filter(Boolean).join(' / ') || 'No classification'}
+                          {[account.account_type, account.classification].filter(Boolean).join(' / ') ||
+                            'No classification'}
                         </p>
                       </div>
                     ))}
@@ -1242,28 +1496,63 @@ export function Pusher({ onBack }: PusherProps) {
                 </div>
               )}
               <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-              <Field label="Account Code" value={draftAccount.accountCode} onChange={(value) => setDraftAccount((prev) => ({ ...prev, accountCode: value }))} placeholder="D.09" />
-              <Field label="Account Name" value={draftAccount.accountName} onChange={(value) => setDraftAccount((prev) => ({ ...prev, accountName: value }))} />
-              <Field label="Section Code" value={draftAccount.sectionCode} onChange={(value) => setDraftAccount((prev) => ({ ...prev, sectionCode: value.toUpperCase().slice(0, 1) }))} placeholder="D" />
-              <Field label="Subsection Code" value={draftAccount.subsectionCode} onChange={(value) => setDraftAccount((prev) => ({ ...prev, subsectionCode: value }))} placeholder="Optional" />
-              <label className="space-y-1.5">
-                <span className="text-xs font-black uppercase tracking-[0.16em] text-slate-500">Account Type</span>
-                <select
-                  value={draftAccount.accountType}
-                  onChange={(event) => setDraftAccount((prev) => ({ ...prev, accountType: event.target.value }))}
-                  className="w-full rounded-lg border border-stone-200 px-3 py-2.5 text-sm outline-none"
-                >
-                  <option value="receipt">receipt</option>
-                  <option value="expense">expense</option>
-                  <option value="remittance">remittance</option>
-                  <option value="balance">balance</option>
-                  <option value="personal_contribution">personal_contribution</option>
-                  <option value="memo">memo</option>
-                </select>
-              </label>
-              <Field label="Classification" value={draftAccount.classification} onChange={(value) => setDraftAccount((prev) => ({ ...prev, classification: value }))} />
-              <Field label="Effective Year" value={String(draftAccount.effectiveYear)} onChange={(value) => setDraftAccount((prev) => ({ ...prev, effectiveYear: Number(value) || new Date().getFullYear() }))} />
-              <Field label="Reason" value={draftAccount.reason} onChange={(value) => setDraftAccount((prev) => ({ ...prev, reason: value }))} />
+                <Field
+                  label="Account Code"
+                  value={draftAccount.accountCode}
+                  onChange={(value) => setDraftAccount((prev) => ({ ...prev, accountCode: value }))}
+                  placeholder="D.09"
+                />
+                <Field
+                  label="Account Name"
+                  value={draftAccount.accountName}
+                  onChange={(value) => setDraftAccount((prev) => ({ ...prev, accountName: value }))}
+                />
+                <Field
+                  label="Section Code"
+                  value={draftAccount.sectionCode}
+                  onChange={(value) =>
+                    setDraftAccount((prev) => ({ ...prev, sectionCode: value.toUpperCase().slice(0, 1) }))
+                  }
+                  placeholder="D"
+                />
+                <Field
+                  label="Subsection Code"
+                  value={draftAccount.subsectionCode}
+                  onChange={(value) => setDraftAccount((prev) => ({ ...prev, subsectionCode: value }))}
+                  placeholder="Optional"
+                />
+                <label className="space-y-1.5">
+                  <span className="text-xs font-black uppercase tracking-[0.16em] text-slate-500">Account Type</span>
+                  <select
+                    value={draftAccount.accountType}
+                    onChange={(event) => setDraftAccount((prev) => ({ ...prev, accountType: event.target.value }))}
+                    className="w-full rounded-lg border border-stone-200 px-3 py-2.5 text-sm outline-none"
+                  >
+                    <option value="receipt">receipt</option>
+                    <option value="expense">expense</option>
+                    <option value="remittance">remittance</option>
+                    <option value="balance">balance</option>
+                    <option value="personal_contribution">personal_contribution</option>
+                    <option value="memo">memo</option>
+                  </select>
+                </label>
+                <Field
+                  label="Classification"
+                  value={draftAccount.classification}
+                  onChange={(value) => setDraftAccount((prev) => ({ ...prev, classification: value }))}
+                />
+                <Field
+                  label="Effective Year"
+                  value={String(draftAccount.effectiveYear)}
+                  onChange={(value) =>
+                    setDraftAccount((prev) => ({ ...prev, effectiveYear: Number(value) || new Date().getFullYear() }))
+                  }
+                />
+                <Field
+                  label="Reason"
+                  value={draftAccount.reason}
+                  onChange={(value) => setDraftAccount((prev) => ({ ...prev, reason: value }))}
+                />
               </div>
             </div>
             <div className="flex justify-end gap-3 border-t border-stone-200 p-4">
@@ -1285,7 +1574,10 @@ export function Pusher({ onBack }: PusherProps) {
                   New Account
                 </button>
               )}
-              <button onClick={createCanonicalAccount} className="rounded-lg bg-slate-950 px-4 py-2.5 text-sm font-bold text-white hover:bg-slate-800">
+              <button
+                onClick={createCanonicalAccount}
+                className="rounded-lg bg-slate-950 px-4 py-2.5 text-sm font-bold text-white hover:bg-slate-800"
+              >
                 {draftSource ? 'Create and Map' : editingAccountId ? 'Save Changes' : 'Create Account'}
               </button>
             </div>
@@ -1296,19 +1588,42 @@ export function Pusher({ onBack }: PusherProps) {
   );
 }
 
-function Metric({ label, value, tone = 'slate' }: { label: string; value: number; tone?: 'slate' | 'emerald' | 'amber' | 'red' }) {
+function Metric({
+  label,
+  value,
+  tone = 'slate',
+  onClick,
+  active = false,
+}: {
+  label: string;
+  value: number;
+  tone?: 'slate' | 'emerald' | 'amber' | 'red';
+  onClick?: () => void;
+  active?: boolean;
+}) {
   const tones = {
     slate: 'border-stone-200 bg-stone-50 text-slate-900',
     emerald: 'border-emerald-200 bg-emerald-50 text-emerald-800',
     amber: 'border-amber-200 bg-amber-50 text-amber-800',
     red: 'border-red-200 bg-red-50 text-red-800',
   };
-  return (
-    <div className={`rounded-lg border p-3 ${tones[tone]}`}>
+  const className = `rounded-lg border p-3 text-left transition ${tones[tone]} ${
+    onClick ? 'cursor-pointer hover:brightness-95 focus:outline-none focus:ring-2 focus:ring-slate-400' : ''
+  } ${active ? 'ring-2 ring-red-300' : ''}`;
+  const content = (
+    <>
       <p className="text-[10px] font-black uppercase tracking-[0.16em] opacity-60">{label}</p>
       <p className="mt-1 text-xl font-black">{formatNumber(value)}</p>
-    </div>
+    </>
   );
+  if (onClick) {
+    return (
+      <button type="button" onClick={onClick} className={className} title={`View ${label.toLowerCase()} rows`}>
+        {content}
+      </button>
+    );
+  }
+  return <div className={className}>{content}</div>;
 }
 
 function Field({
