@@ -11,6 +11,7 @@ from app.services.data_definitions import (
     _SCHEMA_MAP,
     MONTH_ORDER,
 )
+from app.services import analytics_db
 from app.services.supabase_client import get_supabase, get_table
 
 # ── Helpers ──────────────────────────────────────────────────────────────────
@@ -166,7 +167,8 @@ _FACT_MAP = {
 def _write_snapshot(institution_id: str, entity_type: str, score: HealthScoreResponse) -> None:
     """Persist a health snapshot to the analytics star schema. Silently no-ops on any failure."""
     try:
-        # 1. Resolve institution name from diocese.institutions
+        # Institution name is a bronze/transactional read — always from Supabase,
+        # regardless of where the gold-layer write below lands.
         inst_row = (
             get_supabase()
             .schema("diocese")
@@ -178,74 +180,138 @@ def _write_snapshot(institution_id: str, entity_type: str, score: HealthScoreRes
         )
         inst_name = inst_row.data["name"] if inst_row.data else institution_id
 
-        # 2. Ensure dim_institutions row exists and get institution_key
-        di = (
-            get_table("shared_analytics", "dim_institutions")
-            .select("institution_key")
-            .eq("institution_id", institution_id)
-            .maybe_single()
-            .execute()
-        )
-        if di.data:
-            institution_key = di.data["institution_key"]
+        if analytics_db.enabled():
+            _write_snapshot_aws(institution_id, entity_type, inst_name, score)
         else:
-            ins = (
-                get_table("shared_analytics", "dim_institutions")
-                .insert(
-                    {
-                        "institution_id": institution_id,
-                        "institution_name": inst_name,
-                        "institution_type": entity_type,
-                    }
-                )
-                .execute()
-            )
-            institution_key = ins.data[0]["institution_key"]
-
-        # 3. Ensure type-specific dim row exists and get entity_key
-        dim_schema, dim_table, dim_pk = _DIM_MAP[entity_type]
-        dd = (
-            get_table(dim_schema, dim_table)
-            .select(dim_pk)
-            .eq("institution_key", institution_key)
-            .maybe_single()
-            .execute()
-        )
-        if dd.data:
-            entity_key = dd.data[dim_pk]
-        else:
-            ins2 = get_table(dim_schema, dim_table).insert({"institution_key": institution_key}).execute()
-            entity_key = ins2.data[0][dim_pk]
-
-        # 4. date_key = YYYYMM for the current month
-        now = datetime.now(timezone.utc)
-        date_key = now.year * 100 + now.month
-
-        # 5. Insert or update fact snapshot for this (entity_key, date_key)
-        fact_schema, fact_table, fact_fk = _FACT_MAP[entity_type]
-        existing = (
-            get_table(fact_schema, fact_table)
-            .select("snapshot_id")
-            .eq(fact_fk, entity_key)
-            .eq("date_key", date_key)
-            .maybe_single()
-            .execute()
-        )
-        payload = {
-            "composite_score": float(score.composite_score),
-            "liquidity_score": float(score.dimensions.liquidity),
-            "sustainability_score": float(score.dimensions.sustainability),
-            "stability_score": float(score.dimensions.stability),
-        }
-        if existing.data:
-            get_table(fact_schema, fact_table).update(payload).eq("snapshot_id", existing.data["snapshot_id"]).execute()
-        else:
-            get_table(fact_schema, fact_table).insert({fact_fk: entity_key, "date_key": date_key, **payload}).execute()
+            _write_snapshot_supabase(institution_id, entity_type, inst_name, score)
 
     except Exception as exc:
         import logging
 
         logging.getLogger(__name__).warning("Health snapshot write-back failed: %s", exc)
+
+
+def _snapshot_payload(score: HealthScoreResponse) -> dict:
+    return {
+        "composite_score": float(score.composite_score),
+        "liquidity_score": float(score.dimensions.liquidity),
+        "sustainability_score": float(score.dimensions.sustainability),
+        "stability_score": float(score.dimensions.stability),
+    }
+
+
+def _write_snapshot_supabase(institution_id: str, entity_type: str, inst_name: str, score: HealthScoreResponse) -> None:
+    # 1. Ensure dim_institutions row exists and get institution_key
+    di = (
+        get_table("shared_analytics", "dim_institutions")
+        .select("institution_key")
+        .eq("institution_id", institution_id)
+        .maybe_single()
+        .execute()
+    )
+    if di.data:
+        institution_key = di.data["institution_key"]
+    else:
+        ins = (
+            get_table("shared_analytics", "dim_institutions")
+            .insert(
+                {
+                    "institution_id": institution_id,
+                    "institution_name": inst_name,
+                    "institution_type": entity_type,
+                }
+            )
+            .execute()
+        )
+        institution_key = ins.data[0]["institution_key"]
+
+    # 2. Ensure type-specific dim row exists and get entity_key
+    dim_schema, dim_table, dim_pk = _DIM_MAP[entity_type]
+    dd = (
+        get_table(dim_schema, dim_table)
+        .select(dim_pk)
+        .eq("institution_key", institution_key)
+        .maybe_single()
+        .execute()
+    )
+    if dd.data:
+        entity_key = dd.data[dim_pk]
+    else:
+        ins2 = get_table(dim_schema, dim_table).insert({"institution_key": institution_key}).execute()
+        entity_key = ins2.data[0][dim_pk]
+
+    # 3. date_key = YYYYMM for the current month
+    now = datetime.now(timezone.utc)
+    date_key = now.year * 100 + now.month
+
+    # 4. Insert or update fact snapshot for this (entity_key, date_key)
+    fact_schema, fact_table, fact_fk = _FACT_MAP[entity_type]
+    existing = (
+        get_table(fact_schema, fact_table)
+        .select("snapshot_id")
+        .eq(fact_fk, entity_key)
+        .eq("date_key", date_key)
+        .maybe_single()
+        .execute()
+    )
+    payload = _snapshot_payload(score)
+    if existing.data:
+        get_table(fact_schema, fact_table).update(payload).eq("snapshot_id", existing.data["snapshot_id"]).execute()
+    else:
+        get_table(fact_schema, fact_table).insert({fact_fk: entity_key, "date_key": date_key, **payload}).execute()
+
+
+def _write_snapshot_aws(institution_id: str, entity_type: str, inst_name: str, score: HealthScoreResponse) -> None:
+    # 1. Find-or-create dim_institutions row, get institution_key (single round trip)
+    institution_key = analytics_db.upsert_row(
+        "shared_analytics",
+        "dim_institutions",
+        {
+            "institution_id": institution_id,
+            "institution_name": inst_name,
+            "institution_type": entity_type,
+        },
+        conflict_cols="institution_id",
+        returning="institution_key",
+    )
+
+    # 2. Find-or-create type-specific dim row, get entity_key
+    dim_schema, dim_table, dim_pk = _DIM_MAP[entity_type]
+    entity_key = analytics_db.upsert_row(
+        dim_schema,
+        dim_table,
+        {"institution_key": institution_key},
+        conflict_cols="institution_key",
+        returning=dim_pk,
+    )
+
+    # 3. date_key = YYYYMM for the current month
+    now = datetime.now(timezone.utc)
+    date_key = now.year * 100 + now.month
+
+    # 4. Insert or update fact snapshot for this (entity_key, date_key).
+    # No unique constraint on (fact_fk, date_key) exists on this table, so a
+    # single ON CONFLICT upsert isn't possible — select-then-branch like the
+    # Supabase path above.
+    fact_schema, fact_table, fact_fk = _FACT_MAP[entity_type]
+    existing = analytics_db.fetch_one(
+        fact_schema, fact_table, {fact_fk: entity_key, "date_key": date_key}, columns="snapshot_id"
+    )
+    payload = _snapshot_payload(score)
+    if existing:
+        set_clause = ", ".join(f'"{k}" = %s' for k in payload)
+        analytics_db.execute(
+            f'UPDATE "{fact_schema}"."{fact_table}" SET {set_clause} WHERE snapshot_id = %s',
+            [*payload.values(), existing["snapshot_id"]],
+        )
+    else:
+        row = {fact_fk: entity_key, "date_key": date_key, **payload}
+        col_list = ", ".join(f'"{k}"' for k in row)
+        placeholders = ", ".join(["%s"] * len(row))
+        analytics_db.execute(
+            f'INSERT INTO "{fact_schema}"."{fact_table}" ({col_list}) VALUES ({placeholders})',
+            list(row.values()),
+        )
 
 
 # ── Public API ────────────────────────────────────────────────────────────────

@@ -4,6 +4,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.routers import pusher
+from app.services import analytics_db
 
 try:
     from app.routers import analytics, descriptive, diagnostic, health, iafr, predictive, prescriptive
@@ -39,6 +40,11 @@ if OPTIONAL_ROUTERS_ERROR is None:
     app.include_router(diagnostic.router, prefix="/analytics/diagnostic")
     app.include_router(predictive.router, prefix="/analytics/predictive")
     app.include_router(prescriptive.router, prefix="/analytics/prescriptive")
+
+@app.on_event("shutdown")
+def _shutdown_analytics_db():
+    analytics_db.close_pool()
+
 
 @app.get("/analytics/dependency-warning")
 async def analytics_dependency_warning():

@@ -1,0 +1,155 @@
+# AWS RDS deployment manifest.
+# Order matches the actual dependency order the migrations were authored in
+# (reconstructed from `git log --reverse --diff-filter=A`), not filename sort —
+# several files share a numeric prefix (e.g. two different 190_*.sql files) and
+# filename order does not reflect their real dependency order.
+#
+# Lines starting with # are comments. Blank lines ignored.
+# Paths are relative to supabase/.
+
+aws_migrations/000_aws_prelude.sql
+portable_migrations/000_extensions_and_helpers.sql
+portable_migrations/001_create_schemas.sql
+portable_migrations/010_diocese_core.sql
+# Seeded here (not deferred to the end, unlike portable_migrations/*): later
+# files (186, 189, 190) INSERT INTO diocese.role_permissions referencing role
+# ids like 'bishop', 'chancellor' — this seed is what makes those ids exist.
+# Pure RBAC reference data (role names, default permission grants), no PII.
+portable_seeds/001_roles_permissions.sql
+portable_migrations/020_operations.sql
+portable_migrations/030_parishes.sql
+portable_migrations/040_schools.sql
+portable_migrations/050_seminaries.sql
+# 051 skipped: unconditional UPDATE reads expense_category/receipt_category, which
+# 050_seminaries.sql (current version) never creates — file's own header says
+# "Run this if you already created the database before 050_seminaries.sql was updated."
+# 052 skipped: DROP COLUMN IF EXISTS sort_order — safe no-op, but sort_order was
+# never created by the current schema files; purposeless on a fresh deploy.
+# 053 skipped: same reason as 052, for primary_patron/secondary_patron columns.
+# 054 skipped: unconditional RENAME COLUMN lat TO latitude, but 010_diocese_core.sql
+# (current version) already names the column latitude — would fail with
+# "column lat does not exist" on a fresh deploy.
+# 055 skipped: redundant — 100_priest_assignment_analytics.sql already defines
+# dim_priests.profile_id as "NOT NULL UNIQUE REFERENCES diocese.profiles(id)"
+# directly; re-adding the same constraints here would fail as duplicates.
+# 056/057/059/061/064/068 skipped: DROP COLUMN IF EXISTS on columns the current
+# schema files never create — safe no-ops, but purposeless on a fresh deploy.
+portable_migrations/060_shared_analytics.sql
+portable_migrations/062_replace_parish_local_calendar_with_parish_events.sql
+# 063 skipped: unconditional INSERT...SELECT FROM parishes.iafr_sacrament_lines /
+# parishes.iafr_employee_contributions — neither table is created anywhere in the
+# current schema (030_parishes.sql never creates them); would fail "relation does
+# not exist" on a fresh deploy. File's own header: "Run this only if the old
+# detailed parish tables already exist."
+# 058 skipped: unconditional RENAME COLUMN entity_type/entity_class ->
+# institution_type/institution_class, but 010/030/040/050/060 (current versions)
+# already use the institution_* names directly — would fail "column does not exist".
+# 065/066/067/071 skipped: no-op placeholders kept only for numbering continuity
+# (each file's body is a comment, e.g. "Parish events now live in diocese.events.
+# Kept as a no-op placeholder so migration numbering remains stable.").
+# 069 skipped: unconditional RENAME COLUMN has_fiesta -> has_event, but
+# 070_parish_analytics.sql (current version) already creates has_event directly.
+portable_migrations/070_parish_analytics.sql
+# 070a skipped: redundant — 070/080/090 (current versions) already create
+# has_event/minor_events_count directly in their CREATE TABLE statements; this
+# file's ADD COLUMN IF NOT EXISTS would also fail here anyway since it references
+# school_analytics/seminary_analytics tables that don't exist until 080/090 run.
+portable_migrations/080_school_analytics.sql
+portable_migrations/090_seminary_analytics.sql
+portable_migrations/100_priest_assignment_analytics.sql
+portable_migrations/110_reference.sql
+portable_migrations/120_compatibility_views.sql
+portable_migrations/125_seed_dim_date.sql
+# 130/140/150/160 moved to the end of this manifest: they are analytics REFRESH
+# scripts (DELETE+INSERT from operational tables), meant to run once all schema
+# DDL is finished — the deployment guide's own step 8 ("Populate analytics") runs
+# them last, after step 7 ("Migrate your old operational rows"). The checked-in
+# version of 140 already assumes later-added columns (e.g. remittances_total,
+# added by 207) exist, confirming these are living/re-run scripts, not
+# fixed-position migrations.
+# 170 skipped: pure commented-out template (no executable SQL) for backfilling
+# from a legacy monolithic table; not applicable, this deploy has no legacy source.
+portable_migrations/111_fix_weather_observations_index.sql
+portable_migrations/171_replace_liturgical_calendar_columns.sql
+portable_migrations/172_liturgical_calendar_runs.sql
+portable_migrations/173_audit_schema.sql
+portable_migrations/174_staging_liturgical_calendar.sql
+portable_migrations/176_priest_health_records.sql
+# 177 moved to run after 194: its CREATE TABLE IF NOT EXISTS is a no-op (010_diocese_core.sql
+# already created diocese.audit_logs, with an older column set — log_reference/role/occurred_at
+# instead of user_id/user_role/entity/metadata). 177's CREATE INDEX on user_id needs that column,
+# which 194_add_audit_logs_metadata.sql is the one that actually adds.
+portable_migrations/178_weather_runs.sql
+portable_migrations/179_add_subsidy_type_entity_tables.sql
+portable_migrations/180_add_subsidy_type_to_institutions.sql
+portable_migrations/181_create_simulator_scenarios.sql
+portable_migrations/112_add_weather_validation_fields.sql
+portable_migrations/182_allow_diocese_institution_type.sql
+# 183/184 skipped: Supabase Storage bucket policies, not applicable on plain RDS.
+portable_migrations/185_centralize_events.sql
+portable_migrations/186_add_events_permissions.sql
+portable_migrations/187_weather_daily_and_monthly.sql
+portable_migrations/188_fix_weather_monthly_rebuild.sql
+portable_migrations/189_liturgical_validator_role.sql
+portable_migrations/190_institution_budgets.sql
+portable_migrations/190_add_institution_code.sql
+portable_migrations/191_add_profile_code.sql
+portable_migrations/193_announcement_overhaul.sql
+portable_migrations/189_weather_split_daily_tables.sql
+portable_migrations/194_announcement_pinning.sql
+portable_migrations/190_weather_three_validators.sql
+portable_migrations/191_weather_six_validators.sql
+portable_migrations/195_liturgical_source_of_truth_validation.sql
+portable_migrations/196_liturgical_litcal_fallback_columns.sql
+portable_migrations/197_liturgical_rename_validation_statuses.sql
+portable_migrations/198_clean_weather_tables.sql
+portable_migrations/199_weather_wind_humidity_severe.sql
+portable_migrations/192_fix_code_counters_perms.sql
+portable_migrations/200_replace_diff_with_classifications.sql
+portable_migrations/194_add_audit_logs_metadata.sql
+# 193 moved here too: its UPDATE statements read the entity column, same
+# dependency as 177/192 above — 194 is what adds entity.
+portable_migrations/193_update_audit_log_categories.sql
+portable_migrations/177_application_audit_logs.sql
+# 192 moved here too: its debug.v_audit_logs view references al.user_id, same
+# dependency as 177 above. Its other four views have no such dependency but
+# moving the whole file is simpler than splitting it.
+portable_migrations/192_debug_views.sql
+portable_migrations/201_fix_audit_logs_compatibility.sql
+portable_migrations/202_drop_audit_logs_role_ip_columns.sql
+portable_migrations/203_backfill_audit_logs_user_institution_entity.sql
+portable_migrations/204_repair_generic_audit_log_entities.sql
+portable_migrations/205_audit_logs_metadata_backfill_and_fk.sql
+portable_migrations/206_add_profile_avatar_url.sql
+portable_migrations/201_severe_weather_add_jma.sql
+portable_migrations/202_temp_wind_sot_add_nasa_classification.sql
+portable_migrations/203_severe_weather_combined_rain_wind.sql
+portable_migrations/204_severe_combined_monthly_rollup.sql
+portable_migrations/207_add_remittances_total_to_parish_analytics.sql
+portable_migrations/208_drop_wci_columns.sql
+portable_migrations/209_financial_pusher_staging.sql
+portable_migrations/210_allow_iafr_section_a_line_items.sql
+portable_migrations/211_financial_pusher_service_role_grants.sql
+# 212 skipped: one-time reset script for bad 2021 import data on Supabase; nothing to reset on a fresh AWS DB.
+portable_migrations/213_add_parish_monthly_prescribed_amounts.sql
+# 214 skipped: same reason as 212, for 2022 import data.
+portable_migrations/215_add_parish_iafr_source_code.sql
+# 216 skipped: same reason as 212/214, resets all financial pusher imports.
+portable_migrations/217_add_other_special_collections_accounts.sql
+portable_migrations/217_add_parish_monthly_operating_expenses.sql
+portable_migrations/218_add_parking_fee_receipts_account.sql
+
+# Fixes a real bug present on production Supabase too: 208_drop_wci_columns.sql
+# dropped rain_wci/severe_wci/temp_wci/wind_wci/humidity_wci/overall_wci from
+# weather_monthly_summary, but nobody updated rebuild_weather_monthly_summary()
+# afterward — it still tried to INSERT into those columns. Confirmed via the
+# live function definition on Supabase (pg_get_functiondef) that this affects
+# production too, not just this AWS deployment.
+portable_migrations/219_fix_rebuild_function_wci_removal.sql
+portable_migrations/220_add_profile_onboarding_columns.sql
+
+# Analytics refresh — run last, after all schema DDL above (see note near 125).
+portable_migrations/130_sync_analytics_dimensions.sql
+portable_migrations/140_refresh_parish_analytics.sql
+portable_migrations/150_refresh_school_analytics.sql
+portable_migrations/160_refresh_seminary_analytics.sql
