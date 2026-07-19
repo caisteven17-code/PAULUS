@@ -5,11 +5,13 @@ transaction so a failure stops the run without touching later files, and so a
 prior successful file's changes are not rolled back by a later failure.
 
 Usage: python scripts/apply_aws_migrations.py [--start-after <relative-path-substring>]
+       python scripts/apply_aws_migrations.py --only <relative-path-substring>
 
 --start-after resumes a run: it skips every manifest entry up to and including the
 given file (matched by substring), so already-applied files (many of which use
 plain CREATE TABLE / CREATE SCHEMA without IF NOT EXISTS) are not re-run.
 """
+
 import sys
 from pathlib import Path
 
@@ -40,22 +42,36 @@ def load_manifest() -> list[Path]:
 
 
 def main() -> None:
-    import psycopg2
+    try:
+        import psycopg2 as postgres_driver
+    except ModuleNotFoundError:
+        import psycopg as postgres_driver
 
     db_url = load_db_url()
     files = load_manifest()
 
-    if len(sys.argv) > 2 and sys.argv[1] == "--start-after":
+    if len(sys.argv) > 2 and sys.argv[1] == "--only":
+        marker = sys.argv[2]
+        matches = [path for path in files if marker in str(path)]
+        if len(matches) != 1:
+            sys.exit(
+                f"--only marker '{marker}' matched {len(matches)} files; expected exactly one"
+            )
+        files = matches
+        print(f"Deploying only: {files[0].relative_to(SUPABASE_DIR)}\n")
+    elif len(sys.argv) > 2 and sys.argv[1] == "--start-after":
         marker = sys.argv[2]
         idx = next((i for i, p in enumerate(files) if marker in str(p)), None)
         if idx is None:
             sys.exit(f"--start-after marker '{marker}' not found in manifest")
         skipped, files = files[: idx + 1], files[idx + 1 :]
-        print(f"Resuming: skipping {len(skipped)} already-applied file(s), ending with {skipped[-1].name}\n")
+        print(
+            f"Resuming: skipping {len(skipped)} already-applied file(s), ending with {skipped[-1].name}\n"
+        )
 
     print(f"Deploying {len(files)} files to AWS warehouse database...\n")
 
-    conn = psycopg2.connect(db_url, connect_timeout=15)
+    conn = postgres_driver.connect(db_url, connect_timeout=15)
     conn.autocommit = False
 
     applied = 0
@@ -76,7 +92,9 @@ def main() -> None:
             print(f"  [{applied + 1}/{len(files)}] FAIL {rel}")
             print(f"\n{type(e).__name__}: {e}")
             conn.close()
-            sys.exit(f"\nStopped after {applied} successful file(s). Fix the error above and re-run.")
+            sys.exit(
+                f"\nStopped after {applied} successful file(s). Fix the error above and re-run."
+            )
 
     conn.close()
     print(f"\nAll {applied} files applied successfully.")

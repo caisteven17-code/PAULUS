@@ -341,8 +341,8 @@ export class AuditLogService {
 
     const [mutationsResult, appEventsResult] = await Promise.all([
       this.supabaseService.admin
-        .schema('audit')
-        .from('change_log')
+        .schema('diocese')
+        .from('audit_change_log')
         .select('*')
         .order('changed_at', { ascending: false })
         .limit(fetchLimit),
@@ -354,8 +354,8 @@ export class AuditLogService {
         .limit(fetchLimit),
     ]);
 
-    // audit.change_log is optional — silently skip if the schema doesn't exist
-    if (mutationsResult.error && !mutationsResult.error.message?.includes('Invalid schema')) {
+    // The row-history view is optional until migration 221 is deployed.
+    if (mutationsResult.error && !mutationsResult.error.message?.includes('audit_change_log')) {
       console.error('[audit-log.service] change_log:', mutationsResult.error.message);
     }
     if (appEventsResult.error) console.error('[audit-log.service] audit_logs:', appEventsResult.error.message);

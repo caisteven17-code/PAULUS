@@ -64,9 +64,10 @@ a buzzword:
 3. **Adviser direction:** split the database along workload lines to prevent resource
    contention between transactional (submission, approval) and analytical (forecasting,
    health scoring) workloads.
-4. **Decision:** adopt a hybrid architecture — Supabase remains the OLTP system of record;
-   AWS RDS PostgreSQL hosts a data warehouse with bronze/silver/gold layers for analytical
-   workloads.
+4. **Decision:** adopt a hybrid architecture — Supabase remains the OLTP system of record and,
+   with row-level mutation history, the logical source/bronze tier; AWS RDS PostgreSQL hosts
+   cleaned silver and analytical gold data. A physical AWS bronze copy is retained only during
+   migration comparison.
 
 **Do not write:** "we split the database for scalability" as the primary justification — your
 current data volume (tens of thousands of rows) does not require it, and a panelist familiar
@@ -77,16 +78,17 @@ adviser-directed learning objective is the accurate and defensible framing.
 
 | Correct term | What it refers to | Do NOT call this... |
 |---|---|---|
-| **OLTP database** / transactional system | Supabase Postgres | "bronze layer" |
+| **OLTP database** / transactional system | Supabase Postgres | a warehouse table |
 | **Data warehouse** | AWS RDS PostgreSQL | "the AWS database" (too vague for a methodology chapter) |
-| **Bronze layer** | Raw mirror of OLTP tables, landed inside the AWS warehouse by ETL | the Supabase database itself |
-| **Silver layer** | Cleaned/conformed reference data in the warehouse (weather, liturgical calendar) | — |
+| **Logical source/bronze tier** | Supabase current data plus `audit.change_log` row history | `diocese.audit_logs` alone |
+| **Transitional AWS bronze copy** | Temporary source-faithful comparison tables in AWS | the final analytical source |
+| **Silver layer** | Cleaned/conformed AWS data, including `parish_silver` | — |
 | **Gold layer** | Star-schema dimensional/fact tables serving analytics (the `*_analytics` schemas) | — |
-| **ETL job** / warehouse refresh | The nightly Python process that mirrors bronze tables and rebuilds gold facts | "sync" (too informal for methodology writing) |
+| **ETL job** / warehouse refresh | Python extraction, cleaning, reconciliation, and loading into AWS | "sync" (too informal for methodology writing) |
 
-The medallion (bronze/silver/gold) model describes layers **inside the warehouse**, not a label
-for two different databases. This distinction matters if a panelist has data engineering
-background.
+The layers are logical data-quality stages and do not have to reside in one database. Be explicit
+that Supabase is simultaneously the live OLTP system and logical source tier; its mutation log is
+the historical control that makes direct-to-silver defensible.
 
 ## 3. Measured evidence to cite (use in Results or System Evaluation)
 
@@ -140,18 +142,18 @@ Change Log entry with the date.
 
 ## 5. Known architectural trade-off to address explicitly (Limitations chapter)
 
-**Referential integrity is not real-time across the two databases.** PostgreSQL foreign key
-constraints are enforced only within a single database instance; the AWS warehouse's foreign
-keys reference a **local mirror** of OLTP tables, refreshed by nightly ETL — not the live
-Supabase data. This means:
+**Referential integrity is not cross-database.** PostgreSQL foreign keys are enforced only
+within one database. Direct silver therefore stores Supabase UUIDs as lineage values without
+foreign keys back to Supabase; silver-owned parent/child relationships remain enforced locally.
+Gold dimensions may still use temporary local reference copies during transition. This means:
 
-- A deletion or change on Supabase is not reflected in AWS-side constraint checking until the
-  next ETL run (up to ~24 hours).
+- A deletion or change on Supabase reaches AWS after the watermark poll and successful
+  reconciliation, rather than in the same OLTP transaction.
 - This is the standard, accepted trade-off of every medallion/warehouse architecture separated
   from its OLTP source (commonly termed "eventual consistency"), not a defect specific to this
   system.
-- Supabase remains the sole source of truth; the AWS mirror is derived and disposable —
-  it can be fully rebuilt from Supabase at any time without data loss.
+- Supabase remains the sole source of truth; AWS silver is derived and rebuildable from the
+  current source plus retained row-level audit history.
 
 Write this as a deliberate, understood design trade-off in the Limitations/Future Work section,
 not something discovered as a flaw. Panels respond well to "we identified X trade-off and
@@ -167,10 +169,11 @@ narrative.
 | A | AWS RDS PostgreSQL 18.4 (db.t3.micro) provisioned, connectivity verified | Done | 2026-07-17 |
 | B | Full schema deployed to AWS: 83 tables / 15 schemas, RBAC seeded, weather rebuild function verified callable. Also found and fixed a pre-existing bug in `rebuild_weather_monthly_summary()` (dangling references to WCI columns dropped by migration 208) — confirmed present on production Supabase too via live function inspection; fix written as migration 219, applied to AWS, pending user decision on applying to Supabase | Done | 2026-07-18 |
 | C | Python analytics service dual-connection built (`analytics_db.py`), health scoring (`health_scoring.py`) repointed to write AWS gold tables when `ANALYTICS_DB_URL` is set, verified end-to-end with a real parish's health snapshot landing correctly on AWS | Done | 2026-07-18 |
-| D | Minimal bronze mirror built (`warehouse_etl.py`) — `diocese.roles`, `diocese.institutions`, `diocese.profiles` only, enough to satisfy gold-layer FKs. Full 16-table mirror + analytics refresh SQL still pending. Weather pipeline intentionally NOT repointed yet (holding per instruction) | Partial | 2026-07-18 |
-| E | Silver pipelines (weather, liturgical) repointed to write AWS | Pending | — |
-| F | Cutover — backfill, verification, writers/readers repointed | Pending | — |
-| G | Supabase storage hygiene (audit retention, staging pruning) | Pending | — |
+| D | Direct Supabase-to-silver transition validated for one parish across 2021-2025: 60 records and 2,344 lines matched the temporary bronze copy by IDs and PHP 33,816,254.76 total. Audit migration 221 is live and end-to-end incremental verification passed. | Done | 2026-07-18 |
+| E | Parish finance gold/data mart formulas approved and fact refresh implemented | Pending | — |
+| F | Silver pipelines (weather, liturgical) repointed to write AWS | Pending | — |
+| G | Cutover — full backfill, verification, writers/readers repointed | Pending | — |
+| H | Supabase storage hygiene (audit retention, staging pruning) | Pending | — |
 
 ## 7. Anticipated defense questions — prepared answers
 
@@ -183,8 +186,8 @@ narrative.
   decision is driven by the measured storage-quota constraint of the free tier and workload
   isolation, not by scale. State this plainly rather than defend an implied performance claim.
 - **"How do you guarantee data consistency across two databases?"** — See §5. Eventual
-  consistency via nightly ETL; Supabase is the authoritative source; the AWS copy is a rebuildable
-  derived layer.
+  consistency via watermark-driven ETL; Supabase is authoritative, and counts, UUID sets, and
+  amount totals are reconciled before a watermark advances.
 - **"What happens to personal/sensitive data in the warehouse?"** — State explicitly what is
   and is not mirrored (e.g., if priest names are excluded from `priest_assignment_analytics`
   and only IDs are used) — confirm this against the actual ETL implementation once built, and
@@ -234,3 +237,33 @@ this feeds the manuscript's development narrative, not a full commit history.)*
   `dim_institutions`/`dim_parishes`/`fact_parish_health_snapshots` on AWS. Weather pipeline
   intentionally not touched this session, per explicit instruction to hold it for separate
   testing.
+- **2026-07-18** — Parish bronze pipeline Phases 0-2 completed. Added the source-to-bronze
+  contract and AWS-only `warehouse_control` run, watermark, failure, and reconciliation tables.
+  Extended `warehouse_etl.py` with explicit dry-run and manual-pilot modes. Verified Blessed
+  Sacrament Parish (`D1-23`) for 2021: 12 monthly records and 367 line items loaded with all 40
+  reconciliation checks passing; an idempotency rerun retained the same counts. The complete
+  114-account Supabase catalog was aligned to AWS source UUIDs before the first financial load.
+  No silver objects or parish gold facts were populated.
+- **2026-07-18** — Phase 3 limited automation enabled for Blessed Sacrament Parish only. Added
+  a FastAPI background polling worker with an explicit allowlist, per-parish source watermark,
+  full child-snapshot replacement, record-level reconciliation, failure logging, and retry by
+  withholding watermark advancement. A forced incremental record sync passed all checks, and
+  an idle poll left bronze at 12 records/367 lines with no gold facts. Lambda/EventBridge
+  deployment remains pending because no AWS deployment credentials are configured locally.
+- **2026-07-18** — Phase 4 parish finance silver layer deployed and verified. Added the AWS-only
+  `parish_silver` schema with current parish-month and source-line-item grains, canonical account
+  enrichment, normalized dates/text/statuses, lineage timestamps and ETL run IDs, and explicit
+  quality flags. Backfilled 12 pilot months into 12 record rows and 367 line rows; counts and
+  amount sums reconciled, an idempotency rerun produced no duplicates, and gold facts remained
+  empty. Legacy missing submission/preparer/certifier/validation metadata remains as warnings.
+- **2026-07-18** — Architecture simplified to direct Supabase-to-AWS-silver ETL. Added portable
+  migration 221 for complete line-item, account-title, and parish-detail OLD/NEW audit history;
+  it is deployed on AWS for parity and pending execution in Supabase. Decoupled silver lineage
+  UUIDs from temporary bronze foreign keys and verified all 60 current records/2,344 lines for
+  the pilot parish across 2021-2025. Direct silver and bronze comparison IDs and the
+  PHP 33,816,254.76 total match exactly. The source profile found 24 absent parish-years, all
+  in 2023, requiring authoritative-file review before correction.
+- **2026-07-18** — Migration 221 applied to live Supabase and verified with a controlled
+  line-item update that preserved the amount while recording complete OLD/NEW JSONB through
+  the secure audit view. The automatic transition run passed 39 bronze comparison checks and
+  four direct-silver checks, advanced the source watermark, and left zero open failures.

@@ -15,7 +15,7 @@ from __future__ import annotations
 import csv
 import io
 import re
-from dataclasses import dataclass, field as dc_field
+from dataclasses import dataclass
 from typing import Any
 
 import openpyxl
@@ -110,7 +110,13 @@ FIELD_MAP: dict[str, FieldSpec] = {
         "-  Second Collections (KINDLY ENCODE AMOUNT)", "E", "M", "D.07", "receipt", "D", "B.3"
     ),
     "receipts_charge_over_above": FieldSpec(
-        "-  Charge Over/Above (Excess Coll'ns - Net of Discount on Sacraments)", "E", "M", "B.03", "receipt", "B", "B.3"
+        "-  Charge Over/Above (Excess Coll'ns - Net of Discount on Sacraments)",
+        "E",
+        "M",
+        "B.3.06",
+        "receipt",
+        "B",
+        "other_receipts",
     ),
     "receipts_other": FieldSpec("-  Other Receipts:", "E", "M", "D.08", "receipt", "D", "B.3", occurrence=0),
     # C.1 Priest Share — breakdown is memo, the form's own subtotal is the E.01 line item

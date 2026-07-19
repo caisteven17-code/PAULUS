@@ -93,7 +93,6 @@ erDiagram
         numeric sacraments_parish_share
         numeric sacraments_over_above_confirmation_incl
         numeric collections_mass
-        numeric collections_other_95
         numeric collections_other_receipts
         numeric total_collections
         numeric expenses_pastoral_mass_stipend

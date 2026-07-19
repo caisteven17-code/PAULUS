@@ -1,10 +1,18 @@
+import asyncio
 import os
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
+from app.config import (
+    WAREHOUSE_BRONZE_COMPARISON_ENABLED,
+    WAREHOUSE_PILOT_INSTITUTION_IDS,
+    WAREHOUSE_PILOT_POLL_SECONDS,
+    WAREHOUSE_PILOT_SYNC_ENABLED,
+    WAREHOUSE_SYNC_ALL_PARISHES,
+)
 from app.routers import pusher
-from app.services import analytics_db
+from app.services import analytics_db, warehouse_worker
 
 try:
     from app.routers import analytics, descriptive, diagnostic, health, iafr, predictive, prescriptive
@@ -29,6 +37,9 @@ app.add_middleware(
 
 app.include_router(pusher.router)
 
+_warehouse_worker_stop: asyncio.Event | None = None
+_warehouse_worker_task: asyncio.Task | None = None
+
 # Existing routers (unchanged when optional analytics dependencies are installed)
 if OPTIONAL_ROUTERS_ERROR is None:
     app.include_router(health.router)
@@ -41,8 +52,29 @@ if OPTIONAL_ROUTERS_ERROR is None:
     app.include_router(predictive.router, prefix="/analytics/predictive")
     app.include_router(prescriptive.router, prefix="/analytics/prescriptive")
 
+
+@app.on_event("startup")
+async def _start_warehouse_worker():
+    global _warehouse_worker_stop, _warehouse_worker_task
+    if not WAREHOUSE_PILOT_SYNC_ENABLED:
+        return
+    if not WAREHOUSE_SYNC_ALL_PARISHES and not WAREHOUSE_PILOT_INSTITUTION_IDS:
+        raise RuntimeError("WAREHOUSE_PILOT_SYNC_ENABLED requires WAREHOUSE_PILOT_INSTITUTION_IDS")
+    if not analytics_db.enabled():
+        raise RuntimeError("WAREHOUSE_PILOT_SYNC_ENABLED requires ANALYTICS_DB_URL")
+    _warehouse_worker_stop = asyncio.Event()
+    _warehouse_worker_task = asyncio.create_task(warehouse_worker.run_forever(_warehouse_worker_stop))
+
+
 @app.on_event("shutdown")
-def _shutdown_analytics_db():
+async def _shutdown_analytics_db():
+    if _warehouse_worker_stop is not None:
+        _warehouse_worker_stop.set()
+    if _warehouse_worker_task is not None:
+        try:
+            await asyncio.wait_for(_warehouse_worker_task, timeout=10)
+        except TimeoutError:
+            _warehouse_worker_task.cancel()
     analytics_db.close_pool()
 
 
@@ -51,3 +83,16 @@ async def analytics_dependency_warning():
     if OPTIONAL_ROUTERS_ERROR is None:
         return {"ok": True}
     return {"ok": False, "error": str(OPTIONAL_ROUTERS_ERROR)}
+
+
+@app.get("/warehouse/pilot-status")
+async def warehouse_pilot_status():
+    return {
+        "enabled": WAREHOUSE_PILOT_SYNC_ENABLED,
+        "institution_ids": WAREHOUSE_PILOT_INSTITUTION_IDS,
+        "sync_all_parishes": WAREHOUSE_SYNC_ALL_PARISHES,
+        "poll_seconds": WAREHOUSE_PILOT_POLL_SECONDS,
+        "worker_running": _warehouse_worker_task is not None and not _warehouse_worker_task.done(),
+        "silver_source": "supabase_direct",
+        "bronze_comparison_enabled": WAREHOUSE_BRONZE_COMPARISON_ENABLED,
+    }

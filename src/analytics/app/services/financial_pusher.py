@@ -527,10 +527,13 @@ def _suggest_mapping(parts: list[str], account_names: dict[str, str]) -> tuple[s
     elif "confirmation" in text and "bishop" not in text and "diocese" not in text and "pension" not in text and "minister" not in text:
         account, confidence = "A.2.01", 0.96
         reason = "Confirmation receipt column."
-    elif "charge over" in text or "over/above" in text:
-        account, confidence = "A.1.11", 0.78
+    elif "total charge over" in text or "total over/above" in text:
+        account, confidence = "A.1.11", 0.9
         status = "needs_review"
-        reason = "Charge over/above amount; review because source placement changes by year."
+        reason = "Aggregate sacramental charge over/above fallback; keep separate from the B.3.06 parish receipt."
+    elif "charge over" in text or "over/above" in text:
+        account, confidence = "B.3.06", 0.98
+        reason = "Collection-level Charge Over/Above maps to the B.3.06 Other Receipts account."
     elif any(k in text for k in ["baptism", "wedding", "funeral", "certificates", "marriage banns", "permits"]):
         account, confidence = sacrament_code, 0.72
         status = "needs_review"
@@ -1244,8 +1247,9 @@ def start_commit_batch(batch_id: str, import_mode: str, committed_by: str | None
         return {"batchId": batch_id, "status": "already_committing", "alreadyRunning": True}
     if _count_push_rows(batch_id) == 0:
         raise ValueError("No parish rows were staged for this file. Validate the workbook again before pushing.")
+    persisted_mode = "replace_existing" if import_mode == "patch_selected" else import_mode
     get_table("operations", "financial_push_batches").update(
-        {"status": "committing", "import_mode": import_mode, "committed_by": committed_by}
+        {"status": "committing", "import_mode": persisted_mode, "committed_by": committed_by}
     ).eq("id", batch_id).execute()
     return {"batchId": batch_id, "status": "committing", "alreadyRunning": False}
 
@@ -1457,7 +1461,7 @@ def _load_push_rows_for_commit(batch_id: str) -> list[dict[str, Any]]:
     start = 0
     columns = (
         "id, parish_code, parish_name, institution_id, reporting_month, reporting_year, "
-        "validation_status, source_row_number, cleaned_values, issues"
+        "validation_status, source_row_number, raw_values, cleaned_values, issues"
     )
     while True:
         page = (
@@ -1612,36 +1616,93 @@ def commit_batch(
             blocked += 1
             get_table("operations", "financial_push_rows").update({"validation_status": "blocked"}).eq("id", row["id"]).execute()
             continue
-        record_id, action = _ensure_record(row["institution_id"], batch_id, row["reporting_year"], row["reporting_month"], import_mode)
+        if import_mode == "patch_selected":
+            record_id = _get_existing_record(
+                row["institution_id"], row["reporting_year"], MONTH_TO_SHORT[row["reporting_month"]]
+            )
+            action = "patched" if record_id else "skipped_missing_record"
+        else:
+            record_id, action = _ensure_record(
+                row["institution_id"], batch_id, row["reporting_year"], row["reporting_month"], import_mode
+            )
         if not record_id:
             skipped += 1
             get_table("operations", "financial_push_rows").update({"validation_status": "skipped"}).eq("id", row["id"]).execute()
             continue
 
-        get_table("parishes", "iafr_line_items").delete().eq("financial_record_id", record_id).execute()
         items = []
+        raw_values = row.get("raw_values") or {}
         cleaned_values = row.get("cleaned_values") or {}
+        patch_items: dict[str, dict[str, Any] | None] = {}
         for key, mapping in approved.items():
             account_code = mapping["canonicalAccountCode"]
             account = accounts[account_code]
+            raw_value = raw_values.get(key)
+            if import_mode == "patch_selected" and (raw_value is None or str(raw_value).strip() == ""):
+                continue
+            if import_mode == "patch_selected" and account.get("id"):
+                if account["id"] in patch_items:
+                    raise ValueError(f"Patch mode allows only one selected source column per account: {account_code}")
+                patch_items[account["id"]] = None
             amount = float(cleaned_values.get(key) or 0)
             if round(amount, 2) == 0:
                 continue
             source_header = mapping.get("sourceHeader") or key.split(":", 1)[-1]
-            items.append(
-                {
-                    "financial_record_id": record_id,
-                    "account_title_id": account.get("id"),
-                    "section_code": account.get("section_code"),
-                    "subsection_code": account.get("subsection_code"),
-                    "item_label": source_header[:200],
-                    "item_type": account.get("account_type"),
-                    "amount": round(amount, 2),
-                    "source_row_number": row.get("source_row_number"),
-                    "source_label": source_header[:200],
-                }
-            )
-        if items:
+            item = {
+                "financial_record_id": record_id,
+                "account_title_id": account.get("id"),
+                "section_code": account.get("section_code"),
+                "subsection_code": account.get("subsection_code"),
+                "item_label": source_header[:200],
+                "item_type": account.get("account_type"),
+                "amount": round(amount, 2),
+                "source_row_number": row.get("source_row_number"),
+                "source_label": source_header[:200],
+            }
+            if import_mode == "patch_selected":
+                patch_items[account["id"]] = item
+            else:
+                items.append(item)
+        if import_mode == "patch_selected":
+            if not patch_items:
+                skipped += 1
+                get_table("operations", "financial_push_rows").update({"validation_status": "skipped"}).eq(
+                    "id", row["id"]
+                ).execute()
+                continue
+            for account_id, item in patch_items.items():
+                existing = (
+                    get_table("parishes", "iafr_line_items")
+                    .select("id")
+                    .eq("financial_record_id", record_id)
+                    .eq("account_title_id", account_id)
+                    .is_("deleted_at", "null")
+                    .execute()
+                    .data
+                    or []
+                )
+                if item is None:
+                    if existing:
+                        get_table("parishes", "iafr_line_items").delete().in_(
+                            "id", [entry["id"] for entry in existing]
+                        ).execute()
+                    continue
+                if existing:
+                    update_payload = {key: value for key, value in item.items() if key != "financial_record_id"}
+                    get_table("parishes", "iafr_line_items").update(update_payload).eq("id", existing[0]["id"]).execute()
+                    if len(existing) > 1:
+                        get_table("parishes", "iafr_line_items").delete().in_(
+                            "id", [entry["id"] for entry in existing[1:]]
+                        ).execute()
+                else:
+                    get_table("parishes", "iafr_line_items").insert(item).execute()
+                line_items_created += 1
+            get_table("parishes", "financial_records").update(
+                {"record_timestamp": datetime.now(timezone.utc).isoformat()}
+            ).eq("id", record_id).execute()
+        else:
+            get_table("parishes", "iafr_line_items").delete().eq("financial_record_id", record_id).execute()
+        if import_mode != "patch_selected" and items:
             for i in range(0, len(items), 500):
                 get_table("parishes", "iafr_line_items").insert(items[i : i + 500]).execute()
             line_items_created += len(items)
@@ -1658,6 +1719,7 @@ def commit_batch(
             "committed_at": now,
             "committed_by": committed_by,
             "summary": {
+                "importMode": import_mode,
                 "committedRows": committed,
                 "skippedRows": skipped,
                 "blockedRows": blocked,
