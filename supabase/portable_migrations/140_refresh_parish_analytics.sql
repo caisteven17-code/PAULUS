@@ -11,13 +11,12 @@ INSERT INTO parish_analytics.fact_parish_monthly_financials (
   sacraments_parish_share,
   sacraments_over_above_confirmation_incl,
   collections_mass,
-  collections_other_95,
   collections_other_receipts,
   total_collections,
   expenses_pastoral_mass_stipend,
   expenses_parish,
   total_expenses,
-  remittances_total,
+  total_remittance,
   net_receipts_deficit,
   mass_intentions_not_claimed_by_parish_priest,
   mass_intentions_claimed_by_parish_priest,
@@ -39,7 +38,6 @@ SELECT
   pr.mass_intentions_unclaimed::numeric(14, 2),
   pr.charge_over_above::numeric(14, 2),
   (pr.mass_collection_weekday + pr.mass_collection_sunday + pr.mass_collection_saturday)::numeric(14, 2),
-  pr.other_collections_total::numeric(14, 2),
   (pr.donations + pr.interest_income + pr.subsidy_inflow + pr.other_receipts)::numeric(14, 2),
   -- total_collections: sacraments + mass + other D-section items (excl. special/second/construction — tracked separately)
   (

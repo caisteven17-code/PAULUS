@@ -7,7 +7,6 @@ loader from Supabase to this module is a small, mechanical diff.
 
 from __future__ import annotations
 
-import psycopg
 from psycopg.rows import dict_row
 from psycopg.types.json import Jsonb
 from psycopg_pool import ConnectionPool
@@ -48,6 +47,22 @@ def execute(sql: str, params: dict | list | tuple | None = None) -> None:
         conn.commit()
 
 
+def execute_returning_one(sql: str, params: dict | list | tuple | None = None) -> dict | None:
+    with get_pool().connection() as conn:
+        with conn.cursor(row_factory=dict_row) as cur:
+            cur.execute(sql, params)
+            row = cur.fetchone()
+        conn.commit()
+    return row
+
+
+def fetch_query(sql: str, params: dict | list | tuple | None = None) -> list[dict]:
+    with get_pool().connection() as conn:
+        with conn.cursor(row_factory=dict_row) as cur:
+            cur.execute(sql, params)
+            return cur.fetchall()
+
+
 def fetch_all(schema: str, table: str, columns: str = "*", order_by: str | None = None) -> list[dict]:
     sql = f'SELECT {columns} FROM "{schema}"."{table}"'
     if order_by:
@@ -78,7 +93,7 @@ def upsert_rows(schema: str, table: str, rows: list[dict], conflict_cols: list[s
 
     sql = (
         f'INSERT INTO "{schema}"."{table}" ({col_list}) VALUES {values_sql} '
-        f'ON CONFLICT ({conflict_list}) DO UPDATE SET {update_list}'
+        f"ON CONFLICT ({conflict_list}) DO UPDATE SET {update_list}"
     )
     execute(sql, params)
     return len(rows)
@@ -113,7 +128,7 @@ def upsert_row(schema: str, table: str, row: dict, conflict_cols: list[str] | st
 
     sql = (
         f'INSERT INTO "{schema}"."{table}" ({col_list}) VALUES ({placeholders}) '
-        f'ON CONFLICT ({conflict_list}) DO UPDATE SET {update_list}'
+        f"ON CONFLICT ({conflict_list}) DO UPDATE SET {update_list}"
     )
     if returning:
         sql += f' RETURNING "{returning}"'

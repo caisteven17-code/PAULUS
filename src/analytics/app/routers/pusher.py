@@ -1,5 +1,3 @@
-from typing import Any
-
 from fastapi import APIRouter, BackgroundTasks, HTTPException, Query
 from pydantic import BaseModel, Field
 
@@ -46,7 +44,10 @@ class CommitRequest(BaseModel):
     batchId: str
     mappings: list[MappingReview]
     parishMappings: list[ParishMappingReview] = Field(default_factory=list)
-    importMode: str = Field(default="skip_existing", pattern="^(skip_existing|replace_existing|version_existing)$")
+    importMode: str = Field(
+        default="skip_existing",
+        pattern="^(skip_existing|replace_existing|version_existing|patch_selected)$",
+    )
     committedBy: str | None = None
 
 

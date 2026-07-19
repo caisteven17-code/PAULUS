@@ -157,6 +157,11 @@ const importModes = [
     label: 'Version existing',
     description: 'Reserved for later versioning; currently behaves like replace.',
   },
+  {
+    id: 'patch_selected',
+    label: 'Patch selected columns',
+    description: 'Updates mapped columns only and preserves every other line item.',
+  },
 ] as const;
 
 const statusStyle: Record<string, string> = {
@@ -406,6 +411,29 @@ export function Pusher({ onBack }: PusherProps) {
     }));
   };
 
+  const selectImportMode = (mode: (typeof importModes)[number]['id']) => {
+    setImportMode(mode);
+    if (mode !== 'patch_selected' || !activeResult) return;
+    setMappingChoices((previous) => {
+      const next = { ...previous };
+      activeResult.columns.forEach((column) => {
+        const key = `${activeResult.fileName}:${column.key}`;
+        const current = previous[key] ?? mappingFromColumn(column);
+        next[key] =
+          current.canonicalAccountCode === 'B.3.06'
+            ? { ...current, action: 'map', aggregationRule: 'sum' }
+            : {
+                ...current,
+                action: 'ignore',
+                canonicalAccountCode: null,
+                canonicalField: null,
+                aggregationRule: 'ignore',
+              };
+      });
+      return next;
+    });
+  };
+
   const toggleColumnVisibility = (column: PusherColumn, choice: MappingChoice) => {
     if (choice.action === 'ignore') {
       updateChoice(column, mappingFromColumn(column));
@@ -435,7 +463,7 @@ export function Pusher({ onBack }: PusherProps) {
       stopProgressPolling();
       setIsCommitting(false);
       setCommitMessage(
-        `Committed ${formatNumber(data.committedRows)} parish-month rows and created ${formatNumber(
+        `Committed ${formatNumber(data.committedRows)} parish-month rows and wrote ${formatNumber(
           data.lineItemsCreated ?? 0,
         )} line items. Skipped ${formatNumber(data.skippedRows)} row(s).`,
       );
@@ -591,6 +619,10 @@ export function Pusher({ onBack }: PusherProps) {
     const unresolved = mappings.filter((mapping) => mapping.action === 'map' && !mapping.canonicalAccountCode).length;
     if (unresolved) {
       setError('Some mapped columns do not have a canonical account yet.');
+      return;
+    }
+    if (importMode === 'patch_selected' && !mappings.some((mapping) => mapping.action === 'map')) {
+      setError('Select at least one source column to patch.');
       return;
     }
     if (unresolvedParishCount) {
@@ -881,11 +913,11 @@ export function Pusher({ onBack }: PusherProps) {
                 </p>
               </div>
             </div>
-            <div className="mt-4 grid grid-cols-1 gap-2 sm:grid-cols-3">
+            <div className="mt-4 grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-4">
               {importModes.map((mode) => (
                 <button
                   key={mode.id}
-                  onClick={() => setImportMode(mode.id)}
+                  onClick={() => selectImportMode(mode.id)}
                   className={`rounded-lg border p-3 text-left transition ${
                     importMode === mode.id
                       ? 'border-slate-900 bg-slate-950 text-white'

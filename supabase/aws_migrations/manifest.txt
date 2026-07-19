@@ -147,6 +147,28 @@ portable_migrations/218_add_parking_fee_receipts_account.sql
 # production too, not just this AWS deployment.
 portable_migrations/219_fix_rebuild_function_wci_removal.sql
 portable_migrations/220_add_profile_onboarding_columns.sql
+portable_migrations/221_audit_parish_financial_detail.sql
+portable_migrations/222_reclassify_charge_over_above_receipts.sql
+
+# AWS-only ETL observability and reconciliation controls. These tables do not
+# contain parish financial payloads and are safe before any backfill.
+aws_migrations/010_warehouse_control.sql
+aws_migrations/020_parish_silver.sql
+aws_migrations/030_direct_silver_transition.sql
+aws_migrations/040_silver_coverage_backfill.sql
+aws_migrations/050_parish_gold_candidates.sql
+aws_migrations/051_add_other_receipts_charge_over_above.sql
+aws_migrations/052_reclassify_charge_over_above_silver.sql
+aws_migrations/053_mass_collections_tax_net.sql
+aws_migrations/054_other_collections_year_tax.sql
+aws_migrations/055_rename_other_collections_net.sql
+aws_migrations/056_keep_only_other_collections_net_in_gold.sql
+aws_migrations/057_simplify_other_collections_output.sql
+aws_migrations/058_simplify_mass_collections_output.sql
+aws_migrations/059_remove_other_collections_output.sql
+aws_migrations/060_total_remittance_formula.sql
+aws_migrations/061_pipeline_monitoring_and_retries.sql
+aws_migrations/062_parish_liturgical_calendar_analytics.sql
 
 # Analytics refresh — run last, after all schema DDL above (see note near 125).
 portable_migrations/130_sync_analytics_dimensions.sql

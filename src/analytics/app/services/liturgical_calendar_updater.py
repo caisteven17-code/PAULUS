@@ -51,27 +51,19 @@ def _stale_years(today: date | None = None) -> list[int]:
     """Return years still needing refresh from recent failed, partial, or orphaned runs."""
     today = today or _today()
     try:
-        from app.services.supabase_client import get_table
+        from app.services import analytics_db
 
-        table = get_table("reference", "liturgical_calendar_runs")
-        cutoff = (today - timedelta(days=RETRY_WINDOW_DAYS)).isoformat()
-        ttl_cutoff = (datetime.now(timezone.utc) - timedelta(hours=RUN_TTL_HOURS)).isoformat()
-
-        failed_resp = (
-            table.select("years, completed_years, started_at")
-            .in_("status", ["failed", "partial"])
-            .gte("started_at", cutoff)
-            .execute()
+        cutoff = datetime.combine(today - timedelta(days=RETRY_WINDOW_DAYS), datetime.min.time(), timezone.utc)
+        ttl_cutoff = datetime.now(timezone.utc) - timedelta(hours=RUN_TTL_HOURS)
+        problem_runs = analytics_db.fetch_query(
+            """
+            SELECT years, completed_years, started_at
+            FROM reference.liturgical_calendar_runs
+            WHERE started_at >= %s
+              AND (status IN ('failed', 'partial') OR (status = 'running' AND started_at < %s))
+            """,
+            (cutoff, ttl_cutoff),
         )
-        orphaned_resp = (
-            table.select("years, completed_years, started_at")
-            .eq("status", "running")
-            .lt("started_at", ttl_cutoff)
-            .gte("started_at", cutoff)
-            .execute()
-        )
-
-        problem_runs = (failed_resp.data or []) + (orphaned_resp.data or [])
         if not problem_runs:
             return []
 
@@ -85,14 +77,16 @@ def _stale_years(today: date | None = None) -> list[int]:
             return []
 
         oldest_failure = min(run["started_at"] for run in problem_runs)
-        successes = (
-            table.select("years, completed_years, status")
-            .in_("status", ["success", "partial"])
-            .gte("started_at", oldest_failure)
-            .execute()
+        successes = analytics_db.fetch_query(
+            """
+            SELECT years, completed_years, status
+            FROM reference.liturgical_calendar_runs
+            WHERE status IN ('success', 'partial') AND started_at >= %s
+            """,
+            (oldest_failure,),
         )
         refreshed: set[int] = set()
-        for run in successes.data or []:
+        for run in successes:
             if run.get("status") == "success":
                 refreshed.update(run.get("years") or [])
             else:
@@ -106,20 +100,17 @@ def _stale_years(today: date | None = None) -> list[int]:
 
 def _create_run_record(years: list[int]) -> Optional[str]:
     try:
-        from app.services.supabase_client import get_table
+        from app.services import analytics_db
 
-        resp = (
-            get_table("reference", "liturgical_calendar_runs")
-            .insert(
-                {
-                    "years": years,
-                    "status": "running",
-                    "started_at": datetime.now(timezone.utc).isoformat(),
-                }
-            )
-            .execute()
+        row = analytics_db.execute_returning_one(
+            """
+            INSERT INTO reference.liturgical_calendar_runs (years, status, started_at)
+            VALUES (%s, 'running', %s)
+            RETURNING id
+            """,
+            (years, datetime.now(timezone.utc)),
         )
-        return resp.data[0]["id"] if resp.data else None
+        return str(row["id"]) if row else None
     except Exception as exc:
         logger.warning("Could not create run record: %s", exc)
         return None
@@ -136,18 +127,25 @@ def _update_run_record(
     if not run_id:
         return
     try:
-        from app.services.supabase_client import get_table
+        from app.services import analytics_db
 
-        get_table("reference", "liturgical_calendar_runs").update(
-            {
-                "status": status,
-                "finished_at": datetime.now(timezone.utc).isoformat(),
-                "clean_count": clean_count,
-                "review_count": review_count,
-                "error_detail": error_detail,
-                "completed_years": completed_years or [],
-            }
-        ).eq("id", run_id).execute()
+        analytics_db.execute(
+            """
+            UPDATE reference.liturgical_calendar_runs
+            SET status = %s, finished_at = %s, clean_count = %s,
+                review_count = %s, error_detail = %s, completed_years = %s
+            WHERE id = %s
+            """,
+            (
+                status,
+                datetime.now(timezone.utc),
+                clean_count,
+                review_count,
+                error_detail,
+                completed_years or [],
+                run_id,
+            ),
+        )
     except Exception as exc:
         logger.warning("Could not update run record: %s", exc)
 
@@ -214,7 +212,7 @@ if __name__ == "__main__":
 
     parser = argparse.ArgumentParser(description="Refresh Philippine liturgical calendar data")
     parser.add_argument("--out", type=str, default=str(DEFAULT_OUT_DIR))
-    parser.add_argument("--load", action="store_true", help="Load generated rows into Supabase")
+    parser.add_argument("--load", action="store_true", help="Load generated rows into AWS")
     parser.add_argument(
         "--force",
         action="store_true",

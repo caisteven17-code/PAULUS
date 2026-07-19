@@ -14,3 +14,20 @@ PORT: int = int(os.getenv("ANALYTICS_PYTHON_PORT", "8000"))
 # AWS RDS warehouse (silver/gold layers). Empty = feature off — everything
 # falls back to the Supabase paths above. This is the demo-day kill switch.
 ANALYTICS_DB_URL: str = os.getenv("ANALYTICS_DB_URL") or ""
+
+# Phase 3 bronze pilot. Disabled by default and restricted to an explicit
+# comma-separated institution allowlist.
+WAREHOUSE_PILOT_SYNC_ENABLED: bool = os.getenv("WAREHOUSE_PILOT_SYNC_ENABLED", "true").lower() == "true"
+WAREHOUSE_PILOT_INSTITUTION_IDS: list[str] = [
+    value.strip() for value in os.getenv("WAREHOUSE_PILOT_INSTITUTION_IDS", "").split(",") if value.strip()
+]
+WAREHOUSE_PILOT_POLL_SECONDS: int = max(10, int(os.getenv("WAREHOUSE_PILOT_POLL_SECONDS", "30")))
+WAREHOUSE_BRONZE_COMPARISON_ENABLED: bool = os.getenv("WAREHOUSE_BRONZE_COMPARISON_ENABLED", "true").lower() == "true"
+WAREHOUSE_SYNC_ALL_PARISHES: bool = os.getenv("WAREHOUSE_SYNC_ALL_PARISHES", "true").lower() == "true"
+WAREHOUSE_GOLD_INCREMENTAL_ENABLED: bool = os.getenv("WAREHOUSE_GOLD_INCREMENTAL_ENABLED", "true").lower() == "true"
+WAREHOUSE_RETRY_MAX_ATTEMPTS: int = max(1, int(os.getenv("WAREHOUSE_RETRY_MAX_ATTEMPTS", "5")))
+WAREHOUSE_RETRY_BASE_SECONDS: int = max(10, int(os.getenv("WAREHOUSE_RETRY_BASE_SECONDS", "30")))
+WAREHOUSE_RETRY_BATCH_SIZE: int = max(1, int(os.getenv("WAREHOUSE_RETRY_BATCH_SIZE", "20")))
+WAREHOUSE_WATERMARK_STALE_SECONDS: int = max(60, int(os.getenv("WAREHOUSE_WATERMARK_STALE_SECONDS", "180")))
+WAREHOUSE_ETL_SUCCESS_RETENTION_DAYS: int = max(7, int(os.getenv("WAREHOUSE_ETL_SUCCESS_RETENTION_DAYS", "30")))
+WAREHOUSE_ETL_FAILURE_RETENTION_DAYS: int = max(30, int(os.getenv("WAREHOUSE_ETL_FAILURE_RETENTION_DAYS", "180")))

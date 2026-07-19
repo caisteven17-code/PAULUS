@@ -1,5 +1,6 @@
 import { Injectable } from '@nestjs/common';
-import { SupabaseService } from './supabase.service';
+import { DatabaseError } from 'pg';
+import { AnalyticsDbService } from './analytics-db.service';
 
 export type LiturgicalReviewStatus = 'pending' | 'approved' | 'approved_with_revisions' | 'rejected';
 
@@ -52,82 +53,107 @@ export interface LiturgicalCalendarPage {
   pageSize: number;
 }
 
+interface WhereClause {
+  sql: string;
+  params: unknown[];
+}
+
+const MATCHED_STATUSES = [
+  'matched_both',
+  'matched_gcatholic_only',
+  'matched_romcal_only',
+  'matched_litcal_only',
+  'source_of_truth_only',
+];
+const MISMATCHED_STATUSES = ['mismatched_all', 'validator_missing'];
+
 @Injectable()
 export class LiturgicalCalendarService {
-  constructor(private readonly supabaseService: SupabaseService) {}
+  constructor(private readonly analyticsDb: AnalyticsDbService) {}
 
-  private db() {
-    return this.supabaseService.admin.schema('reference');
+  private async refreshAnalytics(): Promise<void> {
+    try {
+      await this.analyticsDb.query('SELECT * FROM parish_analytics.refresh_liturgical_calendar_analytics()');
+    } catch (error) {
+      console.error(
+        '[liturgical-calendar.service] refreshAnalytics:',
+        error instanceof Error ? error.message : error,
+      );
+    }
   }
 
-  private applyFilters(query: any, filters: LiturgicalCalendarFilters) {
-    if (filters.status && filters.status !== 'all') {
-      query = query.eq('review_status', filters.status);
+  private buildWhere(filters: LiturgicalCalendarFilters, pendingOnly = false): WhereClause {
+    const clauses: string[] = [];
+    const params: unknown[] = [];
+    const add = (clause: (position: number) => string, value: unknown) => {
+      params.push(value);
+      clauses.push(clause(params.length));
+    };
+
+    if (pendingOnly) {
+      add((position) => `review_status = $${position}`, 'pending');
+    } else if (filters.status && filters.status !== 'all') {
+      add((position) => `review_status = $${position}`, filters.status);
     }
     if (filters.season && filters.season !== 'all') {
-      query = query.eq('liturgical_season', filters.season);
+      add((position) => `liturgical_season = $${position}`, filters.season);
     }
-    if (filters.month) {
-      query = query.eq('month', filters.month);
-    }
-    if (filters.year) {
-      query = query.eq('year', filters.year);
-    }
+    if (filters.month) add((position) => `month = $${position}`, filters.month);
+    if (filters.year) add((position) => `year = $${position}`, filters.year);
     if (filters.celebration) {
-      query = query.ilike('celebration_name', `%${filters.celebration}%`);
+      add((position) => `celebration_name ILIKE $${position}`, `%${filters.celebration}%`);
     }
     if (filters.reason) {
-      query = query.or(`review_notes.ilike.%${filters.reason}%,validation_reason.ilike.%${filters.reason}%`);
+      add(
+        (position) => `(review_notes ILIKE $${position} OR validation_reason ILIKE $${position})`,
+        `%${filters.reason}%`,
+      );
     }
     if (filters.validation && filters.validation !== 'all') {
-      if (filters.validation === 'matched') {
-        query = query.in('validation_status', [
-          'matched_both',
-          'matched_gcatholic_only',
-          'matched_romcal_only',
-          'matched_litcal_only',
-          'source_of_truth_only',
-        ]);
-      } else if (filters.validation === 'mismatched') {
-        query = query.in('validation_status', ['mismatched_all', 'validator_missing']);
-      }
+      add(
+        (position) => `validation_status = ANY($${position}::text[])`,
+        filters.validation === 'matched' ? MATCHED_STATUSES : MISMATCHED_STATUSES,
+      );
     }
-    return query;
+    return { sql: clauses.length ? `WHERE ${clauses.join(' AND ')}` : '', params };
   }
 
   async getRecords(filters: LiturgicalCalendarFilters): Promise<LiturgicalCalendarPage> {
     const page = Math.max(1, filters.page ?? 1);
     const pageSize = Math.min(100, Math.max(1, filters.pageSize ?? 20));
-    const from = (page - 1) * pageSize;
-
-    let query = this.db().from('liturgical_calendar').select('*', { count: 'exact' });
-    query = this.applyFilters(query, filters);
-    query = query.order('date', { ascending: true }).range(from, from + pageSize - 1);
-
-    const { data, error, count } = await query;
-    if (error) {
-      console.error('[liturgical-calendar.service] getRecords:', error.message);
+    const offset = (page - 1) * pageSize;
+    const where = this.buildWhere(filters);
+    try {
+      const countRows = await this.analyticsDb.query<{ total: string }>(
+        `SELECT count(*)::text AS total FROM reference.liturgical_calendar ${where.sql}`,
+        where.params,
+      );
+      const records = await this.analyticsDb.query<LiturgicalCalendarRecord & Record<string, unknown>>(
+        `SELECT * FROM reference.liturgical_calendar ${where.sql}
+         ORDER BY date ASC, id ASC LIMIT $${where.params.length + 1} OFFSET $${where.params.length + 2}`,
+        [...where.params, pageSize, offset],
+      );
+      return { records, total: Number(countRows[0]?.total ?? 0), page, pageSize };
+    } catch (error) {
+      console.error('[liturgical-calendar.service] getRecords:', error instanceof Error ? error.message : error);
       return { records: [], total: 0, page, pageSize };
     }
-    return { records: (data ?? []) as LiturgicalCalendarRecord[], total: count ?? 0, page, pageSize };
   }
 
   async approveRecord(id: string, reviewedBy: string): Promise<LiturgicalCalendarRecord | null> {
-    const { data, error } = await this.db()
-      .from('liturgical_calendar')
-      .update({
-        review_status: 'approved',
-        reviewed_by: reviewedBy,
-        reviewed_at: new Date().toISOString(),
-      })
-      .eq('id', id)
-      .select()
-      .single();
-    if (error || !data) {
-      console.error('[liturgical-calendar.service] approveRecord:', error?.message);
+    try {
+      const rows = await this.analyticsDb.query<LiturgicalCalendarRecord & Record<string, unknown>>(
+        `UPDATE reference.liturgical_calendar
+         SET review_status = 'approved', reviewed_by = $2, reviewed_at = now()
+         WHERE id = $1 RETURNING *`,
+        [id, reviewedBy],
+      );
+      if (rows[0]) await this.refreshAnalytics();
+      return rows[0] ?? null;
+    } catch (error) {
+      console.error('[liturgical-calendar.service] approveRecord:', error instanceof Error ? error.message : error);
       return null;
     }
-    return data as LiturgicalCalendarRecord;
   }
 
   async approveWithRevisions(
@@ -135,93 +161,98 @@ export class LiturgicalCalendarService {
     patch: { date?: string; celebration_name?: string; name_source?: string },
     reviewedBy: string,
   ): Promise<{ record?: LiturgicalCalendarRecord; errorMessage?: string }> {
-    const { data: existing, error: fetchError } = await this.db()
-      .from('liturgical_calendar')
-      .select('date, celebration_name')
-      .eq('id', id)
-      .single();
-    if (fetchError || !existing) {
-      console.error('[liturgical-calendar.service] approveWithRevisions fetch:', fetchError?.message);
-      return { errorMessage: 'Record not found.' };
-    }
+    try {
+      const existingRows = await this.analyticsDb.query<
+        { date: string; celebration_name: string } & Record<string, unknown>
+      >('SELECT date, celebration_name FROM reference.liturgical_calendar WHERE id = $1', [id]);
+      const existing = existingRows[0];
+      if (!existing) return { errorMessage: 'Record not found.' };
 
-    const update: Record<string, unknown> = {
-      review_status: 'approved_with_revisions',
-      reviewed_by: reviewedBy,
-      reviewed_at: new Date().toISOString(),
-      revision_payload: {
+      let revisedDate: Date | undefined;
+      if (patch.date) {
+        revisedDate = new Date(`${patch.date}T00:00:00Z`);
+        if (Number.isNaN(revisedDate.getTime())) {
+          return { errorMessage: 'The revised date is not a valid calendar date.' };
+        }
+      }
+      const revisionPayload = {
         previous: { date: existing.date, celebration_name: existing.celebration_name },
         revised: {
           date: patch.date,
           celebration_name: patch.celebration_name,
           name_source: patch.name_source,
         },
-      },
-    };
-    if (patch.date) {
-      const revisedDate = new Date(`${patch.date}T00:00:00Z`);
-      if (Number.isNaN(revisedDate.getTime())) {
-        return { errorMessage: 'The revised date is not a valid calendar date.' };
-      }
-      update.date = patch.date;
-      update.year = revisedDate.getUTCFullYear();
-      update.month = revisedDate.getUTCMonth() + 1;
-      update.day = revisedDate.getUTCDate();
-      update.weekday = revisedDate.toLocaleDateString('en-US', { weekday: 'long', timeZone: 'UTC' });
-    }
-    if (patch.celebration_name) {
-      update.celebration_name = patch.celebration_name;
-    }
-
-    const { data, error } = await this.db().from('liturgical_calendar').update(update).eq('id', id).select().single();
-    if (error || !data) {
-      console.error('[liturgical-calendar.service] approveWithRevisions:', error?.message);
-      if (error?.code === '23505') {
+      };
+      const rows = await this.analyticsDb.query<LiturgicalCalendarRecord & Record<string, unknown>>(
+        `UPDATE reference.liturgical_calendar SET
+           review_status = 'approved_with_revisions', reviewed_by = $2, reviewed_at = now(),
+           revision_payload = $3::jsonb,
+           date = COALESCE($4::date, date),
+           year = COALESCE($5::smallint, year),
+           month = COALESCE($6::smallint, month),
+           day = COALESCE($7::smallint, day),
+           weekday = COALESCE($8::text, weekday),
+           celebration_name = COALESCE($9::text, celebration_name)
+         WHERE id = $1 RETURNING *`,
+        [
+          id,
+          reviewedBy,
+          JSON.stringify(revisionPayload),
+          patch.date ?? null,
+          revisedDate?.getUTCFullYear() ?? null,
+          revisedDate ? revisedDate.getUTCMonth() + 1 : null,
+          revisedDate?.getUTCDate() ?? null,
+          revisedDate?.toLocaleDateString('en-US', { weekday: 'long', timeZone: 'UTC' }) ?? null,
+          patch.celebration_name ?? null,
+        ],
+      );
+      if (rows[0]) await this.refreshAnalytics();
+      return rows[0] ? { record: rows[0] } : { errorMessage: 'Record not found.' };
+    } catch (error) {
+      console.error(
+        '[liturgical-calendar.service] approveWithRevisions:',
+        error instanceof Error ? error.message : error,
+      );
+      if (error instanceof DatabaseError && error.code === '23505') {
         return {
           errorMessage: `Another event from the same source already exists on ${patch.date}. Revise that event instead, or change only the celebration name here.`,
         };
       }
       return { errorMessage: 'Failed to revise the record.' };
     }
-    return { record: data as LiturgicalCalendarRecord };
   }
 
   async rejectRecord(id: string, reason: string, reviewedBy: string): Promise<LiturgicalCalendarRecord | null> {
-    const { data, error } = await this.db()
-      .from('liturgical_calendar')
-      .update({
-        review_status: 'rejected',
-        reviewed_by: reviewedBy,
-        reviewed_at: new Date().toISOString(),
-        review_notes: reason,
-      })
-      .eq('id', id)
-      .select()
-      .single();
-    if (error || !data) {
-      console.error('[liturgical-calendar.service] rejectRecord:', error?.message);
+    try {
+      const rows = await this.analyticsDb.query<LiturgicalCalendarRecord & Record<string, unknown>>(
+        `UPDATE reference.liturgical_calendar
+         SET review_status = 'rejected', reviewed_by = $2,
+             reviewed_at = now(), review_notes = $3
+         WHERE id = $1 RETURNING *`,
+        [id, reviewedBy, reason],
+      );
+      if (rows[0]) await this.refreshAnalytics();
+      return rows[0] ?? null;
+    } catch (error) {
+      console.error('[liturgical-calendar.service] rejectRecord:', error instanceof Error ? error.message : error);
       return null;
     }
-    return data as LiturgicalCalendarRecord;
   }
 
-  /** Bulk-approves every still-pending record matching the given filters. */
   async approveAll(filters: LiturgicalCalendarFilters, reviewedBy: string): Promise<{ approved: number }> {
-    let query = this.db()
-      .from('liturgical_calendar')
-      .update({
-        review_status: 'approved',
-        reviewed_by: reviewedBy,
-        reviewed_at: new Date().toISOString(),
-      })
-      .eq('review_status', 'pending');
-    query = this.applyFilters(query, { ...filters, status: undefined });
-
-    const { data, error } = await query.select('id');
-    if (error) {
-      console.error('[liturgical-calendar.service] approveAll:', error.message);
+    const where = this.buildWhere({ ...filters, status: undefined }, true);
+    try {
+      const rows = await this.analyticsDb.query<{ id: string }>(
+        `UPDATE reference.liturgical_calendar
+         SET review_status = 'approved', reviewed_by = $${where.params.length + 1}, reviewed_at = now()
+         ${where.sql} RETURNING id`,
+        [...where.params, reviewedBy],
+      );
+      if (rows.length) await this.refreshAnalytics();
+      return { approved: rows.length };
+    } catch (error) {
+      console.error('[liturgical-calendar.service] approveAll:', error instanceof Error ? error.message : error);
       return { approved: 0 };
     }
-    return { approved: data?.length ?? 0 };
   }
 }
