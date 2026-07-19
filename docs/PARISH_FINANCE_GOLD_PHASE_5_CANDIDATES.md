@@ -110,12 +110,63 @@ The lower 2023 count reflects the previously documented 288 unavailable
 source months. The 12 warnings are 2023 records whose source JSON lacks the
 rate; they use the approved 0.30 fallback. No candidate failed validation.
 
-## Stop Gate
+## Phase 5E Pilot Gold Load
 
-Phase 5E is intentionally not implemented. Before loading Gold facts, review
-the warning cohort, approve representative candidate amounts, and confirm the
-still-pending remittance formula. The liturgical calendar dimension remains a
-separate later phase.
+The transactional, idempotent Gold loader is implemented in
+`src/analytics/app/services/parish_gold_loader.py`. It upserts monthly facts,
+replaces breakdown rows for the selected parish-month scope, and rolls back the
+entire scope if any preflight or reconciliation check fails.
+
+Pilot run `46467138-d052-4611-b7a2-9f2c1e94ed3e` succeeded:
+
+| Check | Result |
+|---|---:|
+| Monthly candidates/facts | 60 / 60 |
+| Monthly value mismatches | 0 |
+| Breakdown expected/loaded | 2,253 / 2,253 |
+| Breakdown value mismatches | 0 |
+| Missing dimension keys | 0 |
+| Duplicate parish-month grain | 0 |
+| Unmapped breakdown lines | 0 |
+
+All 60 pilot rows have a nullable `submission_key`, which is an approved lineage
+warning.
+
+The separately approved full backfill run
+`d280070b-b00a-44e9-afad-f1ddc99412ee` also succeeded:
+
+| Check | Result |
+|---|---:|
+| Monthly candidates/facts | 5,232 / 5,232 |
+| Monthly value mismatches | 0 |
+| Breakdown expected/loaded | 181,048 / 181,048 |
+| Breakdown value mismatches | 0 |
+| Missing dimension keys | 0 |
+| Duplicate parish-month grain | 0 |
+| Unmapped breakdown lines | 0 |
+
+All 5,232 rows currently retain the approved nullable `submission_key` warning.
+The liturgical calendar dimension remains a later phase.
+
+## Phase 5F Incremental Gold Automation
+
+The all-parish polling worker now refreshes Gold after each successful direct
+Supabase-to-Silver record sync and memo-metric recovery. The refresh captures
+both the previous and current parish-month grain, then transactionally:
+
+1. removes obsolete breakdown rows for the affected grain;
+2. upserts the current monthly candidate without resetting weather/event fields;
+3. rebuilds current account breakdowns;
+4. deletes a monthly fact only when no validated current candidate remains; and
+5. rolls back the affected grain if any preflight or reconciliation check fails.
+
+An approved one-record end-to-end test completed with one affected monthly fact,
+zero failed reconciliation checks, and only the accepted nullable
+`submission_key` warning. The API worker runs every 30 seconds with all-parish
+Silver sync and incremental Gold refresh enabled.
+
+Pipeline monitoring, bounded retries, dead-letter handling, and ETL retention are
+documented in `docs/PARISH_PIPELINE_PHASE_6_MONITORING.md`.
 
 ## Mass Collections Tax Correction
 

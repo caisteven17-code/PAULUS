@@ -523,9 +523,10 @@ def _normalize_db_training_row(record: dict[str, Any]) -> Optional[dict[str, Any
     if not isinstance(raw_celebration, dict):
         raw_celebration = {}
 
-    date_str = record.get("date")
-    if not date_str:
+    raw_date = record.get("date")
+    if not raw_date:
         return None
+    date_str = str(raw_date)
 
     celebration_key = record.get("source_reference") or raw_celebration.get("key")
     celebration_name = record.get("celebration_name") or (raw_celebration.get("title") or {}).get("en")
@@ -568,35 +569,19 @@ def _load_approved_source_rows_from_db(
     history_start_year: int = SOURCE_YEAR_START,
     history_end_year: Optional[int] = None,
 ) -> tuple[list[dict[str, Any]], int, int]:
-    from app.services.supabase_client import get_table
+    from app.services import analytics_db
 
-    table = get_table("reference", "liturgical_calendar")
-    page_size = 1000
-    start = 0
-    approved_rows: list[dict[str, Any]] = []
     effective_end_year = history_end_year or date.today().year
-
-    while True:
-        response = (
-            table.select(
-                "date,year,liturgical_season,celebration_name,rank,source_name,source_reference,raw_payload,"
-                "review_status,updated_at"
-            )
-            .gte("year", history_start_year)
-            .lte("year", effective_end_year)
-            .in_("review_status", list(APPROVED_REVIEW_STATUSES))
-            .order("date")
-            .order("updated_at")
-            .range(start, start + page_size - 1)
-            .execute()
-        )
-        page = response.data or []
-        if not page:
-            break
-        approved_rows.extend(page)
-        if len(page) < page_size:
-            break
-        start += page_size
+    approved_rows = analytics_db.fetch_query(
+        """
+        SELECT date, year, liturgical_season, celebration_name, rank,
+               source_name, source_reference, raw_payload, review_status, updated_at
+        FROM reference.liturgical_calendar
+        WHERE year BETWEEN %s AND %s AND review_status = ANY(%s)
+        ORDER BY date, updated_at
+        """,
+        (history_start_year, effective_end_year, list(APPROVED_REVIEW_STATUSES)),
+    )
 
     if not approved_rows:
         raise RuntimeError(
@@ -1220,17 +1205,18 @@ def _apply_generated_validator_results(records: list[dict[str, Any]], year: int)
 
 
 def _year_exists_in_db(year: int, source_name: str = ENGINE_SOURCE_NAME) -> bool:
-    from app.services.supabase_client import get_table
+    from app.services import analytics_db
 
-    response = (
-        get_table("reference", "liturgical_calendar")
-        .select("id")
-        .eq("year", year)
-        .eq("source_name", source_name)
-        .limit(1)
-        .execute()
+    row = analytics_db.fetch_query(
+        """
+        SELECT EXISTS (
+          SELECT 1 FROM reference.liturgical_calendar
+          WHERE year = %s AND source_name = %s
+        ) AS found
+        """,
+        (year, source_name),
     )
-    return bool(response.data)
+    return bool(row and row[0]["found"])
 
 
 def generate_and_load_year(

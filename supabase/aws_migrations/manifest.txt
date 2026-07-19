@@ -167,6 +167,8 @@ aws_migrations/057_simplify_other_collections_output.sql
 aws_migrations/058_simplify_mass_collections_output.sql
 aws_migrations/059_remove_other_collections_output.sql
 aws_migrations/060_total_remittance_formula.sql
+aws_migrations/061_pipeline_monitoring_and_retries.sql
+aws_migrations/062_parish_liturgical_calendar_analytics.sql
 
 # Analytics refresh — run last, after all schema DDL above (see note near 125).
 portable_migrations/130_sync_analytics_dimensions.sql

@@ -6,20 +6,21 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app.config import (
     WAREHOUSE_BRONZE_COMPARISON_ENABLED,
+    WAREHOUSE_GOLD_INCREMENTAL_ENABLED,
     WAREHOUSE_PILOT_INSTITUTION_IDS,
     WAREHOUSE_PILOT_POLL_SECONDS,
     WAREHOUSE_PILOT_SYNC_ENABLED,
     WAREHOUSE_SYNC_ALL_PARISHES,
 )
-from app.routers import pusher
+from app.routers import health, pusher
 from app.services import analytics_db, warehouse_worker
 
 try:
-    from app.routers import analytics, descriptive, diagnostic, health, iafr, predictive, prescriptive
+    from app.routers import analytics, descriptive, diagnostic, iafr, predictive, prescriptive
 
     OPTIONAL_ROUTERS_ERROR = None
 except Exception as exc:
-    analytics = descriptive = diagnostic = health = iafr = predictive = prescriptive = None
+    analytics = descriptive = diagnostic = iafr = predictive = prescriptive = None
     OPTIONAL_ROUTERS_ERROR = exc
 
 app = FastAPI(title="Diocese Analytics API", version="2.0.0")
@@ -36,13 +37,13 @@ app.add_middleware(
 )
 
 app.include_router(pusher.router)
+app.include_router(health.router)
 
 _warehouse_worker_stop: asyncio.Event | None = None
 _warehouse_worker_task: asyncio.Task | None = None
 
 # Existing routers (unchanged when optional analytics dependencies are installed)
 if OPTIONAL_ROUTERS_ERROR is None:
-    app.include_router(health.router)
     app.include_router(analytics.router, prefix="/analytics")
     app.include_router(iafr.router)
 
@@ -95,4 +96,5 @@ async def warehouse_pilot_status():
         "worker_running": _warehouse_worker_task is not None and not _warehouse_worker_task.done(),
         "silver_source": "supabase_direct",
         "bronze_comparison_enabled": WAREHOUSE_BRONZE_COMPARISON_ENABLED,
+        "gold_incremental_enabled": WAREHOUSE_GOLD_INCREMENTAL_ENABLED,
     }

@@ -10,21 +10,31 @@ from typing import Any
 
 from app.config import (
     WAREHOUSE_BRONZE_COMPARISON_ENABLED,
+    WAREHOUSE_GOLD_INCREMENTAL_ENABLED,
     WAREHOUSE_PILOT_INSTITUTION_IDS,
     WAREHOUSE_PILOT_POLL_SECONDS,
     WAREHOUSE_SYNC_ALL_PARISHES,
 )
 from app.services import analytics_db
 from app.services.parish_gold_candidates import recover_record_memo_metrics
+from app.services.parish_gold_loader import refresh_incremental
 from app.services.silver_etl import run_silver_record
 from app.services.supabase_client import get_table
 from app.services.warehouse_etl import run_record_sync
+from app.services.warehouse_monitor import (
+    claim_due_retries,
+    cleanup_history,
+    complete_retry,
+    fail_retry,
+    queue_retry,
+)
 
 logger = logging.getLogger(__name__)
 
 _PIPELINE_PREFIX = "parish_bronze_incremental"
 _GLOBAL_PIPELINE_NAME = "parish_silver_incremental"
 _PAGE_SIZE = 1000
+_last_cleanup_at: datetime | None = None
 
 
 def _pipeline_name(institution_id: str) -> str:
@@ -57,6 +67,19 @@ def _set_pipeline_watermark(pipeline_name: str, updated_at: str | datetime, reco
             updated_at = now()
         """,
         (pipeline_name, updated_at, record_id),
+    )
+
+
+def _touch_pipeline_watermark(pipeline_name: str) -> None:
+    analytics_db.execute(
+        """
+        UPDATE warehouse_control.etl_watermarks
+        SET updated_at = now()
+        WHERE pipeline_name = %s
+          AND source_schema = 'parishes'
+          AND source_table = 'financial_records'
+        """,
+        (pipeline_name,),
     )
 
 
@@ -127,15 +150,74 @@ def _fetch_global_changes(watermark: dict[str, Any]) -> list[dict]:
     return rows
 
 
+def _candidate_grains(source_record_id: str) -> list[tuple[int, int]]:
+    rows = analytics_db.fetch_query(
+        """
+        SELECT parish_key, date_key
+        FROM parish_analytics.vw_parish_monthly_financial_candidates
+        WHERE source_record_id = %s
+          AND parish_key IS NOT NULL
+          AND date_key IS NOT NULL
+        """,
+        (source_record_id,),
+    )
+    return [(int(row["parish_key"]), int(row["date_key"])) for row in rows]
+
+
 def _sync_change(change: dict[str, Any]) -> dict[str, Any]:
+    previous_grains = _candidate_grains(change["id"]) if WAREHOUSE_GOLD_INCREMENTAL_ENABLED else []
     bronze_result = run_record_sync(change["id"]) if WAREHOUSE_BRONZE_COMPARISON_ENABLED else None
     silver_result = run_silver_record(change["id"])
-    memo_metrics = recover_record_memo_metrics(change["id"])
-    return {"bronze": bronze_result, "silver": silver_result, "memo_metrics": memo_metrics}
+    is_active = bool(silver_result.get("counts", {}).get("silver_records"))
+    memo_metrics = recover_record_memo_metrics(change["id"]) if is_active else None
+    gold_result = None
+    if WAREHOUSE_GOLD_INCREMENTAL_ENABLED:
+        current_grains = _candidate_grains(change["id"])
+        gold_result = refresh_incremental(change["id"], previous_grains + current_grains)
+    return {
+        "bronze": bronze_result,
+        "silver": silver_result,
+        "memo_metrics": memo_metrics,
+        "gold": gold_result,
+    }
+
+
+def _process_due_retries() -> dict[str, int]:
+    result = {"claimed": 0, "succeeded": 0, "rescheduled": 0, "dead_letter": 0}
+    for retry in claim_due_retries():
+        result["claimed"] += 1
+        source_record_id = retry["source_record_id"]
+        try:
+            _sync_change({"id": source_record_id})
+            complete_retry(source_record_id)
+            result["succeeded"] += 1
+        except Exception as exc:
+            logger.exception("Incremental retry failed")
+            status = fail_retry(
+                source_record_id,
+                int(retry["attempt_count"]),
+                int(retry["max_attempts"]),
+                str(exc),
+            )
+            result["dead_letter" if status == "dead_letter" else "rescheduled"] += 1
+    return result
+
+
+def _cleanup_if_due() -> dict[str, int] | None:
+    global _last_cleanup_at
+    now = datetime.now(timezone.utc)
+    if _last_cleanup_at is not None and (now - _last_cleanup_at).total_seconds() < 86400:
+        return None
+    result = cleanup_history()
+    _last_cleanup_at = now
+    return result
 
 
 def _run_global_once() -> dict[str, Any]:
-    results: dict[str, Any] = {"initialized": [], "synced": [], "failed": []}
+    results: dict[str, Any] = {
+        "initialized": [], "synced": [], "failed": [],
+        "retries": _process_due_retries(), "cleanup": _cleanup_if_due(),
+    }
     if initialize_global_watermark():
         results["initialized"].append(_GLOBAL_PIPELINE_NAME)
     watermark = _get_pipeline_watermark(_GLOBAL_PIPELINE_NAME)
@@ -147,8 +229,10 @@ def _run_global_once() -> dict[str, Any]:
             _set_pipeline_watermark(_GLOBAL_PIPELINE_NAME, change["updated_at"], change["id"])
         except Exception as exc:
             logger.exception("Global silver sync failed for %s", change["id"])
-            results["failed"].append({"record_id": change["id"], "error": str(exc)})
-            break
+            queue_retry(change["id"], str(exc))
+            _set_pipeline_watermark(_GLOBAL_PIPELINE_NAME, change["updated_at"], change["id"])
+            results["failed"].append({"queued_for_retry": True, "error_type": type(exc).__name__})
+    _touch_pipeline_watermark(_GLOBAL_PIPELINE_NAME)
     return results
 
 
@@ -187,7 +271,10 @@ def run_once(institution_ids: list[str] | None = None) -> dict[str, Any]:
     if institution_ids is None and WAREHOUSE_SYNC_ALL_PARISHES:
         return _run_global_once()
     allowlist = institution_ids if institution_ids is not None else WAREHOUSE_PILOT_INSTITUTION_IDS
-    results: dict[str, Any] = {"initialized": [], "synced": [], "failed": []}
+    results: dict[str, Any] = {
+        "initialized": [], "synced": [], "failed": [],
+        "retries": _process_due_retries(), "cleanup": _cleanup_if_due(),
+    }
     for institution_id in allowlist:
         if initialize_watermark(institution_id):
             results["initialized"].append(institution_id)
@@ -202,8 +289,10 @@ def run_once(institution_ids: list[str] | None = None) -> dict[str, Any]:
                 results["synced"].append(sync_result)
             except Exception as exc:
                 logger.exception("Pilot bronze sync failed for %s", change["id"])
-                results["failed"].append({"record_id": change["id"], "error": str(exc)})
-                break
+                queue_retry(change["id"], str(exc))
+                _set_watermark(institution_id, change["updated_at"], change["id"])
+                results["failed"].append({"queued_for_retry": True, "error_type": type(exc).__name__})
+        _touch_pipeline_watermark(_pipeline_name(institution_id))
     return results
 
 
@@ -236,10 +325,7 @@ def main() -> None:
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
     try:
         if args.record_id:
-            result = {
-                "bronze": run_record_sync(args.record_id) if WAREHOUSE_BRONZE_COMPARISON_ENABLED else None,
-                "silver": run_silver_record(args.record_id),
-            }
+            result = _sync_change({"id": args.record_id})
         else:
             result = run_once()
         print(result)

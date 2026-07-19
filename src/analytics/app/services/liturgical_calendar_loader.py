@@ -1,7 +1,7 @@
 """
 Philippine Liturgical Calendar Loader
 =====================================
-Loads collector/updater JSON into reference.liturgical_calendar in Supabase.
+Loads collector/updater JSON into reference.liturgical_calendar in AWS.
 
 Flow per batch:
   1. Categorize rows: insert / update / skip_approved
@@ -21,6 +21,10 @@ import logging
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Optional
+
+from psycopg import sql
+from psycopg.rows import dict_row
+from psycopg.types.json import Jsonb
 
 logger = logging.getLogger(__name__)
 
@@ -101,109 +105,109 @@ def _upsert_batch(rows: list[dict[str, Any]], run_id: Optional[str] = None) -> i
     if not rows:
         return 0
 
-    from app.services.supabase_client import get_table
+    from app.services import analytics_db
 
-    main_table = get_table("reference", "liturgical_calendar")
     dates = list({row["date"] for row in rows})
     sources = list({row["source_name"] for row in rows})
 
-    existing_map: dict[tuple[str, str], tuple[str, str]] = {}
-    for date_chunk in _chunks(dates):
-        existing_resp = (
-            main_table.select("id, date, source_name, review_status")
-            .in_("date", date_chunk)
-            .in_("source_name", sources)
-            .execute()
-        )
-        existing_map.update(
-            {
-                (r["date"], r["source_name"]): (r["id"], r["review_status"])
-                for r in (existing_resp.data or [])
+    with analytics_db.get_pool().connection() as conn:
+        with conn.cursor(row_factory=dict_row) as cur:
+            cur.execute(
+                """
+                SELECT id, date::text AS date, source_name, review_status
+                FROM reference.liturgical_calendar
+                WHERE date = ANY(%s::date[]) AND source_name = ANY(%s::text[])
+                """,
+                (dates, sources),
+            )
+            existing_map = {
+                (record["date"], record["source_name"]): (str(record["id"]), record["review_status"])
+                for record in cur.fetchall()
             }
-        )
 
-    # Pass 1: categorize
-    inserts: list[dict[str, Any]] = []
-    updates: list[tuple[str, dict[str, Any]]] = []
-    staging_rows: list[dict[str, Any]] = []
-    skipped = 0
+            inserts: list[dict[str, Any]] = []
+            updates: list[tuple[str, dict[str, Any]]] = []
+            staging_rows: list[dict[str, Any]] = []
+            skipped = 0
+            for row in rows:
+                payload = _db_payload(row)
+                key = (payload["date"], payload["source_name"])
+                existing = existing_map.get(key)
+                if existing:
+                    record_id, existing_status = existing
+                    if existing_status in {"approved", "approved_with_revisions"}:
+                        action = "skip_approved"
+                        skipped += 1
+                    else:
+                        action = "update"
+                        updates.append((record_id, payload))
+                else:
+                    action = "insert"
+                    inserts.append(payload)
+                if run_id:
+                    staging_rows.append(_staging_payload(row, run_id, action))
 
-    for row in rows:
-        payload = _db_payload(row)
-        key = (payload["date"], payload["source_name"])
-        existing = existing_map.get(key)
-
-        if existing:
-            record_id, existing_status = existing
-            if existing_status in {"approved", "approved_with_revisions"}:
-                action = "skip_approved"
-                skipped += 1
-            else:
-                action = "update"
-                updates.append((record_id, payload))
-        else:
-            action = "insert"
-            inserts.append(payload)
-
-        if run_id:
-            staging_rows.append(_staging_payload(row, run_id, action))
-
-    # Pass 2: write all proposed rows to staging
-    staging_id_map: dict[tuple[str, str], str] = {}
-    staging_table = None
-    if run_id and staging_rows:
-        try:
-            staging_table = get_table("staging", "liturgical_calendar")
-            for chunk in _chunks(staging_rows):
-                staging_resp = staging_table.insert(chunk).execute()
-                staging_id_map.update(
-                    {(s["date"], s["source_name"]): s["id"] for s in (staging_resp.data or [])}
+            staging_id_map: dict[tuple[str, str], str] = {}
+            for payload in staging_rows:
+                columns = list(payload)
+                statement = sql.SQL("INSERT INTO staging.liturgical_calendar ({}) VALUES ({}) RETURNING id").format(
+                    sql.SQL(", ").join(sql.Identifier(column) for column in columns),
+                    sql.SQL(", ").join(sql.Placeholder() * len(columns)),
                 )
-        except Exception as exc:
-            logger.warning("Could not write to staging: %s", exc)
-            staging_table = None
+                cur.execute(statement, [_adapt(payload[column]) for column in columns])
+                staging_id_map[(payload["date"], payload["source_name"])] = str(cur.fetchone()["id"])
 
-    # Pass 3: promote inserts to main table
-    promotions: list[tuple[str, str]] = []  # (staging_id, main_record_id)
+            promotions: list[tuple[str, str]] = []
+            for payload in inserts:
+                columns = list(payload)
+                statement = sql.SQL(
+                    "INSERT INTO reference.liturgical_calendar ({}) VALUES ({}) RETURNING id"
+                ).format(
+                    sql.SQL(", ").join(sql.Identifier(column) for column in columns),
+                    sql.SQL(", ").join(sql.Placeholder() * len(columns)),
+                )
+                cur.execute(statement, [_adapt(payload[column]) for column in columns])
+                record_id = str(cur.fetchone()["id"])
+                staging_id = staging_id_map.get((payload["date"], payload["source_name"]))
+                if staging_id:
+                    promotions.append((staging_id, record_id))
+
+            for record_id, payload in updates:
+                columns = list(payload)
+                statement = sql.SQL("UPDATE reference.liturgical_calendar SET {} WHERE id = %s").format(
+                    sql.SQL(", ").join(
+                        sql.SQL("{} = %s").format(sql.Identifier(column)) for column in columns
+                    )
+                )
+                cur.execute(statement, [*[_adapt(payload[column]) for column in columns], record_id])
+                staging_id = staging_id_map.get((payload["date"], payload["source_name"]))
+                if staging_id:
+                    promotions.append((staging_id, record_id))
+
+            for staging_id, record_id in promotions:
+                cur.execute(
+                    """
+                    UPDATE staging.liturgical_calendar
+                    SET promoted_record_id = %s, applied_at = now()
+                    WHERE id = %s
+                    """,
+                    (record_id, staging_id),
+                )
+        conn.commit()
+
+    analytics_db.execute("SELECT * FROM parish_analytics.refresh_liturgical_calendar_analytics()")
+
     if inserts:
-        inserted_rows: list[dict[str, Any]] = []
-        for chunk in _chunks(inserts):
-            insert_resp = main_table.insert(chunk).execute()
-            inserted_rows.extend(insert_resp.data or [])
         logger.info("Inserted %d liturgical calendar rows", len(inserts))
-        for promoted in inserted_rows:
-            key = (promoted["date"], promoted["source_name"])
-            staging_id = staging_id_map.get(key)
-            if staging_id:
-                promotions.append((staging_id, promoted["id"]))
-
-    # Pass 4: promote updates to main table
-    for record_id, payload in updates:
-        main_table.update(payload).eq("id", record_id).execute()
-        key = (payload["date"], payload["source_name"])
-        staging_id = staging_id_map.get(key)
-        if staging_id:
-            promotions.append((staging_id, record_id))
     if updates:
         logger.info("Updated %d liturgical calendar rows", len(updates))
     if skipped:
         logger.info("Skipped %d approved rows (protected from overwrite)", skipped)
-
-    # Pass 5: mark promoted staging rows
-    if staging_table and promotions:
-        now_iso = datetime.now(timezone.utc).isoformat()
-        for staging_id, main_record_id in promotions:
-            try:
-                staging_table.update(
-                    {
-                        "promoted_record_id": main_record_id,
-                        "applied_at": now_iso,
-                    }
-                ).eq("id", staging_id).execute()
-            except Exception as exc:
-                logger.warning("Could not mark staging row %s as applied: %s", staging_id, exc)
-
     return len(rows)
+
+
+def _adapt(value: Any) -> Any:
+    return Jsonb(value) if isinstance(value, (dict, list)) else value
 
 
 def load_records(
@@ -238,7 +242,7 @@ if __name__ == "__main__":
 
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
 
-    parser = argparse.ArgumentParser(description="Load liturgical calendar JSON into Supabase")
+    parser = argparse.ArgumentParser(description="Load liturgical calendar JSON into AWS")
     parser.add_argument(
         "--file",
         type=str,
@@ -252,4 +256,4 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     loaded = load_from_file(Path(args.file), include_pending=not args.approved_only)
-    print(f"Loaded {loaded} rows into reference.liturgical_calendar")
+    print(f"Loaded {loaded} rows into AWS reference.liturgical_calendar")

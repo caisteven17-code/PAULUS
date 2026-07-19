@@ -29,8 +29,8 @@ import unicodedata
 import urllib.error
 import urllib.parse
 import urllib.request
-from difflib import SequenceMatcher
 from datetime import date, datetime, timezone
+from difflib import SequenceMatcher
 from pathlib import Path
 from typing import Any, Optional
 
@@ -93,20 +93,17 @@ def _preflight_check() -> None:
 
 def _create_run_record(years: list[int]) -> Optional[str]:
     try:
-        from app.services.supabase_client import get_table
+        from app.services import analytics_db
 
-        resp = (
-            get_table("reference", "liturgical_calendar_runs")
-            .insert(
-                {
-                    "years": years,
-                    "status": "running",
-                    "started_at": datetime.now(timezone.utc).isoformat(),
-                }
-            )
-            .execute()
+        row = analytics_db.execute_returning_one(
+            """
+            INSERT INTO reference.liturgical_calendar_runs (years, status, started_at)
+            VALUES (%s, 'running', %s)
+            RETURNING id
+            """,
+            (years, datetime.now(timezone.utc)),
         )
-        return resp.data[0]["id"] if resp.data else None
+        return str(row["id"]) if row else None
     except Exception as exc:
         logger.warning("Could not create liturgical calendar run record: %s", exc)
         return None
@@ -123,18 +120,25 @@ def _update_run_record(
     if not run_id:
         return
     try:
-        from app.services.supabase_client import get_table
+        from app.services import analytics_db
 
-        get_table("reference", "liturgical_calendar_runs").update(
-            {
-                "status": status,
-                "finished_at": datetime.now(timezone.utc).isoformat(),
-                "clean_count": clean_count,
-                "review_count": review_count,
-                "error_detail": error_detail,
-                "completed_years": completed_years or [],
-            }
-        ).eq("id", run_id).execute()
+        analytics_db.execute(
+            """
+            UPDATE reference.liturgical_calendar_runs
+            SET status = %s, finished_at = %s, clean_count = %s,
+                review_count = %s, error_detail = %s, completed_years = %s
+            WHERE id = %s
+            """,
+            (
+                status,
+                datetime.now(timezone.utc),
+                clean_count,
+                review_count,
+                error_detail,
+                completed_years or [],
+                run_id,
+            ),
+        )
     except Exception as exc:
         logger.warning("Could not update liturgical calendar run record: %s", exc)
 
@@ -1239,12 +1243,12 @@ if __name__ == "__main__":
     parser.add_argument(
         "--load",
         action="store_true",
-        help="Load clean output into Supabase after collecting",
+        help="Load clean output into AWS after collecting",
     )
     parser.add_argument(
         "--load-review",
         action="store_true",
-        help="Also load pending review rows into Supabase",
+        help="Also load pending review rows into AWS",
     )
     args = parser.parse_args()
 
