@@ -9,6 +9,16 @@ function clientIp(req: Request): string {
   return req.socket?.remoteAddress ?? 'unknown';
 }
 
+function passwordMeetsPolicy(password: string): boolean {
+  return (
+    password.length >= 8 &&
+    /[A-Z]/.test(password) &&
+    /[a-z]/.test(password) &&
+    /\d/.test(password) &&
+    /[^A-Za-z0-9\s]/.test(password)
+  );
+}
+
 @Controller('auth')
 export class AuthController {
   constructor(
@@ -236,8 +246,10 @@ export class AuthController {
     if (!email || !otpCode || !newPassword) {
       return res.status(HttpStatus.BAD_REQUEST).json({ error: 'email, otpCode, and newPassword are required.' });
     }
-    if (String(newPassword).length < 8) {
-      return res.status(HttpStatus.BAD_REQUEST).json({ error: 'Password must be at least 8 characters.' });
+    if (!passwordMeetsPolicy(String(newPassword))) {
+      return res.status(HttpStatus.BAD_REQUEST).json({
+        error: 'Password must be at least 8 characters and include uppercase, lowercase, number, and special characters.',
+      });
     }
 
     try {

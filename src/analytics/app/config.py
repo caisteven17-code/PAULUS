@@ -22,7 +22,9 @@ WAREHOUSE_PILOT_INSTITUTION_IDS: list[str] = [
     value.strip() for value in os.getenv("WAREHOUSE_PILOT_INSTITUTION_IDS", "").split(",") if value.strip()
 ]
 WAREHOUSE_PILOT_POLL_SECONDS: int = max(10, int(os.getenv("WAREHOUSE_PILOT_POLL_SECONDS", "30")))
-WAREHOUSE_BRONZE_COMPARISON_ENABLED: bool = os.getenv("WAREHOUSE_BRONZE_COMPARISON_ENABLED", "true").lower() == "true"
+# Permanently retired after the direct-Silver cutover. Kept in status output as
+# an explicit compatibility signal, but environment values cannot re-enable it.
+WAREHOUSE_BRONZE_COMPARISON_ENABLED: bool = False
 WAREHOUSE_SYNC_ALL_PARISHES: bool = os.getenv("WAREHOUSE_SYNC_ALL_PARISHES", "true").lower() == "true"
 WAREHOUSE_GOLD_INCREMENTAL_ENABLED: bool = os.getenv("WAREHOUSE_GOLD_INCREMENTAL_ENABLED", "true").lower() == "true"
 WAREHOUSE_RETRY_MAX_ATTEMPTS: int = max(1, int(os.getenv("WAREHOUSE_RETRY_MAX_ATTEMPTS", "5")))
@@ -31,3 +33,26 @@ WAREHOUSE_RETRY_BATCH_SIZE: int = max(1, int(os.getenv("WAREHOUSE_RETRY_BATCH_SI
 WAREHOUSE_WATERMARK_STALE_SECONDS: int = max(60, int(os.getenv("WAREHOUSE_WATERMARK_STALE_SECONDS", "180")))
 WAREHOUSE_ETL_SUCCESS_RETENTION_DAYS: int = max(7, int(os.getenv("WAREHOUSE_ETL_SUCCESS_RETENTION_DAYS", "30")))
 WAREHOUSE_ETL_FAILURE_RETENTION_DAYS: int = max(30, int(os.getenv("WAREHOUSE_ETL_FAILURE_RETENTION_DAYS", "180")))
+
+# Independent Supabase -> AWS institution dimension sync. This remains off
+# until migration 068 has been deployed to AWS.
+WAREHOUSE_INSTITUTION_SYNC_ENABLED: bool = os.getenv("WAREHOUSE_INSTITUTION_SYNC_ENABLED", "false").lower() == "true"
+WAREHOUSE_INSTITUTION_POLL_SECONDS: int = max(10, int(os.getenv("WAREHOUSE_INSTITUTION_POLL_SECONDS", "60")))
+
+# Direct Supabase -> AWS Silver/Gold for school and seminary finance.
+WAREHOUSE_EDUCATION_SYNC_ENABLED: bool = os.getenv(
+    "WAREHOUSE_EDUCATION_SYNC_ENABLED", "false"
+).lower() == "true"
+WAREHOUSE_EDUCATION_POLL_SECONDS: int = max(
+    30, int(os.getenv("WAREHOUSE_EDUCATION_POLL_SECONDS", "60"))
+)
+
+# Human-reviewed liturgical calendar records are operational master data in
+# Supabase. AWS retains collection staging and an approved analytical copy.
+LITURGICAL_CANONICAL_SOURCE: str = os.getenv("LITURGICAL_CANONICAL_SOURCE", "supabase").lower()
+LITURGICAL_APPROVAL_SYNC_ENABLED: bool = os.getenv(
+    "LITURGICAL_APPROVAL_SYNC_ENABLED", "false"
+).lower() == "true"
+LITURGICAL_APPROVAL_POLL_SECONDS: int = max(
+    30, int(os.getenv("LITURGICAL_APPROVAL_POLL_SECONDS", "300"))
+)

@@ -1,7 +1,7 @@
-"""Supabase-to-AWS bronze loader for warehouse master data and parish pilots.
+"""Retired Supabase-to-AWS operational-mirror loader.
 
-The existing AWS domain schemas are the bronze layer. This module deliberately
-does not refresh silver or gold objects.
+Only ``_fetch_all`` remains available as a shared Supabase paging helper.
+Every mirror entry point fails closed after the direct-Silver cutover.
 
 Usage:
   python -m app.services.warehouse_etl minimal
@@ -25,6 +25,12 @@ logger = logging.getLogger(__name__)
 
 _PAGE_SIZE = 1000
 _PIPELINE_NAME = "parish_bronze"
+
+
+def _raise_legacy_mirror_retired() -> None:
+    raise RuntimeError(
+        "The AWS operational-mirror loader is retired. Use direct Supabase-to-Silver synchronization."
+    )
 
 _FINANCIAL_AMOUNT_COLUMNS = (
     "sacraments_total",
@@ -138,6 +144,7 @@ def _mirror_rows(schema: str, table: str, rows: list[dict], conflict_col: str) -
 
 
 def mirror_table(schema: str, table: str, conflict_col: str = "id", disable_triggers: list[str] = ()) -> int:
+    _raise_legacy_mirror_retired()
     rows = _fetch_all(schema, table)
     original = _TRIGGERS.get((schema, table), ())
     if disable_triggers:
@@ -153,6 +160,7 @@ def mirror_table(schema: str, table: str, conflict_col: str = "id", disable_trig
 
 def run() -> dict[str, int]:
     """Retain the original minimal master-data mirror as the default mode."""
+    _raise_legacy_mirror_retired()
     results = {}
     results["diocese.roles"] = mirror_table("diocese", "roles")
     results["diocese.institutions"] = mirror_table("diocese", "institutions")
@@ -462,6 +470,7 @@ def _record_failure(run_id: str, record_id: str, error: Exception) -> None:
 
 def run_record_sync(record_id: str) -> dict[str, Any]:
     """Idempotently sync one source record and its complete bronze dependency set."""
+    _raise_legacy_mirror_retired()
     run_id = _start_run("incremental", {"record_id": record_id})
     counts: dict[str, Any] = {}
     loaded = 0
@@ -509,6 +518,7 @@ def run_record_sync(record_id: str) -> dict[str, Any]:
 
 
 def run_pilot(institution_id: str, year: int, *, dry_run: bool) -> dict[str, Any]:
+    _raise_legacy_mirror_retired()
     mode = "dry_run" if dry_run else "pilot"
     scope = {"institution_id": institution_id, "year": year}
     run_id = _start_run(mode, scope)

@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState } from 'react';
-import { Calendar, ChevronDown, Check, User, Database, LogOut } from 'lucide-react';
+import { Calendar, ChevronDown, Check, User, Database, KeyRound, LogOut } from 'lucide-react';
 
 import { Role, Timeframe } from '../../App';
 import { auth } from '../../firebase';
@@ -180,6 +180,16 @@ export function TopNav({
                     <User className="w-4 h-4 text-gold-600" />
                     Profile
                   </button>
+                  <button
+                    onClick={() => {
+                      setIsAccountOpen(false);
+                      onNavigate?.('change-password');
+                    }}
+                    className="w-full px-4 py-2.5 text-left text-sm font-bold text-gray-700 hover:bg-gray-50 flex items-center gap-3 transition-colors"
+                  >
+                    <KeyRound className="w-4 h-4 text-gold-600" />
+                    Change Password
+                  </button>
                   {(role === 'priest' || role === 'school' || role === 'seminary') && (
                     <button
                       onClick={() => {
@@ -310,6 +320,16 @@ export function TopNav({
                   >
                     <User className="w-4 h-4 text-gold-500" />
                     Profile
+                  </button>
+                  <button
+                    onClick={() => {
+                      setIsAccountOpen(false);
+                      onNavigate?.('change-password');
+                    }}
+                    className="w-full px-4 py-2.5 text-left text-xs font-bold text-white hover:bg-white/5 flex items-center gap-3 transition-colors"
+                  >
+                    <KeyRound className="w-4 h-4 text-gold-500" />
+                    Change Password
                   </button>
                   <button
                     onClick={() => {

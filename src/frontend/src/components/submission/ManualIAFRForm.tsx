@@ -1,0 +1,465 @@
+'use client';
+
+import React, { useEffect, useMemo, useState } from 'react';
+import { Calculator, Check, ChevronDown, FilePenLine, Save, Send } from 'lucide-react';
+import { AnimatePresence, motion } from 'motion/react';
+import {
+  iafrManualSections,
+  iafrSacramentRows,
+  iafrSpecialCollections2026,
+  IAFRAmountField,
+  IAFRSectionCode,
+} from './iafrManualForm';
+
+export interface ManualSubmissionEntry {
+  fieldKey: string;
+  sectionCode: IAFRSectionCode;
+  subsectionCode?: string;
+  canonicalAccountCode: string;
+  sourceLabel: string;
+  rawValue: string;
+  cleanedAmount: number;
+  sourceMetadata?: Record<string, unknown>;
+}
+
+interface ManualIAFRFormProps {
+  parishName: string;
+  reportingMonth: number;
+  reportingYear: number;
+  disabled?: boolean;
+  isSubmitting?: boolean;
+  onSubmit: (entries: ManualSubmissionEntry[]) => Promise<void>;
+}
+
+type ValueMap = Record<string, string>;
+
+const money = new Intl.NumberFormat('en-PH', { style: 'currency', currency: 'PHP' });
+
+function numberValue(values: ValueMap, key: string) {
+  const parsed = Number(values[key] ?? 0);
+  return Number.isFinite(parsed) ? parsed : 0;
+}
+
+function specialCollectionKey(date: string) {
+  return `special_collection.${date}`;
+}
+
+function AmountInput({ field, value, onChange }: { field: IAFRAmountField; value: string; onChange: (value: string) => void }) {
+  return (
+    <label className="grid gap-2 border-t border-gray-100 px-4 py-3 first:border-t-0 sm:grid-cols-[minmax(0,1fr)_180px] sm:items-center sm:px-5">
+      <span className="min-w-0">
+        <span className="block text-sm font-medium text-gray-900">{field.label}</span>
+        <span className="mt-0.5 block text-[10px] font-semibold uppercase tracking-[0.1em] text-gray-400">
+          {field.accountCode}
+        </span>
+      </span>
+      <span className="relative block">
+        <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-xs font-semibold text-gray-500">PHP</span>
+        <input
+          type="number"
+          min="0"
+          step="0.01"
+          value={value}
+          onChange={(event) => onChange(event.target.value)}
+          placeholder="0.00"
+          className="h-10 w-full rounded-md border border-gold-200 bg-gold-50/50 pl-12 pr-3 text-right text-sm font-semibold text-gray-900 outline-none transition focus:border-gold-500 focus:ring-2 focus:ring-gold-500/20"
+        />
+      </span>
+    </label>
+  );
+}
+
+export function ManualIAFRForm({
+  parishName,
+  reportingMonth,
+  reportingYear,
+  disabled = false,
+  isSubmitting = false,
+  onSubmit,
+}: ManualIAFRFormProps) {
+  const storageKey = `iafr-manual-draft:${parishName}:${reportingYear}:${reportingMonth}`;
+  const [openSection, setOpenSection] = useState<IAFRSectionCode | null>('A');
+  const [values, setValues] = useState<ValueMap>({});
+  const [draftStatus, setDraftStatus] = useState('Draft not saved');
+  const [validationMessage, setValidationMessage] = useState('');
+  const specialCollections = reportingYear === 2026 ? (iafrSpecialCollections2026[reportingMonth] ?? []) : [];
+
+  useEffect(() => {
+    try {
+      const saved = window.localStorage.getItem(storageKey);
+      if (saved) {
+        setValues(JSON.parse(saved) as ValueMap);
+        setDraftStatus('Draft restored on this device');
+      }
+    } catch {
+      setDraftStatus('Draft could not be restored');
+    }
+  }, [storageKey]);
+
+  useEffect(() => {
+    if (Object.keys(values).length === 0) return;
+    const timer = window.setTimeout(() => {
+      window.localStorage.setItem(storageKey, JSON.stringify(values));
+      setDraftStatus('Draft saved on this device');
+    }, 450);
+    setDraftStatus('Saving draft...');
+    return () => window.clearTimeout(timer);
+  }, [storageKey, values]);
+
+  const setValue = (key: string, value: string) => {
+    if (value !== '' && Number(value) < 0) return;
+    setValues((current) => ({ ...current, [key]: value }));
+    setValidationMessage('');
+  };
+
+  const sectionTotals = useMemo(() => {
+    const totals = Object.fromEntries(iafrManualSections.map((section) => [section.code, 0])) as Record<IAFRSectionCode, number>;
+    for (const section of iafrManualSections) {
+      totals[section.code] = section.fields.reduce((sum, field) => sum + numberValue(values, field.key), 0);
+    }
+    totals.A += iafrSacramentRows.reduce((sum, row) => {
+      const prescribed = row.prescribedRate * numberValue(values, `${row.accountCode}.chargeable`);
+      const overAbove = numberValue(values, `${row.accountCode}.overAboveRate`) * numberValue(values, `${row.accountCode}.chargeable`);
+      return sum + prescribed + overAbove;
+    }, 0);
+    totals.F += specialCollections.reduce((sum, collection) => sum + numberValue(values, specialCollectionKey(collection.date)), 0);
+    return totals;
+  }, [specialCollections, values]);
+
+  const completedBySection = useMemo(() => {
+    const result = {} as Record<IAFRSectionCode, number>;
+    for (const section of iafrManualSections) {
+      result[section.code] = section.fields.filter((field) => numberValue(values, field.key) > 0).length;
+      if (section.code === 'A') {
+        result.A += iafrSacramentRows.filter((row) => numberValue(values, `${row.accountCode}.chargeable`) > 0).length;
+      }
+      if (section.code === 'F') {
+        result.F += specialCollections.filter((collection) => numberValue(values, specialCollectionKey(collection.date)) > 0).length;
+      }
+    }
+    return result;
+  }, [specialCollections, values]);
+
+  const buildEntries = () => {
+    const entries: ManualSubmissionEntry[] = [];
+    for (const section of iafrManualSections) {
+      for (const field of section.fields) {
+        const amount = numberValue(values, field.key);
+        if (amount === 0) continue;
+        entries.push({
+          fieldKey: `${section.code}.${field.key}`,
+          sectionCode: section.code,
+          subsectionCode: field.subsection,
+          canonicalAccountCode: field.accountCode,
+          sourceLabel: field.label,
+          rawValue: values[field.key] ?? '',
+          cleanedAmount: Math.round(amount * 100) / 100,
+          sourceMetadata: { formVersion: 'iafr_2026_v1', inputKind: 'amount' },
+        });
+      }
+    }
+
+    for (const row of iafrSacramentRows) {
+      const rate = row.prescribedRate;
+      const gratis = numberValue(values, `${row.accountCode}.gratis`);
+      const chargeable = numberValue(values, `${row.accountCode}.chargeable`);
+      const overAboveRate = numberValue(values, `${row.accountCode}.overAboveRate`);
+      const metadata = { rate, gratis, chargeable, overAboveRate, formVersion: 'iafr_2026_v1' };
+      const prescribed = Math.round(rate * chargeable * 100) / 100;
+      const overAbove = Math.round(overAboveRate * chargeable * 100) / 100;
+
+      if (prescribed > 0) {
+        entries.push({
+          fieldKey: `${row.accountCode}.prescribed_total`,
+          sectionCode: 'A',
+          subsectionCode: 'sacrament_breakdown',
+          canonicalAccountCode: `${row.accountCode}.01`,
+          sourceLabel: `${row.label} - Total Prescribed Amount`,
+          rawValue: String(prescribed),
+          cleanedAmount: prescribed,
+          sourceMetadata: metadata,
+        });
+      }
+      if (overAbove > 0) {
+        entries.push({
+          fieldKey: `${row.accountCode}.over_above_total`,
+          sectionCode: 'A',
+          subsectionCode: 'sacrament_breakdown',
+          canonicalAccountCode: `${row.accountCode}.02`,
+          sourceLabel: `${row.label} - Total Over/Above Amount`,
+          rawValue: String(overAbove),
+          cleanedAmount: overAbove,
+          sourceMetadata: metadata,
+        });
+      }
+    }
+
+    for (const collection of specialCollections) {
+      const key = specialCollectionKey(collection.date);
+      const amount = numberValue(values, key);
+      if (amount === 0) continue;
+      entries.push({
+        fieldKey: `F.${key}`,
+        sectionCode: 'F',
+        subsectionCode: 'special_collections',
+        canonicalAccountCode: 'F.3.01',
+        sourceLabel: `${collection.displayDate} - ${collection.label}`,
+        rawValue: values[key] ?? '',
+        cleanedAmount: Math.round(amount * 100) / 100,
+        sourceMetadata: {
+          collectionDate: collection.date,
+          collectionName: collection.label,
+          formVersion: 'iafr_2026_v1',
+          inputKind: 'scheduled_special_collection',
+        },
+      });
+    }
+
+    const intentionTotal = numberValue(values, 'mass_intentions_total');
+    const intentionClaimed = numberValue(values, 'mass_intentions_claimed');
+    if (intentionTotal >= intentionClaimed && intentionTotal - intentionClaimed > 0) {
+      entries.push({
+        fieldKey: 'A.mass_intentions_unclaimed',
+        sectionCode: 'A',
+        subsectionCode: 'mass_intentions',
+        canonicalAccountCode: 'A.3.03',
+        sourceLabel: 'Mass Intentions - Unclaimed',
+        rawValue: String(intentionTotal - intentionClaimed),
+        cleanedAmount: Math.round((intentionTotal - intentionClaimed) * 100) / 100,
+        sourceMetadata: { derivedFrom: ['A.3.01', 'A.3.02'], formVersion: 'iafr_2026_v1' },
+      });
+    }
+    return entries;
+  };
+
+  const submit = async () => {
+    const intentionTotal = numberValue(values, 'mass_intentions_total');
+    const intentionClaimed = numberValue(values, 'mass_intentions_claimed');
+    if (intentionClaimed > intentionTotal) {
+      setOpenSection('A');
+      setValidationMessage('Mass intentions claimed cannot be greater than total Mass intention receipts.');
+      return;
+    }
+    const entries = buildEntries();
+    if (entries.length === 0) {
+      setValidationMessage('Enter at least one amount before submitting the test report.');
+      return;
+    }
+    await onSubmit(entries);
+  };
+
+  return (
+    <div className="overflow-hidden rounded-lg border border-gray-200 bg-white shadow-sm">
+      <div className="flex flex-col gap-3 border-b border-gray-200 px-5 py-5 sm:flex-row sm:items-center sm:justify-between sm:px-6">
+        <div className="flex items-start gap-3">
+          <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-black text-gold-400">
+            <FilePenLine className="h-5 w-5" />
+          </span>
+          <div>
+            <h2 className="font-serif text-xl font-bold text-black">Manual IAFR entry</h2>
+            <p className="mt-1 text-sm text-gray-500">2026 form structure - one section at a time</p>
+          </div>
+        </div>
+        <span className="inline-flex items-center gap-2 text-xs font-medium text-gray-500">
+          <Save className="h-4 w-4" /> {draftStatus}
+        </span>
+      </div>
+
+      <div className="divide-y divide-gray-200">
+        {iafrManualSections.map((section) => {
+          const isOpen = openSection === section.code;
+          const available = section.fields.length
+            + (section.code === 'A' ? iafrSacramentRows.length : 0)
+            + (section.code === 'F' ? specialCollections.length : 0);
+          return (
+            <section key={section.code}>
+              <button
+                type="button"
+                onClick={() => setOpenSection((current) => (current === section.code ? null : section.code))}
+                aria-expanded={isOpen}
+                className="flex w-full items-center gap-4 px-5 py-4 text-left transition hover:bg-gray-50 sm:px-6"
+              >
+                <span className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-md text-sm font-bold ${isOpen ? 'bg-gold-500 text-black' : 'bg-gray-100 text-gray-700'}`}>
+                  {section.code}
+                </span>
+                <span className="min-w-0 flex-1">
+                  <span className="block text-sm font-semibold text-black">{section.title}</span>
+                  <span className="mt-0.5 block truncate text-xs text-gray-500">{section.description}</span>
+                </span>
+                <span className="hidden text-right sm:block">
+                  <span className="block text-sm font-semibold text-black">{money.format(sectionTotals[section.code])}</span>
+                  <span className="text-[10px] uppercase tracking-[0.1em] text-gray-400">{completedBySection[section.code]} of {available} entered</span>
+                </span>
+                <ChevronDown className={`h-4 w-4 shrink-0 text-gray-500 transition-transform ${isOpen ? 'rotate-180' : ''}`} />
+              </button>
+
+              <AnimatePresence initial={false}>
+                {isOpen && (
+                  <motion.div
+                    key={`${section.code}-content`}
+                    initial={{ height: 0, opacity: 0 }}
+                    animate={{ height: 'auto', opacity: 1 }}
+                    exit={{ height: 0, opacity: 0 }}
+                    transition={{ height: { duration: 0.28, ease: [0.4, 0, 0.2, 1] }, opacity: { duration: 0.18 } }}
+                    className="overflow-hidden"
+                  >
+                    <div className="border-t border-gray-200 bg-[#fafafa] px-4 py-4 sm:px-6">
+                  {section.code === 'A' && (
+                    <div className="mb-4 overflow-x-auto rounded-lg border border-gray-200 bg-white">
+                      <div className="min-w-[1180px]">
+                        <div className="grid grid-cols-[minmax(220px,1fr)_120px_90px_100px_145px_135px_155px_135px] gap-2 border-b border-gray-200 bg-gray-50 px-4 py-2.5 text-[10px] font-bold uppercase tracking-[0.08em] text-gray-500">
+                          <span>Sacrament</span>
+                          <span>Prescribed rate</span>
+                          <span>Gratis</span>
+                          <span>Chargeable</span>
+                          <span>Total amount as prescribed</span>
+                          <span>Charge over/above</span>
+                          <span>Total amount as over/above</span>
+                          <span>Total amount</span>
+                        </div>
+                        {iafrSacramentRows.map((row) => {
+                          const rate = row.prescribedRate;
+                          const chargeable = numberValue(values, `${row.accountCode}.chargeable`);
+                          const overAbove = numberValue(values, `${row.accountCode}.overAboveRate`);
+                          const prescribedTotal = rate * chargeable;
+                          const overAboveTotal = overAbove * chargeable;
+                          const total = prescribedTotal + overAboveTotal;
+                          return (
+                            <div key={row.accountCode} className="grid grid-cols-[minmax(220px,1fr)_120px_90px_100px_145px_135px_155px_135px] items-center gap-2 border-b border-gray-100 px-4 py-2.5 last:border-b-0">
+                              <span><span className="block text-sm font-medium text-gray-900">{row.label}</span><span className="text-[10px] font-semibold text-gray-400">{row.accountCode}</span></span>
+                              <span
+                                title="Fixed prescribed rate from the approved IAFR template"
+                                className="flex h-9 items-center justify-end rounded-md border border-gray-200 bg-gray-100 px-3 text-sm font-semibold text-gray-800"
+                              >
+                                {money.format(rate)}
+                              </span>
+                              {['gratis', 'chargeable'].map((part) => (
+                                <input
+                                  key={part}
+                                  type="number"
+                                  min="0"
+                                  step={part === 'gratis' || part === 'chargeable' ? '1' : '0.01'}
+                                  value={values[`${row.accountCode}.${part}`] ?? ''}
+                                  onChange={(event) => setValue(`${row.accountCode}.${part}`, event.target.value)}
+                                  placeholder="0"
+                                  className="h-9 w-full rounded-md border border-gold-200 bg-gold-50/50 px-2 text-right text-xs font-semibold outline-none focus:border-gold-500 focus:ring-2 focus:ring-gold-500/20"
+                                />
+                              ))}
+                              <span className="flex h-9 items-center justify-end rounded-md bg-gray-100 px-3 text-sm font-semibold text-gray-800">{money.format(prescribedTotal)}</span>
+                              <input
+                                type="number"
+                                min="0"
+                                step="0.01"
+                                value={values[`${row.accountCode}.overAboveRate`] ?? ''}
+                                onChange={(event) => setValue(`${row.accountCode}.overAboveRate`, event.target.value)}
+                                placeholder="0.00"
+                                className="h-9 w-full rounded-md border border-gold-200 bg-gold-50/50 px-2 text-right text-xs font-semibold outline-none focus:border-gold-500 focus:ring-2 focus:ring-gold-500/20"
+                              />
+                              <span className="flex h-9 items-center justify-end rounded-md bg-gray-100 px-3 text-sm font-semibold text-gray-800">{money.format(overAboveTotal)}</span>
+                              <span className="flex h-9 items-center justify-end rounded-md bg-gray-900 px-3 text-sm font-semibold text-white">{money.format(total)}</span>
+                            </div>
+                          );
+                        })}
+                        <div className="grid grid-cols-[minmax(220px,1fr)_120px_90px_100px_145px_135px_155px_135px] items-center gap-2 border-t-2 border-gray-300 bg-gray-50 px-4 py-3">
+                          <strong className="text-sm uppercase tracking-[0.08em] text-black">Total</strong>
+                          <span />
+                          <span />
+                          <strong className="text-right text-sm text-gray-700">
+                            {iafrSacramentRows.reduce((sum, row) => sum + numberValue(values, `${row.accountCode}.chargeable`), 0)}
+                          </strong>
+                          <strong className="text-right text-sm text-gray-900">
+                            {money.format(iafrSacramentRows.reduce((sum, row) => sum + row.prescribedRate * numberValue(values, `${row.accountCode}.chargeable`), 0))}
+                          </strong>
+                          <span />
+                          <strong className="text-right text-sm text-gray-900">
+                            {money.format(iafrSacramentRows.reduce((sum, row) => sum + numberValue(values, `${row.accountCode}.overAboveRate`) * numberValue(values, `${row.accountCode}.chargeable`), 0))}
+                          </strong>
+                          <strong className="text-right text-sm text-black">{money.format(sectionTotals.A - section.fields.reduce((sum, field) => sum + numberValue(values, field.key), 0))}</strong>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {section.code === 'F' && (
+                    <div className="mb-4 overflow-hidden rounded-lg border border-gray-200 bg-white">
+                      <div className="border-b border-gray-200 bg-gray-50 px-4 py-3 sm:px-5">
+                        <div className="flex items-center justify-between gap-4">
+                          <div>
+                            <h3 className="text-sm font-semibold text-gray-900">Scheduled special collections</h3>
+                            <p className="mt-0.5 text-xs text-gray-500">Dates and collection names from the approved 2026 IAFR template.</p>
+                          </div>
+                          <span className="shrink-0 text-xs font-semibold text-gray-500">F.3.01</span>
+                        </div>
+                      </div>
+                      {specialCollections.length > 0 ? (
+                        <>
+                          {specialCollections.map((collection) => {
+                            const key = specialCollectionKey(collection.date);
+                            return (
+                              <label key={collection.date} className="grid gap-2 border-t border-gray-100 px-4 py-3 first:border-t-0 sm:grid-cols-[140px_minmax(0,1fr)_180px] sm:items-center sm:px-5">
+                                <span className="text-xs font-semibold text-gold-800">{collection.displayDate}</span>
+                                <span className="text-sm font-medium text-gray-900">{collection.label}</span>
+                                <span className="relative block">
+                                  <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-xs font-semibold text-gray-500">PHP</span>
+                                  <input
+                                    type="number"
+                                    min="0"
+                                    step="0.01"
+                                    value={values[key] ?? ''}
+                                    onChange={(event) => setValue(key, event.target.value)}
+                                    placeholder="0.00"
+                                    className="h-10 w-full rounded-md border border-gold-200 bg-gold-50/50 pl-12 pr-3 text-right text-sm font-semibold text-gray-900 outline-none transition focus:border-gold-500 focus:ring-2 focus:ring-gold-500/20"
+                                  />
+                                </span>
+                              </label>
+                            );
+                          })}
+                          <div className="flex items-center justify-between border-t border-gray-200 bg-gray-50 px-4 py-3 sm:px-5">
+                            <span className="text-xs font-semibold uppercase tracking-[0.08em] text-gray-500">Scheduled collections total</span>
+                            <strong className="text-sm text-gray-900">
+                              {money.format(specialCollections.reduce((sum, collection) => sum + numberValue(values, specialCollectionKey(collection.date)), 0))}
+                            </strong>
+                          </div>
+                        </>
+                      ) : (
+                        <p className="px-5 py-4 text-sm text-gray-500">No dated special-collection schedule is configured for this reporting period.</p>
+                      )}
+                    </div>
+                  )}
+
+                  <div className="overflow-hidden rounded-lg border border-gray-200 bg-white">
+                    {section.fields.map((field) => (
+                      <AmountInput key={field.key} field={field} value={values[field.key] ?? ''} onChange={(value) => setValue(field.key, value)} />
+                    ))}
+                  </div>
+
+                  <div className="mt-4 flex flex-col gap-3 rounded-lg border border-gray-200 bg-white px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
+                    <span className="flex items-center gap-2 text-xs font-medium text-gray-500"><Calculator className="h-4 w-4 text-gold-700" /> Calculated section subtotal</span>
+                    <strong className="text-base text-black">{money.format(sectionTotals[section.code])}</strong>
+                  </div>
+                    </div>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+            </section>
+          );
+        })}
+      </div>
+
+      <div className="border-t border-gray-200 bg-gray-50 px-5 py-4 sm:px-6">
+        {validationMessage && <p className="mb-3 text-sm font-medium text-red-700">{validationMessage}</p>}
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <p className="flex items-center gap-2 text-xs text-gray-500"><Check className="h-4 w-4 text-emerald-600" /> Entries will be written only to the parish submission sandbox.</p>
+          <button
+            type="button"
+            onClick={submit}
+            disabled={disabled || isSubmitting}
+            className="inline-flex h-10 items-center justify-center gap-2 rounded-md bg-black px-5 text-sm font-semibold text-white transition hover:bg-gray-800 disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            <Send className="h-4 w-4 text-gold-400" /> {isSubmitting ? 'Submitting test...' : 'Review and submit test'}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}

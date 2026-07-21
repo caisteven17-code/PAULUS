@@ -66,6 +66,32 @@ _AMOUNT_COLUMNS = (
 )
 
 
+class InstitutionDimensionMissingError(RuntimeError):
+    """A source institution has not reached the AWS analytics dimension yet."""
+
+
+def _resolve_institution_keys(institution_ids: list[str]) -> dict[str, int]:
+    unique_ids = sorted(set(str(value) for value in institution_ids))
+    if not unique_ids:
+        return {}
+    rows = analytics_db.fetch_query(
+        """
+        SELECT institution_id::text AS institution_id, institution_key
+        FROM shared_analytics.dim_institutions
+        WHERE institution_id = ANY(%s::uuid[])
+        """,
+        (unique_ids,),
+    )
+    resolved = {str(row["institution_id"]): int(row["institution_key"]) for row in rows}
+    missing_count = len(set(unique_ids) - set(resolved))
+    if missing_count:
+        raise InstitutionDimensionMissingError(
+            f"{missing_count} institution dimension mapping(s) missing; "
+            "run the institution synchronizer and retry"
+        )
+    return resolved
+
+
 def _clean_text(value: Any, *, case: str | None = None) -> str | None:
     if value is None:
         return None
@@ -164,7 +190,13 @@ def _upsert_rows(cursor, table: str, rows: list[dict], conflict_column: str) -> 
     )
 
 
-def _build_line_rows(record: dict[str, Any], lines: list[dict], accounts: dict[str, dict], run_id: str) -> list[dict]:
+def _build_line_rows(
+    record: dict[str, Any],
+    lines: list[dict],
+    accounts: dict[str, dict],
+    run_id: str,
+    institution_key: int,
+) -> list[dict]:
     month_number = _MONTH_NUMBERS[record["month"]]
     reporting_month = datetime(int(record["year"]), month_number, 1).date()
     transformed_at = datetime.now(timezone.utc)
@@ -188,6 +220,7 @@ def _build_line_rows(record: dict[str, Any], lines: list[dict], accounts: dict[s
                 "source_line_item_id": line["id"],
                 "source_record_id": record["id"],
                 "institution_id": record["institution_id"],
+                "institution_key": institution_key,
                 "reporting_month": reporting_month,
                 "source_account_title_id": line.get("account_title_id"),
                 "account_code": _clean_text(account.get("account_code")) if account else None,
@@ -218,7 +251,9 @@ def _build_line_rows(record: dict[str, Any], lines: list[dict], accounts: dict[s
     return rows
 
 
-def _build_record_row(record: dict[str, Any], line_rows: list[dict], run_id: str) -> dict:
+def _build_record_row(
+    record: dict[str, Any], line_rows: list[dict], run_id: str, institution_key: int
+) -> dict:
     flags = []
     if record.get("submission_batch_id") is None:
         flags.append("MISSING_SUBMISSION_BATCH")
@@ -249,6 +284,7 @@ def _build_record_row(record: dict[str, Any], line_rows: list[dict], run_id: str
     row = {
         "source_record_id": record["id"],
         "institution_id": record["institution_id"],
+        "institution_key": institution_key,
         "submission_batch_id": record.get("submission_batch_id"),
         "reporting_month": datetime(int(record["year"]), month_number, 1).date(),
         "reporting_year": int(record["year"]),
@@ -280,11 +316,11 @@ def _load_snapshot(record: dict[str, Any], record_row: dict, line_rows: list[dic
             cursor.execute(
                 """
                 DELETE FROM parish_silver.financial_records
-                WHERE institution_id = %s
+                WHERE institution_key = %s
                   AND reporting_month = %s
                   AND source_record_id <> %s
                 """,
-                (record_row["institution_id"], record_row["reporting_month"], record["id"]),
+                (record_row["institution_key"], record_row["reporting_month"], record["id"]),
             )
             _upsert_rows(cursor, "financial_records", [record_row], "source_record_id")
             cursor.execute(
@@ -295,7 +331,7 @@ def _load_snapshot(record: dict[str, Any], record_row: dict, line_rows: list[dic
         conn.commit()
 
 
-def _update_reporting_coverage(record: dict[str, Any], active: bool) -> None:
+def _update_reporting_coverage(record: dict[str, Any], institution_key: int, active: bool) -> None:
     reporting_month = datetime(
         int(record["year"]),
         _MONTH_NUMBERS[record["month"]],
@@ -305,10 +341,11 @@ def _update_reporting_coverage(record: dict[str, Any], active: bool) -> None:
         analytics_db.execute(
             """
             INSERT INTO parish_silver.reporting_coverage (
-              institution_id, reporting_month, availability_status,
+              institution_id, institution_key, reporting_month, availability_status,
               source_record_id, source_updated_at
-            ) VALUES (%s, %s, 'available', %s, %s)
+            ) VALUES (%s, %s, %s, 'available', %s, %s)
             ON CONFLICT (institution_id, reporting_month) DO UPDATE SET
+              institution_key = EXCLUDED.institution_key,
               availability_status = 'available',
               source_record_id = EXCLUDED.source_record_id,
               source_updated_at = EXCLUDED.source_updated_at,
@@ -319,6 +356,7 @@ def _update_reporting_coverage(record: dict[str, Any], active: bool) -> None:
             """,
             (
                 record["institution_id"],
+                institution_key,
                 reporting_month,
                 record["id"],
                 record["updated_at"],
@@ -342,9 +380,10 @@ def _update_reporting_coverage(record: dict[str, Any], active: bool) -> None:
     analytics_db.execute(
         """
         INSERT INTO parish_silver.reporting_coverage (
-          institution_id, reporting_month, availability_status
-        ) VALUES (%s, %s, 'unreviewed_missing')
+          institution_id, institution_key, reporting_month, availability_status
+        ) VALUES (%s, %s, %s, 'unreviewed_missing')
         ON CONFLICT (institution_id, reporting_month) DO UPDATE SET
+          institution_key = EXCLUDED.institution_key,
           availability_status = 'unreviewed_missing',
           source_record_id = NULL,
           source_updated_at = NULL,
@@ -353,7 +392,7 @@ def _update_reporting_coverage(record: dict[str, Any], active: bool) -> None:
           confirmed_at = NULL,
           assessed_at = now()
         """,
-        (record["institution_id"], reporting_month),
+        (record["institution_id"], institution_key, reporting_month),
     )
 
 
@@ -373,6 +412,10 @@ def run_silver_record(record_id: str) -> dict[str, Any]:
     counts: dict[str, Any] = {}
     try:
         record, lines, accounts = _fetch_source(record_id)
+        institution_key = (
+            _resolve_institution_keys([str(record["institution_id"])])[str(record["institution_id"])]
+            if record else None
+        )
         active = bool(record and record.get("is_current_version") and record.get("deleted_at") is None)
         if not active:
             analytics_db.execute(
@@ -382,12 +425,12 @@ def run_silver_record(record_id: str) -> dict[str, Any]:
             lines = []
             quality_status = "passed"
         else:
-            line_rows = _build_line_rows(record, lines, accounts, run_id)
-            record_row = _build_record_row(record, line_rows, run_id)
+            line_rows = _build_line_rows(record, lines, accounts, run_id, institution_key)
+            record_row = _build_record_row(record, line_rows, run_id, institution_key)
             _load_snapshot(record, record_row, line_rows)
             quality_status = record_row["quality_status"]
         if record:
-            _update_reporting_coverage(record, active)
+            _update_reporting_coverage(record, institution_key, active)
 
         target = analytics_db.fetch_query(
             """

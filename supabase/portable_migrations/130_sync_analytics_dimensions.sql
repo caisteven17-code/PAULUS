@@ -111,6 +111,8 @@ SET financial_record_id = EXCLUDED.financial_record_id,
 
 INSERT INTO parish_analytics.dim_parishes (
   institution_key,
+  institution_code,
+  institution_name,
   vicariate,
   district,
   cluster,
@@ -121,6 +123,8 @@ INSERT INTO parish_analytics.dim_parishes (
 )
 SELECT
   di.institution_key,
+  i.institution_code,
+  i.name,
   i.vicariate,
   i.district,
   i.cluster,
@@ -135,7 +139,9 @@ LEFT JOIN diocese.profiles pr ON pr.id = pd.assigned_priest_id
 WHERE i.institution_type = 'parish'
   AND i.deleted_at IS NULL
 ON CONFLICT (institution_key) DO UPDATE
-SET vicariate        = EXCLUDED.vicariate,
+SET institution_code = EXCLUDED.institution_code,
+    institution_name = EXCLUDED.institution_name,
+    vicariate        = EXCLUDED.vicariate,
     district         = EXCLUDED.district,
     cluster          = EXCLUDED.cluster,
     assigned_priest  = EXCLUDED.assigned_priest,

@@ -26,6 +26,8 @@ from psycopg import sql
 from psycopg.rows import dict_row
 from psycopg.types.json import Jsonb
 
+from app.config import LITURGICAL_CANONICAL_SOURCE
+
 logger = logging.getLogger(__name__)
 
 PROJECT_ROOT = Path(__file__).resolve().parents[4]
@@ -67,8 +69,39 @@ def _db_payload(row: dict[str, Any]) -> dict[str, Any]:
         "revision_payload",
     }
     payload = {key: row.get(key) for key in allowed}
-    payload["updated_at"] = datetime.now(timezone.utc).isoformat()
+    payload["updated_at"] = row.get("updated_at") or datetime.now(timezone.utc).isoformat()
     return payload
+
+
+def _publish_review_candidates(rows: list[dict[str, Any]]) -> int:
+    """Publish candidates to the Supabase-owned human approval workflow.
+
+    Existing approved rows are protected from collector overwrite. Pending or
+    rejected rows may be refreshed by a newer source comparison.
+    """
+    if not rows:
+        return 0
+    from app.services.supabase_client import get_table
+
+    published = 0
+    for row in rows:
+        payload = _db_payload(row)
+        existing_response = (
+            get_table("reference", "liturgical_calendar")
+            .select("id,review_status")
+            .eq("date", payload["date"])
+            .eq("source_name", payload["source_name"])
+            .limit(1)
+            .execute()
+        )
+        existing = (existing_response.data or [None])[0]
+        if existing and existing.get("review_status") in {"approved", "approved_with_revisions"}:
+            continue
+        if existing:
+            payload["id"] = existing["id"]
+        get_table("reference", "liturgical_calendar").upsert(payload).execute()
+        published += 1
+    return published
 
 
 def _staging_payload(row: dict[str, Any], run_id: str, action: str) -> dict[str, Any]:
@@ -101,14 +134,75 @@ def _staging_payload(row: dict[str, Any], run_id: str, action: str) -> dict[str,
     }
 
 
-def _upsert_batch(rows: list[dict[str, Any]], run_id: Optional[str] = None) -> int:
+def _upsert_authoritative_calendar(rows: list[dict[str, Any]]) -> int:
+    """Chunked Supabase-canonical refresh, including approval reversals."""
+    from app.services import analytics_db
+
+    dates = list({row["date"] for row in rows})
+    sources = list({row["source_name"] for row in rows})
+    source_ids = [row["id"] for row in rows if row.get("id")]
+    existing = analytics_db.fetch_query(
+        """
+        SELECT id::text AS id, date::text AS date, source_name
+        FROM reference.liturgical_calendar
+        WHERE (date = ANY(%s::date[]) AND source_name = ANY(%s::text[]))
+           OR id = ANY(%s::uuid[])
+        """,
+        (dates, sources, source_ids),
+    )
+    existing_by_id = {row["id"]: row["id"] for row in existing}
+    existing_by_key = {
+        (row["date"], row["source_name"]): row["id"] for row in existing
+    }
+
+    payloads: list[dict[str, Any]] = []
+    for row in rows:
+        source_id = str(row.get("id")) if row.get("id") else None
+        payload = _db_payload(row)
+        payload["id"] = (
+            existing_by_id.get(source_id)
+            or existing_by_key.get((payload["date"], payload["source_name"]))
+            or source_id
+        )
+        payloads.append(payload)
+
+    for offset in range(0, len(payloads), _LITURGICAL_CHUNK):
+        analytics_db.upsert_rows(
+            "reference",
+            "liturgical_calendar",
+            payloads[offset : offset + _LITURGICAL_CHUNK],
+            "id",
+        )
+    analytics_db.execute(
+        "SELECT * FROM parish_analytics.refresh_liturgical_calendar_analytics()"
+    )
+    return len(payloads)
+
+
+def _upsert_batch(
+    rows: list[dict[str, Any]],
+    run_id: Optional[str] = None,
+    *,
+    authoritative_approval: bool = False,
+) -> int:
     if not rows:
         return 0
 
     from app.services import analytics_db
 
+    if authoritative_approval:
+        return _upsert_authoritative_calendar(rows)
+
+    canonical_in_supabase = (
+        LITURGICAL_CANONICAL_SOURCE == "supabase" and not authoritative_approval
+    )
+    if canonical_in_supabase:
+        published = _publish_review_candidates(rows)
+        logger.info("Published %d liturgical candidates to Supabase for review", published)
+
     dates = list({row["date"] for row in rows})
     sources = list({row["source_name"] for row in rows})
+    source_ids = [row["id"] for row in rows if authoritative_approval and row.get("id")]
 
     with analytics_db.get_pool().connection() as conn:
         with conn.cursor(row_factory=dict_row) as cur:
@@ -116,14 +210,16 @@ def _upsert_batch(rows: list[dict[str, Any]], run_id: Optional[str] = None) -> i
                 """
                 SELECT id, date::text AS date, source_name, review_status
                 FROM reference.liturgical_calendar
-                WHERE date = ANY(%s::date[]) AND source_name = ANY(%s::text[])
+                WHERE (date = ANY(%s::date[]) AND source_name = ANY(%s::text[]))
+                   OR id = ANY(%s::uuid[])
                 """,
-                (dates, sources),
+                (dates, sources, source_ids),
             )
-            existing_map = {
+            existing_by_key = {
                 (record["date"], record["source_name"]): (str(record["id"]), record["review_status"])
                 for record in cur.fetchall()
             }
+            existing_by_id = {value[0]: value for value in existing_by_key.values()}
 
             inserts: list[dict[str, Any]] = []
             updates: list[tuple[str, dict[str, Any]]] = []
@@ -132,10 +228,17 @@ def _upsert_batch(rows: list[dict[str, Any]], run_id: Optional[str] = None) -> i
             for row in rows:
                 payload = _db_payload(row)
                 key = (payload["date"], payload["source_name"])
-                existing = existing_map.get(key)
+                source_id = str(row.get("id")) if row.get("id") else None
+                existing = (
+                    existing_by_id.get(source_id) if authoritative_approval and source_id
+                    else existing_by_key.get(key)
+                )
                 if existing:
                     record_id, existing_status = existing
-                    if existing_status in {"approved", "approved_with_revisions"}:
+                    if (
+                        existing_status in {"approved", "approved_with_revisions"}
+                        and not authoritative_approval
+                    ):
                         action = "skip_approved"
                         skipped += 1
                     else:
@@ -143,9 +246,17 @@ def _upsert_batch(rows: list[dict[str, Any]], run_id: Optional[str] = None) -> i
                         updates.append((record_id, payload))
                 else:
                     action = "insert"
+                    if authoritative_approval and source_id:
+                        payload["id"] = source_id
                     inserts.append(payload)
                 if run_id:
                     staging_rows.append(_staging_payload(row, run_id, action))
+
+            # With Supabase ownership, AWS receives raw staging now and only
+            # receives canonical rows later through the approval synchronizer.
+            if canonical_in_supabase:
+                inserts = []
+                updates = []
 
             staging_id_map: dict[tuple[str, str], str] = {}
             for payload in staging_rows:
@@ -206,6 +317,48 @@ def _upsert_batch(rows: list[dict[str, Any]], run_id: Optional[str] = None) -> i
     return len(rows)
 
 
+def sync_approved_from_supabase() -> int:
+    """Refresh AWS from Supabase canonical rows, including approval reversals."""
+    from app.services.supabase_client import get_table
+
+    rows: list[dict[str, Any]] = []
+    offset = 0
+    while True:
+        response = (
+            get_table("reference", "liturgical_calendar")
+            .select("*")
+            .order("updated_at")
+            .order("id")
+            .range(offset, offset + _LITURGICAL_CHUNK - 1)
+            .execute()
+        )
+        batch = response.data or []
+        rows.extend(batch)
+        if len(batch) < _LITURGICAL_CHUNK:
+            break
+        offset += _LITURGICAL_CHUNK
+    return _upsert_batch(rows, authoritative_approval=True)
+
+
+async def run_approval_sync_forever(stop_event) -> None:
+    """Periodically publish the canonical Supabase calendar into AWS."""
+    import asyncio
+
+    from app.config import LITURGICAL_APPROVAL_POLL_SECONDS
+
+    while not stop_event.is_set():
+        try:
+            await asyncio.to_thread(sync_approved_from_supabase)
+        except Exception:
+            logger.exception("Liturgical approval synchronization failed")
+        try:
+            await asyncio.wait_for(
+                stop_event.wait(), timeout=LITURGICAL_APPROVAL_POLL_SECONDS
+            )
+        except TimeoutError:
+            pass
+
+
 def _adapt(value: Any) -> Any:
     return Jsonb(value) if isinstance(value, (dict, list)) else value
 
@@ -253,7 +406,15 @@ if __name__ == "__main__":
         action="store_true",
         help="Only load rows already approved by a human reviewer",
     )
+    parser.add_argument(
+        "--sync-approved-from-supabase",
+        action="store_true",
+        help="Refresh AWS analytics from the Supabase-approved canonical calendar",
+    )
     args = parser.parse_args()
 
-    loaded = load_from_file(Path(args.file), include_pending=not args.approved_only)
+    if args.sync_approved_from_supabase:
+        loaded = sync_approved_from_supabase()
+    else:
+        loaded = load_from_file(Path(args.file), include_pending=not args.approved_only)
     print(f"Loaded {loaded} rows into AWS reference.liturgical_calendar")

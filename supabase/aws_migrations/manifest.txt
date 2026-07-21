@@ -169,9 +169,21 @@ aws_migrations/059_remove_other_collections_output.sql
 aws_migrations/060_total_remittance_formula.sql
 aws_migrations/061_pipeline_monitoring_and_retries.sql
 aws_migrations/062_parish_liturgical_calendar_analytics.sql
+aws_migrations/063_restore_collections_other_net.sql
+aws_migrations/064_rekey_parish_and_institution_dimensions.sql
+aws_migrations/065_add_parish_dimension_identity.sql
+aws_migrations/066_add_ordered_parish_dimension_view.sql
+aws_migrations/067_reorder_parish_dimension_columns.sql
+aws_migrations/068_decouple_institution_dimension.sql
+aws_migrations/069_repoint_parish_silver_institution_keys.sql
+aws_migrations/070_decouple_parish_dimension_refresh.sql
+aws_migrations/071_decouple_weather_ownership.sql
+aws_migrations/072_add_ukmo_humidity_validation.sql
+aws_migrations/073_prepare_diocese_retirement.sql
+aws_migrations/074_decouple_remaining_operational_mirrors.sql
+aws_migrations/075_school_seminary_silver.sql
 
 # Analytics refresh — run last, after all schema DDL above (see note near 125).
-portable_migrations/130_sync_analytics_dimensions.sql
-portable_migrations/140_refresh_parish_analytics.sql
-portable_migrations/150_refresh_school_analytics.sql
-portable_migrations/160_refresh_seminary_analytics.sql
+# Phase 4: these legacy refresh scripts are intentionally excluded because they
+# read the duplicated AWS diocese operational schema. Controlled analytics
+# services now populate dimensions and facts after schema migrations complete.

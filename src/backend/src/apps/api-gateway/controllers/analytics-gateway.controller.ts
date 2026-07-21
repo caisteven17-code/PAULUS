@@ -135,4 +135,9 @@ export class AnalyticsGatewayController {
   async cleanIafrSubmission(@Req() req: Request, @Res({ passthrough: true }) res: Response) {
     return proxyToPython(req, res, '/iafr/clean-submission', 'POST');
   }
+
+  @Post('iafr/clean-submission-test')
+  async cleanIafrSubmissionTest(@Req() req: Request, @Res({ passthrough: true }) res: Response) {
+    return proxyToPython(req, res, '/iafr/clean-submission-test', 'POST');
+  }
 }

@@ -20,4 +20,8 @@ out/
 *.tsbuildinfo
 testing/
 .cache/
+backups/*.dump
+backups/*.zip
+backups/*.json
+backups/supabase_*/
 

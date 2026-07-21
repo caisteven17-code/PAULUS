@@ -2,9 +2,18 @@
 
 export type SubmissionInstitutionType = 'parish' | 'seminary' | 'school';
 
-export type SubmissionStepId = 'upload' | 'cleaning' | 'anomaly' | 'validation' | 'loading' | 'success';
+export type SubmissionStepId =
+  | 'upload'
+  | 'cleaning'
+  | 'anomaly'
+  | 'validation'
+  | 'calculation'
+  | 'mapping'
+  | 'loading'
+  | 'reconciliation'
+  | 'success';
 
-export type SubmissionFlowState = 'idle' | 'running' | 'success' | 'anomaly' | 'error';
+export type SubmissionFlowState = 'idle' | 'running' | 'success' | 'warning' | 'anomaly' | 'error';
 
 export type AnomalySimulationMode = 'auto' | 'force-clean' | 'force-anomaly';
 

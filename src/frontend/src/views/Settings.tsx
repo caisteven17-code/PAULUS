@@ -54,7 +54,6 @@ import { DataManagementControl } from '../components/settings/DataManagementCont
 import { LiturgicalValidatorControl } from '../components/settings/LiturgicalValidatorControl';
 import { EntityManagementControl } from '../components/settings/EntityManagementControl';
 import { ParishClassificationLogic } from '../components/settings/ParishClassificationLogic';
-import { DashboardHeader } from '../components/layout/DashboardHeader';
 import { getAccessRoleLabel, getAppRole, normalizeAccessRole } from '../lib/access';
 import { usePermissions } from '../hooks/usePermissions';
 import { roundedField, selectField } from '../lib/formStyles';
@@ -223,7 +222,8 @@ export function Settings({ onBack, onLogout, onNavigate, role = 'bishop', initia
         status: u.status || 'active',
         entityId: u.entityId,
         entityType: u.entityType,
-        birthday: u.birthday || u.birthDate || u.dateOfBirth || u.user_metadata?.birthday || u.user_metadata?.birthDate || '',
+        birthday:
+          u.birthday || u.birthDate || u.dateOfBirth || u.user_metadata?.birthday || u.user_metadata?.birthDate || '',
         avatarUrl: u.avatarUrl || u.photoURL || '',
         onboardingCompleted:
           u.onboardingCompleted === true ||
@@ -313,13 +313,16 @@ export function Settings({ onBack, onLogout, onNavigate, role = 'bishop', initia
     show: false,
     message: '',
   });
-  const [duplicatePriestModal, setDuplicatePriestModal] = useState<{ open: boolean; existingPriest: string; existingPriestEmail: string; parishName: string; onProceed: () => void }>({ open: false, existingPriest: '', existingPriestEmail: '', parishName: '', onProceed: () => {} });
-  const [showPasswordSuccess, setShowPasswordSuccess] = useState(false);
+  const [duplicatePriestModal, setDuplicatePriestModal] = useState<{
+    open: boolean;
+    existingPriest: string;
+    existingPriestEmail: string;
+    parishName: string;
+    onProceed: () => void;
+  }>({ open: false, existingPriest: '', existingPriestEmail: '', parishName: '', onProceed: () => {} });
   const [showProfileSuccess, setShowProfileSuccess] = useState(false);
-  const [passwords, setPasswords] = useState({ current: '', new: '' });
-  // Profile view/edit mode + password visibility + email-change OTP
+  // Profile view/edit mode + email-change OTP
   const [isEditingProfile, setIsEditingProfile] = useState(false);
-  const [pwVisible, setPwVisible] = useState({ current: false, new: false });
   const [emailOtp, setEmailOtp] = useState<{
     open: boolean;
     pendingEmail: string;
@@ -411,38 +414,12 @@ export function Settings({ onBack, onLogout, onNavigate, role = 'bishop', initia
     };
   });
 
-  const handleUpdatePassword = async () => {
-    if (!passwords.new) return;
-    try {
-      // Update via Supabase Auth (works when logged in with a real Supabase session)
-      const { error } = await supabaseBrowser.auth.updateUser({ password: passwords.new });
-      if (error) throw error;
-    } catch {
-      // Also update the localStorage demo record so offline sessions work
-      const currentUser = auth.currentUser;
-      if (currentUser) {
-        localStorage.setItem(
-          'currentUser',
-          JSON.stringify({
-            ...currentUser,
-            passwordUpdatedAt: new Date().toISOString(),
-          }),
-        );
-      }
-    }
-    setShowPasswordSuccess(true);
-    setPasswords({ current: '', new: '' });
-    setTimeout(() => setShowPasswordSuccess(false), 3000);
-  };
-
   // Persist profile metadata using a specific email (the email only changes once
   // the OTP is verified).
   const persistProfile = async (emailToUse: string) => {
     const currentUser = auth.currentUser || {};
     const displayName =
-      [profileForm.firstName, profileForm.lastName].filter(Boolean).join(' ') ||
-      currentUser.displayName ||
-      emailToUse;
+      [profileForm.firstName, profileForm.lastName].filter(Boolean).join(' ') || currentUser.displayName || emailToUse;
     const updatedUser = {
       ...currentUser,
       ...profileForm,
@@ -732,9 +709,7 @@ export function Settings({ onBack, onLogout, onNavigate, role = 'bishop', initia
 
   const institutionNameSuggestions = React.useMemo(() => {
     const query = formState.entity.trim().toLowerCase();
-    const matches = query
-      ? institutionNames.filter((i) => i.name.toLowerCase().includes(query))
-      : institutionNames;
+    const matches = query ? institutionNames.filter((i) => i.name.toLowerCase().includes(query)) : institutionNames;
 
     return matches.slice(0, 8);
   }, [formState.entity, institutionNames]);
@@ -809,11 +784,7 @@ export function Settings({ onBack, onLogout, onNavigate, role = 'bishop', initia
       const accessRole = normalizeAccessRole(formState.role);
 
       // One-priest-per-parish rule: warn before creating/reassigning a second parish_priest.
-      if (
-        accessRole === 'parish_priest' &&
-        formState.institutionType === 'parish' &&
-        formState.entity
-      ) {
+      if (accessRole === 'parish_priest' && formState.institutionType === 'parish' && formState.entity) {
         // Account rows carry the institution under `entity` (and the normalized
         // role under `roleId`) — matching on the non-existent `a.entityName`
         // with the role label is why the warning never fired and duplicates
@@ -836,8 +807,16 @@ export function Settings({ onBack, onLogout, onNavigate, role = 'bishop', initia
               onProceed: resolve,
             });
             setTimeout(() => reject(new Error('DUPLICATE_CANCELLED')), 300_000);
-          }).catch(() => { throw new Error('DUPLICATE_CANCELLED'); });
-          setDuplicatePriestModal({ open: false, existingPriest: '', existingPriestEmail: '', parishName: '', onProceed: () => {} });
+          }).catch(() => {
+            throw new Error('DUPLICATE_CANCELLED');
+          });
+          setDuplicatePriestModal({
+            open: false,
+            existingPriest: '',
+            existingPriestEmail: '',
+            parishName: '',
+            onProceed: () => {},
+          });
         }
       }
 
@@ -897,7 +876,13 @@ export function Settings({ onBack, onLogout, onNavigate, role = 'bishop', initia
       await fetchAccounts();
     } catch (err: any) {
       if (err?.message === 'DUPLICATE_CANCELLED') {
-        setDuplicatePriestModal({ open: false, existingPriest: '', existingPriestEmail: '', parishName: '', onProceed: () => {} });
+        setDuplicatePriestModal({
+          open: false,
+          existingPriest: '',
+          existingPriestEmail: '',
+          parishName: '',
+          onProceed: () => {},
+        });
         return;
       }
       console.error('Error saving account, falling back to local storage:', err);
@@ -1452,7 +1437,9 @@ export function Settings({ onBack, onLogout, onNavigate, role = 'bishop', initia
                           />
                         ) : (
                           <div className="w-16 h-16 rounded-2xl bg-[#D4AF37] text-black flex items-center justify-center text-2xl font-black shadow-lg shadow-[#D4AF37]/25">
-                            {getInitials(`${profileForm.firstName} ${profileForm.lastName}`.trim() || profileForm.email)}
+                            {getInitials(
+                              `${profileForm.firstName} ${profileForm.lastName}`.trim() || profileForm.email,
+                            )}
                           </div>
                         )}
                         {isEditingProfile && (
@@ -1534,46 +1521,65 @@ export function Settings({ onBack, onLogout, onNavigate, role = 'bishop', initia
                   </div>
 
                   <div className="p-8 sm:p-10">
-                  {showProfileSuccess && (
-                    <div className="mb-8 p-5 bg-emerald-50 border border-emerald-100 text-emerald-700 rounded-2xl text-sm font-bold animate-in fade-in slide-in-from-top-2 flex items-center gap-3">
-                      <div className="w-8 h-8 bg-emerald-100 rounded-full flex items-center justify-center flex-shrink-0">
-                        <ShieldCheck className="w-5 h-5" />
+                    {showProfileSuccess && (
+                      <div className="mb-8 p-5 bg-emerald-50 border border-emerald-100 text-emerald-700 rounded-2xl text-sm font-bold animate-in fade-in slide-in-from-top-2 flex items-center gap-3">
+                        <div className="w-8 h-8 bg-emerald-100 rounded-full flex items-center justify-center flex-shrink-0">
+                          <ShieldCheck className="w-5 h-5" />
+                        </div>
+                        Profile updated successfully!
                       </div>
-                      Profile updated successfully!
-                    </div>
-                  )}
+                    )}
 
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    {[
-                      { id: 'firstName', label: 'First Name', type: 'text', placeholder: 'First name' },
-                      { id: 'lastName', label: 'Last Name', type: 'text', placeholder: 'Last name' },
-                      { id: 'nickName', label: 'Nick Name', type: 'text', placeholder: 'Preferred name' },
-                      { id: 'email', label: 'Email Address', type: 'email', placeholder: 'name@diocese.ph' },
-                      { id: 'contactNumber', label: 'Contact Number', type: 'tel', placeholder: '+63 900 000 0000' },
-                      { id: 'birthday', label: 'Birthday', type: 'date', placeholder: '' },
-                      {
-                        id: 'emergencyContact',
-                        label: 'Emergency Contact',
-                        type: 'text',
-                        placeholder: 'Name and number',
-                      },
-                    ].map((field) => (
-                      <div key={field.id} className="space-y-2">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                      {[
+                        { id: 'firstName', label: 'First Name', type: 'text', placeholder: 'First name' },
+                        { id: 'lastName', label: 'Last Name', type: 'text', placeholder: 'Last name' },
+                        { id: 'nickName', label: 'Nick Name', type: 'text', placeholder: 'Preferred name' },
+                        { id: 'email', label: 'Email Address', type: 'email', placeholder: 'name@diocese.ph' },
+                        { id: 'contactNumber', label: 'Contact Number', type: 'tel', placeholder: '+63 900 000 0000' },
+                        { id: 'birthday', label: 'Birthday', type: 'date', placeholder: '' },
+                        {
+                          id: 'emergencyContact',
+                          label: 'Emergency Contact',
+                          type: 'text',
+                          placeholder: 'Name and number',
+                        },
+                      ].map((field) => (
+                        <div key={field.id} className="space-y-2">
+                          <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest ml-1">
+                            {field.label}
+                            {field.id === 'email' && isEditingProfile && (
+                              <span className="ml-1.5 normal-case font-medium text-gray-300">(verified by code)</span>
+                            )}
+                          </label>
+                          <input
+                            type={field.type}
+                            value={(profileForm as any)[field.id]}
+                            disabled={!isEditingProfile}
+                            max={field.type === 'date' ? new Date().toISOString().split('T')[0] : undefined}
+                            onChange={(event) =>
+                              setProfileForm((prev) => ({ ...prev, [field.id]: event.target.value }))
+                            }
+                            placeholder={field.placeholder}
+                            className={`w-full px-5 py-4 rounded-2xl border text-gray-900 transition-all font-medium placeholder:text-gray-300 ${
+                              isEditingProfile
+                                ? 'bg-white border-slate-200 shadow-sm focus:outline-none focus:border-[#D4AF37] focus:ring-4 focus:ring-[#D4AF37]/10'
+                                : 'cursor-default border-slate-100 bg-slate-50 text-gray-700'
+                            }`}
+                          />
+                        </div>
+                      ))}
+
+                      <div className="md:col-span-2 space-y-2">
                         <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest ml-1">
-                          {field.label}
-                          {field.id === 'email' && isEditingProfile && (
-                            <span className="ml-1.5 normal-case font-medium text-gray-300">
-                              (verified by code)
-                            </span>
-                          )}
+                          Address
                         </label>
                         <input
-                          type={field.type}
-                          value={(profileForm as any)[field.id]}
+                          type="text"
+                          value={profileForm.address}
                           disabled={!isEditingProfile}
-                          max={field.type === 'date' ? new Date().toISOString().split('T')[0] : undefined}
-                          onChange={(event) => setProfileForm((prev) => ({ ...prev, [field.id]: event.target.value }))}
-                          placeholder={field.placeholder}
+                          onChange={(event) => setProfileForm((prev) => ({ ...prev, address: event.target.value }))}
+                          placeholder="Complete address"
                           className={`w-full px-5 py-4 rounded-2xl border text-gray-900 transition-all font-medium placeholder:text-gray-300 ${
                             isEditingProfile
                               ? 'bg-white border-slate-200 shadow-sm focus:outline-none focus:border-[#D4AF37] focus:ring-4 focus:ring-[#D4AF37]/10'
@@ -1581,54 +1587,32 @@ export function Settings({ onBack, onLogout, onNavigate, role = 'bishop', initia
                           }`}
                         />
                       </div>
-                    ))}
 
-                    <div className="md:col-span-2 space-y-2">
-                      <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest ml-1">
-                        Address
-                      </label>
-                      <input
-                        type="text"
-                        value={profileForm.address}
-                        disabled={!isEditingProfile}
-                        onChange={(event) => setProfileForm((prev) => ({ ...prev, address: event.target.value }))}
-                        placeholder="Complete address"
-                        className={`w-full px-5 py-4 rounded-2xl border text-gray-900 transition-all font-medium placeholder:text-gray-300 ${
-                          isEditingProfile
-                            ? 'bg-white border-slate-200 shadow-sm focus:outline-none focus:border-[#D4AF37] focus:ring-4 focus:ring-[#D4AF37]/10'
-                            : 'cursor-default border-slate-100 bg-slate-50 text-gray-700'
-                        }`}
-                      />
-                    </div>
-
-                    <div className="md:col-span-2 space-y-2">
-                      <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest ml-1">
-                        Additional Notes
-                      </label>
-                      <textarea
-                        value={profileForm.notes}
-                        disabled={!isEditingProfile}
-                        onChange={(event) => setProfileForm((prev) => ({ ...prev, notes: event.target.value }))}
-                        placeholder="Office hours, alternate contact, or other profile notes"
-                        rows={4}
-                        className={`w-full px-5 py-4 rounded-2xl border text-gray-900 transition-all font-medium placeholder:text-gray-300 resize-none ${
-                          isEditingProfile
-                            ? 'bg-white border-slate-200 shadow-sm focus:outline-none focus:border-[#D4AF37] focus:ring-4 focus:ring-[#D4AF37]/10'
-                            : 'cursor-default border-slate-100 bg-slate-50 text-gray-700'
-                        }`}
-                      />
+                      <div className="md:col-span-2 space-y-2">
+                        <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest ml-1">
+                          Additional Notes
+                        </label>
+                        <textarea
+                          value={profileForm.notes}
+                          disabled={!isEditingProfile}
+                          onChange={(event) => setProfileForm((prev) => ({ ...prev, notes: event.target.value }))}
+                          placeholder="Office hours, alternate contact, or other profile notes"
+                          rows={4}
+                          className={`w-full px-5 py-4 rounded-2xl border text-gray-900 transition-all font-medium placeholder:text-gray-300 resize-none ${
+                            isEditingProfile
+                              ? 'bg-white border-slate-200 shadow-sm focus:outline-none focus:border-[#D4AF37] focus:ring-4 focus:ring-[#D4AF37]/10'
+                              : 'cursor-default border-slate-100 bg-slate-50 text-gray-700'
+                          }`}
+                        />
+                      </div>
                     </div>
                   </div>
-                  </div>
-
                 </form>
 
                 <div className="space-y-8">
                   <div className="overflow-hidden rounded-[32px] border border-slate-200 bg-white shadow-[0_18px_45px_rgba(15,23,42,0.06)]">
                     <div className="border-b border-slate-100 bg-gradient-to-br from-[#FFF8E5] to-white p-6">
-                      <p className="text-[10px] font-black uppercase tracking-[0.2em] text-[#B5952F]">
-                        Access Summary
-                      </p>
+                      <p className="text-[10px] font-black uppercase tracking-[0.2em] text-[#B5952F]">Access Summary</p>
                       <h4 className="mt-1 text-xl font-serif font-bold text-gray-900">Account Details</h4>
                     </div>
                     <div className="space-y-4 p-6">
@@ -1664,72 +1648,21 @@ export function Settings({ onBack, onLogout, onNavigate, role = 'bishop', initia
                   </div>
 
                   <div className="rounded-[32px] border border-slate-800 bg-slate-950 p-8 text-white shadow-xl shadow-slate-950/10">
-                    <h4 className="text-lg font-bold text-white mb-2">Change Password</h4>
-                    <p className="text-sm text-white/55 mb-6">Update the password used for this account.</p>
-
-                    {showPasswordSuccess && (
-                      <div className="mb-6 p-4 bg-emerald-400/10 border border-emerald-300/20 text-emerald-100 rounded-2xl text-sm font-bold flex items-center gap-3">
-                        <ShieldCheck className="w-5 h-5" />
-                        Password updated successfully!
-                      </div>
-                    )}
-
-                    <div className="space-y-5">
-                      <div className="space-y-2">
-                        <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest ml-1">
-                          Current Password
-                        </label>
-                        <div className="relative">
-                          <input
-                            type={pwVisible.current ? 'text' : 'password'}
-                            value={passwords.current}
-                            onChange={(event) => setPasswords((prev) => ({ ...prev, current: event.target.value }))}
-                            placeholder="••••••••"
-                            className="w-full px-5 py-4 pr-12 rounded-2xl border border-white/10 bg-slate-900 text-white focus:outline-none focus:border-[#D4AF37] focus:ring-4 focus:ring-[#D4AF37]/15 transition-all font-medium placeholder:text-white/30"
-                          />
-                          <button
-                            type="button"
-                            onClick={() => setPwVisible((p) => ({ ...p, current: !p.current }))}
-                            className="absolute right-4 top-1/2 -translate-y-1/2 text-white/45 hover:text-white transition-colors"
-                            tabIndex={-1}
-                            aria-label={pwVisible.current ? 'Hide password' : 'Show password'}
-                          >
-                            {pwVisible.current ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
-                          </button>
-                        </div>
-                      </div>
-                      <div className="space-y-2">
-                        <label className="text-[10px] font-bold text-white/45 uppercase tracking-widest ml-1">
-                          New Password
-                        </label>
-                        <div className="relative">
-                          <input
-                            type={pwVisible.new ? 'text' : 'password'}
-                            value={passwords.new}
-                            onChange={(event) => setPasswords((prev) => ({ ...prev, new: event.target.value }))}
-                            placeholder="••••••••"
-                            className="w-full px-5 py-4 pr-12 rounded-2xl border border-white/10 bg-slate-900 text-white focus:outline-none focus:border-[#D4AF37] focus:ring-4 focus:ring-[#D4AF37]/15 transition-all font-medium placeholder:text-white/30"
-                          />
-                          <button
-                            type="button"
-                            onClick={() => setPwVisible((p) => ({ ...p, new: !p.new }))}
-                            className="absolute right-4 top-1/2 -translate-y-1/2 text-white/45 hover:text-white transition-colors"
-                            tabIndex={-1}
-                            aria-label={pwVisible.new ? 'Hide password' : 'Show password'}
-                          >
-                            {pwVisible.new ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
-                          </button>
-                        </div>
-                      </div>
-                      <button
-                        type="button"
-                        onClick={handleUpdatePassword}
-                        className="w-full bg-[#D4AF37] text-slate-950 px-8 py-4 rounded-2xl font-bold hover:bg-[#E2BF43] transition-all flex items-center justify-center gap-3 active:scale-[0.98] shadow-lg shadow-[#D4AF37]/20"
-                      >
-                        <Save className="w-5 h-5" />
-                        Update Password
-                      </button>
+                    <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-[#D4AF37] text-slate-950">
+                      <Shield className="h-5 w-5" />
                     </div>
+                    <h4 className="mt-5 text-lg font-bold text-white">Password & Security</h4>
+                    <p className="mt-2 text-sm leading-relaxed text-white/55">
+                      Verify your current password and choose a stronger replacement on the secure password page.
+                    </p>
+                    <button
+                      type="button"
+                      onClick={() => onNavigate?.('change-password')}
+                      className="mt-6 flex w-full items-center justify-between rounded-2xl bg-[#D4AF37] px-5 py-4 font-bold text-slate-950 transition-all hover:bg-[#E2BF43] active:scale-[0.98]"
+                    >
+                      Change Password
+                      <ArrowRight className="h-5 w-5" />
+                    </button>
                   </div>
                 </div>
 
@@ -1743,8 +1676,9 @@ export function Settings({ onBack, onLogout, onNavigate, role = 'bishop', initia
                         </p>
                         <h3 className="mt-1 font-serif text-2xl font-bold">Enter the 6-digit code</h3>
                         <p className="mt-1 text-sm text-white/55">
-                          We sent a verification code to <span className="font-bold text-white">{emailOtp.pendingEmail}</span>.
-                          Your email won’t change until the code is confirmed.
+                          We sent a verification code to{' '}
+                          <span className="font-bold text-white">{emailOtp.pendingEmail}</span>. Your email won’t change
+                          until the code is confirmed.
                         </p>
                       </div>
                       <div className="space-y-5 p-6">
@@ -2100,7 +2034,10 @@ export function Settings({ onBack, onLogout, onNavigate, role = 'bishop', initia
                           setTypeFilter(e.target.value);
                           setInstitutionFilter('all');
                         }}
-                        className={selectField(typeFilter !== 'all', 'h-11 w-full rounded-2xl px-4 text-sm font-bold capitalize')}
+                        className={selectField(
+                          typeFilter !== 'all',
+                          'h-11 w-full rounded-2xl px-4 text-sm font-bold capitalize',
+                        )}
                       >
                         <option value="all">All types</option>
                         <option value="diocese">Diocese</option>
@@ -2114,7 +2051,10 @@ export function Settings({ onBack, onLogout, onNavigate, role = 'bishop', initia
                       <select
                         value={institutionFilter}
                         onChange={(e) => setInstitutionFilter(e.target.value)}
-                        className={selectField(institutionFilter !== 'all', 'h-11 w-full rounded-2xl px-4 text-sm font-bold')}
+                        className={selectField(
+                          institutionFilter !== 'all',
+                          'h-11 w-full rounded-2xl px-4 text-sm font-bold',
+                        )}
                       >
                         <option value="all">All institutions</option>
                         {accountInstitutionOptions.map((name) => (
@@ -2421,56 +2361,29 @@ export function Settings({ onBack, onLogout, onNavigate, role = 'bishop', initia
               <div className="bg-white rounded-[32px] shadow-sm border border-gray-100 p-10">
                 <div className="space-y-1 mb-10">
                   <h3 className="text-3xl font-bold text-gray-900">Account Security</h3>
-                  <p className="text-sm text-gray-500 font-medium">Update your password and manage account access.</p>
+                  <p className="text-sm text-gray-500 font-medium">
+                    Manage the credentials used to protect your account.
+                  </p>
                 </div>
 
                 <div className="max-w-xl">
-                  <div className="bg-gray-50/50 rounded-[32px] p-10 border border-gray-100 relative overflow-hidden">
-                    <div className="absolute top-0 right-0 w-32 h-32 bg-[#D4AF37]/5 rounded-full -mr-16 -mt-16 blur-2xl"></div>
-                    <h4 className="text-lg font-bold text-gray-900 mb-8 relative z-10">Change Account Password</h4>
-
-                    {showPasswordSuccess && (
-                      <div className="mb-8 p-5 bg-emerald-50 border border-emerald-100 text-emerald-700 rounded-2xl text-sm font-bold animate-in fade-in slide-in-from-top-2 flex items-center gap-3 relative z-10">
-                        <div className="w-8 h-8 bg-emerald-100 rounded-full flex items-center justify-center flex-shrink-0">
-                          <ShieldCheck className="w-5 h-5" />
-                        </div>
-                        Password updated successfully!
-                      </div>
-                    )}
-
-                    <div className="space-y-6 mb-10 relative z-10">
-                      <div className="space-y-2">
-                        <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest ml-1">
-                          Current Password
-                        </label>
-                        <input
-                          type="password"
-                          placeholder="••••••••"
-                          value={passwords.current}
-                          onChange={(e) => setPasswords((prev) => ({ ...prev, current: e.target.value }))}
-                          className="w-full px-5 py-4 bg-white border border-gray-200 rounded-2xl text-gray-900 focus:outline-none focus:border-[#D4AF37] focus:ring-4 focus:ring-[#D4AF37]/10 transition-all font-medium placeholder:text-gray-300"
-                        />
-                      </div>
-                      <div className="space-y-2">
-                        <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest ml-1">
-                          New Password
-                        </label>
-                        <input
-                          type="password"
-                          placeholder="••••••••"
-                          value={passwords.new}
-                          onChange={(e) => setPasswords((prev) => ({ ...prev, new: e.target.value }))}
-                          className="w-full px-5 py-4 bg-white border border-gray-200 rounded-2xl text-gray-900 focus:outline-none focus:border-[#D4AF37] focus:ring-4 focus:ring-[#D4AF37]/10 transition-all font-medium placeholder:text-gray-300"
-                        />
-                      </div>
+                  <div className="relative overflow-hidden rounded-[32px] border border-gray-100 bg-gray-50/50 p-10">
+                    <div className="absolute -mr-16 -mt-16 h-32 w-32 rounded-full bg-[#D4AF37]/5 blur-2xl right-0 top-0" />
+                    <div className="relative z-10 flex h-12 w-12 items-center justify-center rounded-2xl bg-[#D4AF37]/15 text-[#9A7715]">
+                      <Shield className="h-6 w-6" />
                     </div>
-
+                    <h4 className="relative z-10 mt-6 text-lg font-bold text-gray-900">Change Account Password</h4>
+                    <p className="relative z-10 mt-2 text-sm leading-relaxed text-gray-500">
+                      Continue to the dedicated security page to verify your current password and review password
+                      requirements.
+                    </p>
                     <button
-                      onClick={handleUpdatePassword}
-                      className="w-full bg-[#D4AF37] text-white px-8 py-4 rounded-2xl font-bold hover:bg-[#B5952F] transition-all shadow-lg shadow-[#D4AF37]/20 flex items-center justify-center gap-3 relative z-10 active:scale-[0.98]"
+                      type="button"
+                      onClick={() => onNavigate?.('change-password')}
+                      className="relative z-10 mt-8 flex w-full items-center justify-center gap-3 rounded-2xl bg-[#D4AF37] px-8 py-4 font-bold text-slate-950 shadow-lg shadow-[#D4AF37]/20 transition-all hover:bg-[#E2BF43] active:scale-[0.98]"
                     >
-                      <Save className="w-5 h-5" />
-                      Update Account Password
+                      Open Change Password
+                      <ArrowRight className="h-5 w-5" />
                     </button>
                   </div>
                 </div>
@@ -2487,13 +2400,25 @@ export function Settings({ onBack, onLogout, onNavigate, role = 'bishop', initia
             {/* Header */}
             <div className="flex items-start gap-4 bg-amber-50 px-6 py-5">
               <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-amber-100">
-                <svg className="h-6 w-6 text-amber-700" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.007v.008H12v-.008z" />
+                <svg
+                  className="h-6 w-6 text-amber-700"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                  strokeWidth={2}
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.007v.008H12v-.008z"
+                  />
                 </svg>
               </div>
               <div className="min-w-0">
                 <h2 className="text-lg font-black text-slate-950">Parish Priest Already Assigned</h2>
-                <p className="mt-0.5 text-xs font-semibold text-amber-700">Each parish should have only one assigned priest.</p>
+                <p className="mt-0.5 text-xs font-semibold text-amber-700">
+                  Each parish should have only one assigned priest.
+                </p>
               </div>
             </div>
 
@@ -2504,7 +2429,9 @@ export function Settings({ onBack, onLogout, onNavigate, role = 'bishop', initia
                 <p className="mt-0.5 text-sm font-bold text-slate-900">{duplicatePriestModal.parishName}</p>
               </div>
               <div className="rounded-2xl border border-slate-100 bg-slate-50 px-4 py-3">
-                <p className="text-[11px] font-black uppercase tracking-widest text-slate-400">Currently Assigned Priest</p>
+                <p className="text-[11px] font-black uppercase tracking-widest text-slate-400">
+                  Currently Assigned Priest
+                </p>
                 <p className="mt-0.5 text-sm font-bold text-slate-900">{duplicatePriestModal.existingPriest}</p>
               </div>
               <p className="text-sm leading-relaxed text-slate-500">
@@ -2518,7 +2445,13 @@ export function Settings({ onBack, onLogout, onNavigate, role = 'bishop', initia
               <button
                 type="button"
                 onClick={() => {
-                  setDuplicatePriestModal({ open: false, existingPriest: '', existingPriestEmail: '', parishName: '', onProceed: () => {} });
+                  setDuplicatePriestModal({
+                    open: false,
+                    existingPriest: '',
+                    existingPriestEmail: '',
+                    parishName: '',
+                    onProceed: () => {},
+                  });
                   closeModal();
                   setSearchQuery(duplicatePriestModal.existingPriestEmail || duplicatePriestModal.existingPriest);
                 }}
@@ -2531,7 +2464,15 @@ export function Settings({ onBack, onLogout, onNavigate, role = 'bishop', initia
                 {/* Cancel */}
                 <button
                   type="button"
-                  onClick={() => setDuplicatePriestModal({ open: false, existingPriest: '', existingPriestEmail: '', parishName: '', onProceed: () => {} })}
+                  onClick={() =>
+                    setDuplicatePriestModal({
+                      open: false,
+                      existingPriest: '',
+                      existingPriestEmail: '',
+                      parishName: '',
+                      onProceed: () => {},
+                    })
+                  }
                   className="flex-1 rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-black text-slate-600 transition-colors hover:bg-slate-50"
                 >
                   Cancel
@@ -2540,7 +2481,9 @@ export function Settings({ onBack, onLogout, onNavigate, role = 'bishop', initia
                 {/* Proceed anyway */}
                 <button
                   type="button"
-                  onClick={() => { duplicatePriestModal.onProceed(); }}
+                  onClick={() => {
+                    duplicatePriestModal.onProceed();
+                  }}
                   className="flex-1 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-black text-amber-700 transition-colors hover:bg-amber-100"
                 >
                   Proceed Anyway

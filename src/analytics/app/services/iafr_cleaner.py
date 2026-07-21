@@ -230,6 +230,36 @@ FIELD_MAP: dict[str, FieldSpec] = {
     "bishop_share_total": FieldSpec("Bishop's Fund Share", "C", "O", "F.02", "remittance", "F", "F.2"),
 }
 
+# The sandbox preserves the two calculated sacrament components separately.
+# Production currently ignores Section A line items, so adding these extraction
+# fields does not change the existing production write behavior.
+_SACRAMENT_BREAKDOWN_ROWS = {
+    "baptism_infant": ("Baptism (Infant)", "A.1.02"),
+    "baptism_adult": ("Baptism (Adult)", "A.1.03"),
+    "wedding_with_mass": ("Wedding with Mass", "A.1.04"),
+    "wedding_without_mass": ("Wedding w/out Mass", "A.1.05"),
+    "funeral_mass": ("Funeral Mass", "A.1.06"),
+    "funeral_blessings": ("Funeral Blessings", "A.1.07"),
+    "certificates": ("Certificates", "A.1.08"),
+    "marriage_banns": ("Marriage Banns", "A.1.09"),
+    "permits": ("Permits", "A.1.10"),
+}
+
+for _field_key, (_label, _account_code) in _SACRAMENT_BREAKDOWN_ROWS.items():
+    FIELD_MAP[f"{_field_key}_prescribed_amount"] = FieldSpec(
+        _label, "B", "I", f"{_account_code}.01", "receipt", "A", "sacrament_breakdown"
+    )
+    FIELD_MAP[f"{_field_key}_over_above_amount"] = FieldSpec(
+        _label, "B", "M", f"{_account_code}.02", "receipt", "A", "sacrament_breakdown"
+    )
+
+FIELD_MAP["confirmation_prescribed_amount"] = FieldSpec(
+    "Confirmation", "C", "I", "A.2.01.01", "receipt", "A", "sacrament_breakdown"
+)
+FIELD_MAP["confirmation_over_above_amount"] = FieldSpec(
+    "Confirmation", "C", "M", "A.2.01.02", "receipt", "A", "sacrament_breakdown"
+)
+
 # Page-level totals and the Personal Contributions block — each label is unique
 # sheet-wide, so these are looked up directly without section scoping.
 STANDALONE_FIELDS: dict[str, FieldSpec] = {

@@ -9,7 +9,6 @@ from datetime import datetime, timezone
 from typing import Any
 
 from app.config import (
-    WAREHOUSE_BRONZE_COMPARISON_ENABLED,
     WAREHOUSE_GOLD_INCREMENTAL_ENABLED,
     WAREHOUSE_PILOT_INSTITUTION_IDS,
     WAREHOUSE_PILOT_POLL_SECONDS,
@@ -20,7 +19,6 @@ from app.services.parish_gold_candidates import recover_record_memo_metrics
 from app.services.parish_gold_loader import refresh_incremental
 from app.services.silver_etl import run_silver_record
 from app.services.supabase_client import get_table
-from app.services.warehouse_etl import run_record_sync
 from app.services.warehouse_monitor import (
     claim_due_retries,
     cleanup_history,
@@ -166,7 +164,6 @@ def _candidate_grains(source_record_id: str) -> list[tuple[int, int]]:
 
 def _sync_change(change: dict[str, Any]) -> dict[str, Any]:
     previous_grains = _candidate_grains(change["id"]) if WAREHOUSE_GOLD_INCREMENTAL_ENABLED else []
-    bronze_result = run_record_sync(change["id"]) if WAREHOUSE_BRONZE_COMPARISON_ENABLED else None
     silver_result = run_silver_record(change["id"])
     is_active = bool(silver_result.get("counts", {}).get("silver_records"))
     memo_metrics = recover_record_memo_metrics(change["id"]) if is_active else None
@@ -175,7 +172,7 @@ def _sync_change(change: dict[str, Any]) -> dict[str, Any]:
         current_grains = _candidate_grains(change["id"])
         gold_result = refresh_incremental(change["id"], previous_grains + current_grains)
     return {
-        "bronze": bronze_result,
+        "bronze": None,
         "silver": silver_result,
         "memo_metrics": memo_metrics,
         "gold": gold_result,

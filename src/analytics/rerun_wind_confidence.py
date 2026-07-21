@@ -11,7 +11,7 @@ import time
 
 sys.path.insert(0, ".")
 
-from app.services.supabase_client import get_table
+from app.services.weather_repository import get_table
 from app.services.weather_daily_classifier import _validate_dimension, classify_wind, WIND_AGREE_TOLERANCE_MS
 
 

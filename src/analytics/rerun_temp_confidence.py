@@ -1,7 +1,7 @@
 """Old (NASA SoT) vs new (ECMWF IFS SoT) temperature validation, on live data."""
 import sys, time
 sys.path.insert(0, ".")
-from app.services.supabase_client import get_table
+from app.services.weather_repository import get_table
 from app.services.weather_daily_classifier import _validate_dimension, classify_temp, TEMP_AGREE_TOLERANCE_C
 
 def fetch_all_temp_rows():

@@ -6,7 +6,7 @@ approach (trusting each model's own internal weathercode, which only has
 """
 import sys, time
 sys.path.insert(0, ".")
-from app.services.supabase_client import get_table
+from app.services.weather_repository import get_table
 from app.services.weather_daily_classifier import classify_severe, SOURCE_LINEAGE
 from collections import Counter, defaultdict
 

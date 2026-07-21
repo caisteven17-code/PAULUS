@@ -180,10 +180,17 @@ def _write_snapshot(institution_id: str, entity_type: str, score: HealthScoreRes
         )
         inst_name = inst_row.data["name"] if inst_row.data else institution_id
 
-        if analytics_db.enabled():
-            _write_snapshot_aws(institution_id, entity_type, inst_name, score)
-        else:
-            _write_snapshot_supabase(institution_id, entity_type, inst_name, score)
+        if not analytics_db.enabled():
+            # Supabase owns the operational financial record, so the score can
+            # be recomputed after AWS recovers. Never recreate an analytical
+            # fallback copy in Supabase.
+            import logging
+
+            logging.getLogger(__name__).warning(
+                "Health snapshot deferred because ANALYTICS_DB_URL is unavailable"
+            )
+            return
+        _write_snapshot_aws(institution_id, entity_type, inst_name, score)
 
     except Exception as exc:
         import logging
@@ -198,67 +205,6 @@ def _snapshot_payload(score: HealthScoreResponse) -> dict:
         "sustainability_score": float(score.dimensions.sustainability),
         "stability_score": float(score.dimensions.stability),
     }
-
-
-def _write_snapshot_supabase(institution_id: str, entity_type: str, inst_name: str, score: HealthScoreResponse) -> None:
-    # 1. Ensure dim_institutions row exists and get institution_key
-    di = (
-        get_table("shared_analytics", "dim_institutions")
-        .select("institution_key")
-        .eq("institution_id", institution_id)
-        .maybe_single()
-        .execute()
-    )
-    if di.data:
-        institution_key = di.data["institution_key"]
-    else:
-        ins = (
-            get_table("shared_analytics", "dim_institutions")
-            .insert(
-                {
-                    "institution_id": institution_id,
-                    "institution_name": inst_name,
-                    "institution_type": entity_type,
-                }
-            )
-            .execute()
-        )
-        institution_key = ins.data[0]["institution_key"]
-
-    # 2. Ensure type-specific dim row exists and get entity_key
-    dim_schema, dim_table, dim_pk = _DIM_MAP[entity_type]
-    dd = (
-        get_table(dim_schema, dim_table)
-        .select(dim_pk)
-        .eq("institution_key", institution_key)
-        .maybe_single()
-        .execute()
-    )
-    if dd.data:
-        entity_key = dd.data[dim_pk]
-    else:
-        ins2 = get_table(dim_schema, dim_table).insert({"institution_key": institution_key}).execute()
-        entity_key = ins2.data[0][dim_pk]
-
-    # 3. date_key = YYYYMM for the current month
-    now = datetime.now(timezone.utc)
-    date_key = now.year * 100 + now.month
-
-    # 4. Insert or update fact snapshot for this (entity_key, date_key)
-    fact_schema, fact_table, fact_fk = _FACT_MAP[entity_type]
-    existing = (
-        get_table(fact_schema, fact_table)
-        .select("snapshot_id")
-        .eq(fact_fk, entity_key)
-        .eq("date_key", date_key)
-        .maybe_single()
-        .execute()
-    )
-    payload = _snapshot_payload(score)
-    if existing.data:
-        get_table(fact_schema, fact_table).update(payload).eq("snapshot_id", existing.data["snapshot_id"]).execute()
-    else:
-        get_table(fact_schema, fact_table).insert({fact_fk: entity_key, "date_key": date_key, **payload}).execute()
 
 
 def _write_snapshot_aws(institution_id: str, entity_type: str, inst_name: str, score: HealthScoreResponse) -> None:
