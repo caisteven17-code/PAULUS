@@ -1,7 +1,7 @@
 """
 Laguna Province Weather Loader
 ================================
-Upserts weather output JSON into reference.weather_observations in Supabase.
+Upserts weather output JSON into the AWS reference weather tables.
 Applies the migration in 111_fix_weather_observations_index.sql must be run
 first so the (date, location) partial unique index exists.
 
@@ -54,6 +54,8 @@ from pathlib import Path
 from typing import Optional
 
 import httpx
+
+from app.services import analytics_db
 
 logger = logging.getLogger(__name__)
 
@@ -161,43 +163,36 @@ def _upsert_batch(rows: list[dict]) -> int:
     if not rows:
         return 0
 
-    from app.services.supabase_client import get_table
-
     # Fetch existing (date, location) → id so we can tag rows with their PK.
     # PostgREST caps responses at 1000 rows, so page through with .range().
     dates = list({r["date"] for r in rows})
     locations = list({r["location"] for r in rows})
 
-    existing_map: dict[tuple[str, str], str] = {}
-    page_size = 1000
-    offset = 0
-    while True:
-        existing_resp = _execute_with_retry(
-            get_table("reference", "weather_observations")
-            .select("id, date, location")
-            .in_("date", dates)
-            .in_("location", locations)
-            .is_("institution_id", "null")
-            .range(offset, offset + page_size - 1)
-        )
-        batch = existing_resp.data or []
-        for r in batch:
-            existing_map[(r["date"], r["location"])] = r["id"]
-        if len(batch) < page_size:
-            break
-        offset += page_size
+    existing = analytics_db.fetch_query(
+        """
+        SELECT id::text AS id, date::text AS date, location
+        FROM reference.weather_observations
+        WHERE date = ANY(%s::date[])
+          AND location = ANY(%s::text[])
+          AND institution_id IS NULL
+        """,
+        (dates, locations),
+    )
+    existing_map = {(row["date"], row["location"]): row["id"] for row in existing}
 
     # Tag each row with its existing id (if any), then upsert in chunks.
     # Rows with an id → ON CONFLICT (id) DO UPDATE; rows without → INSERT.
+    from uuid import uuid4
+
     tagged: list[dict] = []
     for row in rows:
-        rec_id = existing_map.get((row["date"], row["location"]))
-        tagged.append({**row, "id": rec_id} if rec_id else {**row})
+        rec_id = existing_map.get((row["date"], row["location"]), str(uuid4()))
+        tagged.append({**row, "id": rec_id})
 
     total = 0
     for i in range(0, len(tagged), _OBSERVATIONS_CHUNK):
         chunk = tagged[i : i + _OBSERVATIONS_CHUNK]
-        _execute_with_retry(get_table("reference", "weather_observations").upsert(chunk))
+        analytics_db.upsert_rows("reference", "weather_observations", chunk, "id")
         total += len(chunk)
         logger.info("Upserted %d/%d weather_observations rows", total, len(tagged))
 
@@ -405,14 +400,53 @@ def _upsert_daily_table(table: str, rows: list[dict]) -> int:
     if not rows:
         return 0
 
-    from app.services.supabase_client import get_table
+    # Older classified exports predate the required WMO label but retain the
+    # agreement count and reason. Reconstruct only missing labels; never
+    # overwrite a label produced by the current classifier.
+    import re
+
+    for row in rows:
+        if row.get("wmo_quality_flag"):
+            continue
+        agreed = int(row.get("validators_agreed") or 0)
+        match = re.search(r"\((\d+)\s*/\s*(\d+)\)", str(row.get("reason") or ""))
+        total = int(match.group(2)) if match else None
+        if total and agreed == total:
+            row["wmo_quality_flag"] = "Correct"
+        elif total and agreed > total / 2:
+            row["wmo_quality_flag"] = "Probably Correct"
+        elif agreed > 0:
+            row["wmo_quality_flag"] = "Probably Suspect"
+        else:
+            row["wmo_quality_flag"] = "Suspect"
+
+    available = {
+        row["column_name"]
+        for row in analytics_db.fetch_query(
+            """
+            SELECT column_name
+            FROM information_schema.columns
+            WHERE table_schema = 'reference' AND table_name = %s
+            """,
+            (table,),
+        )
+    }
+    unsupported = sorted(set().union(*(row.keys() for row in rows)) - available)
+    if unsupported:
+        logger.info(
+            "Ignoring retired %s input columns: %s",
+            table,
+            ", ".join(unsupported),
+        )
+    rows = [
+        {column: value for column, value in row.items() if column in available}
+        for row in rows
+    ]
 
     total = 0
     for i in range(0, len(rows), _DAILY_UPSERT_CHUNK):
         chunk = rows[i : i + _DAILY_UPSERT_CHUNK]
-        _execute_with_retry(
-            get_table("reference", table).upsert(chunk, on_conflict="date,municipality")
-        )
+        analytics_db.upsert_rows("reference", table, chunk, "date,municipality")
         total += len(chunk)
         logger.info("Upserted %d/%d %s rows", total, len(rows), table)
 
@@ -440,18 +474,14 @@ def rebuild_monthly_summary(period_start: Optional[str] = None, period_end: Opti
     daily tables into weather_monthly_summary for the given period
     (ISO dates; None = unbounded). Returns the number of month-rows upserted.
     """
-    from app.services.supabase_client import get_supabase
-
-    resp = _execute_with_retry(
-        get_supabase()
-        .schema("reference")
-        .rpc(
-            "rebuild_weather_monthly_summary",
-            {"p_period_start": period_start, "p_period_end": period_end},
-        )
+    result = analytics_db.call_function(
+        "reference",
+        "rebuild_weather_monthly_summary",
+        p_period_start=period_start,
+        p_period_end=period_end,
     )
     try:
-        count = int(resp.data)
+        count = int(result)
     except (TypeError, ValueError):
         count = 0
     logger.info("Monthly summary rebuilt — %d month-rows upserted", count)
@@ -468,8 +498,41 @@ def upsert_monthly_confidence(
     factors and upsert into weather_monthly_summary.
     """
     from collections import defaultdict
+
+    # The deployed warehouse currently stores the multi-rater Fleiss metrics
+    # produced by rebuild_weather_monthly_summary(), not the pairwise
+    # Cohen/Lin fields produced by this optional local diagnostic. Never write
+    # one metric under another metric's name.
+    confidence_columns = {
+        "rain_cohens_kappa",
+        "rain_lins_ccc",
+        "severe_cohens_kappa",
+        "temp_cohens_kappa",
+        "temp_lins_ccc",
+        "humidity_cohens_kappa",
+        "humidity_lins_ccc",
+        "wind_cohens_kappa",
+        "wind_lins_ccc",
+    }
+    available = {
+        row["column_name"]
+        for row in analytics_db.fetch_query(
+            """
+            SELECT column_name
+            FROM information_schema.columns
+            WHERE table_schema = 'reference'
+              AND table_name = 'weather_monthly_summary'
+            """
+        )
+    }
+    if not confidence_columns.issubset(available):
+        logger.info(
+            "Skipping optional Cohen/Lin confidence fields; AWS uses the "
+            "monthly Fleiss metric schema"
+        )
+        return 0
+
     from app.services.weather_daily_classifier import compute_confidence_scores
-    from app.services.supabase_client import get_supabase
 
     rain_by_key: dict[tuple, list[dict]] = defaultdict(list)
     temp_by_key: dict[tuple, list[dict]] = defaultdict(list)
@@ -512,12 +575,8 @@ def upsert_monthly_confidence(
     if not upsert_rows:
         return 0
 
-    sb = get_supabase()
-    _execute_with_retry(
-        sb.schema("reference").table("weather_monthly_summary").upsert(
-            upsert_rows,
-            on_conflict="year_month,municipality",
-        )
+    analytics_db.upsert_rows(
+        "reference", "weather_monthly_summary", upsert_rows, "year_month,municipality"
     )
 
     logger.info("Cohen's Kappa + Lin's CCC upserted for %d municipality-months", len(upsert_rows))
@@ -526,24 +585,7 @@ def upsert_monthly_confidence(
 
 def _fetch_all_daily_rows(table: str) -> list[dict]:
     """Paginate through every row in a reference daily table and return them all."""
-    from app.services.supabase_client import get_table
-
-    page_size = 1000
-    offset = 0
-    all_rows: list[dict] = []
-    while True:
-        resp = _execute_with_retry(
-            get_table("reference", table)
-            .select("*")
-            .order("date")
-            .range(offset, offset + page_size - 1)
-        )
-        batch = resp.data or []
-        all_rows.extend(batch)
-        if len(batch) < page_size:
-            break
-        offset += page_size
-    return all_rows
+    return analytics_db.fetch_all("reference", table, order_by="date")
 
 
 def confidence_from_db() -> int:

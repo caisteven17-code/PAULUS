@@ -39,6 +39,7 @@ from app.services.predictive.financial_forecast import (  # noqa: E402
     _xgboost_trainer,
 )
 from app.services.supabase_client import get_table  # noqa: E402
+from app.services.weather_repository import get_table as get_weather_table  # noqa: E402
 from model_lab.dashboard_graphs import plot_forecast_comparison, plot_model_leaderboard  # noqa: E402
 
 
@@ -318,7 +319,7 @@ def fetch_weather_features(municipality: str | None, start_date: pd.Timestamp, e
         return pd.DataFrame(columns=["date", *WEATHER_FEATURE_COLUMNS])
 
     rows = _fetch_all_pages(
-        get_table("reference", "weather_monthly_summary")
+        get_weather_table("reference", "weather_monthly_summary")
         .select("*")
         .eq("municipality", municipality)
         .gte("year_month", start_date.date().isoformat())

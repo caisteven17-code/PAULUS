@@ -54,22 +54,18 @@ DEFAULT_OUT_DIR = Path(__file__).resolve().parents[4] / "weather_output"
 
 def _create_run_record(period_start: date, period_end: date) -> Optional[str]:
     try:
-        from app.services.supabase_client import get_table
+        from app.services import analytics_db
 
-        resp = (
-            get_table("reference", "weather_runs")
-            .insert(
-                {
-                    "mode": "full",
-                    "status": "running",
-                    "period_start": period_start.isoformat(),
-                    "period_end": period_end.isoformat(),
-                    "started_at": datetime.now(timezone.utc).isoformat(),
-                }
-            )
-            .execute()
+        row = analytics_db.execute_returning_one(
+            """
+            INSERT INTO reference.weather_runs
+              (mode, status, period_start, period_end, started_at)
+            VALUES ('full', 'running', %s, %s, %s)
+            RETURNING id
+            """,
+            (period_start, period_end, datetime.now(timezone.utc)),
         )
-        return resp.data[0]["id"] if resp.data else None
+        return str(row["id"]) if row else None
     except Exception as exc:
         logger.warning("Could not create weather run record: %s", exc)
         return None
@@ -85,17 +81,24 @@ def _update_run_record(
     if not run_id:
         return
     try:
-        from app.services.supabase_client import get_table
+        from app.services import analytics_db
 
-        get_table("reference", "weather_runs").update(
-            {
-                "status": status,
-                "finished_at": datetime.now(timezone.utc).isoformat(),
-                "municipalities_count": municipalities_count,
-                "records_loaded": records_loaded,
-                "error_detail": error_detail,
-            }
-        ).eq("id", run_id).execute()
+        analytics_db.execute(
+            """
+            UPDATE reference.weather_runs
+            SET status = %s, finished_at = %s, municipalities_count = %s,
+                records_loaded = %s, error_detail = %s
+            WHERE id = %s
+            """,
+            (
+                status,
+                datetime.now(timezone.utc),
+                municipalities_count,
+                records_loaded,
+                error_detail,
+                run_id,
+            ),
+        )
     except Exception as exc:
         logger.warning("Could not update weather run record: %s", exc)
 

@@ -50,11 +50,17 @@ def _upsert_in_chunks(
 
 
 def sync_parish_dimensions() -> dict[str, int]:
-    institutions = _fetch_all(
-        "diocese",
-        "institutions",
-        {"institution_type": "parish", "deleted_at": None},
-        order_by="id",
+    # The dedicated institution synchronizer owns this dimension. Gold must
+    # never repopulate it from the temporary AWS operational mirror.
+    institutions = analytics_db.fetch_query(
+        """
+        SELECT institution_id::text AS id, institution_key, institution_code,
+               institution_name AS name, institution_type, vicariate, district,
+               cluster, class, latitude, longitude
+        FROM shared_analytics.dim_institutions
+        WHERE institution_type = 'parish' AND is_active = true
+        ORDER BY institution_id
+        """
     )
     details = _fetch_all(
         "parishes",
@@ -63,49 +69,6 @@ def sync_parish_dimensions() -> dict[str, int]:
         order_by="institution_id",
     )
     details_by_institution = {str(row["institution_id"]): row for row in details}
-    priest_ids = sorted(
-        {str(row["assigned_priest_id"]) for row in details if row.get("assigned_priest_id") is not None}
-    )
-    profiles: list[dict[str, Any]] = []
-    for offset in range(0, len(priest_ids), 100):
-        profiles.extend(
-            _fetch_all(
-                "diocese",
-                "profiles",
-                {"id": priest_ids[offset : offset + 100]},
-                order_by="id",
-            )
-        )
-    profile_names = {str(row["id"]): row.get("full_name") for row in profiles}
-
-    institution_rows = [
-        {
-            "institution_id": row["id"],
-            "institution_name": row["name"],
-            "institution_type": row["institution_type"],
-            "vicariate": row.get("vicariate"),
-            "district": row.get("district"),
-            "cluster": row.get("cluster"),
-            "class": row.get("class"),
-        }
-        for row in institutions
-    ]
-    _upsert_in_chunks(
-        "shared_analytics",
-        "dim_institutions",
-        institution_rows,
-        "institution_id",
-    )
-    institution_keys = {
-        str(row["institution_id"]): row["institution_key"]
-        for row in analytics_db.fetch_query(
-            """
-            SELECT institution_id, institution_key
-            FROM shared_analytics.dim_institutions
-            WHERE institution_type = 'parish'
-            """
-        )
-    }
     parish_rows = []
     for institution in institutions:
         institution_id = str(institution["id"])
@@ -113,12 +76,13 @@ def sync_parish_dimensions() -> dict[str, int]:
         assigned_priest_id = detail.get("assigned_priest_id")
         parish_rows.append(
             {
-                "institution_key": institution_keys[institution_id],
+                "institution_key": institution["institution_key"],
+                "institution_code": institution.get("institution_code"),
+                "institution_name": institution.get("name"),
                 "vicariate": institution.get("vicariate"),
                 "district": institution.get("district"),
                 "cluster": institution.get("cluster"),
-                "assigned_priest": profile_names.get(str(assigned_priest_id)) if assigned_priest_id else None,
-                "address": institution.get("address"),
+                "assigned_priest_source_id": assigned_priest_id,
                 "latitude": institution.get("latitude"),
                 "longitude": institution.get("longitude"),
             }
@@ -159,7 +123,7 @@ def sync_parish_dimensions() -> dict[str, int]:
         "source_account_title_id",
     )
     return {
-        "shared_parishes": len(institution_rows),
+        "shared_parishes": len(institutions),
         "parish_dimensions": len(parish_rows),
         "account_dimensions": len(account_rows),
     }

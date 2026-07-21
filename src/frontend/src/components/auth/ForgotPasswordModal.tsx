@@ -1,8 +1,9 @@
 'use client';
 
-import React, { useState } from 'react';
-import { CheckCircle2, Eye, EyeOff, HelpCircle, KeyRound, Lock, Mail, ShieldQuestion, X } from 'lucide-react';
+import React, { useMemo, useState } from 'react';
+import { Check, CheckCircle2, Eye, EyeOff, HelpCircle, KeyRound, Lock, Mail, ShieldQuestion, X } from 'lucide-react';
 import { OtpVerificationStep } from './OtpVerificationStep';
+import { getPasswordRequirementState, passwordMeetsPolicy } from '../../lib/passwordPolicy';
 
 interface ForgotPasswordModalProps {
   open: boolean;
@@ -23,6 +24,8 @@ export function ForgotPasswordModal({ open, onClose }: ForgotPasswordModalProps)
   const [isBusy, setIsBusy] = useState(false);
   const [otpNote, setOtpNote] = useState('');
   const [otpDevMode, setOtpDevMode] = useState(false);
+  const passwordRequirements = useMemo(() => getPasswordRequirementState(newPassword), [newPassword]);
+  const passwordsMatch = confirmPassword.length > 0 && newPassword === confirmPassword;
 
   if (!open) return null;
 
@@ -87,8 +90,8 @@ export function ForgotPasswordModal({ open, onClose }: ForgotPasswordModalProps)
   // Step 3 — passwords match → ask for confirmation
   const handlePasswordSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (newPassword.length < 8) {
-      setError('Password must be at least 8 characters.');
+    if (!passwordMeetsPolicy(newPassword)) {
+      setError('Password must satisfy every requirement below.');
       return;
     }
     if (newPassword !== confirmPassword) {
@@ -245,6 +248,34 @@ export function ForgotPasswordModal({ open, onClose }: ForgotPasswordModalProps)
                 </div>
               </div>
 
+              <div className="rounded-xl border border-slate-800 bg-slate-900/40 p-3.5">
+                <p className="text-[10px] font-bold uppercase tracking-widest text-slate-300">
+                  Password requirements
+                </p>
+                <div className="mt-3 grid gap-2 sm:grid-cols-2">
+                  {passwordRequirements.map((requirement) => {
+                    const untouched = newPassword.length === 0;
+                    return (
+                      <div
+                        key={requirement.key}
+                        className={`flex items-center gap-2 text-[11px] font-medium ${
+                          untouched ? 'text-slate-500' : requirement.met ? 'text-emerald-400' : 'text-red-400'
+                        }`}
+                      >
+                        <span
+                          className={`flex h-4 w-4 shrink-0 items-center justify-center rounded-full ${
+                            untouched ? 'bg-slate-800' : requirement.met ? 'bg-emerald-500/15' : 'bg-red-500/15'
+                          }`}
+                        >
+                          {requirement.met ? <Check className="h-3 w-3" /> : <X className="h-3 w-3" />}
+                        </span>
+                        {requirement.label}
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+
               <div>
                 <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1.5 ml-1">
                   Confirm Password
@@ -269,8 +300,10 @@ export function ForgotPasswordModal({ open, onClose }: ForgotPasswordModalProps)
                     {showConfirm ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                   </button>
                 </div>
-                {confirmPassword.length > 0 && newPassword !== confirmPassword && (
-                  <p className="mt-1 ml-1 text-[11px] text-red-400">Passwords do not match.</p>
+                {confirmPassword.length > 0 && (
+                  <p className={`mt-1 ml-1 text-[11px] ${passwordsMatch ? 'text-emerald-400' : 'text-red-400'}`}>
+                    {passwordsMatch ? 'Passwords match.' : 'Passwords do not match.'}
+                  </p>
                 )}
               </div>
 
@@ -278,7 +311,7 @@ export function ForgotPasswordModal({ open, onClose }: ForgotPasswordModalProps)
 
               <button
                 type="submit"
-                disabled={isBusy || !newPassword || newPassword !== confirmPassword}
+                disabled={isBusy || !passwordMeetsPolicy(newPassword) || !passwordsMatch}
                 className="w-full bg-gradient-to-r from-[#E6C27A] to-[#D4AF37] hover:from-[#D4AF37] hover:to-[#B5952F] text-slate-950 font-bold py-3.5 rounded-xl transition-all duration-300 active:scale-[0.98] shadow-lg shadow-[#D4AF37]/10 disabled:opacity-50 text-sm"
               >
                 Submit

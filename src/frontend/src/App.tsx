@@ -10,6 +10,7 @@ import { ErrorBoundary } from './components/ui/ErrorBoundary';
 import { BishopDashboard } from './views/BishopDashboard';
 import { PriestDashboard } from './views/PriestDashboard';
 import { Settings } from './views/Settings';
+import { ChangePassword } from './views/ChangePassword';
 import { Login } from './views/Login';
 import { Home } from './views/Home';
 import { Projects } from './views/Projects';
@@ -132,7 +133,7 @@ const getFirstAllowedTab = (role: Role, permissions: Record<string, boolean>) =>
 };
 
 const canAccessTab = (tab: string, role: Role, permissions: Record<string, boolean>) => {
-  if (tab === 'profile') return true;
+  if (tab === 'profile' || tab === 'change-password') return true;
   // Archives is a standalone top-level page gated by archive permissions.
   if (tab === 'archives' || tab === 'admin-archives') return hasAnyArchiveAccess(permissions);
   if (tab.startsWith('admin-') || tab === 'settings' || tab === 'audit-log') {
@@ -153,7 +154,8 @@ const canAccessTab = (tab: string, role: Role, permissions: Record<string, boole
   }
   if (tab === 'priest-dashboard' || tab === 'priest-health') return permissions.view_priests === true;
   if (tab === 'seminaries') return permissions.view_seminary_dashboard === true;
-  if (tab === 'seminary-aitwin') return permissions.view_seminary_dashboard === true || permissions.digital_twin === true;
+  if (tab === 'seminary-aitwin')
+    return permissions.view_seminary_dashboard === true || permissions.digital_twin === true;
   if (tab === 'school') return permissions.view_school_dashboard === true;
   if (tab === 'school-aitwin') return permissions.view_school_dashboard === true || permissions.digital_twin === true;
   if (tab === 'projects') return hasProjectAccess(permissions);
@@ -186,6 +188,7 @@ const TAB_TO_PATH: Record<string, string> = {
   'admin-archives': '/admin/archives',
   consolidated: '/consolidated-financial',
   profile: '/profile',
+  'change-password': '/change-password',
   'audit-log': '/admin/audit-log',
   settings: '/admin/settings',
   'admin-user-management': '/admin/user-management',
@@ -670,7 +673,10 @@ export default function App() {
             <div className="border-t border-slate-100 px-6 pb-6 pt-4">
               <button
                 type="button"
-                onClick={() => { setRoleChangedModal(false); void handleLogout(); }}
+                onClick={() => {
+                  setRoleChangedModal(false);
+                  void handleLogout();
+                }}
                 className="w-full rounded-2xl bg-slate-950 px-4 py-3.5 text-sm font-black text-white transition-colors hover:bg-slate-800"
               >
                 Sign Out Now
@@ -981,9 +987,7 @@ export default function App() {
                 institutionType={digitalTwinSession.entityType}
                 institutionId={digitalTwinSession.entityId ?? ''}
                 baselineHealthScore={digitalTwinSession.baselineHealthScore ?? 70}
-                baselineNet={
-                  (digitalTwinSession.monthlyCollections ?? 0) - (digitalTwinSession.monthlyExpenses ?? 0)
-                }
+                baselineNet={(digitalTwinSession.monthlyCollections ?? 0) - (digitalTwinSession.monthlyExpenses ?? 0)}
                 currentSandboxState={dtSandboxState}
                 onSandboxStateChange={setDtSandboxState}
                 onReset={() => setDtSandboxState(buildInitialSandboxState(digitalTwinSession))}
@@ -1041,6 +1045,10 @@ export default function App() {
     if (activeTab === 'archives' || activeTab === 'admin-archives') {
       if (!hasAnyArchiveAccess(permissions)) return renderAccessDenied();
       return <ArchivesPage />;
+    }
+
+    if (activeTab === 'change-password') {
+      return <ChangePassword onBack={() => setActiveTab('profile')} />;
     }
 
     // Administration sub-routes - each deep-links to a specific Settings tab
@@ -1175,7 +1183,11 @@ export default function App() {
             return renderAccessDenied();
           return <WhatIfSimulator mode="school" />;
         case 'projects':
-          return permissions.view_projects || permissions.manage_projects ? <Projects role={role} /> : renderAccessDenied();
+          return permissions.view_projects || permissions.manage_projects ? (
+            <Projects role={role} />
+          ) : (
+            renderAccessDenied()
+          );
         case 'digital-twin':
           return permissions.digital_twin ? (
             <DigitalTwin
@@ -1195,17 +1207,9 @@ export default function App() {
             renderAccessDenied()
           );
         case 'events':
-          return permissions.view_events || permissions.manage_events ? (
-            <Events />
-          ) : (
-            renderAccessDenied()
-          );
+          return permissions.view_events || permissions.manage_events ? <Events /> : renderAccessDenied();
         case 'budget':
-          return permissions.view_budget || permissions.manage_budget ? (
-            <Budget />
-          ) : (
-            renderAccessDenied()
-          );
+          return permissions.view_budget || permissions.manage_budget ? <Budget /> : renderAccessDenied();
         case 'audit-log':
           return permissions.view_audit_logs ? <AuditLog /> : renderAccessDenied();
         case 'consolidated':
@@ -1319,11 +1323,7 @@ export default function App() {
         case 'priest-aitwin':
           // Priest reassignment simulator is gated by the Priest Assignment
           // Simulator permission only, matching canAccessTab and the sidebar.
-          return permissions.manage_assignments === true ? (
-            <WhatIfSimulator mode="priest" />
-          ) : (
-            renderAccessDenied()
-          );
+          return permissions.manage_assignments === true ? <WhatIfSimulator mode="priest" /> : renderAccessDenied();
         case 'seminaries':
           if (permissions.view_seminary_dashboard !== true) {
             return renderAccessDenied();
@@ -1391,7 +1391,11 @@ export default function App() {
             renderAccessDenied()
           );
         case 'projects':
-          return permissions.view_projects || permissions.manage_projects ? <Projects role={role} /> : renderAccessDenied();
+          return permissions.view_projects || permissions.manage_projects ? (
+            <Projects role={role} />
+          ) : (
+            renderAccessDenied()
+          );
         case 'announcements':
           return permissions.view_announcements || permissions.manage_announcements ? (
             <Announcements />
@@ -1399,17 +1403,9 @@ export default function App() {
             renderAccessDenied()
           );
         case 'events':
-          return permissions.view_events || permissions.manage_events ? (
-            <Events />
-          ) : (
-            renderAccessDenied()
-          );
+          return permissions.view_events || permissions.manage_events ? <Events /> : renderAccessDenied();
         case 'budget':
-          return permissions.view_budget || permissions.manage_budget ? (
-            <Budget />
-          ) : (
-            renderAccessDenied()
-          );
+          return permissions.view_budget || permissions.manage_budget ? <Budget /> : renderAccessDenied();
         case 'consolidated':
           return <ConsolidatedFinancial />;
         default:
@@ -1429,11 +1425,7 @@ export default function App() {
       ) : !isAuthenticated ? (
         <Login onLogin={handleLogin} onPusher={openPusher} />
       ) : onboardingUser ? (
-        <OnboardingModal
-          user={onboardingUser}
-          onComplete={() => setOnboardingUser(null)}
-          onLogout={requestLogout}
-        />
+        <OnboardingModal user={onboardingUser} onComplete={() => setOnboardingUser(null)} onLogout={requestLogout} />
       ) : !onboardingChecked ? (
         <LoadingScreen label={logoutInProgress ? 'Signing out' : 'Signing in'} />
       ) : (
@@ -1448,25 +1440,25 @@ export default function App() {
               onTimeframeChange={setTimeframe}
             />
 
-        <div className="flex flex-col flex-1 min-w-0 h-screen overflow-hidden">
-          <TopNav
-            onNavigate={(page) => setActiveTab(page)}
-            role={role}
-            currentPage={activeTab}
-            timeframe={timeframe}
-            onTimeframeChange={setTimeframe}
-            year={year}
-            onYearChange={setYear}
-            onLogout={requestLogout}
-          />
-          <main ref={mainScrollRef} className="flex-1 overflow-y-auto pb-20 md:pb-0">
-            {renderContent()}
-            <Footer />
-          </main>
-        </div>
+            <div className="flex flex-col flex-1 min-w-0 h-screen overflow-hidden">
+              <TopNav
+                onNavigate={(page) => setActiveTab(page)}
+                role={role}
+                currentPage={activeTab}
+                timeframe={timeframe}
+                onTimeframeChange={setTimeframe}
+                year={year}
+                onYearChange={setYear}
+                onLogout={requestLogout}
+              />
+              <main ref={mainScrollRef} className="flex-1 overflow-y-auto pb-20 md:pb-0">
+                {renderContent()}
+                <Footer />
+              </main>
+            </div>
 
-        <BottomNav activeTab={activeTab} onNavigate={setActiveTab} role={role} />
-        <StewardChatbot />
+            <BottomNav activeTab={activeTab} onNavigate={setActiveTab} role={role} />
+            <StewardChatbot />
           </div>
         </ErrorBoundary>
       )}

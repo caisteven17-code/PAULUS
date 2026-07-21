@@ -10,7 +10,7 @@ from typing import Any
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 
-from app.services import iafr_cleaner
+from app.services import iafr_cleaner, iafr_sandbox
 from app.services.supabase_client import get_table, get_supabase
 
 router = APIRouter(tags=["iafr"])
@@ -21,6 +21,193 @@ STORAGE_BUCKET = "financial-submissions"
 class CleanSubmissionRequest(BaseModel):
     submissionBatchId: str
     storagePath: str
+
+
+class TestCleanSubmissionRequest(BaseModel):
+    runId: str
+    storagePath: str
+
+
+def _validation_issue_preview(result: dict[str, Any]) -> list[dict[str, Any]]:
+    return [
+        {
+            "fieldName": issue.get("field_name") or "Submission",
+            "severity": issue.get("severity", "warning"),
+            "message": issue.get("error_message", "The field needs review."),
+            "sourceRow": issue.get("source_row_number"),
+            "errorType": issue.get("error_type"),
+        }
+        for issue in result.get("validation_errors", [])
+    ]
+
+
+def _set_test_stage(
+    run_id: str,
+    stage_code: str,
+    sequence_no: int,
+    status: str,
+    message: str,
+    progress_percent: int,
+) -> None:
+    now = datetime.now(timezone.utc).isoformat()
+    finished_at = now if status in {"completed", "warning", "failed"} else None
+    get_table("operations", "parish_submission_test_stage_events").upsert(
+        {
+            "run_id": run_id,
+            "stage_code": stage_code,
+            "sequence_no": sequence_no,
+            "status": status,
+            "message": message,
+            "started_at": None if status == "pending" else now,
+            "finished_at": finished_at,
+        },
+        on_conflict="run_id,stage_code",
+    ).execute()
+    run_update: dict[str, Any] = {
+        "current_stage": stage_code,
+        "progress_percent": progress_percent,
+        "status": "failed" if status == "failed" else "running",
+    }
+    if status == "failed":
+        run_update["error_summary"] = message
+    get_table("operations", "parish_submission_test_runs").update(run_update).eq("id", run_id).execute()
+
+
+@router.post("/iafr/clean-submission-test")
+async def clean_submission_test(body: TestCleanSubmissionRequest):
+    """Parse and commit one uploaded IAFR file into the isolated test schema."""
+    run_response = (
+        get_table("operations", "parish_submission_test_runs")
+        .select("id,institution_id,reporting_month,reporting_year,input_method,status")
+        .eq("id", body.runId)
+        .single()
+        .execute()
+    )
+    if not run_response.data:
+        raise HTTPException(status_code=404, detail=f"Test submission run {body.runId} not found.")
+
+    run = run_response.data
+    if run["input_method"] != "file":
+        raise HTTPException(status_code=400, detail="The sandbox cleaner only processes file test runs.")
+
+    institution = (
+        get_table("diocese", "institutions")
+        .select("id,name")
+        .eq("id", run["institution_id"])
+        .single()
+        .execute()
+    )
+    institution_name = institution.data["name"] if institution.data else None
+
+    _set_test_stage(body.runId, "reading", 2, "running", "Reading the uploaded IAFR workbook.", 25)
+    try:
+        file_bytes = get_supabase().storage.from_(STORAGE_BUCKET).download(body.storagePath)
+        result = iafr_cleaner.clean_submission(
+            file_bytes=file_bytes,
+            filename=body.storagePath,
+            target_month=run["reporting_month"],
+            target_year=run["reporting_year"],
+            expected_parish_name=institution_name,
+        )
+    except Exception as exc:
+        _set_test_stage(body.runId, "reading", 2, "failed", f"Could not read the test file: {exc}", 25)
+        raise HTTPException(status_code=422, detail=f"Could not read the test file: {exc}") from exc
+
+    _set_test_stage(body.runId, "reading", 2, "completed", "IAFR workbook structure was read successfully.", 30)
+    if result["validation_status"] == "failed" and not result["line_items"]:
+        message = f"File validation failed with {len(result['validation_errors'])} issue(s)."
+        _set_test_stage(body.runId, "validation", 3, "failed", message, 35)
+        return {
+            "runId": body.runId,
+            "status": "failed",
+            "validationStatus": result["validation_status"],
+            "issues": _validation_issue_preview(result),
+            "summary": {"errorCount": len(result["validation_errors"]), "canonicalEntryCount": 0},
+        }
+
+    _set_test_stage(body.runId, "validation", 3, "completed", "Required workbook fields passed validation.", 40)
+    _set_test_stage(body.runId, "cleaning", 4, "completed", "Financial values were standardized.", 50)
+    _set_test_stage(body.runId, "calculation", 5, "completed", "IAFR calculated fields were extracted.", 60)
+
+    entries = iafr_sandbox.canonical_entries(result)
+    if not entries:
+        _set_test_stage(body.runId, "mapping", 6, "failed", "No canonical financial entries were produced.", 65)
+        return {
+            "runId": body.runId,
+            "status": "failed",
+            "validationStatus": result["validation_status"],
+            "issues": _validation_issue_preview(result),
+            "summary": {"errorCount": len(result["validation_errors"]), "canonicalEntryCount": 0},
+        }
+
+    _set_test_stage(body.runId, "mapping", 6, "running", "Matching extracted values to canonical accounts.", 70)
+    get_table("operations", "parish_submission_test_entries").delete().eq("run_id", body.runId).execute()
+    entry_payload = [{"run_id": body.runId, **entry} for entry in entries]
+    get_table("operations", "parish_submission_test_entries").insert(entry_payload).execute()
+    _set_test_stage(body.runId, "mapping", 6, "completed", f"Mapped {len(entries)} canonical entries.", 75)
+
+    _set_test_stage(body.runId, "loading", 7, "running", "Writing to parishes_submission_test.", 80)
+    commit_response = get_supabase().schema("operations").rpc(
+        "commit_parish_submission_test_run", {"p_run_id": body.runId}
+    ).execute()
+    if not commit_response.data:
+        _set_test_stage(body.runId, "loading", 7, "failed", "The production-shaped test insert failed.", 80)
+        return {
+            "runId": body.runId,
+            "status": "failed",
+            "validationStatus": result["validation_status"],
+            "issues": _validation_issue_preview(result),
+            "summary": {"errorCount": len(result["validation_errors"]), "canonicalEntryCount": len(entries)},
+        }
+
+    _set_test_stage(body.runId, "loading", 7, "completed", "Production-shaped test records were saved.", 85)
+    failed_checks = [check for check in result["reconciliation_checks"] if check["status"] == "failed"]
+    reconciliation_status = "failed" if failed_checks else "completed"
+    reconciliation_message = (
+        f"{len(failed_checks)} reconciliation check(s) failed."
+        if failed_checks
+        else f"{len(result['reconciliation_checks'])} reconciliation check(s) completed."
+    )
+    _set_test_stage(body.runId, "reconciliation", 8, reconciliation_status, reconciliation_message, 95)
+    if failed_checks:
+        return {
+            "runId": body.runId,
+            "status": "failed",
+            "validationStatus": result["validation_status"],
+            "issues": _validation_issue_preview(result)
+            + [
+                {
+                    "fieldName": check["check_name"],
+                    "severity": "error",
+                    "message": "The calculated workbook total does not match the extracted component total.",
+                    "sourceRow": None,
+                    "errorType": "reconciliation_mismatch",
+                }
+                for check in failed_checks
+            ],
+            "summary": {
+                "errorCount": len(result["validation_errors"]),
+                "canonicalEntryCount": len(entries),
+                "reconciliationCheckCount": len(result["reconciliation_checks"]),
+            },
+        }
+
+    _set_test_stage(body.runId, "completed", 9, "completed", "Sandbox file submission completed.", 100)
+    get_table("operations", "parish_submission_test_runs").update(
+        {"status": "completed", "current_stage": "completed", "progress_percent": 100, "completed_at": datetime.now(timezone.utc).isoformat()}
+    ).eq("id", body.runId).execute()
+    return {
+        "runId": body.runId,
+        "financialRecordId": commit_response.data,
+        "status": "completed",
+        "validationStatus": result["validation_status"],
+        "issues": _validation_issue_preview(result),
+        "summary": {
+            "errorCount": len(result["validation_errors"]),
+            "canonicalEntryCount": len(entries),
+            "reconciliationCheckCount": len(result["reconciliation_checks"]),
+        },
+    }
 
 
 @router.post("/iafr/clean-submission")

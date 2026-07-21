@@ -16,6 +16,7 @@ from app.services.silver_etl import (
     _build_line_rows,
     _build_record_row,
     _record_check,
+    _resolve_institution_keys,
     _upsert_rows,
 )
 from app.services.warehouse_etl import _fetch_all
@@ -129,6 +130,7 @@ def queue_records(records: list[dict], backfill_name: str = _BACKFILL_NAME) -> N
 
 def populate_coverage(records: list[dict]) -> dict[str, int]:
     parishes = sorted({str(row["institution_id"]) for row in records})
+    institution_keys = _resolve_institution_keys(parishes)
     years = range(min(int(row["year"]) for row in records), max(int(row["year"]) for row in records) + 1)
     actual = {(str(row["institution_id"]), int(row["year"]), _MONTH_NUMBERS[row["month"]]): row for row in records}
     now = datetime.now(timezone.utc)
@@ -142,6 +144,7 @@ def populate_coverage(records: list[dict]) -> dict[str, int]:
                 if source:
                     row = (
                         institution_id,
+                        institution_keys[institution_id],
                         reporting_month,
                         "available",
                         source["id"],
@@ -154,6 +157,7 @@ def populate_coverage(records: list[dict]) -> dict[str, int]:
                 elif year == 2023:
                     row = (
                         institution_id,
+                        institution_keys[institution_id],
                         reporting_month,
                         "confirmed_unavailable",
                         None,
@@ -166,6 +170,7 @@ def populate_coverage(records: list[dict]) -> dict[str, int]:
                 else:
                     row = (
                         institution_id,
+                        institution_keys[institution_id],
                         reporting_month,
                         "unreviewed_missing",
                         None,
@@ -182,11 +187,12 @@ def populate_coverage(records: list[dict]) -> dict[str, int]:
             cursor.executemany(
                 """
                 INSERT INTO parish_silver.reporting_coverage (
-                  institution_id, reporting_month, availability_status,
+                  institution_id, institution_key, reporting_month, availability_status,
                   source_record_id, source_updated_at, missing_reason,
                   confirmation_source, confirmed_at
-                ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+                ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
                 ON CONFLICT (institution_id, reporting_month) DO UPDATE SET
+                  institution_key = EXCLUDED.institution_key,
                   availability_status = EXCLUDED.availability_status,
                   source_record_id = EXCLUDED.source_record_id,
                   source_updated_at = EXCLUDED.source_updated_at,
@@ -286,6 +292,9 @@ def process_batch(
     run_id = _start_run(record_ids, backfill_name)
     _mark_running(record_ids, run_id, backfill_name)
     try:
+        institution_keys = _resolve_institution_keys(
+            [str(record["institution_id"]) for record in records]
+        )
         source_lines = fetch_source_lines(record_ids)
         lines_by_record: dict[str, list[dict]] = defaultdict(list)
         for line in source_lines:
@@ -299,21 +308,29 @@ def process_batch(
                 lines_by_record[str(record["id"])],
                 accounts,
                 run_id,
+                institution_keys[str(record["institution_id"])],
             )
             line_rows.extend(cleaned_lines)
-            record_rows.append(_build_record_row(record, cleaned_lines, run_id))
+            record_rows.append(
+                _build_record_row(
+                    record,
+                    cleaned_lines,
+                    run_id,
+                    institution_keys[str(record["institution_id"])],
+                )
+            )
 
         with analytics_db.get_pool().connection() as conn:
             with conn.cursor() as cursor:
                 cursor.executemany(
                     """
                     DELETE FROM parish_silver.financial_records
-                    WHERE institution_id = %s AND reporting_month = %s
+                    WHERE institution_key = %s AND reporting_month = %s
                       AND source_record_id <> %s
                     """,
                     [
                         (
-                            row["institution_id"],
+                            row["institution_key"],
                             row["reporting_month"],
                             row["source_record_id"],
                         )

@@ -1,8 +1,9 @@
 ﻿'use client';
 
 import React, { useState, useRef, useEffect } from 'react';
+import Image from 'next/image';
 import { motion, AnimatePresence } from 'motion/react';
-import { MessageSquare, X, Send, Bot, User, Sparkles, Loader2, ChevronRight } from 'lucide-react';
+import { X, Send, Loader2, ChevronRight } from 'lucide-react';
 import { GoogleGenAI } from '@google/genai';
 import { dataService } from '../../services/dataService';
 import { FinancialRecord } from '../../types';
@@ -18,8 +19,115 @@ interface StewardChatbotProps {
   currentEntityId?: string;
 }
 
+const CrowImage: React.FC<{ size?: number; className?: string }> = ({ size = 42, className }) => (
+  <Image
+    src="/assets/steward-crow-bread-v2.png"
+    alt=""
+    width={size}
+    height={size}
+    className={`object-contain ${className ?? ''}`}
+    aria-hidden="true"
+    priority
+  />
+);
+
+const AnimatedHeaderCrow: React.FC<{ cycle: number }> = ({ cycle }) => {
+  const [bendFrame, setBendFrame] = useState(0);
+
+  useEffect(() => {
+    if (cycle === 0) return;
+
+    // Upright pause, anatomical crouch, ground pickup, then rise.
+    const bendSequence = [0, 0, 0, 1, 2, 3, 3, 3, 4, 5, 0];
+    let sequenceIndex = 0;
+    setBendFrame(0);
+    const frameTimer = window.setInterval(() => {
+      sequenceIndex += 1;
+      setBendFrame(bendSequence[Math.min(sequenceIndex, bendSequence.length - 1)]);
+      if (sequenceIndex >= bendSequence.length - 1) window.clearInterval(frameTimer);
+    }, 220);
+
+    return () => window.clearInterval(frameTimer);
+  }, [cycle]);
+
+  return (
+    <div className="relative h-12 w-12 overflow-visible" aria-hidden="true">
+      <div
+        className="absolute inset-[7px]"
+        style={{
+          backgroundImage: 'url(/assets/steward-crow-bend.png)',
+          backgroundRepeat: 'no-repeat',
+          backgroundSize: '600% 100%',
+          backgroundPosition: `${(bendFrame * 100) / 5}% center`,
+        }}
+      />
+      <motion.div
+        key={`bread-${cycle}`}
+        className="absolute left-1 top-2.5 h-3 w-4"
+        animate={
+          cycle > 0
+            ? {
+                x: [0, 0, 1, 2, 2, 2, 2, 2, 1, 0, 0],
+                y: [0, 11, 20, 20, 20, 20, 20, 20, 14, 7, 0],
+                rotate: [0, -15, -48, -62, -62, -62, -62, -62, -42, -20, 0],
+              }
+            : { x: 0, y: 0, rotate: 0 }
+        }
+        transition={{
+          duration: 2.2,
+          ease: 'linear',
+          times: [0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1],
+        }}
+      >
+        <Image src="/assets/steward-bread.png" alt="" fill className="object-contain" priority />
+      </motion.div>
+    </div>
+  );
+};
+
+const playCrowCalls = () => {
+  const AudioContextClass =
+    window.AudioContext ?? (window as typeof window & { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
+  if (!AudioContextClass) return;
+
+  const audioContext = new AudioContextClass();
+  const makeCaw = (delay: number) => {
+    const start = audioContext.currentTime + delay;
+
+    [0, 0.16].forEach((syllableDelay, index) => {
+      const syllableStart = start + syllableDelay;
+      const oscillator = audioContext.createOscillator();
+      const filter = audioContext.createBiquadFilter();
+      const gain = audioContext.createGain();
+
+      oscillator.type = 'sawtooth';
+      oscillator.frequency.setValueAtTime(index === 0 ? 540 : 470, syllableStart);
+      oscillator.frequency.exponentialRampToValueAtTime(index === 0 ? 190 : 165, syllableStart + 0.3);
+      filter.type = 'lowpass';
+      filter.frequency.setValueAtTime(1350, syllableStart);
+      filter.frequency.exponentialRampToValueAtTime(520, syllableStart + 0.32);
+      filter.Q.value = 2.4;
+      gain.gain.setValueAtTime(0.0001, syllableStart);
+      gain.gain.exponentialRampToValueAtTime(index === 0 ? 0.2 : 0.13, syllableStart + 0.025);
+      gain.gain.exponentialRampToValueAtTime(0.0001, syllableStart + 0.34);
+
+      oscillator.connect(filter).connect(gain).connect(audioContext.destination);
+      oscillator.start(syllableStart);
+      oscillator.stop(syllableStart + 0.36);
+    });
+  };
+
+  makeCaw(0);
+  makeCaw(2.45);
+  window.setTimeout(() => void audioContext.close(), 3400);
+};
+
 export const StewardChatbot: React.FC<StewardChatbotProps> = ({ currentEntityId }) => {
   const [isOpen, setIsOpen] = useState(false);
+  const [isFlying, setIsFlying] = useState(false);
+  const [flightFrame, setFlightFrame] = useState(0);
+  const [flightArea, setFlightArea] = useState({ width: 0, height: 0 });
+  const [headerAnimationCycle, setHeaderAnimationCycle] = useState(0);
   const [messages, setMessages] = useState<Message[]>([
     {
       id: '1',
@@ -44,6 +152,46 @@ export const StewardChatbot: React.FC<StewardChatbotProps> = ({ currentEntityId 
   useEffect(() => {
     scrollToBottom();
   }, [messages]);
+
+  useEffect(() => {
+    const updateFlightArea = () =>
+      setFlightArea({
+        width: Math.max(window.innerWidth - 160, 0),
+        height: Math.max(window.innerHeight - 190, 0),
+      });
+
+    updateFlightArea();
+    window.addEventListener('resize', updateFlightArea);
+    return () => window.removeEventListener('resize', updateFlightArea);
+  }, []);
+
+  useEffect(() => {
+    if (!isFlying) {
+      setFlightFrame(0);
+      return;
+    }
+
+    // Full flap, recovery, and a held glide pose before the next flap.
+    const frameSequence = [0, 1, 2, 3, 4, 5, 6, 7, 7, 7, 7, 7, 6, 5, 4, 3, 2, 1];
+    let sequenceIndex = 0;
+    const frameTimer = window.setInterval(() => {
+      sequenceIndex = (sequenceIndex + 1) % frameSequence.length;
+      setFlightFrame(frameSequence[sequenceIndex]);
+    }, 105);
+
+    return () => window.clearInterval(frameTimer);
+  }, [isFlying]);
+
+  useEffect(() => {
+    if (!isOpen) return;
+
+    const firstDrop = window.setTimeout(() => setHeaderAnimationCycle((cycle) => cycle + 1), 4000);
+    const repeatedDrops = window.setInterval(() => setHeaderAnimationCycle((cycle) => cycle + 1), 30000);
+    return () => {
+      window.clearTimeout(firstDrop);
+      window.clearInterval(repeatedDrops);
+    };
+  }, [isOpen]);
 
   const handleSend = async () => {
     if (!input.trim() || isLoading) return;
@@ -228,10 +376,64 @@ export const StewardChatbot: React.FC<StewardChatbotProps> = ({ currentEntityId 
       <motion.button
         whileHover={{ scale: 1.1 }}
         whileTap={{ scale: 0.9 }}
-        onClick={() => setIsOpen(true)}
+        onClick={() => {
+          if (isFlying) return;
+          if (flightArea.width === 0) {
+            setIsOpen(true);
+            return;
+          }
+          playCrowCalls();
+          setIsFlying(true);
+        }}
+        disabled={isFlying}
+        aria-label="Open Steward AI chat"
         className="fixed bottom-6 right-6 w-16 h-16 bg-gold-500 text-black rounded-full shadow-[0_8px_32px_rgba(212,175,55,0.4)] flex items-center justify-center z-50 cursor-pointer border-2 border-gold-600/20"
       >
-        <Bot size={28} className="drop-shadow-sm" />
+        {isFlying ? (
+          <motion.div
+            className="absolute h-[128px] w-[96px] drop-shadow-[0_7px_6px_rgba(0,0,0,0.35)]"
+            style={{
+              offsetPath: `path("M 0 0 C ${-flightArea.width * 0.18} ${-flightArea.height * 0.12}, ${-flightArea.width * 0.52} ${-flightArea.height * 0.58}, ${-flightArea.width * 0.72} ${-flightArea.height * 0.38} C ${-flightArea.width * 0.92} ${-flightArea.height * 0.18}, ${-flightArea.width * 0.42} ${-flightArea.height * 0.05}, 0 0")`,
+              offsetRotate: '0deg',
+            }}
+            initial={{ offsetDistance: '0%', scale: 0.58, rotate: -4 }}
+            animate={{
+              offsetDistance: ['0%', '28%', '50%', '72%', '100%'],
+              scale: [0.58, 0.92, 1, 0.9, 0.58],
+              rotate: [-4, -7, -11, 6, 2],
+            }}
+            transition={{ duration: 5.4, ease: 'linear', times: [0, 0.28, 0.5, 0.72, 1] }}
+            onAnimationComplete={() => {
+              setIsFlying(false);
+              setIsOpen(true);
+            }}
+          >
+            <motion.div
+              className="absolute inset-0"
+              style={{
+                backgroundImage: 'url(/assets/steward-crow-flight-v2.png)',
+                backgroundRepeat: 'no-repeat',
+                backgroundSize: '800% 100%',
+                backgroundPosition: `${(flightFrame * 100) / 7}% center`,
+              }}
+              animate={{ opacity: [1, 1, 0, 0] }}
+              transition={{ duration: 5.4, ease: 'linear', times: [0, 0.44, 0.56, 1] }}
+            />
+            <motion.div
+              className="absolute inset-0 -scale-x-100"
+              style={{
+                backgroundImage: 'url(/assets/steward-crow-flight-v2.png)',
+                backgroundRepeat: 'no-repeat',
+                backgroundSize: '800% 100%',
+                backgroundPosition: `${(flightFrame * 100) / 7}% center`,
+              }}
+              animate={{ opacity: [0, 0, 1, 1] }}
+              transition={{ duration: 5.4, ease: 'linear', times: [0, 0.44, 0.56, 1] }}
+            />
+          </motion.div>
+        ) : (
+          <CrowImage size={48} className="drop-shadow-sm" />
+        )}
       </motion.button>
 
       {/* Chat Window */}
@@ -247,7 +449,7 @@ export const StewardChatbot: React.FC<StewardChatbotProps> = ({ currentEntityId 
             <div className="bg-black p-5 flex justify-between items-center text-white border-b border-white/10">
               <div className="flex items-center gap-3">
                 <div className="w-12 h-12 bg-gold-500 rounded-2xl flex items-center justify-center shadow-lg shadow-gold-500/20">
-                  <Bot size={24} className="text-black" />
+                  <AnimatedHeaderCrow cycle={headerAnimationCycle} />
                 </div>
                 <div>
                   <h3 className="font-black text-sm uppercase tracking-widest">Steward AI</h3>

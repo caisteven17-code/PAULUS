@@ -3,16 +3,14 @@
 import { AnomalySimulationMode, SubmissionInstitutionType, SubmissionStep, SubmissionTemplate } from './types';
 
 export const submissionSteps: SubmissionStep[] = [
-  { id: 'upload', label: 'Uploading Report', description: 'Preparing your file inside the submission sandbox.' },
-  { id: 'cleaning', label: 'Data Cleaning', description: 'Formatting and normalizing uploaded values.' },
-  { id: 'anomaly', label: 'Anomaly Check', description: 'Checking for unusual or suspicious financial values.' },
-  { id: 'validation', label: 'Data Validation', description: 'Validating required structure and business rules.' },
-  { id: 'loading', label: 'Loading to Database', description: 'Simulating save to the temporary submission pipeline.' },
-  {
-    id: 'success',
-    label: 'Report Submitted Successfully',
-    description: 'Submission flow completed in frontend-only mode.',
-  },
+  { id: 'upload', label: 'Receiving report', description: 'Saving the file or manual submission in the sandbox.' },
+  { id: 'validation', label: 'Validating fields', description: 'Checking the form structure and required values.' },
+  { id: 'cleaning', label: 'Cleaning data', description: 'Standardizing labels, codes, and financial amounts.' },
+  { id: 'calculation', label: 'Calculating totals', description: 'Preparing derived IAFR values.' },
+  { id: 'mapping', label: 'Mapping accounts', description: 'Matching values to canonical IAFR accounts.' },
+  { id: 'loading', label: 'Saving test records', description: 'Writing only to the production-shaped test schema.' },
+  { id: 'reconciliation', label: 'Reconciling results', description: 'Confirming submitted and stored values agree.' },
+  { id: 'success', label: 'Complete', description: 'The sandbox submission passed its checks.' },
 ];
 
 const parishTemplateContent = [

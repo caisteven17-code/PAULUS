@@ -6,7 +6,7 @@ per-group numbers. This is the fix for the asymmetry in the first version.
 """
 import sys, time
 sys.path.insert(0, ".")
-from app.services.supabase_client import get_table
+from app.services.weather_repository import get_table
 from app.services.weather_daily_classifier import (
     classify_rain, classify_temp, classify_humidity, classify_wind, classify_severe, SOURCE_LINEAGE,
 )
