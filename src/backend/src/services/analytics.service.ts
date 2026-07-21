@@ -7,6 +7,8 @@ const PYTHON_ANALYTICS_URL = (process.env.ANALYTICS_PYTHON_URL || 'http://127.0.
 @Injectable()
 export class AnalyticsService {
   private readonly logger = new Logger(AnalyticsService.name);
+  private pythonRetryAfter = 0;
+  private pythonUnavailableLogged = false;
 
   constructor(
     @Inject(forwardRef(() => FinancialService))
@@ -18,12 +20,22 @@ export class AnalyticsService {
   }
 
   private async callPython(path: string): Promise<any | null> {
+    if (Date.now() < this.pythonRetryAfter) return null;
+
     try {
       const res = await fetch(`${PYTHON_ANALYTICS_URL}${path}`, { signal: AbortSignal.timeout(5000) });
       if (!res.ok) return null;
+      if (this.pythonUnavailableLogged) {
+        this.logger.log('Python analytics connection restored');
+        this.pythonUnavailableLogged = false;
+      }
+      this.pythonRetryAfter = 0;
       return await res.json();
     } catch {
-      this.logger.warn(`Python analytics unreachable — falling back to NestJS computation`);
+      this.pythonRetryAfter = Date.now() + 10_000;
+      if (this.pythonUnavailableLogged) return null;
+      this.pythonUnavailableLogged = true;
+      this.logger.log('Python analytics is still starting; using NestJS fallback temporarily');
       return null;
     }
   }
@@ -73,6 +85,10 @@ export class AnalyticsService {
     return x - Math.floor(x);
   }
 
+  private isUuid(value: string): boolean {
+    return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value);
+  }
+
   async calculateHealthScore(
     entityId: string,
     entityType: 'parish' | 'seminary' | 'school',
@@ -85,7 +101,12 @@ export class AnalyticsService {
     if (year) params.set('year', String(year));
     if (timeframe) params.set('timeframe', timeframe);
     const query = params.toString();
-    const python = await this.callPython(`/analytics/health/${entityType}/${entityId}${query ? `?${query}` : ''}`);
+    // Python queries UUID-typed institution_id columns directly. Legacy/demo
+    // entities can still be keyed by their display name, so keep those on the
+    // NestJS path, which already resolves names safely before querying.
+    const python = this.isUuid(entityId)
+      ? await this.callPython(`/analytics/health/${entityType}/${entityId}${query ? `?${query}` : ''}`)
+      : null;
     if (python) {
       return {
         entityId: python.entity_id,

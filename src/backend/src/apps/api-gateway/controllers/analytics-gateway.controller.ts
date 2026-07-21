@@ -18,22 +18,35 @@ async function proxyToPython(
   if (req.headers.authorization) headers['authorization'] = req.headers.authorization;
 
   const hasBody = method === 'POST';
-  const response = await fetch(targetUrl, {
-    method,
-    headers,
-    body: hasBody ? JSON.stringify(req.body) : undefined,
-  });
-
-  const text = await response.text();
-  let data: unknown;
   try {
-    data = JSON.parse(text);
-  } catch {
-    data = text;
-  }
+    const response = await fetch(targetUrl, {
+      method,
+      headers,
+      body: hasBody ? JSON.stringify(req.body) : undefined,
+      signal: AbortSignal.timeout(10_000),
+    });
 
-  res.status(response.status);
-  return data;
+    const text = await response.text();
+    let data: unknown;
+    try {
+      data = JSON.parse(text);
+    } catch {
+      data = text;
+    }
+
+    res.status(response.status);
+    return data;
+  } catch (error) {
+    // Uvicorn can be briefly unavailable while its development reloader is
+    // restarting. Keep that expected condition out of Nest's global exception
+    // handler and give the frontend a useful, retryable response instead.
+    res.status(503);
+    return {
+      error: 'Python analytics service is temporarily unavailable.',
+      retryable: true,
+      detail: error instanceof Error ? error.message : 'Connection failed',
+    };
+  }
 }
 
 @Controller('analytics')

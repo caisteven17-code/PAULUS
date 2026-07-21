@@ -1066,6 +1066,10 @@ export function Settings({ onBack, onLogout, onNavigate, role = 'bishop', initia
     setInstitutionFilter('all');
   };
 
+  const activeAccounts = accounts.filter((account) => account.status === 'active');
+  const activeRoleCount = new Set(activeAccounts.map((account) => account.role).filter(Boolean)).size;
+  const activeInstitutionCount = new Set(activeAccounts.map((account) => account.entity).filter(Boolean)).size;
+
   const filteredAccounts = accounts.filter((acc) => {
     const query = searchQuery.trim().toLowerCase();
     const matchesSearch =
@@ -1974,30 +1978,62 @@ export function Settings({ onBack, onLogout, onNavigate, role = 'bishop', initia
             )}
 
             {activeTab === 'user-management' && permissions.create_users === true && (
-              <div className="bg-white rounded-[32px] shadow-sm border border-gray-100 p-8">
-                <div className="flex items-center justify-between mb-8">
-                  <div className="space-y-1">
-                    <h3 className="text-2xl font-serif font-bold text-gray-900">User Account Management</h3>
-                    <p className="text-xs text-gray-500">Manage access and roles for diocese personnel.</p>
-                  </div>
-                  <div className="flex items-center gap-4">
-                    <div className="rounded-xl bg-gray-100 px-4 py-2 text-xs font-bold text-gray-700">
-                      Active Accounts
+              <div className="space-y-5">
+                <section className="relative overflow-hidden rounded-[32px] bg-gradient-to-br from-black via-[#111111] to-[#29230f] px-6 py-7 text-white shadow-[0_24px_60px_rgba(15,15,15,0.2)] md:px-8 md:py-8">
+                  <div className="pointer-events-none absolute -right-16 -top-28 h-72 w-72 rounded-full border-[40px] border-gold-500/[0.07]" />
+                  <div className="pointer-events-none absolute bottom-0 right-1/3 h-32 w-32 translate-y-20 rounded-full bg-gold-400/10 blur-2xl" />
+                  <div className="relative flex flex-col gap-7 xl:flex-row xl:items-end xl:justify-between">
+                    <div className="max-w-xl">
+                      <div className="inline-flex items-center gap-2 rounded-full border border-gold-500/25 bg-gold-500/10 px-3 py-1.5 text-[9px] font-black uppercase tracking-[0.22em] text-gold-400">
+                        <ShieldCheck className="h-3.5 w-3.5" /> Identity &amp; Access
+                      </div>
+                      <h3 className="mt-4 text-3xl font-black tracking-tight md:text-4xl">User Account Management</h3>
+                      <p className="mt-3 max-w-lg text-sm font-medium leading-relaxed text-white/55">
+                        Provision personnel accounts, assign institutional access, and keep diocesan roles organized from one secure directory.
+                      </p>
                     </div>
-                    <button
-                      onClick={() => {
-                        setEditingAccountId(null);
-                        setIsModalOpen(true);
-                      }}
-                      className="bg-[#D4AF37] hover:bg-[#B8962E] text-white px-5 py-3 rounded-xl text-sm font-bold flex items-center gap-2 transition-all shadow-xl shadow-[#D4AF37]/20 active:scale-95 whitespace-nowrap"
-                    >
-                      <UserPlus className="w-4 h-4" />
-                      Add User Account
-                    </button>
-                  </div>
-                </div>
 
-                <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-center">
+                    <div className="flex flex-col gap-3 sm:flex-row sm:items-stretch">
+                      <div className="grid grid-cols-3 overflow-hidden rounded-2xl border border-white/15 bg-slate-950/20 backdrop-blur-sm">
+                        {[
+                          { label: 'Active', value: activeAccounts.length, Icon: Users },
+                          { label: 'Roles', value: activeRoleCount, Icon: Shield },
+                          { label: 'Institutions', value: activeInstitutionCount, Icon: Building2 },
+                        ].map(({ label, value, Icon }) => (
+                          <div key={label} className="min-w-[92px] border-r border-white/10 px-4 py-3 last:border-r-0">
+                            <div className="flex items-center gap-1.5 text-gold-400/70">
+                              <Icon className="h-3.5 w-3.5" />
+                              <span className="text-[8px] font-black uppercase tracking-[0.16em]">{label}</span>
+                            </div>
+                            <p className="mt-2 text-2xl font-black leading-none text-white">{value}</p>
+                          </div>
+                        ))}
+                      </div>
+                      <button
+                        onClick={() => {
+                          setEditingAccountId(null);
+                          setIsModalOpen(true);
+                        }}
+                        className="inline-flex min-h-14 items-center justify-center gap-2 rounded-2xl bg-gold-500 px-5 text-[11px] font-black uppercase tracking-[0.14em] text-black shadow-xl shadow-gold-500/15 transition-all hover:-translate-y-0.5 hover:bg-gold-400 active:translate-y-0 whitespace-nowrap"
+                      >
+                        <UserPlus className="h-4 w-4" />
+                        Add User Account
+                      </button>
+                    </div>
+                  </div>
+                </section>
+
+                <section className="overflow-hidden rounded-[28px] border border-slate-200 bg-white shadow-[0_16px_45px_rgba(15,23,42,0.07)]">
+                  <div className="border-b border-slate-100 px-5 py-5 md:px-7">
+                    <div className="mb-4 flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between">
+                      <div>
+                        <p className="text-[9px] font-black uppercase tracking-[0.22em] text-gold-600">Personnel directory</p>
+                        <h4 className="mt-1 text-xl font-black text-slate-950">Authorized accounts</h4>
+                      </div>
+                      <p className="text-xs font-bold text-slate-400">Showing {filteredAccounts.length} of {activeAccounts.length} active accounts</p>
+                    </div>
+
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
                   <div className="relative flex-1">
                     <Search className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400" />
                     <input
@@ -2066,11 +2102,12 @@ export function Settings({ onBack, onLogout, onNavigate, role = 'bishop', initia
                     </FilterField>
                   </FilterModal>
                 </div>
+                  </div>
 
-                <div className="overflow-x-auto">
+                <div className="overflow-x-auto px-5 pb-5 md:px-7 md:pb-7">
                   <table className="w-full text-left border-collapse">
                     <thead>
-                      <tr className="border-b border-gray-100">
+                      <tr className="border-b border-slate-200 bg-slate-50/80">
                         <th className="pb-3.5 font-bold text-gray-400 text-[10px] uppercase tracking-widest w-1/5">
                           Institution Name
                         </th>
@@ -2097,16 +2134,23 @@ export function Settings({ onBack, onLogout, onNavigate, role = 'bishop', initia
                           <tr
                             key={account.id}
                             onClick={() => setViewAccount(account)}
-                            className="group cursor-pointer hover:bg-gray-50/50 transition-colors"
+                            className="group cursor-pointer transition-colors hover:bg-gold-50/45"
                           >
                             <td className="py-4 pr-4">
                               <div className="font-bold text-gray-900 text-sm">{account.entity}</div>
                             </td>
                             <td className="py-4 pr-4 text-gray-600 text-sm font-medium capitalize">
-                              {account.entityType || 'Institution'}
+                              <span className="inline-flex rounded-full border border-gold-200 bg-gold-50 px-2.5 py-1 text-[9px] font-black uppercase tracking-wider text-gold-700">
+                                {account.entityType || 'Institution'}
+                              </span>
                             </td>
                             <td className="py-4 pr-4 text-gray-800 text-sm font-semibold">
-                              {getFormattedFullName(account.leader)}
+                              <div className="flex items-center gap-3">
+                                <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-black to-slate-700 text-[10px] font-black text-gold-400 shadow-sm">
+                                  {getInitials(account.leader || account.email)}
+                                </span>
+                                <span>{getFormattedFullName(account.leader)}</span>
+                              </div>
                             </td>
                             <td className="py-4 pr-4 text-gray-500 font-mono text-xs">{account.email}</td>
                             <td className="py-4 pr-4">
@@ -2123,14 +2167,14 @@ export function Settings({ onBack, onLogout, onNavigate, role = 'bishop', initia
                               </span>
                             </td>
                             <td className="py-4 text-right">
-                              <div className="flex items-center justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                              <div className="flex items-center justify-end gap-1 opacity-60 transition-opacity group-hover:opacity-100">
                                 {viewMode === 'active' && (
                                   <button
                                     onClick={(e) => {
                                       e.stopPropagation();
                                       handleEditClick(account);
                                     }}
-                                    className="p-2 text-gray-400 hover:text-[#D4AF37] hover:bg-[#D4AF37]/10 rounded-lg transition-all"
+                                    className="rounded-lg p-2 text-slate-400 transition-all hover:bg-gold-50 hover:text-gold-700"
                                     title="Edit Account"
                                   >
                                     <Pencil className="w-3.5 h-3.5" />
@@ -2173,6 +2217,7 @@ export function Settings({ onBack, onLogout, onNavigate, role = 'bishop', initia
                     </tbody>
                   </table>
                 </div>
+                </section>
               </div>
             )}
 

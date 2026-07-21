@@ -10,7 +10,7 @@ import { apiClient } from '../lib/api-client';
 import { getAccessRoleLabel } from '../lib/access';
 import { InlineLoader } from '../components/ui/LoadingScreen';
 import { getSubmissionStatus, type SubmissionStatus } from '../lib/healthDeadlines';
-import { getPriestHealthReminder, getDioceseHealthSummary } from '../lib/healthAnnouncements';
+import { getPriestHealthReminder } from '../lib/healthAnnouncements';
 import { FilterModal, FilterField } from '../components/ui/FilterModal';
 import { selectField } from '../lib/formStyles';
 
@@ -78,13 +78,12 @@ export function HealthTracker() {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [selectedPriest, setSelectedPriest] = useState<PriestRecord | null>(null);
   const [selectedGroup, setSelectedGroup] = useState<PriestGroup | null>(null);
-  const [filter, setFilter] = useState<'all' | 'birthdays' | 'checkups'>('all');
+  const [filter, setFilter] = useState<'all' | 'birthdays' | 'checkups' | 'pending'>('all');
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState<'all' | 'good' | 'fair' | 'needs-attention'>('all');
   const [submissionFilter, setSubmissionFilter] = useState<'all' | 'submitted' | 'pending' | 'late' | 'year-late'>('all');
   const [parishFilter, setParishFilter] = useState('all');
   const [page, setPage] = useState(1);
-  const [showHealthNames, setShowHealthNames] = useState(false); // diocesan drill-down modal
   const PAGE_SIZE = 9;
   // Soft-archive is kept client-side (no archive column on health_records yet),
   // persisted so the archived view survives reloads.
@@ -747,6 +746,19 @@ export function HealthTracker() {
 
   const isArchived = (p: PriestRecord) => archivedIds.includes(p.id);
   const activePriests = priests.filter((p) => !isArchived(p));
+  const latestActivePriests = Array.from(
+    activePriests.reduce((latestByPriest, priest) => {
+      const key = priest.email?.trim().toLowerCase() || priest.name?.trim().toLowerCase() || priest.id;
+      const current = latestByPriest.get(key);
+      if (!current || new Date(priest.lastCheckup || 0).getTime() > new Date(current.lastCheckup || 0).getTime()) {
+        latestByPriest.set(key, priest);
+      }
+      return latestByPriest;
+    }, new Map<string, PriestRecord>()).values(),
+  );
+  const pendingPriests = latestActivePriests.filter(
+    (p) => getSubmissionStatus(p.birthDate, p.lastCheckup).needsAttention,
+  );
 
   const parishOptions = Array.from(new Set(activePriests.map((p) => p.parish).filter(Boolean))).sort();
   const healthFilterCount =
@@ -760,6 +772,7 @@ export function HealthTracker() {
   let filteredPriests: PriestRecord[];
   if (filter === 'birthdays') filteredPriests = upcomingBirthdays.filter((p) => !isArchived(p));
   else if (filter === 'checkups') filteredPriests = priestsNeedingCheckup.filter((p) => !isArchived(p));
+  else if (filter === 'pending') filteredPriests = pendingPriests;
   else filteredPriests = activePriests;
 
   if (statusFilter !== 'all') {
@@ -841,14 +854,6 @@ export function HealthTracker() {
 
   // ── Auto-generated medical-records reminders (System / Important) ──────────
   // Computed live from the records, so they disappear once a record is submitted.
-  const healthLikeRecords = activePriests.map((p) => ({
-    name: p.name,
-    parish: p.parish,
-    email: p.email,
-    birthDate: p.birthDate,
-    lastCheckup: p.lastCheckup,
-  }));
-  const dioceseSummary = canManageRecords ? getDioceseHealthSummary(healthLikeRecords) : null;
   const myRecord = isPriestView
     ? priests.find(
         (p) =>
@@ -937,27 +942,6 @@ export function HealthTracker() {
             </div>
           </div>
         )}
-        {dioceseSummary && (
-          <button
-            onClick={() => setShowHealthNames(true)}
-            className="mb-6 flex w-full items-center gap-4 rounded-3xl border border-amber-200 bg-amber-50 p-5 text-left transition-colors hover:bg-amber-100 md:p-6"
-          >
-            <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-amber-500 text-white">
-              <Stethoscope className="h-5 w-5" />
-            </div>
-            <div className="min-w-0 flex-1">
-              <div className="flex flex-wrap items-center gap-2">
-                <span className="rounded-md bg-amber-500/15 px-2 py-0.5 text-[9px] font-black uppercase tracking-wider text-amber-700">
-                  System · Important
-                </span>
-                <p className="text-sm font-black text-amber-900">{dioceseSummary.title}</p>
-              </div>
-              <p className="mt-1 text-sm font-medium leading-relaxed text-amber-800">{dioceseSummary.content}</p>
-            </div>
-            <ChevronRight className="h-5 w-5 shrink-0 text-amber-500" />
-          </button>
-        )}
-
         {/* ------ Filter / search bar ------ */}
         <div className="mb-6 rounded-3xl border border-slate-200 bg-white p-3 shadow-[0_12px_32px_rgba(15,23,42,0.06)]">
           <div className="flex flex-col gap-3 lg:flex-row lg:items-center">
@@ -966,12 +950,15 @@ export function HealthTracker() {
                 { id: 'all', label: 'All', Icon: Users },
                 { id: 'birthdays', label: 'Birthdays', Icon: Cake },
                 { id: 'checkups', label: 'Check-ups', Icon: Stethoscope },
+                { id: 'pending', label: 'Pending submissions', Icon: FileText },
               ] as const).map(({ id, label, Icon }) => {
                 const count =
                   id === 'birthdays'
                       ? upcomingBirthdays.filter((p) => !isArchived(p)).length
                       : id === 'checkups'
                         ? priestsNeedingCheckup.filter((p) => !isArchived(p)).length
+                        : id === 'pending'
+                          ? pendingPriests.length
                         : activePriests.length;
                 const active = filter === id;
                 return (
@@ -1243,6 +1230,27 @@ export function HealthTracker() {
             </motion.div>
           )}
         </AnimatePresence>
+
+        {filter === 'pending' && (
+          <div className="mb-6 flex flex-col gap-4 rounded-3xl border border-amber-200 bg-gradient-to-r from-amber-50 to-white p-5 sm:flex-row sm:items-center sm:justify-between md:p-6">
+            <div className="flex items-start gap-4">
+              <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-amber-500 text-white shadow-lg shadow-amber-500/20">
+                <FileText className="h-5 w-5" />
+              </div>
+              <div>
+                <p className="text-[10px] font-black uppercase tracking-[0.2em] text-amber-700">Medical compliance</p>
+                <h2 className="mt-1 font-serif text-2xl font-bold text-slate-950">Pending Submissions</h2>
+                <p className="mt-1 text-sm font-medium text-slate-500">
+                  Priests whose medical records are due or overdue for the current submission cycle.
+                </p>
+              </div>
+            </div>
+            <div className="rounded-2xl border border-amber-200 bg-white px-5 py-3 text-center shadow-sm">
+              <p className="text-2xl font-black leading-none text-amber-700">{priestGroups.length}</p>
+              <p className="mt-1 text-[9px] font-black uppercase tracking-[0.16em] text-slate-400">Awaiting records</p>
+            </div>
+          </div>
+        )}
 
         {/* ------ Records card grid ------ */}
         {recordsLoading ? (
@@ -1555,52 +1563,6 @@ export function HealthTracker() {
           )}
         </AnimatePresence>
 
-        {/* ------ Diocesan drill-down: priests with pending medical records ------ */}
-        <AnimatePresence>
-          {showHealthNames && dioceseSummary && (
-            <div className="fixed inset-0 z-[140] flex items-center justify-center p-4">
-              <motion.div
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                exit={{ opacity: 0 }}
-                onClick={() => setShowHealthNames(false)}
-                className="absolute inset-0 bg-black/50 backdrop-blur-sm"
-              />
-              <motion.div
-                initial={{ opacity: 0, scale: 0.96, y: 16 }}
-                animate={{ opacity: 1, scale: 1, y: 0 }}
-                exit={{ opacity: 0, scale: 0.96, y: 16 }}
-                className="relative flex max-h-[80vh] w-full max-w-md flex-col overflow-hidden rounded-3xl bg-white shadow-2xl"
-              >
-                <div className="flex items-center justify-between border-b border-slate-100 px-6 py-5">
-                  <div>
-                    <p className="text-[10px] font-black uppercase tracking-widest text-amber-600">System · Important</p>
-                    <h3 className="mt-0.5 text-lg font-black text-slate-950">Pending Medical Records</h3>
-                  </div>
-                  <button
-                    onClick={() => setShowHealthNames(false)}
-                    className="rounded-xl p-2 text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-700"
-                  >
-                    <X className="h-5 w-5" />
-                  </button>
-                </div>
-                <div className="divide-y divide-slate-50 overflow-y-auto px-2 py-2">
-                  {(dioceseSummary.names ?? []).map((n, i) => (
-                    <div key={`${n.name}-${i}`} className="flex items-center justify-between gap-3 px-4 py-3">
-                      <div className="min-w-0">
-                        <p className="truncate text-sm font-bold text-slate-900">{n.name}</p>
-                        {n.parish && <p className="truncate text-[11px] text-slate-400">{n.parish}</p>}
-                      </div>
-                      <span className="shrink-0 rounded-full bg-amber-50 px-2.5 py-1 text-[10px] font-black uppercase tracking-wider text-amber-700">
-                        {n.status}
-                      </span>
-                    </div>
-                  ))}
-                </div>
-              </motion.div>
-            </div>
-          )}
-        </AnimatePresence>
       </div>
     </div>
   );

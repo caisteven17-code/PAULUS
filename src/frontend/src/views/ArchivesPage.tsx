@@ -56,6 +56,16 @@ const TYPE_META: Record<ArchiveType, { label: string; icon: React.ElementType; t
   health: { label: 'Health Record', icon: Heart, tint: 'bg-fuchsia-50 border-fuchsia-100 text-fuchsia-600', chip: 'bg-fuchsia-50 text-fuchsia-700 border-fuchsia-100' },
 };
 
+const ARCHIVE_SECTION_TITLES: Record<'all' | ArchiveType, string> = {
+  all: 'All Archived Records',
+  user: 'Archived Users',
+  entity: 'Archived Institutions',
+  event: 'Archived Events',
+  announcement: 'Archived Announcements',
+  project: 'Archived Projects',
+  health: 'Archived Health Records',
+};
+
 const SUBTYPE_ICON: Record<string, React.ElementType> = ENTITY_TYPE_ICON;
 
 const PAGE_SIZE = 10;
@@ -524,6 +534,23 @@ export function ArchivesPage() {
         </div>
 
         {/* ── Table ── */}
+        <div className="mb-4 flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
+          <div>
+            <p className="text-[10px] font-black uppercase tracking-[0.22em] text-gold-600">Selected category</p>
+            <h2 className="mt-1 font-serif text-2xl font-bold text-slate-950">{ARCHIVE_SECTION_TITLES[typeFilter]}</h2>
+            <p className="mt-1 text-sm font-medium text-slate-400">
+              {typeFilter === 'all'
+                ? 'Showing every archived record you are permitted to manage.'
+                : `Showing only ${ARCHIVE_SECTION_TITLES[typeFilter].toLowerCase()}.`}
+            </p>
+          </div>
+          {!loading && (
+            <span className="inline-flex w-fit items-center rounded-full border border-slate-200 bg-white px-3 py-1.5 text-[10px] font-black uppercase tracking-[0.14em] text-slate-500">
+              {filtered.length} record{filtered.length === 1 ? '' : 's'}
+            </span>
+          )}
+        </div>
+
         {loading ? (
           <div className="rounded-3xl border border-slate-200 bg-white">
             <InlineLoader label="Loading archives" />

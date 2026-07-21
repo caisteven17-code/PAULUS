@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo, useEffect, useRef } from 'react';
 import {
   Filter,
   ChevronDown,
@@ -1061,6 +1061,7 @@ export function BishopDashboard({
   const [apiParishFinancialTrend, setApiParishFinancialTrend] = useState<any | null>(null);
   const [apiParishSeasonality, setApiParishSeasonality] = useState<any | null>(null);
   const [apiParishProjects, setApiParishProjects] = useState<any | null>(null);
+  const financialTrendCacheRef = useRef<Map<string, any>>(new Map());
   // True while a filter/year/parish change is refetching real data. The old
   // values stay on screen until the new response lands (avoids a jarring
   // flash to empty), so without this flag there's no way to tell "updating"
@@ -1319,8 +1320,10 @@ export function BishopDashboard({
   const selectedParishInstitutionId = useMemo(() => {
     if (entityType !== 'Parishes' || filterMode !== 'per-entity') return null;
     if (!entityFilter || entityFilter === 'All Entities') return null;
+    const selectedEntity = realEntities?.find((entity) => entity.name === entityFilter);
+    if (selectedEntity?.id && UUID_PATTERN.test(selectedEntity.id)) return selectedEntity.id;
     return parishIdByName[entityFilter] ?? null;
-  }, [entityType, filterMode, entityFilter, parishIdByName]);
+  }, [entityType, filterMode, entityFilter, realEntities, parishIdByName]);
 
   // Vicariate to scope the diocese-wide ("all") descriptive fetch to, when
   // the Vicariate filter alone is active (vicariate is a real, first-class
@@ -1411,8 +1414,16 @@ export function BishopDashboard({
       setIsDescriptiveLoading(false);
       return;
     }
+    const requestKey = JSON.stringify({
+      institutionId,
+      year,
+      vicariates: vicariates ? [...vicariates].sort() : [],
+      institutionIds: institutionIds ? [...institutionIds].sort() : [],
+    });
+    const cachedFinancialTrend = financialTrendCacheRef.current.get(requestKey);
     let cancelled = false;
     setIsDescriptiveLoading(true);
+    if (cachedFinancialTrend) setApiParishFinancialTrend(cachedFinancialTrend);
 
     Promise.all([
       // Always fetch the full real history (no year, timeframe: 'all') in a
@@ -1428,21 +1439,24 @@ export function BishopDashboard({
           'parish',
           institutionId,
           institutionIds
-            ? { timeframe: 'all', institutionIds }
-            : { timeframe: 'all', vicariates },
+            ? { year, timeframe: 'all', institutionIds }
+            : { year, timeframe: 'all', vicariates },
         )
         .then((res: any) => {
-          if (
-            !cancelled &&
+          if (cancelled) return;
+          const usable =
             res?.data_sufficient !== false &&
             Array.isArray(res?.monthly_series) &&
-            res.monthly_series.length > 0
-          ) {
+            res.monthly_series.length > 0;
+          if (usable) {
+            financialTrendCacheRef.current.set(requestKey, res);
             setApiParishFinancialTrend(res);
+          } else if (!cachedFinancialTrend) {
+            setApiParishFinancialTrend(null);
           }
         })
         .catch(() => {
-          if (!cancelled) setApiParishFinancialTrend(null);
+          if (!cancelled && !cachedFinancialTrend) setApiParishFinancialTrend(null);
         }),
       apiClient
         .getSeasonalityTrend('parish', institutionId, {
@@ -1450,14 +1464,12 @@ export function BishopDashboard({
           timeframe: timeframe === '6m' ? '6m' : timeframe === '1y' ? '12m' : 'all',
         })
         .then((res: any) => {
-          if (
-            !cancelled &&
+          if (cancelled) return;
+          const usable =
             res?.data_sufficient !== false &&
             Array.isArray(res?.monthly_trend) &&
-            res.monthly_trend.length > 0
-          ) {
-            setApiParishSeasonality(res);
-          }
+            res.monthly_trend.length > 0;
+          setApiParishSeasonality(usable ? res : null);
         })
         .catch(() => {
           if (!cancelled) setApiParishSeasonality(null);
@@ -1465,8 +1477,8 @@ export function BishopDashboard({
       apiClient
         .getProjectsDescriptive(institutionId)
         .then((res: any) => {
-          if (!cancelled && res?.data_sufficient !== false && res?.aggregates) {
-            setApiParishProjects(res);
+          if (!cancelled) {
+            setApiParishProjects(res?.data_sufficient !== false && res?.aggregates ? res : null);
           }
         })
         .catch(() => {

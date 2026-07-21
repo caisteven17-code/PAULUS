@@ -1241,11 +1241,11 @@ export function AuditLog() {
         {showAnalytics && (
           <motion.div
             key="analytics"
-            initial={{ opacity: 0, height: 0 }}
-            animate={{ opacity: 1, height: 'auto' }}
-            exit={{ opacity: 0, height: 0 }}
-            transition={{ duration: 0.3, ease: 'easeInOut' }}
-            className="overflow-hidden border-b border-gray-100 bg-gray-50"
+            initial={{ opacity: 0, y: -8 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -8 }}
+            transition={{ duration: 0.18, ease: 'easeOut' }}
+            className="border-b border-gray-100 bg-gray-50"
           >
             <div className="max-w-[1400px] mx-auto px-6 py-8">
               <div className="flex items-center gap-3 mb-6">
@@ -1267,6 +1267,7 @@ export function AuditLog() {
                   <ReactECharts
                     style={{ height: '180px', width: '100%' }}
                     option={{
+                      animation: false,
                       color: ['#6366f1', '#8b5cf6', '#06b6d4', '#10b981', '#f59e0b', '#ef4444'],
                       tooltip: { trigger: 'axis' },
                       grid: { top: 5, right: 10, left: 20, bottom: 20 },
@@ -1323,6 +1324,7 @@ export function AuditLog() {
                   <ReactECharts
                     style={{ height: '140px', width: '100%' }}
                     option={{
+                      animation: false,
                       color: categoryData.map((c) => c.color),
                       tooltip: { trigger: 'item', formatter: '{b}: {c}' },
                       series: [
@@ -1359,6 +1361,7 @@ export function AuditLog() {
                   <ReactECharts
                     style={{ height: '160px', width: '100%' }}
                     option={{
+                      animation: false,
                       color: severityData.map((d) => d.color),
                       tooltip: { trigger: 'axis', axisPointer: { type: 'shadow' } },
                       grid: { top: 5, right: 20, left: 60, bottom: 5 },
@@ -1400,6 +1403,7 @@ export function AuditLog() {
                   <ReactECharts
                     style={{ height: '160px', width: '100%' }}
                     option={{
+                      animation: false,
                       color: ['#D4AF37'],
                       tooltip: { trigger: 'axis', axisPointer: { type: 'shadow' } },
                       grid: { top: 5, right: 20, left: 80, bottom: 5 },

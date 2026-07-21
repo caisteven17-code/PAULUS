@@ -19,6 +19,20 @@ export interface Announcement {
   archivedAt: number | null;
   archivedBy: string | null;
   createdAt: number;
+  audienceType: 'general' | 'specific';
+  recipientIds: string[];
+  recipientCount: number;
+  attachments: AnnouncementAttachment[];
+}
+
+export interface AnnouncementAttachment {
+  id: string;
+  originalName: string;
+  mimeType: string;
+  fileSize: number;
+  kind: 'image' | 'document';
+  displayOrder: number;
+  altText: string | null;
 }
 
 const GRACE_PERIOD_MS = 5 * 60 * 1000; // 5 minutes
@@ -32,6 +46,8 @@ export class AnnouncementService {
   ) {}
 
   private toAnnouncement(row: any): Announcement {
+    const recipients = row.announcement_recipients ?? [];
+    const attachments = row.announcement_attachments ?? [];
     return {
       id: row.id,
       title: row.title,
@@ -48,7 +64,74 @@ export class AnnouncementService {
       archivedAt: row.archived_at ? new Date(row.archived_at).getTime() : null,
       archivedBy: row.archived_by ?? null,
       createdAt: new Date(row.created_at).getTime(),
+      audienceType: row.audience_type === 'specific' ? 'specific' : 'general',
+      recipientIds: recipients.map((item: any) => item.profile_id),
+      recipientCount: recipients.length,
+      attachments: attachments
+        .map((item: any) => ({
+          id: item.id,
+          originalName: item.original_name,
+          mimeType: item.mime_type,
+          fileSize: Number(item.file_size),
+          kind: item.attachment_kind,
+          displayOrder: item.display_order,
+          altText: item.alt_text ?? null,
+        }))
+        .sort((a: AnnouncementAttachment, b: AnnouncementAttachment) => a.displayOrder - b.displayOrder),
     };
+  }
+
+  private async enrichRows(rows: any[]): Promise<any[]> {
+    if (!rows.length) return rows;
+    const ids = rows.map((row) => row.id);
+    const [{ data: recipients }, { data: attachments }] = await Promise.all([
+      this.supabaseService.admin.schema('diocese').from('announcement_recipients').select('announcement_id, profile_id').in('announcement_id', ids),
+      this.supabaseService.admin.schema('diocese').from('announcement_attachments').select('id, announcement_id, original_name, mime_type, file_size, attachment_kind, display_order, alt_text').in('announcement_id', ids),
+    ]);
+    return rows.map((row) => ({
+      ...row,
+      announcement_recipients: (recipients ?? []).filter((item: any) => item.announcement_id === row.id),
+      announcement_attachments: (attachments ?? []).filter((item: any) => item.announcement_id === row.id),
+    }));
+  }
+
+  async resolveProfileId(authorization?: string, fallbackName?: string, fallbackId?: string): Promise<string | null> {
+    const token = authorization?.replace(/^Bearer\s+/i, '');
+    if (token && !token.startsWith('demo-')) {
+      const { data } = await this.supabaseService.admin.auth.getUser(token);
+      if (data.user) {
+        const { data: profile } = await this.supabaseService.admin.schema('diocese').from('profiles')
+          .select('id').eq('external_auth_id', data.user.id).maybeSingle();
+        if (profile?.id) return profile.id;
+        const { data: legacyAuthProfile } = await this.supabaseService.admin.schema('diocese').from('profiles')
+          .select('id').eq('auth_user_id', data.user.id).maybeSingle();
+        if (legacyAuthProfile?.id) return legacyAuthProfile.id;
+        const { data: directProfile } = await this.supabaseService.admin.schema('diocese').from('profiles')
+          .select('id').eq('id', data.user.id).maybeSingle();
+        if (directProfile?.id) return directProfile.id;
+      }
+    }
+    if (fallbackId) {
+      const { data: directProfile } = await this.supabaseService.admin.schema('diocese').from('profiles')
+        .select('id').eq('id', fallbackId).maybeSingle();
+      if (directProfile?.id) return directProfile.id;
+    }
+    if (fallbackName) {
+      const { data: profile } = await this.supabaseService.admin.schema('diocese').from('profiles')
+        .select('id').ilike('full_name', fallbackName).limit(1).maybeSingle();
+      if (profile?.id) return profile.id;
+      const { data: legacyProfile } = await this.supabaseService.admin.schema('diocese').from('profiles')
+        .select('id').ilike('display_name', fallbackName).limit(1).maybeSingle();
+      return legacyProfile?.id ?? null;
+    }
+    return null;
+  }
+
+  async getAudienceOptions(): Promise<Array<{ id: string; name: string; role: string; institution: string }>> {
+    const { data, error } = await this.supabaseService.admin.schema('diocese').from('profiles')
+      .select('id, full_name, role_id, institutions(name)').eq('is_active', true).order('full_name');
+    if (error) return [];
+    return (data ?? []).map((p: any) => ({ id: p.id, name: p.full_name || 'Unnamed user', role: p.role_id || '', institution: p.institutions?.name || '' }));
   }
 
   private async writeAuditLog(payload: {
@@ -100,7 +183,7 @@ export class AnnouncementService {
 
   // ── Queries ─────────────────────────────────────────────────────────────────
 
-  async getAnnouncements(): Promise<Announcement[]> {
+  async getAnnouncements(profileId: string | null = null, feed: 'all' | 'general' | 'for-me' | 'specific' = 'all'): Promise<Announcement[]> {
     await this.transitionExpiredToPost();
 
     const now = new Date().toISOString();
@@ -121,9 +204,16 @@ export class AnnouncementService {
     // Filter out those where end_date has passed (belt-and-suspenders).
     // Pinned-first ordering happens here (not in SQL) so the query still works
     // on databases where migration 194 has not been applied yet.
-    return (data ?? [])
-      .filter((row) => !row.end_date || new Date(row.end_date).getTime() >= Date.now())
-      .map((row) => this.toAnnouncement(row))
+    const enriched = await this.enrichRows(data ?? []);
+    return enriched
+      .filter((row: any) => !row.end_date || new Date(row.end_date).getTime() >= Date.now())
+      .filter((row: any) => {
+        if (feed === 'general') return row.audience_type !== 'specific';
+        if (feed === 'specific') return row.audience_type === 'specific';
+        if (feed === 'for-me') return row.audience_type === 'specific' && profileId && row.announcement_recipients?.some((r: any) => r.profile_id === profileId);
+        return row.audience_type !== 'specific' || (profileId && row.announcement_recipients?.some((r: any) => r.profile_id === profileId));
+      })
+      .map((row: any) => this.toAnnouncement(row))
       .sort((a, b) => Number(b.pinned) - Number(a.pinned));
   }
 
@@ -213,10 +303,13 @@ export class AnnouncementService {
     status: 'draft' | 'active';
     startDate?: string;
     endDate?: string;
+    audienceType?: 'general' | 'specific';
+    recipientIds?: string[];
   }): Promise<Announcement | null> {
     const isPublishing = body.status === 'active';
     const now = new Date().toISOString();
 
+    if (isPublishing && body.audienceType === 'specific' && !body.recipientIds?.length) return null;
     const { data, error } = await this.supabaseService.admin
       .schema('diocese')
       .from('announcements')
@@ -231,29 +324,50 @@ export class AnnouncementService {
         start_date: body.startDate ?? now,
         end_date: body.endDate ?? null,
         published_at: isPublishing ? now : null,
+        audience_type: body.audienceType ?? 'general',
       })
-      .select()
+      .select('*')
       .single();
 
     if (error || !data) {
       console.error('[announcement.service] createAnnouncement:', error?.message);
-      return null;
+      throw new Error(error?.message || 'The announcement row was not created.');
     }
 
+    const createdRow: any = data;
+    if (body.audienceType === 'specific' && body.recipientIds?.length) {
+      const recipients = [...new Set(body.recipientIds)].map((profile_id) => ({ announcement_id: createdRow.id, profile_id }));
+      const { error: recipientError } = await this.supabaseService.admin.schema('diocese').from('announcement_recipients').insert(recipients);
+      if (recipientError) {
+        await this.supabaseService.admin.schema('diocese').from('announcements').delete().eq('id', createdRow.id);
+        console.error('[announcement.service] createAnnouncement recipients:', recipientError.message);
+        throw new Error(recipientError.message);
+      }
+      createdRow.announcement_recipients = recipients;
+    }
     await this.writeAuditLog({
       userName: body.author,
       userRole: body.authorRole,
       action: isPublishing ? 'Announcement Published' : 'Announcement Saved as Draft',
       detail: `"${body.title}" was ${isPublishing ? 'published' : 'saved as draft'} by ${body.author}`,
       severity: isPublishing ? 'success' : 'info',
-      metadata: { announcement_id: data.id, title: body.title, status: body.status },
+      metadata: { announcement_id: createdRow.id, title: body.title, status: body.status },
     });
 
-    return this.toAnnouncement(data);
+    return this.toAnnouncement(createdRow);
   }
 
   async publishDraft(id: string, userName: string, userRole: string): Promise<Announcement | null> {
     const now = new Date().toISOString();
+
+    const { data: draft } = await this.supabaseService.admin.schema('diocese').from('announcements')
+      .select('audience_type').eq('id', id).eq('status', 'draft').maybeSingle();
+    if (!draft) return null;
+    if (draft.audience_type === 'specific') {
+      const { count } = await this.supabaseService.admin.schema('diocese').from('announcement_recipients')
+        .select('id', { count: 'exact', head: true }).eq('announcement_id', id);
+      if (!count) return null;
+    }
 
     const { data, error } = await this.supabaseService.admin
       .schema('diocese')
@@ -312,6 +426,8 @@ export class AnnouncementService {
       }
     }
 
+    const { data: storedAttachments } = await this.supabaseService.admin.schema('diocese')
+      .from('announcement_attachments').select('storage_path').eq('announcement_id', id);
     const { error: deleteError } = await this.supabaseService.admin
       .schema('diocese')
       .from('announcements')
@@ -322,6 +438,8 @@ export class AnnouncementService {
       console.error('[announcement.service] hardDeleteAnnouncement:', deleteError.message);
       return { ok: false, reason: 'Delete failed.' };
     }
+    const storagePaths = (storedAttachments ?? []).map((item: any) => item.storage_path).filter(Boolean);
+    if (storagePaths.length) await this.supabaseService.admin.storage.from('announcement-attachments').remove(storagePaths);
 
     // Always write an audit log — this is the only permanent record after hard delete
     await this.writeAuditLog({
@@ -440,6 +558,8 @@ export class AnnouncementService {
       category?: Announcement['category'];
       startDate?: string;
       endDate?: string;
+      audienceType?: 'general' | 'specific';
+      recipientIds?: string[];
     },
     userName: string,
     userRole: string,
@@ -451,6 +571,8 @@ export class AnnouncementService {
     if (body.category !== undefined) updates.category = body.category;
     if (body.startDate !== undefined) updates.start_date = body.startDate;
     if ('endDate' in body) updates.end_date = body.endDate ?? null;
+    if (body.audienceType !== undefined) updates.audience_type = body.audienceType;
+    if (body.audienceType === 'specific' && body.recipientIds !== undefined && body.recipientIds.length === 0) return null;
 
     // Snapshot the row before the update so the audit log can show before -> after.
     const { data: before } = await this.supabaseService.admin
@@ -465,7 +587,7 @@ export class AnnouncementService {
       .from('announcements')
       .update(updates)
       .eq('id', id)
-      .select()
+      .select('*')
       .single();
 
     if (error || !data) {
@@ -473,17 +595,26 @@ export class AnnouncementService {
       return null;
     }
 
-    const changes = buildFieldChanges(before, data, Object.keys(updates));
+    const updatedRow: any = data;
+    if (body.recipientIds !== undefined) {
+      await this.supabaseService.admin.schema('diocese').from('announcement_recipients').delete().eq('announcement_id', id);
+      if ((body.audienceType ?? updatedRow.audience_type) === 'specific') {
+        const recipients = [...new Set(body.recipientIds)].map((profile_id) => ({ announcement_id: id, profile_id }));
+        if (recipients.length) await this.supabaseService.admin.schema('diocese').from('announcement_recipients').insert(recipients);
+        updatedRow.announcement_recipients = recipients;
+      } else updatedRow.announcement_recipients = [];
+    }
+    const changes = buildFieldChanges(before, updatedRow, Object.keys(updates));
 
     await this.writeAuditLog({
       userName,
       userRole,
       action: 'Announcement Edited',
-      detail: `"${data.title}" was edited by ${userName}`,
+      detail: `"${updatedRow.title}" was edited by ${userName}`,
       severity: 'info',
       metadata: { announcement_id: id, changes },
     });
 
-    return this.toAnnouncement(data);
+    return this.toAnnouncement(updatedRow);
   }
 }

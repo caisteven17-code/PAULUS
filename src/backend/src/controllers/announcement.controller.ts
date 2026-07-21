@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Patch, Delete, Body, Param, Req, Res, HttpStatus } from '@nestjs/common';
+import { Controller, Get, Post, Patch, Delete, Body, Param, Query, Req, Res, HttpStatus } from '@nestjs/common';
 import { Request, Response } from 'express';
 import { AnnouncementService } from '../services/announcement.service';
 
@@ -26,9 +26,23 @@ export class AnnouncementController {
   // ── Public reads ────────────────────────────────────────────────────────────
 
   @Get()
-  async getAnnouncements(@Res() res: Response) {
-    const data = await this.announcementService.getAnnouncements();
+  async getAnnouncements(@Query('feed') rawFeed: string, @Req() req: Request, @Res() res: Response) {
+    const profileId = await this.announcementService.resolveProfileId(
+      req.headers.authorization,
+      getCallerInfo(req).name,
+      req.headers['x-user-id'] as string | undefined,
+    );
+    const requestedFeed = rawFeed === 'general' || rawFeed === 'for-me' || rawFeed === 'specific' ? rawFeed : 'all';
+    const feed = requestedFeed === 'specific' && !canManage(getCallerInfo(req).role) ? 'for-me' : requestedFeed;
+    const data = await this.announcementService.getAnnouncements(profileId, feed);
     return res.status(HttpStatus.OK).json(data);
+  }
+
+  @Get('audience-options')
+  async getAudienceOptions(@Req() req: Request, @Res() res: Response) {
+    const { role } = getCallerInfo(req);
+    if (!canManage(role)) return res.status(HttpStatus.FORBIDDEN).json({ error: 'Forbidden' });
+    return res.status(HttpStatus.OK).json(await this.announcementService.getAudienceOptions());
   }
 
   @Get('scheduled')
@@ -70,20 +84,26 @@ export class AnnouncementController {
     const { name, role } = getCallerInfo(req);
     if (!canManage(role)) return res.status(HttpStatus.FORBIDDEN).json({ error: 'Forbidden' });
 
-    const created = await this.announcementService.createAnnouncement({
-      title: body.title,
-      content: body.content,
-      author: body.author || name,
-      authorRole: body.authorRole || role,
-      priority: body.priority ?? 'medium',
-      category: body.category ?? 'general',
-      status: body.status === 'draft' ? 'draft' : 'active',
-      startDate: body.startDate,
-      endDate: body.endDate,
-    });
-
-    if (!created) return res.status(HttpStatus.INTERNAL_SERVER_ERROR).json({ error: 'Failed to create.' });
-    return res.status(HttpStatus.CREATED).json(created);
+    try {
+      const created = await this.announcementService.createAnnouncement({
+        title: body.title,
+        content: body.content,
+        author: body.author || name,
+        authorRole: body.authorRole || role,
+        priority: body.priority ?? 'medium',
+        category: body.category ?? 'general',
+        status: body.status === 'draft' ? 'draft' : 'active',
+        startDate: body.startDate,
+        endDate: body.endDate,
+        audienceType: body.audienceType === 'specific' ? 'specific' : 'general',
+        recipientIds: Array.isArray(body.recipientIds) ? body.recipientIds : [],
+      });
+      if (!created) throw new Error('The announcement was not created.');
+      return res.status(HttpStatus.CREATED).json(created);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Unknown database error';
+      return res.status(HttpStatus.INTERNAL_SERVER_ERROR).json({ error: `Could not save targeted announcement: ${message}` });
+    }
   }
 
   // ── State transitions ───────────────────────────────────────────────────────

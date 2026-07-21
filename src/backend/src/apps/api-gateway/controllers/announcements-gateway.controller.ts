@@ -8,18 +8,21 @@ export class AnnouncementsGatewayController {
 
   private headers(req: Request): Record<string, string> {
     return {
+      ...(req.headers.authorization ? { authorization: req.headers.authorization } : {}),
       ...(req.headers['x-user-name'] ? { 'x-user-name': req.headers['x-user-name'] as string } : {}),
       ...(req.headers['x-user-role'] ? { 'x-user-role': req.headers['x-user-role'] as string } : {}),
+      ...(req.headers['x-user-id'] ? { 'x-user-id': req.headers['x-user-id'] as string } : {}),
     };
   }
 
   // ── Reads ───────────────────────────────────────────────────────────────────
 
   @Get()
-  async getAnnouncements(@Res({ passthrough: true }) res: Response) {
+  async getAnnouncements(@Req() req: Request, @Res({ passthrough: true }) res: Response) {
     const result = await requestDownstream<unknown>({
       baseUrl: SERVICE_URLS.announcement,
-      path: '/announcements',
+      path: `/announcements${req.url.includes('?') ? req.url.slice(req.url.indexOf('?')) : ''}`,
+      headers: this.headers(req),
     });
     res.status(result.status);
     return result.data;
@@ -30,6 +33,17 @@ export class AnnouncementsGatewayController {
     const result = await requestDownstream<unknown>({
       baseUrl: SERVICE_URLS.announcement,
       path: '/announcements/scheduled',
+      headers: this.headers(req),
+    });
+    res.status(result.status);
+    return result.data;
+  }
+
+  @Get('audience-options')
+  async getAudienceOptions(@Req() req: Request, @Res({ passthrough: true }) res: Response) {
+    const result = await requestDownstream<unknown>({
+      baseUrl: SERVICE_URLS.announcement,
+      path: '/announcements/audience-options',
       headers: this.headers(req),
     });
     res.status(result.status);

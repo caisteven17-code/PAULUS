@@ -286,15 +286,16 @@ _AWS_TREND_SQL_TEMPLATE = """
     ORDER BY f.date_key
 """
 
-# Last-12-months rollups powering the vicariate bar chart and its per-parish
-# drill-down. date_key is YYYYMM, so "- 100" is one calendar year back.
+# Period-scoped rollups powering the vicariate bar chart and its per-parish
+# drill-down. The caller supplies either a selected-year predicate or the
+# trailing-12-month predicate used when no year is selected.
 _AWS_VICARIATE_SQL = """
     SELECT COALESCE(NULLIF(TRIM(dp.vicariate), ''), 'Unassigned') AS vicariate,
            SUM(COALESCE(f.total_collections, 0))::float8 AS total_receipts,
            SUM(COALESCE(f.total_expenses, 0))::float8 AS total_expenses
     FROM parish_analytics.fact_parish_monthly_financials f
     JOIN parish_analytics.dim_parishes dp ON dp.parish_key = f.parish_key
-    WHERE f.date_key > (SELECT MAX(date_key) - 100 FROM parish_analytics.fact_parish_monthly_financials)
+    WHERE 1=1 {period_sql}
     GROUP BY 1
     ORDER BY 2 DESC
 """
@@ -307,7 +308,7 @@ _AWS_PARISH_TOTALS_SQL = """
     FROM parish_analytics.fact_parish_monthly_financials f
     JOIN parish_analytics.dim_parishes dp ON dp.parish_key = f.parish_key
     JOIN shared_analytics.dim_institutions di ON di.institution_key = dp.institution_key
-    WHERE f.date_key > (SELECT MAX(date_key) - 100 FROM parish_analytics.fact_parish_monthly_financials)
+    WHERE 1=1 {period_sql}
     GROUP BY 1, 2
     ORDER BY 3 DESC
 """
@@ -326,8 +327,7 @@ _AWS_DISB_CATEGORIES_SQL = """
     FROM parish_analytics.fact_parish_monthly_financials f
     JOIN parish_analytics.dim_parishes dp ON dp.parish_key = f.parish_key
     JOIN shared_analytics.dim_institutions di ON di.institution_key = dp.institution_key
-    WHERE f.date_key > (SELECT MAX(date_key) - 100 FROM parish_analytics.fact_parish_monthly_financials)
-    {scope_sql}
+    WHERE 1=1 {period_sql} {scope_sql}
 """
 
 
@@ -369,6 +369,16 @@ def _fetch_and_process_aws_parish(
     result["source"] = "aws"
 
     if result.get("data_sufficient"):
+        if year:
+            period_sql = "AND f.date_key >= %s AND f.date_key < %s"
+            period_params: list[Any] = [year * 100, (year + 1) * 100]
+        else:
+            period_sql = (
+                "AND f.date_key > (SELECT MAX(date_key) - 100 "
+                "FROM parish_analytics.fact_parish_monthly_financials)"
+            )
+            period_params = []
+
         # Same scope as the trend query above: single parish, a vicariate/
         # district/class subset, or the whole diocese.
         if not scope_all:
@@ -393,12 +403,17 @@ def _fetch_and_process_aws_parish(
         # connections, so firing 1-3 queries at once is well within budget.
         jobs: dict[str, Callable[[], list[dict]]] = {
             "disb": lambda: analytics_db.fetch_query(
-                _AWS_DISB_CATEGORIES_SQL.format(scope_sql=disb_scope_sql), disb_params
+                _AWS_DISB_CATEGORIES_SQL.format(period_sql=period_sql, scope_sql=disb_scope_sql),
+                [*period_params, *disb_params],
             ),
         }
         if include_rollups:
-            jobs["vicariate"] = lambda: analytics_db.fetch_query(_AWS_VICARIATE_SQL)
-            jobs["parish"] = lambda: analytics_db.fetch_query(_AWS_PARISH_TOTALS_SQL)
+            jobs["vicariate"] = lambda: analytics_db.fetch_query(
+                _AWS_VICARIATE_SQL.format(period_sql=period_sql), period_params
+            )
+            jobs["parish"] = lambda: analytics_db.fetch_query(
+                _AWS_PARISH_TOTALS_SQL.format(period_sql=period_sql), period_params
+            )
 
         with ThreadPoolExecutor(max_workers=len(jobs)) as pool:
             futures = {name: pool.submit(fn) for name, fn in jobs.items()}

@@ -11,12 +11,14 @@ const copyRequestHeaders = (request: Request) => {
   const cookie = request.headers.get('cookie');
   const userName = request.headers.get('x-user-name');
   const userRole = request.headers.get('x-user-role');
+  const userId = request.headers.get('x-user-id');
 
   if (contentType) headers.set('content-type', contentType);
   if (authorization) headers.set('authorization', authorization);
   if (cookie) headers.set('cookie', cookie);
   if (userName) headers.set('x-user-name', userName);
   if (userRole) headers.set('x-user-role', userRole);
+  if (userId) headers.set('x-user-id', userId);
 
   return headers;
 };

@@ -128,6 +128,7 @@ portable_migrations/204_severe_combined_monthly_rollup.sql
 portable_migrations/207_add_remittances_total_to_parish_analytics.sql
 portable_migrations/208_drop_wci_columns.sql
 portable_migrations/209_financial_pusher_staging.sql
+portable_migrations/210_announcement_audiences_attachments.sql
 portable_migrations/210_allow_iafr_section_a_line_items.sql
 portable_migrations/211_financial_pusher_service_role_grants.sql
 # 212 skipped: one-time reset script for bad 2021 import data on Supabase; nothing to reset on a fresh AWS DB.

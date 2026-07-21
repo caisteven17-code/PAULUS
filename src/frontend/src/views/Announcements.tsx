@@ -28,17 +28,20 @@ import {
   PinOff,
   Copy,
   Check,
-  Stethoscope,
+  Paperclip,
+  Download,
+  Image as ImageIcon,
+  Users,
+  Globe2,
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { useAuth } from '../firebase';
 import { formatDate } from '../lib/format';
 import { usePermissions } from '../hooks/usePermissions';
 import { InlineLoader } from '../components/ui/LoadingScreen';
-import { apiClient } from '../lib/api-client';
-import { getPriestHealthReminder, getDioceseHealthSummary } from '../lib/healthAnnouncements';
 import { FilterModal, FilterField } from '../components/ui/FilterModal';
 import { selectField, dateField } from '../lib/formStyles';
+import { supabaseBrowser } from '../lib/supabase';
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -58,7 +61,23 @@ interface Announcement {
   archivedAt: number | null;
   archivedBy: string | null;
   createdAt: number;
+  audienceType: 'general' | 'specific';
+  recipientIds: string[];
+  recipientCount: number;
+  attachments: AnnouncementAttachment[];
 }
+
+interface AnnouncementAttachment {
+  id: string;
+  originalName: string;
+  mimeType: string;
+  fileSize: number;
+  kind: 'image' | 'document';
+  displayOrder: number;
+  altText: string | null;
+}
+
+interface AudienceOption { id: string; name: string; role: string; institution: string }
 
 type Tab = 'active' | 'scheduled' | 'drafts' | 'past';
 type SortMode = 'newest' | 'oldest' | 'priority';
@@ -186,10 +205,12 @@ export function Announcements() {
 
   // ── UI state ───────────────────────────────────────────────────────────────
   const [tab,                  setTab]                  = useState<Tab>('active');
+  const [feedMode, setFeedMode] = useState<'general' | 'for-me' | 'specific'>('general');
   const [filters,              setFilters]              = useState<{ search: string; category: string; priority: string; dateFrom: string; dateTo: string }>(EMPTY_FILTERS);
   const [sort,                 setSort]                 = useState<SortMode>('newest');
   const [selectedAnnouncement, setSelectedAnnouncement] = useState<Announcement | null>(null);
   const [showForm,             setShowForm]             = useState(false);
+  const [managementMode,       setManagementMode]       = useState(false);
   const [editingId,            setEditingId]            = useState<string | null>(null);
   const [loading,              setLoading]              = useState(true);
   const [isSubmitting,         setIsSubmitting]         = useState(false);
@@ -202,6 +223,7 @@ export function Announcements() {
     tone: 'danger' | 'warning';
     action(): void;
   }>(null);
+  const isManagementMode = canManage && managementMode;
 
   // Grace-period countdown ticker (1s so the Delete button countdown is smooth)
   const [tick, setTick] = useState(0);
@@ -211,27 +233,6 @@ export function Announcements() {
   }, []);
 
   // ── Auto-generated medical-records reminders (computed, read-only) ───────────
-  const [healthRecords, setHealthRecords] = useState<any[]>([]);
-  const [showHealthNames, setShowHealthNames] = useState(false);
-  useEffect(() => {
-    apiClient
-      .getHealthRecords()
-      .then((d: any) => setHealthRecords(Array.isArray(d) ? d : []))
-      .catch(() => setHealthRecords([]));
-  }, []);
-  const isPriestView =
-    permissions.view_priests === true && permissions.view_diocese !== true && permissions.manage_entities !== true;
-  const canSeeHealthSummary = permissions.view_diocese === true || permissions.manage_assignments === true;
-  const myHealthRecord = isPriestView
-    ? healthRecords.find(
-        (p) =>
-          (p.email && user?.email && p.email.toLowerCase() === user.email.toLowerCase()) ||
-          (p.name && user?.displayName && p.name.toLowerCase() === user.displayName.toLowerCase()),
-      )
-    : undefined;
-  const myHealthReminder = isPriestView && myHealthRecord ? getPriestHealthReminder(myHealthRecord) : null;
-  const dioceseHealthSummary = canSeeHealthSummary ? getDioceseHealthSummary(healthRecords) : null;
-
   // Toast state
   const [toast, setToast] = useState<{ message: string } | null>(null);
   const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -245,20 +246,53 @@ export function Announcements() {
     startDate: '',
     endDate:   '',
     saveAs:    'active' as 'active' | 'draft',
+    audienceType: 'general' as 'general' | 'specific',
+    recipientIds: [] as string[],
   });
+  const [pendingFiles, setPendingFiles] = useState<File[]>([]);
+  const [audienceOptions, setAudienceOptions] = useState<AudienceOption[]>([]);
+  const [audienceSearch, setAudienceSearch] = useState('');
+  const [audienceState, setAudienceState] = useState<'idle' | 'loading' | 'ready' | 'error'>('idle');
+  const [attachmentUrls, setAttachmentUrls] = useState<Record<string, string>>({});
+  const [sessionToken, setSessionToken] = useState<string | null>(null);
+  const pendingImagePreviews = useMemo(() => pendingFiles
+    .map((file, index) => file.type.startsWith('image/') ? { file, index, url: URL.createObjectURL(file) } : null)
+    .filter((item): item is { file: File; index: number; url: string } => item !== null), [pendingFiles]);
+  useEffect(() => () => pendingImagePreviews.forEach((item) => URL.revokeObjectURL(item.url)), [pendingImagePreviews]);
 
   // ── Auth headers ───────────────────────────────────────────────────────────
+  useEffect(() => {
+    supabaseBrowser.auth.getSession()
+      .then(({ data }) => setSessionToken(data.session?.access_token ?? null))
+      .catch(() => setSessionToken(null));
+  }, [user?.id]);
+
   const authHeaders = useMemo<Record<string, string>>(() => ({
     'Content-Type':  'application/json',
-    'x-user-name':   user?.name  || "Chancellor's Office",
-    'x-user-role':   user?.role  || 'chancellor',
-  }), [user]);
+    'x-user-name':   user?.name || user?.displayName || user?.email || "Chancellor's Office",
+    'x-user-role':   user?.roleId || user?.accessRole || user?.role || 'chancellor',
+    ...(user?.id || user?.uid ? { 'x-user-id': user.id || user.uid || '' } : {}),
+    ...(sessionToken ? { Authorization: `Bearer ${sessionToken}` } : {}),
+  }), [user, sessionToken]);
 
   // ── Fetch helpers ──────────────────────────────────────────────────────────
   const fetchActive = useCallback(async () => {
-    const res = await fetch('/api/announcements', { credentials: 'include' });
-    if (res.ok) setActiveList(await res.json());
-  }, []);
+    setLoading(true);
+    try {
+      const res = await fetch(`/api/announcements?feed=${feedMode}`, { credentials: 'include', headers: authHeaders });
+      if (!res.ok) throw new Error(`Announcement feed failed (${res.status})`);
+      const rows: Announcement[] = await res.json();
+      setActiveList(rows.filter((announcement) =>
+        feedMode === 'general'
+          ? announcement.audienceType !== 'specific'
+          : announcement.audienceType === 'specific',
+      ));
+    } catch {
+      setActiveList([]);
+    } finally {
+      setLoading(false);
+    }
+  }, [feedMode, authHeaders]);
 
   const fetchScheduled = useCallback(async () => {
     const res = await fetch('/api/announcements/scheduled', { credentials: 'include', headers: authHeaders });
@@ -282,8 +316,31 @@ export function Announcements() {
 
   // Initial load — fetch all lists up front so the tab count badges are accurate
   useEffect(() => {
-    fetchActive().catch(() => {}).finally(() => setLoading(false));
+    fetchActive().catch(() => {});
   }, [fetchActive]);
+  useEffect(() => {
+    if (!canManage) return;
+    setAudienceState('loading');
+    fetch('/api/announcements/audience-options', { credentials: 'include', headers: authHeaders })
+      .then(async (r) => { if (!r.ok) throw new Error(`Recipient request failed (${r.status})`); return r.json(); })
+      .then((rows) => { setAudienceOptions(Array.isArray(rows) ? rows : []); setAudienceState('ready'); })
+      .catch(() => { setAudienceOptions([]); setAudienceState('error'); });
+  }, [canManage, authHeaders]);
+  useEffect(() => {
+    if (!selectedAnnouncement) return;
+    const images = (selectedAnnouncement.attachments ?? []).filter((attachment) => attachment.kind === 'image');
+    setAttachmentUrls((current) => {
+      const next = { ...current };
+      images.forEach((attachment) => delete next[attachment.id]);
+      return next;
+    });
+    images.forEach((attachment) => {
+      fetch(`/api/announcements/${selectedAnnouncement.id}/attachments/${attachment.id}`, { credentials: 'include', headers: authHeaders })
+        .then((response) => response.ok ? response.json() : null)
+        .then((result) => result?.url && setAttachmentUrls((current) => ({ ...current, [attachment.id]: result.url })))
+        .catch(() => {});
+    });
+  }, [selectedAnnouncement, authHeaders]);
   useEffect(() => {
     if (!canManage) return;
     fetchScheduled();
@@ -309,7 +366,8 @@ export function Announcements() {
 
   // ── Form helpers ───────────────────────────────────────────────────────────
   const resetForm = useCallback(() => {
-    setFormData({ title: '', content: '', priority: 'medium', category: 'general', startDate: '', endDate: '', saveAs: 'active' });
+    setFormData({ title: '', content: '', priority: 'medium', category: 'general', startDate: '', endDate: '', saveAs: 'active', audienceType: 'general', recipientIds: [] });
+    setPendingFiles([]);
     setEditingId(null);
     setFormError(null);
     setFormSubmitted(false);
@@ -318,8 +376,12 @@ export function Announcements() {
   // ── Submit form ────────────────────────────────────────────────────────────
   const handleSubmitForm = useCallback(async (submitStatus?: 'draft' | 'active') => {
     setFormSubmitted(true);
-    if (!formData.title.trim() || !formData.content.trim()) {
-      setFormError('Please fill in the required fields marked with *.');
+    if (!formData.title.trim() || (!formData.content.trim() && pendingFiles.length === 0 && !editingId)) {
+      setFormError('Add a title and either a message or at least one attachment.');
+      return;
+    }
+    if (formData.audienceType === 'specific' && formData.recipientIds.length === 0) {
+      setFormError('Select at least one recipient for a specific announcement.');
       return;
     }
     if (formData.startDate && formData.endDate && new Date(formData.endDate) <= new Date(formData.startDate)) {
@@ -343,6 +405,8 @@ export function Announcements() {
             category:  formData.category,
             startDate: formData.startDate ? new Date(formData.startDate).toISOString() : undefined,
             endDate:   formData.endDate   ? new Date(formData.endDate).toISOString()   : null,
+            audienceType: formData.audienceType,
+            recipientIds: formData.recipientIds,
           }),
         });
         if (!res.ok) {
@@ -360,6 +424,7 @@ export function Announcements() {
         showToast('Changes saved.');
       } else {
         // Create new
+        const desiredStatus = submitStatus ?? formData.saveAs;
         const body = {
           title:      formData.title,
           content:    formData.content,
@@ -367,9 +432,11 @@ export function Announcements() {
           authorRole: user?.role  || 'chancellor',
           priority:   formData.priority,
           category:   formData.category,
-          status:     submitStatus ?? formData.saveAs,
+          status:     pendingFiles.length > 0 && desiredStatus === 'active' ? 'draft' : desiredStatus,
           startDate:  formData.startDate ? new Date(formData.startDate).toISOString() : undefined,
           endDate:    formData.endDate   ? new Date(formData.endDate).toISOString()   : undefined,
+          audienceType: formData.audienceType,
+          recipientIds: formData.recipientIds,
         };
 
         const res = await fetch('/api/announcements', {
@@ -381,6 +448,30 @@ export function Announcements() {
 
         if (res.ok) {
           const created: Announcement = await res.json();
+          if (pendingFiles.length) {
+            const upload = new FormData();
+            pendingFiles.forEach((file) => upload.append('files', file));
+            const { ['Content-Type']: _contentType, ...uploadHeaders } = authHeaders;
+            const uploadRes = await fetch(`/api/announcements/${created.id}/attachments`, { method: 'POST', credentials: 'include', headers: uploadHeaders, body: upload });
+            if (!uploadRes.ok) {
+              const detail = await uploadRes.json().catch(() => ({ error: '' }));
+              setFormError(detail.error || 'The announcement was saved, but its attachments could not be uploaded.');
+              setDraftList((prev) => [created, ...prev]);
+              setTab('drafts');
+              return;
+            }
+            created.attachments = await uploadRes.json();
+            if (desiredStatus === 'active') {
+              const publishRes = await fetch(`/api/announcements/${created.id}/publish`, { method: 'POST', credentials: 'include', headers: authHeaders });
+              if (!publishRes.ok) {
+                setDraftList((prev) => [created, ...prev]);
+                setTab('drafts');
+                setFormError('Files uploaded successfully, but publishing failed. The announcement remains safely in Drafts.');
+                return;
+              }
+              Object.assign(created, await publishRes.json(), { attachments: created.attachments });
+            }
+          }
           if (created.status === 'draft') {
             setDraftList((prev) => [created, ...prev]);
             setTab('drafts');
@@ -391,28 +482,13 @@ export function Announcements() {
             showToast(`Scheduled — "${created.title}" goes live on ${formatDate(new Date(created.startDate))}.`);
           } else {
             setActiveList((prev) => [created, ...prev]);
+            setFeedMode(created.audienceType === 'specific' && canManage ? 'specific' : 'general');
             showToast('Announcement published to the board.');
           }
         } else {
-          // Optimistic fallback
-          const now = Date.now();
-          const optimistic: Announcement = {
-            id: Math.random().toString(36).substr(2, 9),
-            title: formData.title, content: formData.content,
-            author: user?.name || "Chancellor's Office",
-            authorRole: user?.role || 'chancellor',
-            priority: formData.priority, category: formData.category,
-            status: submitStatus ?? formData.saveAs,
-            pinned: false,
-            startDate: formData.startDate ? new Date(formData.startDate).getTime() : now,
-            endDate:   formData.endDate   ? new Date(formData.endDate).getTime()   : null,
-            publishedAt: (submitStatus ?? formData.saveAs) === 'active' ? now : null,
-            archivedAt: null, archivedBy: null,
-            createdAt: now,
-          };
-          if (optimistic.status === 'draft') setDraftList((prev) => [optimistic, ...prev]);
-          else if (optimistic.startDate > now) setScheduledList((prev) => [...prev, optimistic].sort((a, b) => a.startDate - b.startDate));
-          else setActiveList((prev) => [optimistic, ...prev]);
+          const detail = await res.json().catch(() => ({ error: '' }));
+          setFormError(detail.error || 'Publishing failed. Apply the announcement database migration, restart the backend, and try again.');
+          return;
         }
       }
 
@@ -421,7 +497,7 @@ export function Announcements() {
     } finally {
       setIsSubmitting(false);
     }
-  }, [editingId, formData, resetForm, user, authHeaders, showToast, fetchActive, fetchScheduled]);
+  }, [editingId, formData, pendingFiles, resetForm, user, authHeaders, showToast, fetchActive, fetchScheduled, canManage]);
 
   // ── Hard delete (grace period / drafts) ────────────────────────────────────
   const performDelete = useCallback(async (a: Announcement) => {
@@ -575,6 +651,8 @@ export function Announcements() {
       startDate: a.startDate ? toLocalInputValue(a.startDate) : '',
       endDate:   a.endDate   ? toLocalInputValue(a.endDate)   : '',
       saveAs:    a.status === 'draft' ? 'draft' : 'active',
+      audienceType: a.audienceType ?? 'general',
+      recipientIds: a.recipientIds ?? [],
     });
     setEditingId(a.id);
     setFormError(null);
@@ -591,15 +669,24 @@ export function Announcements() {
       startDate: '',
       endDate:   '',
       saveAs:    'active',
+      audienceType: a.audienceType ?? 'general',
+      recipientIds: a.recipientIds ?? [],
     });
     setEditingId(null);
     setFormError(null);
     setShowForm(true);
   }, []);
 
+  const openAttachment = useCallback(async (announcementId: string, attachment: AnnouncementAttachment, download = false) => {
+    const res = await fetch(`/api/announcements/${announcementId}/attachments/${attachment.id}${download ? '?download=1' : ''}`, { credentials: 'include', headers: authHeaders });
+    if (!res.ok) { showToast('This attachment is unavailable or you no longer have access.'); return; }
+    const { url } = await res.json();
+    window.open(url, '_blank', 'noopener,noreferrer');
+  }, [authHeaders, showToast]);
+
   // ── Derived lists ──────────────────────────────────────────────────────────
   const currentList =
-    tab === 'active'    ? activeList    :
+    tab === 'active'    ? activeList.filter((announcement) => feedMode === 'general' ? announcement.audienceType !== 'specific' : announcement.audienceType === 'specific') :
     tab === 'scheduled' ? scheduledList :
     tab === 'drafts'    ? draftList     :
     tab === 'past'      ? pastList      : activeList;
@@ -732,6 +819,25 @@ export function Announcements() {
               <p className="mt-3 max-w-2xl text-sm font-medium leading-relaxed text-white/50">
                 Central posting space for diocesan updates, directives, financial notices, and event reminders.
               </p>
+              {canManage && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setManagementMode((current) => !current);
+                    setTab('active');
+                    setFeedMode('general');
+                    setShowForm(false);
+                  }}
+                  className={`mt-5 inline-flex h-11 items-center justify-center gap-2 rounded-2xl px-5 text-[10px] font-black uppercase tracking-[0.18em] transition-all ${
+                    isManagementMode
+                      ? 'border border-white/15 bg-white/10 text-white hover:bg-white/15'
+                      : 'bg-gold-500 text-slate-950 shadow-lg shadow-gold-500/20 hover:bg-gold-400'
+                  }`}
+                >
+                  {isManagementMode ? <Globe2 className="h-4 w-4" /> : <ClipboardList className="h-4 w-4" />}
+                  {isManagementMode ? 'Return to view-only board' : 'Manage announcements'}
+                </button>
+              )}
             </div>
             <div className="shrink-0 space-y-2.5">
               <p className="text-[10px] font-black uppercase tracking-[0.2em] text-white/35 md:text-right">
@@ -757,94 +863,9 @@ export function Announcements() {
           </div>
         </div>
 
-        {/* ── Auto-generated medical-records reminders (System · Important) ── */}
-        {myHealthReminder && (
-          <div className="mb-6 flex items-start gap-4 rounded-3xl border border-amber-200 bg-amber-50 p-5 md:p-6">
-            <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-amber-500 text-white">
-              <Stethoscope className="h-5 w-5" />
-            </div>
-            <div className="min-w-0 flex-1">
-              <div className="flex flex-wrap items-center gap-2">
-                <span className="rounded-md bg-amber-500/15 px-2 py-0.5 text-[9px] font-black uppercase tracking-wider text-amber-700">
-                  System · Important
-                </span>
-                <p className="text-sm font-black text-amber-900">{myHealthReminder.title}</p>
-              </div>
-              <p className="mt-1 text-sm font-medium leading-relaxed text-amber-800">{myHealthReminder.content}</p>
-            </div>
-          </div>
-        )}
-        {dioceseHealthSummary && (
-          <button
-            onClick={() => setShowHealthNames(true)}
-            className="mb-6 flex w-full items-center gap-4 rounded-3xl border border-amber-200 bg-amber-50 p-5 text-left transition-colors hover:bg-amber-100 md:p-6"
-          >
-            <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-amber-500 text-white">
-              <Stethoscope className="h-5 w-5" />
-            </div>
-            <div className="min-w-0 flex-1">
-              <div className="flex flex-wrap items-center gap-2">
-                <span className="rounded-md bg-amber-500/15 px-2 py-0.5 text-[9px] font-black uppercase tracking-wider text-amber-700">
-                  System · Important
-                </span>
-                <p className="text-sm font-black text-amber-900">{dioceseHealthSummary.title}</p>
-              </div>
-              <p className="mt-1 text-sm font-medium leading-relaxed text-amber-800">{dioceseHealthSummary.content}</p>
-            </div>
-            <ChevronRight className="h-5 w-5 shrink-0 text-amber-500" />
-          </button>
-        )}
-
-        {/* ── Diocesan drill-down: priests with pending medical records ── */}
-        <AnimatePresence>
-          {showHealthNames && dioceseHealthSummary && (
-            <div className="fixed inset-0 z-[140] flex items-center justify-center p-4">
-              <motion.div
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                exit={{ opacity: 0 }}
-                onClick={() => setShowHealthNames(false)}
-                className="absolute inset-0 bg-black/50 backdrop-blur-sm"
-              />
-              <motion.div
-                initial={{ opacity: 0, scale: 0.96, y: 16 }}
-                animate={{ opacity: 1, scale: 1, y: 0 }}
-                exit={{ opacity: 0, scale: 0.96, y: 16 }}
-                className="relative flex max-h-[80vh] w-full max-w-md flex-col overflow-hidden rounded-3xl bg-white shadow-2xl"
-              >
-                <div className="flex items-center justify-between border-b border-slate-100 px-6 py-5">
-                  <div>
-                    <p className="text-[10px] font-black uppercase tracking-widest text-amber-600">System · Important</p>
-                    <h3 className="mt-0.5 text-lg font-black text-slate-950">Pending Medical Records</h3>
-                  </div>
-                  <button
-                    onClick={() => setShowHealthNames(false)}
-                    className="rounded-xl p-2 text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-700"
-                  >
-                    <X className="h-5 w-5" />
-                  </button>
-                </div>
-                <div className="divide-y divide-slate-50 overflow-y-auto px-2 py-2">
-                  {(dioceseHealthSummary.names ?? []).map((n, i) => (
-                    <div key={`${n.name}-${i}`} className="flex items-center justify-between gap-3 px-4 py-3">
-                      <div className="min-w-0">
-                        <p className="truncate text-sm font-bold text-slate-900">{n.name}</p>
-                        {n.parish && <p className="truncate text-[11px] text-slate-400">{n.parish}</p>}
-                      </div>
-                      <span className="shrink-0 rounded-full bg-amber-50 px-2.5 py-1 text-[10px] font-black uppercase tracking-wider text-amber-700">
-                        {n.status}
-                      </span>
-                    </div>
-                  ))}
-                </div>
-              </motion.div>
-            </div>
-          )}
-        </AnimatePresence>
-
         {/* ── Sidebar + feed ── */}
-        <div className={`grid grid-cols-1 gap-6 lg:items-start ${canManage ? 'lg:grid-cols-[280px_minmax(0,1fr)]' : ''}`}>
-          {canManage && (
+        <div className={`grid grid-cols-1 gap-6 lg:items-start ${isManagementMode ? 'lg:grid-cols-[280px_minmax(0,1fr)]' : ''}`}>
+          {isManagementMode && (
           <aside className="custom-scrollbar space-y-4 lg:sticky lg:top-2 lg:max-h-[calc(100vh-9rem)] lg:overflow-y-auto">
               <button
                 onClick={() => { resetForm(); setShowForm(true); }}
@@ -892,6 +913,16 @@ export function Announcements() {
           )}
 
           <div className="min-w-0">
+        {tab === 'active' && (
+          <div className="mb-4 grid grid-cols-2 gap-2 rounded-3xl border border-slate-200 bg-white p-2 shadow-[0_12px_32px_rgba(15,23,42,0.05)]">
+            <button onClick={() => setFeedMode('general')} className={`flex items-center justify-center gap-2 rounded-2xl px-4 py-3 text-sm font-black transition-all ${feedMode === 'general' ? 'bg-slate-950 text-white shadow-lg' : 'text-slate-500 hover:bg-slate-50'}`}>
+              <Globe2 className="h-4 w-4" /> General announcements
+            </button>
+            <button onClick={() => setFeedMode(isManagementMode ? 'specific' : 'for-me')} className={`flex items-center justify-center gap-2 rounded-2xl px-4 py-3 text-sm font-black transition-all ${(isManagementMode ? feedMode === 'specific' : feedMode === 'for-me') ? 'bg-gold-500 text-slate-950 shadow-lg' : 'text-slate-500 hover:bg-slate-50'}`}>
+              <Users className="h-4 w-4" /> {isManagementMode ? 'Targeted announcements' : 'For you'}
+            </button>
+          </div>
+        )}
         {/* ── Filter bar — search inline, everything else in the modal ── */}
         <div className="mb-4 flex flex-col gap-2 rounded-3xl border border-slate-200 bg-white p-3 shadow-[0_12px_32px_rgba(15,23,42,0.05)] sm:flex-row sm:items-center">
           <div className="relative flex-1">
@@ -995,7 +1026,7 @@ export function Announcements() {
                 {hasActiveFilters ? 'Try adjusting or clearing the filters above.' : emptyMeta[tab].sub}
               </p>
             </div>
-            {canManage && tab === 'active' && !hasActiveFilters && (
+            {isManagementMode && tab === 'active' && !hasActiveFilters && (
               <button
                 onClick={() => { resetForm(); setShowForm(true); }}
                 className="rounded-2xl bg-black px-6 py-3 text-sm font-bold text-white transition-all hover:bg-slate-800"
@@ -1013,7 +1044,7 @@ export function Announcements() {
                   announcement={a}
                   index={i}
                   tab={tab}
-                  canManage={canManage}
+                  canManage={isManagementMode}
                   tick={tick}
                   onView={() => setSelectedAnnouncement(a)}
                   onEdit={() => handleEdit(a)}
@@ -1024,6 +1055,8 @@ export function Announcements() {
                   onPublishNow={() => handlePublishScheduledNow(a)}
                   onTogglePin={() => handleTogglePin(a)}
                   onDuplicate={() => handleDuplicate(a)}
+                  onOpenAttachment={(attachment, download) => openAttachment(a.id, attachment, download)}
+                  attachmentUrls={attachmentUrls}
                 />
               ))}
             </AnimatePresence>
@@ -1035,7 +1068,7 @@ export function Announcements() {
 
       {/* ── Create / Edit modal ── */}
       <AnimatePresence>
-        {showForm && (
+        {showForm && isManagementMode && (
           <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
             <motion.div
               initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
@@ -1114,6 +1147,88 @@ export function Announcements() {
                   </div>
 
                   {/* Category | Priority */}
+                  <div className="space-y-3 rounded-3xl border border-slate-200 bg-slate-50/70 p-5">
+                    <div className="flex items-center gap-2">
+                      <Paperclip className="h-4 w-4 text-gold-600" />
+                      <label className="text-[11px] font-bold uppercase tracking-[0.2em] text-gold-700">Photos and attachments</label>
+                    </div>
+                    <label className="flex cursor-pointer flex-col items-center justify-center rounded-2xl border-2 border-dashed border-slate-300 bg-white px-5 py-7 text-center transition-colors hover:border-gold-500 hover:bg-gold-50/30">
+                      <ImageIcon className="mb-2 h-7 w-7 text-slate-400" />
+                      <span className="text-sm font-bold text-slate-700">Choose photos, PDFs, or documents</span>
+                      <span className="mt-1 text-xs text-slate-400">Up to 5 files, maximum 25 MB each</span>
+                      <input
+                        type="file"
+                        multiple
+                        className="sr-only"
+                        accept="image/jpeg,image/png,image/webp,image/gif,application/pdf,.doc,.docx,.xls,.xlsx,.csv,.txt"
+                        onChange={(e) => {
+                          const selected = Array.from(e.target.files ?? []);
+                          setPendingFiles((current) => {
+                            const existing = new Set(current.map((file) => `${file.name}:${file.size}:${file.lastModified}`));
+                            const additions = selected.filter((file) => !existing.has(`${file.name}:${file.size}:${file.lastModified}`));
+                            return [...current, ...additions].slice(0, 5);
+                          });
+                          e.currentTarget.value = '';
+                        }}
+                      />
+                    </label>
+                    {pendingFiles.length > 0 && (
+                      <div className="space-y-2">
+                        {pendingImagePreviews.length > 0 && (
+                          <div className={`grid overflow-hidden rounded-2xl border border-slate-200 bg-slate-100 ${pendingImagePreviews.length === 1 ? 'grid-cols-1' : 'grid-cols-2'} gap-0.5`}>
+                            {pendingImagePreviews.map(({ file, index, url }, photoIndex) => (
+                              <div key={`${file.name}-${index}`} className={`group/photo relative overflow-hidden bg-slate-200 ${pendingImagePreviews.length === 1 ? 'h-72' : pendingImagePreviews.length === 3 && photoIndex === 0 ? 'col-span-2 h-56' : 'h-44'} ${pendingImagePreviews.length === 5 && photoIndex === 0 ? 'col-span-2 h-56' : ''}`}>
+                                <img src={url} alt={file.name} className="h-full w-full object-cover" />
+                                <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/60 to-transparent px-3 pb-3 pt-8 text-left">
+                                  <p className="truncate text-xs font-bold text-white">{file.name}</p>
+                                </div>
+                                <button type="button" aria-label={`Remove ${file.name}`} onClick={() => setPendingFiles((files) => files.filter((_, i) => i !== index))} className="absolute right-2 top-2 flex h-8 w-8 items-center justify-center rounded-full bg-black/65 text-white shadow-lg transition-colors hover:bg-rose-600"><X className="h-4 w-4" /></button>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                        {pendingFiles.map((file, index) => file.type.startsWith('image/') ? null : (
+                          <div key={`${file.name}-${index}`} className="flex items-center gap-3 rounded-2xl border border-slate-200 bg-white px-4 py-3">
+                            <FileText className="h-4 w-4 text-sky-600" />
+                            <span className="min-w-0 flex-1 truncate text-sm font-semibold text-slate-700">{file.name}</span>
+                            <span className="text-xs text-slate-400">{(file.size / 1024 / 1024).toFixed(1)} MB</span>
+                            <button type="button" onClick={() => setPendingFiles((files) => files.filter((_, i) => i !== index))} className="rounded-lg p-1 text-slate-400 hover:bg-rose-50 hover:text-rose-600"><X className="h-4 w-4" /></button>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="space-y-3 rounded-3xl border border-slate-200 p-5">
+                    <label className="text-[11px] font-bold uppercase tracking-[0.2em] text-gold-700">Audience</label>
+                    <div className="grid grid-cols-2 gap-2">
+                      <button type="button" onClick={() => setFormData({ ...formData, audienceType: 'general', recipientIds: [] })} className={`rounded-2xl border p-4 text-left ${formData.audienceType === 'general' ? 'border-slate-950 bg-slate-950 text-white' : 'border-slate-200 bg-white text-slate-600'}`}>
+                        <Globe2 className="mb-2 h-5 w-5" /><span className="block text-sm font-black">Everyone</span><span className="text-xs opacity-60">General board</span>
+                      </button>
+                      <button type="button" onClick={() => setFormData({ ...formData, audienceType: 'specific' })} className={`rounded-2xl border p-4 text-left ${formData.audienceType === 'specific' ? 'border-gold-500 bg-gold-50 text-slate-950' : 'border-slate-200 bg-white text-slate-600'}`}>
+                        <Users className="mb-2 h-5 w-5" /><span className="block text-sm font-black">Specific people</span><span className="text-xs opacity-60">Private recipients</span>
+                      </button>
+                    </div>
+                    {formData.audienceType === 'specific' && (
+                      <div className="space-y-2">
+                        <input value={audienceSearch} onChange={(e) => setAudienceSearch(e.target.value)} placeholder="Search people, roles, or institutions…" className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm focus:border-gold-500 focus:outline-none" />
+                        <div className="max-h-48 space-y-1 overflow-y-auto rounded-2xl border border-slate-200 bg-white p-2">
+                          {audienceState === 'loading' && <p className="px-3 py-5 text-center text-sm font-semibold text-slate-400">Loading users…</p>}
+                          {audienceState === 'error' && <p className="rounded-xl bg-rose-50 px-3 py-4 text-center text-sm font-semibold text-rose-600">Could not load users. Confirm the announcement migration is applied, then refresh the page.</p>}
+                          {audienceState === 'ready' && audienceOptions.length === 0 && <p className="px-3 py-5 text-center text-sm font-semibold text-slate-400">No active user profiles are available.</p>}
+                          {audienceOptions.filter((option) => `${option.name} ${option.role} ${option.institution}`.toLowerCase().includes(audienceSearch.toLowerCase())).map((option) => {
+                            const selected = formData.recipientIds.includes(option.id);
+                            return <button key={option.id} type="button" onClick={() => setFormData({ ...formData, recipientIds: selected ? formData.recipientIds.filter((id) => id !== option.id) : [...formData.recipientIds, option.id] })} className={`flex w-full items-center gap-3 rounded-xl px-3 py-2 text-left ${selected ? 'bg-gold-50 ring-1 ring-gold-300' : 'hover:bg-slate-50'}`}>
+                              <span className={`flex h-5 w-5 items-center justify-center rounded-md border ${selected ? 'border-gold-500 bg-gold-500 text-white' : 'border-slate-300'}`}>{selected && <Check className="h-3 w-3" />}</span>
+                              <span className="min-w-0"><span className="block truncate text-sm font-bold text-slate-800">{option.name}</span><span className="block truncate text-xs text-slate-400">{option.role}{option.institution ? ` · ${option.institution}` : ''}</span></span>
+                            </button>;
+                          })}
+                        </div>
+                        <p className="text-xs font-semibold text-slate-500">{formData.recipientIds.length} recipient{formData.recipientIds.length === 1 ? '' : 's'} selected. Only they and announcement managers can view this post.</p>
+                      </div>
+                    )}
+                  </div>
+
                   <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
                     <div className="space-y-2">
                       <label className="text-[11px] font-bold uppercase tracking-[0.2em] text-gold-700">
@@ -1306,7 +1421,39 @@ export function Announcements() {
                 <div className="rounded-3xl border border-slate-100 bg-slate-50/70 p-6">
                   <p className="whitespace-pre-wrap leading-relaxed text-slate-700">{selectedAnnouncement.content}</p>
                 </div>
+                {(selectedAnnouncement.attachments ?? []).length > 0 && (
+                  <div className="mt-5 space-y-3">
+                    <p className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400">Attachments</p>
+                    {selectedAnnouncement.attachments.map((attachment) => attachment.kind === 'image' ? (
+                      <button key={attachment.id} onClick={() => openAttachment(selectedAnnouncement.id, attachment, false)} className="block w-full overflow-hidden rounded-3xl bg-slate-100">
+                        {attachmentUrls[attachment.id] ? <img src={attachmentUrls[attachment.id]} alt={attachment.altText || attachment.originalName} className="max-h-[520px] w-full object-contain" /> : <span className="flex h-48 items-center justify-center"><ImageIcon className="h-8 w-8 text-slate-400" /></span>}
+                      </button>
+                    ) : (
+                      <button key={attachment.id} onClick={() => openAttachment(selectedAnnouncement.id, attachment, true)} className="flex w-full items-center gap-3 rounded-2xl border border-slate-200 bg-white px-4 py-4 text-left hover:bg-slate-50">
+                        <FileText className="h-5 w-5 text-sky-600" /><span className="min-w-0 flex-1 truncate text-sm font-bold text-slate-700">{attachment.originalName}</span><Download className="h-4 w-4 text-slate-400" />
+                      </button>
+                    ))}
+                  </div>
+                )}
               </div>
+              {canManage && !isManagementMode && (
+                <div className="flex items-center justify-between gap-4 border-t border-slate-100 bg-white px-6 py-4 md:px-8">
+                  <p className="text-xs font-medium text-slate-400">You are viewing this announcement in read-only mode.</p>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setSelectedAnnouncement(null);
+                      setManagementMode(true);
+                      setTab('active');
+                      setFeedMode('general');
+                    }}
+                    className="inline-flex h-10 shrink-0 items-center justify-center gap-2 rounded-xl bg-gold-500 px-4 text-[10px] font-black uppercase tracking-[0.15em] text-slate-950 transition-colors hover:bg-gold-400"
+                  >
+                    <ClipboardList className="h-4 w-4" />
+                    Manage announcements
+                  </button>
+                </div>
+              )}
             </motion.div>
           </div>
         )}
@@ -1374,7 +1521,7 @@ export function Announcements() {
 
 function AnnouncementRow({
   announcement: a, index, tab, canManage, tick,
-  onView, onEdit, onDelete, onArchive, onRestore, onPublish, onPublishNow, onTogglePin, onDuplicate,
+  onView, onEdit, onDelete, onArchive, onRestore, onPublish, onPublishNow, onTogglePin, onDuplicate, onOpenAttachment, attachmentUrls,
 }: {
   announcement: Announcement;
   index: number;
@@ -1390,6 +1537,8 @@ function AnnouncementRow({
   onPublishNow(): void;
   onTogglePin(): void;
   onDuplicate(): void;
+  onOpenAttachment(attachment: AnnouncementAttachment, download: boolean): void;
+  attachmentUrls: Record<string, string>;
 }) {
   const priority = PRIORITY_STYLES[a.priority];
   const category = CATEGORY_META[a.category];
@@ -1529,12 +1678,30 @@ function AnnouncementRow({
               <category.icon className="h-3 w-3" />
               {category.label}
             </span>
+            <span className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-[10px] font-black uppercase tracking-[0.12em] ${a.audienceType === 'specific' ? 'border-violet-200 bg-violet-50 text-violet-700' : 'border-slate-200 text-slate-500'}`}>
+              {a.audienceType === 'specific' ? <Users className="h-3 w-3" /> : <Globe2 className="h-3 w-3" />}
+              {a.audienceType === 'specific' ? `For you${canManage ? ` · ${a.recipientCount}` : ''}` : 'General'}
+            </span>
+            {(a.attachments ?? []).length > 0 && (
+              <span className="inline-flex items-center gap-1.5 rounded-full border border-sky-200 bg-sky-50 px-3 py-1 text-[10px] font-black uppercase tracking-[0.12em] text-sky-700">
+                <Paperclip className="h-3 w-3" />
+                {a.attachments.length} attachment{a.attachments.length === 1 ? '' : 's'}
+              </span>
+            )}
           </div>
 
           {/* Content preview */}
-          <p className={`mt-3 max-w-3xl text-sm leading-relaxed line-clamp-2 ${muted ? 'text-slate-400' : 'text-slate-500'}`}>
-            {a.content}
-          </p>
+          {a.content && <p className={`mt-3 max-w-3xl text-sm leading-relaxed line-clamp-2 ${muted ? 'text-slate-400' : 'text-slate-500'}`}>{a.content}</p>}
+
+          {(a.attachments ?? []).some((attachment) => attachment.kind === 'document') && (
+            <div className="mt-3 space-y-2">
+              {a.attachments.filter((attachment) => attachment.kind === 'document').map((attachment) => (
+                <button key={attachment.id} type="button" onClick={(event) => { event.stopPropagation(); onOpenAttachment(attachment, true); }} className="flex w-full max-w-3xl items-center gap-3 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-left hover:border-gold-300 hover:bg-gold-50/40">
+                  <FileText className="h-5 w-5 shrink-0 text-sky-600" /><span className="min-w-0 flex-1 truncate text-sm font-bold text-slate-700">{attachment.originalName}</span><span className="text-xs text-slate-400">{(attachment.fileSize / 1024 / 1024).toFixed(1)} MB</span><Download className="h-4 w-4 text-slate-400" />
+                </button>
+              ))}
+            </div>
+          )}
 
           {/* Meta — small-caps register line */}
           <p className="mt-3 text-[10px] font-bold uppercase tracking-[0.14em] text-slate-400">{metaParts.join('  ·  ')}</p>
