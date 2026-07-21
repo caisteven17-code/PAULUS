@@ -183,6 +183,7 @@ aws_migrations/072_add_ukmo_humidity_validation.sql
 aws_migrations/073_prepare_diocese_retirement.sql
 aws_migrations/074_decouple_remaining_operational_mirrors.sql
 aws_migrations/075_school_seminary_silver.sql
+aws_migrations/076_rename_collections_other_net.sql
 
 # Analytics refresh — run last, after all schema DDL above (see note near 125).
 # Phase 4: these legacy refresh scripts are intentionally excluded because they

@@ -2372,6 +2372,7 @@ export function Settings({ onBack, onLogout, onNavigate, role = 'bishop', initia
                 onUpdateSchools={setSchools}
                 onNavigate={onNavigate}
                 accounts={accounts}
+                currentUser={user}
               />
             )}
 

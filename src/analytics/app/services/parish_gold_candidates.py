@@ -527,7 +527,7 @@ def validate() -> dict[str, Any]:
                   COALESCE(g.amount, 0)
                   * CASE WHEN c.reporting_year BETWEEN 2023 AND 2025 THEN 0.05 ELSE 0 END
                 )::numeric(14, 2)
-            )::numeric(14, 2) AS expected_collections_other_net,
+            )::numeric(14, 2) AS expected_collection_other,
             COALESCE(r.amount, 0)::numeric(14, 2) AS expected_total_remittance
           FROM parish_analytics.vw_parish_monthly_financial_candidates c
           JOIN parish_analytics.vw_parish_monthly_financial_candidates_v1 v1
@@ -557,7 +557,7 @@ def validate() -> dict[str, Any]:
                 c.sacraments_parish_share
               + c.sacraments_over_above_confirmation_incl
               + c.collections_mass
-              + c.expected_collections_other_net
+              + c.expected_collection_other
               + c.collections_other_receipts
             )::numeric(14, 2)
            OR c.net_receipts_deficit IS DISTINCT FROM

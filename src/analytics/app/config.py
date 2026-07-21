@@ -22,6 +22,13 @@ WAREHOUSE_PILOT_INSTITUTION_IDS: list[str] = [
     value.strip() for value in os.getenv("WAREHOUSE_PILOT_INSTITUTION_IDS", "").split(",") if value.strip()
 ]
 WAREHOUSE_PILOT_POLL_SECONDS: int = max(10, int(os.getenv("WAREHOUSE_PILOT_POLL_SECONDS", "30")))
+WAREHOUSE_OUTBOX_SYNC_ENABLED: bool = os.getenv("WAREHOUSE_OUTBOX_SYNC_ENABLED", "false").lower() == "true"
+WAREHOUSE_OUTBOX_BATCH_SIZE: int = max(1, min(100, int(os.getenv("WAREHOUSE_OUTBOX_BATCH_SIZE", "20"))))
+WAREHOUSE_OUTBOX_LEASE_SECONDS: int = max(30, int(os.getenv("WAREHOUSE_OUTBOX_LEASE_SECONDS", "300")))
+WAREHOUSE_OUTBOX_RETRY_MAX_SECONDS: int = max(30, int(os.getenv("WAREHOUSE_OUTBOX_RETRY_MAX_SECONDS", "900")))
+WAREHOUSE_DB_STATEMENT_TIMEOUT_SECONDS: int = max(
+    30, int(os.getenv("WAREHOUSE_DB_STATEMENT_TIMEOUT_SECONDS", "120"))
+)
 # Permanently retired after the direct-Silver cutover. Kept in status output as
 # an explicit compatibility signal, but environment values cannot re-enable it.
 WAREHOUSE_BRONZE_COMPARISON_ENABLED: bool = False

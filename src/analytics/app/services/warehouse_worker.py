@@ -5,11 +5,17 @@ from __future__ import annotations
 import argparse
 import asyncio
 import logging
+import os
+import socket
 from datetime import datetime, timezone
 from typing import Any
 
 from app.config import (
     WAREHOUSE_GOLD_INCREMENTAL_ENABLED,
+    WAREHOUSE_OUTBOX_BATCH_SIZE,
+    WAREHOUSE_OUTBOX_LEASE_SECONDS,
+    WAREHOUSE_OUTBOX_RETRY_MAX_SECONDS,
+    WAREHOUSE_OUTBOX_SYNC_ENABLED,
     WAREHOUSE_PILOT_INSTITUTION_IDS,
     WAREHOUSE_PILOT_POLL_SECONDS,
     WAREHOUSE_SYNC_ALL_PARISHES,
@@ -18,7 +24,7 @@ from app.services import analytics_db
 from app.services.parish_gold_candidates import recover_record_memo_metrics
 from app.services.parish_gold_loader import refresh_incremental
 from app.services.silver_etl import run_silver_record
-from app.services.supabase_client import get_table
+from app.services.supabase_client import get_supabase, get_table
 from app.services.warehouse_monitor import (
     claim_due_retries,
     cleanup_history,
@@ -33,6 +39,114 @@ _PIPELINE_PREFIX = "parish_bronze_incremental"
 _GLOBAL_PIPELINE_NAME = "parish_silver_incremental"
 _PAGE_SIZE = 1000
 _last_cleanup_at: datetime | None = None
+_worker_id = f"{socket.gethostname()}:{os.getpid()}"
+_worker_state: dict[str, Any] = {
+    "last_heartbeat_at": None,
+    "last_success_at": None,
+    "last_error_type": None,
+    "consecutive_failures": 0,
+    "connection_recoveries": 0,
+    "phase": "not_started",
+}
+
+
+def _utc_now() -> datetime:
+    return datetime.now(timezone.utc)
+
+
+def _mark_heartbeat(phase: str) -> None:
+    _worker_state["last_heartbeat_at"] = _utc_now()
+    _worker_state["phase"] = phase
+
+
+def worker_status() -> dict[str, Any]:
+    now = _utc_now()
+    heartbeat = _worker_state["last_heartbeat_at"]
+    last_success = _worker_state["last_success_at"]
+    return {
+        "delivery_mode": "durable_supabase_outbox" if WAREHOUSE_OUTBOX_SYNC_ENABLED else "aws_watermark_polling",
+        "outbox_enabled": WAREHOUSE_OUTBOX_SYNC_ENABLED,
+        "worker_id": _worker_id,
+        "phase": _worker_state["phase"],
+        "last_heartbeat_at": heartbeat.isoformat() if heartbeat else None,
+        "heartbeat_age_seconds": int((now - heartbeat).total_seconds()) if heartbeat else None,
+        "last_success_at": last_success.isoformat() if last_success else None,
+        "last_error_type": _worker_state["last_error_type"],
+        "consecutive_failures": _worker_state["consecutive_failures"],
+        "connection_recoveries": _worker_state["connection_recoveries"],
+    }
+
+
+def _rpc(name: str, params: dict[str, Any]) -> Any:
+    return get_supabase().schema("operations").rpc(name, params).execute().data
+
+
+def _claim_outbox_events() -> list[dict[str, Any]]:
+    return _rpc(
+        "claim_analytics_sync_events",
+        {
+            "p_worker_id": _worker_id,
+            "p_limit": WAREHOUSE_OUTBOX_BATCH_SIZE,
+            "p_lease_seconds": WAREHOUSE_OUTBOX_LEASE_SECONDS,
+        },
+    ) or []
+
+
+def _complete_outbox_event(event: dict[str, Any]) -> bool:
+    return bool(
+        _rpc(
+            "complete_analytics_sync_event",
+            {
+                "p_event_id": event["event_id"],
+                "p_source_updated_at": event["source_updated_at"],
+            },
+        )
+    )
+
+
+def _retry_delay(attempt_count: int) -> int:
+    return min(30 * (2 ** min(max(attempt_count, 0), 10)), WAREHOUSE_OUTBOX_RETRY_MAX_SECONDS)
+
+
+def _fail_outbox_event(event: dict[str, Any], error: Exception) -> bool:
+    return bool(
+        _rpc(
+            "fail_analytics_sync_event",
+            {
+                "p_event_id": event["event_id"],
+                "p_source_updated_at": event["source_updated_at"],
+                "p_error": f"{type(error).__name__}: {error}"[:2000],
+                "p_retry_seconds": _retry_delay(int(event.get("attempt_count") or 0)),
+            },
+        )
+    )
+
+
+def _run_outbox_once() -> dict[str, int]:
+    result = {"claimed": 0, "succeeded": 0, "rescheduled": 0, "superseded": 0}
+    events = _claim_outbox_events()
+    result["claimed"] = len(events)
+    aws_error: Exception | None = None
+    for event in events:
+        try:
+            if aws_error is not None:
+                raise aws_error
+            _sync_change({"id": str(event["source_record_id"])})
+            if _complete_outbox_event(event):
+                result["succeeded"] += 1
+            else:
+                # The source changed again while this snapshot was processing.
+                # Its trigger already returned the event to pending.
+                result["superseded"] += 1
+        except Exception as exc:
+            logger.exception("Durable analytics delivery failed for %s", event["source_record_id"])
+            if aws_error is None:
+                aws_error = exc
+                analytics_db.discard_pool()
+                _worker_state["connection_recoveries"] += 1
+            if _fail_outbox_event(event, exc):
+                result["rescheduled"] += 1
+    return result
 
 
 def _pipeline_name(institution_id: str) -> str:
@@ -265,6 +379,14 @@ def _fetch_changes(institution_id: str, watermark: dict[str, Any]) -> list[dict]
 
 
 def run_once(institution_ids: list[str] | None = None) -> dict[str, Any]:
+    if WAREHOUSE_OUTBOX_SYNC_ENABLED:
+        outbox = _run_outbox_once()
+        # Drain retries created by the former AWS-watermark worker. New events
+        # are retained and retried in Supabase instead.
+        retries = _process_due_retries() if outbox["rescheduled"] == 0 else {
+            "claimed": 0, "succeeded": 0, "rescheduled": 0, "dead_letter": 0
+        }
+        return {"outbox": outbox, "retries": retries, "cleanup": _cleanup_if_due()}
     if institution_ids is None and WAREHOUSE_SYNC_ALL_PARISHES:
         return _run_global_once()
     allowlist = institution_ids if institution_ids is not None else WAREHOUSE_PILOT_INSTITUTION_IDS
@@ -300,10 +422,20 @@ async def run_forever(stop_event: asyncio.Event) -> None:
         WAREHOUSE_PILOT_POLL_SECONDS,
     )
     while not stop_event.is_set():
+        _mark_heartbeat("polling")
         try:
             await asyncio.to_thread(run_once)
-        except Exception:
+            _worker_state["last_success_at"] = _utc_now()
+            _worker_state["last_error_type"] = None
+            _worker_state["consecutive_failures"] = 0
+            _mark_heartbeat("waiting")
+        except Exception as exc:
             logger.exception("Pilot bronze poll failed")
+            _worker_state["last_error_type"] = type(exc).__name__
+            _worker_state["consecutive_failures"] += 1
+            _worker_state["connection_recoveries"] += 1
+            analytics_db.discard_pool()
+            _mark_heartbeat("recovering")
         try:
             await asyncio.wait_for(stop_event.wait(), timeout=WAREHOUSE_PILOT_POLL_SECONDS)
         except TimeoutError:

@@ -131,7 +131,7 @@ export function Sidebar({ activeTab = '', onNavigate, role, timeframe = '6m', on
     // matches User Role Control — e.g. it is hidden for Finance Staff and
     // Seminary roles that are not granted it, and shown for Chancellor.
     ...(permissions.manage_assignments === true
-      ? [{ id: 'priest-aitwin', label: 'Simulator', icon: Zap, section: 'PRIEST' }]
+      ? [{ id: 'priest-aitwin', label: 'Reassignment', icon: Users, section: 'PRIEST' }]
       : []),
   ];
 

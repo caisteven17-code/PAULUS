@@ -7,13 +7,16 @@ loader from Supabase to this module is a small, mechanical diff.
 
 from __future__ import annotations
 
+from threading import RLock
+
 from psycopg.rows import dict_row
 from psycopg.types.json import Jsonb
 from psycopg_pool import ConnectionPool
 
-from app.config import ANALYTICS_DB_URL
+from app.config import ANALYTICS_DB_URL, WAREHOUSE_DB_STATEMENT_TIMEOUT_SECONDS
 
 _pool: ConnectionPool | None = None
+_pool_lock = RLock()
 
 
 def enabled() -> bool:
@@ -22,7 +25,11 @@ def enabled() -> bool:
 
 def get_pool() -> ConnectionPool:
     global _pool
-    if _pool is None:
+    if _pool is not None:
+        return _pool
+    with _pool_lock:
+        if _pool is not None:
+            return _pool
         if not ANALYTICS_DB_URL:
             raise RuntimeError("ANALYTICS_DB_URL must be set in .env")
         # min_size=0 meant every request after an idle gap paid for a fresh
@@ -48,7 +55,10 @@ def get_pool() -> ConnectionPool:
             max_size=8,
             timeout=30,
             max_idle=120,
-            kwargs={"connect_timeout": 10},
+            kwargs={
+                "connect_timeout": 10,
+                "options": f"-c statement_timeout={WAREHOUSE_DB_STATEMENT_TIMEOUT_SECONDS * 1000}",
+            },
             check=ConnectionPool.check_connection,
             open=True,
         )
@@ -57,9 +67,21 @@ def get_pool() -> ConnectionPool:
 
 def close_pool() -> None:
     global _pool
-    if _pool is not None:
-        _pool.close()
+    with _pool_lock:
+        stale_pool = _pool
         _pool = None
+    if stale_pool is not None:
+        stale_pool.close(timeout=5)
+
+
+def discard_pool() -> None:
+    """Drop stale RDS connections; the next operation creates a fresh pool."""
+    try:
+        close_pool()
+    except Exception:
+        # The pool is already detached above. Recovery must not be prevented by
+        # an error while closing sockets from the failed AWS connection.
+        pass
 
 
 def _adapt(value):

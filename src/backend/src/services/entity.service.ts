@@ -55,6 +55,12 @@ export class EntityService {
 
   // Live database administrative calls (falling back to constants)
   async getAdminEntities(type?: EntityType, includeAll = false): Promise<any> {
+    // The portable canonical institution registry is authoritative for parish
+    // management and includes newly renumbered parishes immediately.
+    if (type === 'parish') {
+      return this.getPortableAdminEntities('parish', includeAll);
+    }
+
     const table = this.tableFor(type ?? null);
     if (table) {
       const entityType = type as EntityType;
@@ -304,6 +310,33 @@ export class EntityService {
     return typeof value === 'string' && /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value);
   }
 
+  private async resolveDioceseProfileId(userId?: string): Promise<string | null> {
+    if (!this.isUuid(userId)) return null;
+
+    const { data: externalProfile, error: externalError } = await this.supabaseService.admin
+      .schema('diocese')
+      .from('profiles')
+      .select('id')
+      .eq('external_auth_id', userId)
+      .is('deleted_at', null)
+      .maybeSingle();
+    if (!externalError && externalProfile?.id) return externalProfile.id;
+
+    const { data: directProfile, error: directError } = await this.supabaseService.admin
+      .schema('diocese')
+      .from('profiles')
+      .select('id')
+      .eq('id', userId)
+      .is('deleted_at', null)
+      .maybeSingle();
+    if (!directError && directProfile?.id) return directProfile.id;
+
+    // Demo/local users and partially onboarded accounts may not yet have a
+    // canonical diocesan profile. The audit log still records their displayed
+    // identity, while nullable renumbering FKs remain valid.
+    return null;
+  }
+
   private normalizeInstitutionClass(value: any): string | undefined {
     if (typeof value !== 'string') return undefined;
     const match = value.trim().match(/^(?:Class\s*)?([A-E])$/i);
@@ -378,6 +411,249 @@ export class EntityService {
 
   private isMissingTableError(error: any): boolean {
     return !!error && (MISSING_TABLE_CODES.has(error.code) || String(error.message ?? '').includes('schema cache'));
+  }
+
+  async previewParishRenumbering(requestedSourceCode: string): Promise<any> {
+    const normalizedCode = String(requestedSourceCode ?? '').trim().toUpperCase().replace(/\s+/g, '');
+    if (!/^D[1-4]-[1-9][0-9]*$/.test(normalizedCode)) {
+      throw new Error('Enter the source code in D#-# format, for example D2-42.');
+    }
+
+    const { data, error } = await this.supabaseService.admin
+      .schema('operations')
+      .rpc('preview_parish_source_code_insert', { p_requested_source_code: normalizedCode });
+    if (error) throw error;
+
+    const changes = (data ?? []).map((row: any) => ({
+      institutionId: row.institution_id,
+      parishName: row.parish_name,
+      oldSourceCode: row.old_source_code,
+      newSourceCode: row.new_source_code,
+      sequenceNumber: row.sequence_number,
+    }));
+
+    return {
+      requestedSourceCode: normalizedCode,
+      affectedParishCount: changes.length,
+      finalSourceCode: changes.length ? changes[changes.length - 1].newSourceCode : normalizedCode,
+      changes,
+    };
+  }
+
+  async createParishWithRenumbering(input: any, changedBy?: string): Promise<any> {
+    const requestedSourceCode = String(input?.requestedSourceCode ?? '').trim().toUpperCase().replace(/\s+/g, '');
+    const actorId = await this.resolveDioceseProfileId(changedBy);
+
+    if (!/^D[1-4]-[1-9][0-9]*$/.test(requestedSourceCode)) {
+      throw new Error('Enter the source code in D#-# format, for example D2-42.');
+    }
+    const parish = input?.parish ?? {};
+    const { data, error } = await this.supabaseService.admin
+      .schema('operations')
+      .rpc('create_parish_with_source_code_renumbering', {
+        p_parish: {
+          name: parish.name,
+          district: parish.district,
+          vicariate: parish.vicariate,
+          class: parish.class,
+          address: parish.address,
+          contact_number: parish.contactNumber ?? parish.contact_number,
+          email: parish.email,
+          latitude: parish.lat ?? parish.latitude,
+          longitude: parish.lng ?? parish.longitude,
+        },
+        p_requested_source_code: requestedSourceCode,
+        p_changed_by: actorId,
+      });
+    if (error) throw error;
+
+    const result = data as any;
+    const { data: institution, error: institutionError } = await this.supabaseService.admin
+      .schema('diocese')
+      .from('institutions')
+      .select('*')
+      .eq('id', result.institutionId)
+      .single();
+    if (institutionError) {
+      // The transactional RPC has already committed successfully. Return the
+      // canonical identity from its result rather than misreporting the whole
+      // operation as failed because a follow-up display read was unavailable.
+      return {
+        id: result.institutionId,
+        name: parish.name,
+        district: parish.district,
+        vicariate: parish.vicariate,
+        class: parish.class,
+        address: parish.address,
+        institutionCode: requestedSourceCode,
+        iafrSourceCode: requestedSourceCode,
+        status: 'active',
+        renumbering: result,
+      };
+    }
+
+    return {
+      ...this.normalizePortableEntity('parish', institution),
+      renumbering: result,
+    };
+  }
+
+  async getParishRenumberingHistory(): Promise<any[]> {
+    const { data, error } = await this.supabaseService.admin
+      .schema('operations')
+      .from('parish_renumbering_batches')
+      .select('id, new_parish_id, requested_source_code, affected_parish_count, effective_at, status, executed_by, executed_at, operation_type')
+      .order('executed_at', { ascending: false });
+    if (error) throw error;
+    return data ?? [];
+  }
+
+  async previewBulkParishReorder(district: string, order: string[]): Promise<any> {
+    if (!Array.isArray(order) || order.length === 0 || order.some((id) => !this.isUuid(id))) {
+      throw new Error('The proposed order must contain valid parish identifiers.');
+    }
+    const { data, error } = await this.supabaseService.admin
+      .schema('operations')
+      .rpc('preview_bulk_parish_reorder', { p_district: district, p_order: order });
+    if (error) throw error;
+
+    const changes = (data ?? []).map((row: any) => ({
+      institutionId: row.institution_id,
+      parishName: row.parish_name,
+      oldSourceCode: row.old_source_code,
+      newSourceCode: row.new_source_code,
+      oldPosition: row.old_position,
+      newPosition: row.new_position,
+      changed: row.old_source_code !== row.new_source_code,
+    }));
+    return {
+      district,
+      parishCount: changes.length,
+      affectedParishCount: changes.filter((row: any) => row.changed).length,
+      changes,
+    };
+  }
+
+  async executeBulkParishReorder(input: any, changedBy?: string): Promise<any> {
+    const order = input?.order;
+    if (!Array.isArray(order) || order.length === 0 || order.some((id: any) => !this.isUuid(id))) {
+      throw new Error('The proposed order must contain valid parish identifiers.');
+    }
+    const actorId = await this.resolveDioceseProfileId(changedBy);
+    const { data, error } = await this.supabaseService.admin
+      .schema('operations')
+      .rpc('execute_bulk_parish_reorder', {
+        p_district: input?.district,
+        p_order: order,
+        p_changed_by: actorId,
+      });
+    if (error) throw error;
+    return data;
+  }
+
+  async getPriestAssignmentWorkspace(): Promise<any> {
+    const [profilesResult, institutionsResult, assignmentsResult] = await Promise.all([
+      this.supabaseService.admin
+        .schema('diocese')
+        .from('profiles')
+        .select('id, full_name, is_active')
+        .eq('role_id', 'parish_priest')
+        .eq('is_active', true)
+        .is('deleted_at', null)
+        .order('full_name'),
+      this.supabaseService.admin
+        .schema('diocese')
+        .from('institutions')
+        .select('id, name, institution_code, district, vicariate, is_active')
+        .eq('institution_type', 'parish')
+        .eq('is_active', true)
+        .is('deleted_at', null)
+        .order('name'),
+      this.supabaseService.admin
+        .schema('operations')
+        .from('priest_assignments')
+        .select('id, priest_id, institution_id, start_date, end_date, status, is_active, reassignment_batch_id, previous_assignment_id, created_at')
+        .eq('assignment_role', 'parish_priest')
+        .is('deleted_at', null)
+        .order('start_date', { ascending: false }),
+    ]);
+
+    if (profilesResult.error) throw profilesResult.error;
+    if (institutionsResult.error) throw institutionsResult.error;
+    if (assignmentsResult.error) throw assignmentsResult.error;
+
+    const priests = profilesResult.data ?? [];
+    const parishes = institutionsResult.data ?? [];
+    const assignments = assignmentsResult.data ?? [];
+    const priestNames = new Map(priests.map((priest: any) => [priest.id, priest.full_name || 'Unnamed priest']));
+    const parishNames = new Map(parishes.map((parish: any) => [parish.id, parish.name]));
+
+    return {
+      priests: priests.map((priest: any) => ({ id: priest.id, name: priest.full_name || 'Unnamed priest' })),
+      parishes: parishes.map((parish: any) => ({
+        id: parish.id,
+        name: parish.name,
+        institutionCode: parish.institution_code,
+        district: parish.district,
+        vicariate: parish.vicariate,
+      })),
+      assignments: assignments.map((assignment: any) => ({
+        id: assignment.id,
+        priestId: assignment.priest_id,
+        priestName: priestNames.get(assignment.priest_id) || 'Unknown priest',
+        parishId: assignment.institution_id,
+        parishName: parishNames.get(assignment.institution_id) || 'Unknown parish',
+        startDate: assignment.start_date,
+        endDate: assignment.end_date,
+        status: assignment.status,
+        isActive: assignment.is_active,
+        reassignmentBatchId: assignment.reassignment_batch_id,
+        previousAssignmentId: assignment.previous_assignment_id,
+      })),
+    };
+  }
+
+  async previewPriestReassignment(moves: any[]): Promise<any> {
+    if (!Array.isArray(moves) || moves.length === 0) throw new Error('Add at least one priest reassignment.');
+    const { data, error } = await this.supabaseService.admin
+      .schema('operations')
+      .rpc('preview_priest_reassignment', { p_moves: moves });
+    if (error) throw error;
+    const normalized = (data ?? []).map((row: any) => ({
+      priestId: row.priest_id,
+      priestName: row.priest_name,
+      oldAssignmentId: row.old_assignment_id,
+      fromParishId: row.from_parish_id,
+      fromParishName: row.from_parish_name,
+      toParishId: row.to_parish_id,
+      toParishName: row.to_parish_name,
+      createsVacancy: row.creates_vacancy,
+    }));
+    return {
+      assignmentCount: normalized.length,
+      vacancyCount: normalized.filter((move: any) => move.createsVacancy).length,
+      moves: normalized,
+    };
+  }
+
+  async executePriestReassignment(moves: any[], executedBy?: string): Promise<any> {
+    if (!Array.isArray(moves) || moves.length === 0) throw new Error('Add at least one priest reassignment.');
+    const actorId = await this.resolveDioceseProfileId(executedBy);
+    const { data, error } = await this.supabaseService.admin
+      .schema('operations')
+      .rpc('execute_priest_reassignment', { p_moves: moves, p_executed_by: actorId });
+    if (error) throw error;
+    return data;
+  }
+
+  async getPriestReassignmentHistory(): Promise<any[]> {
+    const { data, error } = await this.supabaseService.admin
+      .schema('operations')
+      .from('priest_reassignment_batches')
+      .select('id, assignment_count, vacancy_count, status, executed_by, executed_at, created_at')
+      .order('executed_at', { ascending: false });
+    if (error) throw error;
+    return data ?? [];
   }
 
   private async syncEntityDetails(type: EntityType, institutionId: string, entity: any): Promise<void> {
@@ -499,6 +775,9 @@ export class EntityService {
   async createAdminEntity(type: EntityType, entity: any): Promise<any> {
     const table = this.tableFor(type);
     if (!table) throw new Error('Invalid type');
+    if (type === 'parish') {
+      throw new Error('New parishes must be created through the source-code preview and confirmation workflow.');
+    }
 
     // For schools, convert cluster to vicariate if database still uses vicariate column
     let payload = entity;
@@ -536,6 +815,18 @@ export class EntityService {
   async updateAdminEntity(type: EntityType, id: string, updates: any): Promise<any> {
     const table = this.tableFor(type);
     if (!table || !id) throw new Error('type and id are required');
+
+    if (type === 'parish') {
+      updates = { ...updates };
+      delete updates.institutionCode;
+      delete updates.institution_code;
+      delete updates.iafrSourceCode;
+      delete updates.iafr_source_code;
+
+      const syncedInstitution = await this.syncInstitutionFields(type, { ...updates, id });
+      if (!syncedInstitution) throw new Error('Unable to update the canonical parish record.');
+      return this.normalizePortableEntity('parish', syncedInstitution);
+    }
 
     // For schools, convert cluster to vicariate if database still uses vicariate column
     let payload = { ...updates, updated_at: new Date().toISOString() };
@@ -1072,6 +1363,23 @@ export class EntityService {
   async deleteAdminEntity(type: EntityType, id: string, hardDelete = false): Promise<any> {
     const table = this.tableFor(type);
     if (!table || !id) throw new Error('type and id are required');
+
+    if (type === 'parish') {
+      if (hardDelete) {
+        throw new Error('Parishes with source-code history cannot be permanently deleted. Archive the parish instead.');
+      }
+      const now = new Date().toISOString();
+      const { data, error } = await this.supabaseService.admin
+        .schema('diocese')
+        .from('institutions')
+        .update({ is_active: false, deleted_at: now, updated_at: now })
+        .eq('id', id)
+        .eq('institution_type', 'parish')
+        .select('*')
+        .single();
+      if (error) throw error;
+      return this.normalizePortableEntity('parish', data);
+    }
 
     if (hardDelete) {
       const { data, error } = await this.supabaseService.supabaseServer

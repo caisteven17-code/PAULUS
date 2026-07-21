@@ -121,6 +121,8 @@ type CommitProgress = {
   lineItemsCreated?: number | null;
   percent: number;
   error?: string | null;
+  targetYear?: number | null;
+  targetMonth?: number | null;
 };
 
 type BatchRow = {
@@ -159,8 +161,8 @@ const importModes = [
   },
   {
     id: 'patch_selected',
-    label: 'Patch selected columns',
-    description: 'Updates mapped columns only and preserves every other line item.',
+    label: 'Patch one column',
+    description: 'Updates one mapped column across all months and preserves every other line item.',
   },
 ] as const;
 
@@ -211,6 +213,25 @@ function mappingFromColumn(column: PusherColumn): MappingChoice {
   };
 }
 
+function ignoredMappingFromColumn(column: PusherColumn): MappingChoice {
+  return {
+    ...mappingFromColumn(column),
+    action: 'ignore',
+    canonicalAccountCode: null,
+    canonicalField: null,
+    aggregationRule: 'ignore',
+  };
+}
+
+function patchMappingFromColumn(column: PusherColumn): MappingChoice {
+  const suggested = mappingFromColumn(column);
+  return {
+    ...suggested,
+    action: 'map',
+    aggregationRule: 'sum',
+  };
+}
+
 function defaultAccountDraft(year = new Date().getFullYear()) {
   return {
     accountCode: '',
@@ -227,6 +248,7 @@ function defaultAccountDraft(year = new Date().getFullYear()) {
 export function Pusher({ onBack }: PusherProps) {
   const inputRef = useRef<HTMLInputElement>(null);
   const progressPollRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const mappingsBeforePatchRef = useRef<Record<string, MappingChoice> | null>(null);
   const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
   const [accounts, setAccounts] = useState<CanonicalAccount[]>([]);
   const [institutions, setInstitutions] = useState<ParishInstitution[]>([]);
@@ -249,6 +271,8 @@ export function Pusher({ onBack }: PusherProps) {
   const [error, setError] = useState('');
   const [commitMessage, setCommitMessage] = useState('');
   const [importMode, setImportMode] = useState<(typeof importModes)[number]['id']>('skip_existing');
+  const [patchYear, setPatchYear] = useState(2025);
+  const [patchColumnSelections, setPatchColumnSelections] = useState<Record<string, string>>({});
   const [search, setSearch] = useState('');
   const [accountSearch, setAccountSearch] = useState('');
   const [accountDraftOpen, setAccountDraftOpen] = useState(false);
@@ -274,6 +298,17 @@ export function Pusher({ onBack }: PusherProps) {
   }, []);
 
   const activeResult = results.find((file) => file.fileName === activeFileName) ?? results[0] ?? null;
+  const selectedPatchColumnKey = activeResult ? (patchColumnSelections[activeResult.fileName] ?? '') : '';
+  const selectedPatchColumn = activeResult?.columns.find((column) => column.key === selectedPatchColumnKey) ?? null;
+  const selectedPatchChoice =
+    activeResult && selectedPatchColumn
+      ? (mappingChoices[`${activeResult.fileName}:${selectedPatchColumn.key}`] ??
+        patchMappingFromColumn(selectedPatchColumn))
+      : null;
+
+  useEffect(() => {
+    if (activeResult?.summary.detectedYear) setPatchYear(activeResult.summary.detectedYear);
+  }, [activeResult?.summary.detectedYear]);
 
   const accountLabel = useMemo(() => {
     const map: Record<string, string> = {};
@@ -339,6 +374,9 @@ export function Pusher({ onBack }: PusherProps) {
     setSelectedFiles(next);
     setResults([]);
     setMappingChoices({});
+    mappingsBeforePatchRef.current = null;
+    setPatchColumnSelections({});
+    setImportMode('skip_existing');
     setParishChoices({});
     setCommitProgress(null);
     setSkippedRows([]);
@@ -377,10 +415,14 @@ export function Pusher({ onBack }: PusherProps) {
       if (!res.ok) throw new Error(data?.detail || data?.error || 'Validation failed.');
       const files: PusherFileResult[] = data.files ?? [];
       const initialChoices: Record<string, MappingChoice> = {};
+      const defaultChoices: Record<string, MappingChoice> = {};
       const initialParishChoices: Record<string, string> = {};
       files.forEach((file) => {
         file.columns.forEach((column) => {
-          initialChoices[`${file.fileName}:${column.key}`] = mappingFromColumn(column);
+          const key = `${file.fileName}:${column.key}`;
+          defaultChoices[key] = mappingFromColumn(column);
+          initialChoices[key] =
+            importMode === 'patch_selected' ? ignoredMappingFromColumn(column) : defaultChoices[key];
         });
         file.parishMatches.forEach((match) => {
           if (match.institutionId) {
@@ -390,6 +432,10 @@ export function Pusher({ onBack }: PusherProps) {
       });
       setResults(files);
       setMappingChoices(initialChoices);
+      if (importMode === 'patch_selected') {
+        mappingsBeforePatchRef.current = defaultChoices;
+        setPatchColumnSelections({});
+      }
       setParishChoices(initialParishChoices);
       setActiveFileName(files[0]?.fileName ?? '');
     } catch (err) {
@@ -413,28 +459,60 @@ export function Pusher({ onBack }: PusherProps) {
 
   const selectImportMode = (mode: (typeof importModes)[number]['id']) => {
     setImportMode(mode);
-    if (mode !== 'patch_selected' || !activeResult) return;
+    if (mode !== 'patch_selected') {
+      if (mappingsBeforePatchRef.current) {
+        setMappingChoices(mappingsBeforePatchRef.current);
+        mappingsBeforePatchRef.current = null;
+      }
+      setPatchColumnSelections({});
+      return;
+    }
+    if (!activeResult) return;
+    if (importMode !== 'patch_selected') mappingsBeforePatchRef.current = mappingChoices;
+    setPatchYear(activeResult.summary.detectedYear ?? 2025);
+    setPatchColumnSelections((previous) => ({ ...previous, [activeResult.fileName]: '' }));
     setMappingChoices((previous) => {
       const next = { ...previous };
       activeResult.columns.forEach((column) => {
         const key = `${activeResult.fileName}:${column.key}`;
-        const current = previous[key] ?? mappingFromColumn(column);
-        next[key] =
-          current.canonicalAccountCode === 'B.3.06'
-            ? { ...current, action: 'map', aggregationRule: 'sum' }
-            : {
-                ...current,
-                action: 'ignore',
-                canonicalAccountCode: null,
-                canonicalField: null,
-                aggregationRule: 'ignore',
-              };
+        next[key] = ignoredMappingFromColumn(column);
+      });
+      return next;
+    });
+  };
+
+  const selectPatchColumn = (columnKey: string) => {
+    if (!activeResult) return;
+    setPatchColumnSelections((previous) => ({ ...previous, [activeResult.fileName]: columnKey }));
+    setMappingChoices((previous) => {
+      const next = { ...previous };
+      activeResult.columns.forEach((column) => {
+        next[`${activeResult.fileName}:${column.key}`] =
+          column.key === columnKey ? patchMappingFromColumn(column) : ignoredMappingFromColumn(column);
+      });
+      return next;
+    });
+    setError('');
+  };
+
+  const activateFile = (file: PusherFileResult) => {
+    setActiveFileName(file.fileName);
+    if (importMode !== 'patch_selected') return;
+    setPatchColumnSelections((previous) => ({ ...previous, [file.fileName]: '' }));
+    setMappingChoices((previous) => {
+      const next = { ...previous };
+      file.columns.forEach((column) => {
+        next[`${file.fileName}:${column.key}`] = ignoredMappingFromColumn(column);
       });
       return next;
     });
   };
 
   const toggleColumnVisibility = (column: PusherColumn, choice: MappingChoice) => {
+    if (importMode === 'patch_selected') {
+      selectPatchColumn(choice.action === 'ignore' ? column.key : '');
+      return;
+    }
     if (choice.action === 'ignore') {
       updateChoice(column, mappingFromColumn(column));
       return;
@@ -444,6 +522,20 @@ export function Pusher({ onBack }: PusherProps) {
       canonicalAccountCode: null,
       canonicalField: null,
       aggregationRule: 'ignore',
+    });
+  };
+
+  const updateColumnAction = (column: PusherColumn, choice: MappingChoice, action: MappingChoice['action']) => {
+    if (importMode === 'patch_selected') {
+      if (action === 'map') selectPatchColumn(column.key);
+      else if (selectedPatchColumnKey === column.key) selectPatchColumn('');
+      return;
+    }
+    updateChoice(column, {
+      action,
+      canonicalAccountCode: action === 'map' ? choice.canonicalAccountCode : null,
+      aggregationRule:
+        action === 'memo' ? 'memo' : action === 'ignore' || action === 'not_in_template' ? action : 'sum',
     });
   };
 
@@ -621,9 +713,20 @@ export function Pusher({ onBack }: PusherProps) {
       setError('Some mapped columns do not have a canonical account yet.');
       return;
     }
-    if (importMode === 'patch_selected' && !mappings.some((mapping) => mapping.action === 'map')) {
-      setError('Select at least one source column to patch.');
-      return;
+    if (importMode === 'patch_selected') {
+      if (!selectedPatchColumnKey) {
+        setError('Choose the spreadsheet column that you want to patch.');
+        return;
+      }
+      const selectedMappings = mappings.filter((mapping) => mapping.action === 'map' && mapping.canonicalAccountCode);
+      if (selectedMappings.length !== 1) {
+        setError('Select exactly one source column to patch.');
+        return;
+      }
+      if (!patchYear) {
+        setError('The workbook year could not be detected for this patch.');
+        return;
+      }
     }
     if (unresolvedParishCount) {
       setError('Some parish matches still need a selected institution before pushing.');
@@ -657,6 +760,8 @@ export function Pusher({ onBack }: PusherProps) {
           parishMappings,
           importMode,
           committedBy: 'PUSHER temporary user',
+          targetYear: importMode === 'patch_selected' ? patchYear : null,
+          targetMonth: null,
         }),
       });
       const data = await res.json();
@@ -933,7 +1038,14 @@ export function Pusher({ onBack }: PusherProps) {
             </div>
             <button
               onClick={commitActiveFile}
-              disabled={!activeResult || isCommitting || !activeResult.batchId || unresolvedParishCount > 0}
+              disabled={
+                !activeResult ||
+                isCommitting ||
+                !activeResult.batchId ||
+                unresolvedParishCount > 0 ||
+                (importMode === 'patch_selected' &&
+                  (!selectedPatchColumnKey || !selectedPatchChoice?.canonicalAccountCode))
+              }
               className="mt-4 flex w-full items-center justify-center gap-2 rounded-lg bg-emerald-700 px-4 py-3 text-sm font-bold text-white transition hover:bg-emerald-800 disabled:cursor-not-allowed disabled:opacity-50"
             >
               {isCommitting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Database className="h-4 w-4" />}
@@ -1044,7 +1156,7 @@ export function Pusher({ onBack }: PusherProps) {
               {results.map((file) => (
                 <button
                   key={file.fileName}
-                  onClick={() => setActiveFileName(file.fileName)}
+                  onClick={() => activateFile(file)}
                   className={`rounded-lg px-3 py-2 text-sm font-bold transition ${
                     activeResult?.fileName === file.fileName
                       ? 'bg-slate-950 text-white'
@@ -1247,25 +1359,16 @@ export function Pusher({ onBack }: PusherProps) {
                                   <select
                                     value={choice.action}
                                     onChange={(event) =>
-                                      updateChoice(column, {
-                                        action: event.target.value as MappingChoice['action'],
-                                        canonicalAccountCode:
-                                          event.target.value === 'map' ? choice.canonicalAccountCode : null,
-                                        aggregationRule:
-                                          event.target.value === 'memo'
-                                            ? 'memo'
-                                            : event.target.value === 'ignore' ||
-                                                event.target.value === 'not_in_template'
-                                              ? event.target.value
-                                              : 'sum',
-                                      })
+                                      updateColumnAction(column, choice, event.target.value as MappingChoice['action'])
                                     }
                                     className="w-40 rounded-lg border border-stone-200 bg-white px-3 py-2 text-sm font-semibold outline-none"
                                   >
                                     <option value="map">Map</option>
-                                    <option value="memo">Memo only</option>
                                     <option value="ignore">Ignore</option>
-                                    <option value="not_in_template">Not in template</option>
+                                    {importMode !== 'patch_selected' && <option value="memo">Memo only</option>}
+                                    {importMode !== 'patch_selected' && (
+                                      <option value="not_in_template">Not in template</option>
+                                    )}
                                   </select>
                                 </td>
                                 <td className="px-4 py-3">

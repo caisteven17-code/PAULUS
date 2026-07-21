@@ -261,7 +261,11 @@ def _sacrament_breakdown_account(base_code: str | None, kind: str) -> str | None
     return f"{base_code}.{suffix}"
 
 
-def _suggest_mapping(parts: list[str], account_names: dict[str, str]) -> tuple[str | None, str | None, str | None, float, str, str, str, bool]:
+def _suggest_mapping(
+    parts: list[str],
+    account_names: dict[str, str],
+    template_year: int | None = None,
+) -> tuple[str | None, str | None, str | None, float, str, str, str, bool]:
     text = " ".join(parts).lower()
     section = parts[0].lower() if parts else ""
     account: str | None = None
@@ -274,6 +278,24 @@ def _suggest_mapping(parts: list[str], account_names: dict[str, str]) -> tuple[s
 
     sacrament_code, sacrament_name = _sacrament_account(text)
 
+    if (
+        template_year in {2021, 2022}
+        and "mass intention" in text
+        and "claimed" in text
+        and "not claimed" not in text
+        and "unclaimed" not in text
+        and "priest share" not in text
+    ):
+        return (
+            "A.3.02",
+            account_names.get("A.3.02"),
+            None,
+            1.0,
+            "approved",
+            f"{template_year} Mass Intentions claimed-by-Parish-Priest column.",
+            "sum",
+            False,
+        )
     if section == "sacraments" and parts and parts[-1].lower() == "rate":
         return None, None, "sacrament_diocese_share_rate", 0.9, "needs_review", "Sacrament diocese-share rate; saved as memo/checking detail, not posted as money.", "memo", False
     if sacrament_code and ("rate amount" in text or "prescribed rate" in text):
@@ -815,7 +837,7 @@ def _column_has_parish_values(ws, column_index: int) -> bool:
     return False
 
 
-def _source_columns(ws, account_names: dict[str, str]) -> list[SourceColumn]:
+def _source_columns(ws, account_names: dict[str, str], template_year: int | None = None) -> list[SourceColumn]:
     grid = _header_grid(ws)
     columns: list[SourceColumn] = []
     occurrences: dict[str, int] = defaultdict(int)
@@ -825,9 +847,23 @@ def _source_columns(ws, account_names: dict[str, str]) -> list[SourceColumn]:
             value = _clean_header(grid[row - 1][idx - 1])
             if value and value not in parts:
                 parts.append(value)
+        has_parish_values = _column_has_parish_values(ws, idx)
+        # The 2025 workbook accidentally left the prescribed-total header blank
+        # under sacrament groups (for example Baptism (Infant), column G). The
+        # parent sacrament header and the populated numeric column still make
+        # the intended measure unambiguous.
+        leaf_headers = [
+            _clean_header(grid[row - 1][idx - 1])
+            for row in (5, 6)
+            if _clean_header(grid[row - 1][idx - 1])
+        ]
+        if template_year == 2025 and parts and not leaf_headers and has_parish_values:
+            sacrament_code, _ = _sacrament_account(" ".join(parts).lower())
+            if sacrament_code:
+                parts.append("Total Amount as Prescribed")
         if not parts:
             continue
-        if not _is_financial_value_column(parts) and not _column_has_parish_values(ws, idx):
+        if not _is_financial_value_column(parts) and not has_parish_values:
             continue
         column_letter = get_column_letter(idx)
         header = parts[-1] if parts else column_letter
@@ -835,7 +871,11 @@ def _source_columns(ws, account_names: dict[str, str]) -> list[SourceColumn]:
         base_key = _source_column_key(parts, 1)
         occurrences[base_key] += 1
         source_key = _source_column_key(parts, occurrences[base_key])
-        account, account_name, field, confidence, status, reason, rule, combined = _suggest_mapping(parts, account_names)
+        account, account_name, field, confidence, status, reason, rule, combined = _suggest_mapping(
+            parts,
+            account_names,
+            template_year,
+        )
         columns.append(
             SourceColumn(
                 key=source_key,
@@ -871,8 +911,8 @@ def _parse_workbook(file_name: str, file_bytes: bytes) -> dict[str, Any]:
 
     sheet_columns: dict[str, list[SourceColumn]] = {}
     columns_by_key: dict[str, SourceColumn] = {}
-    for sheet_name, _, _ in month_sheets:
-        active_columns = _source_columns(wb[sheet_name], account_names)
+    for sheet_name, _, sheet_year in month_sheets:
+        active_columns = _source_columns(wb[sheet_name], account_names, sheet_year)
         sheet_columns[sheet_name] = active_columns
         for col in active_columns:
             columns_by_key.setdefault(col.key, col)
@@ -1230,10 +1270,16 @@ def _ensure_record(institution_id: str, batch_id: str, year: int, month: int, im
     return inserted_data[0]["id"], "inserted"
 
 
-def start_commit_batch(batch_id: str, import_mode: str, committed_by: str | None = None) -> dict[str, Any]:
+def start_commit_batch(
+    batch_id: str,
+    import_mode: str,
+    committed_by: str | None = None,
+    target_year: int | None = None,
+    target_month: int | None = None,
+) -> dict[str, Any]:
     batch = (
         get_table("operations", "financial_push_batches")
-        .select("id, status, upload_mode")
+        .select("id, status, upload_mode, summary")
         .eq("id", batch_id)
         .maybe_single()
         .execute()
@@ -1245,11 +1291,26 @@ def start_commit_batch(batch_id: str, import_mode: str, committed_by: str | None
         return {"batchId": batch_id, "status": "committed", "alreadyFinished": True}
     if data.get("status") == "committing":
         return {"batchId": batch_id, "status": "already_committing", "alreadyRunning": True}
-    if _count_push_rows(batch_id) == 0:
+    if import_mode == "patch_selected":
+        if target_year is None:
+            raise ValueError("Patch one column requires the workbook year.")
+        if target_year < 2000 or target_year > 2100:
+            raise ValueError("The selected patch year is invalid.")
+        if target_month is not None and target_month not in range(1, 13):
+            raise ValueError("The selected patch month is invalid.")
+    if _count_push_rows(batch_id, target_year=target_year, target_month=target_month) == 0:
         raise ValueError("No parish rows were staged for this file. Validate the workbook again before pushing.")
     persisted_mode = "replace_existing" if import_mode == "patch_selected" else import_mode
+    summary = data.get("summary") or {}
+    if import_mode == "patch_selected":
+        summary.update({"targetYear": target_year, "targetMonth": target_month})
     get_table("operations", "financial_push_batches").update(
-        {"status": "committing", "import_mode": persisted_mode, "committed_by": committed_by}
+        {
+            "status": "committing",
+            "import_mode": persisted_mode,
+            "committed_by": committed_by,
+            "summary": summary,
+        }
     ).eq("id", batch_id).execute()
     return {"batchId": batch_id, "status": "committing", "alreadyRunning": False}
 
@@ -1269,7 +1330,12 @@ def mark_commit_failed(batch_id: str, message: str) -> None:
         pass
 
 
-def _count_push_rows(batch_id: str, status: str | None = None) -> int:
+def _count_push_rows(
+    batch_id: str,
+    status: str | None = None,
+    target_year: int | None = None,
+    target_month: int | None = None,
+) -> int:
     query = (
         get_table("operations", "financial_push_rows")
         .select("id", count="exact")
@@ -1279,6 +1345,10 @@ def _count_push_rows(batch_id: str, status: str | None = None) -> int:
     )
     if status:
         query = query.eq("validation_status", status)
+    if target_year is not None:
+        query = query.eq("reporting_year", target_year)
+    if target_month is not None:
+        query = query.eq("reporting_month", target_month)
     result = query.execute()
     return int(getattr(result, "count", 0) or 0)
 
@@ -1493,16 +1563,17 @@ def get_commit_progress(batch_id: str) -> dict[str, Any]:
     if not batch_data:
         raise ValueError("PUSHER batch was not found.")
 
-    total = _count_push_rows(batch_id)
-    committed = _count_push_rows(batch_id, "committed")
-    skipped = _count_push_rows(batch_id, "skipped")
-    blocked = _count_push_rows(batch_id, "blocked")
-    ready = _count_push_rows(batch_id, "ready")
-    warning = _count_push_rows(batch_id, "warning")
+    summary = batch_data.get("summary") or {}
+    target_year = summary.get("targetYear")
+    target_month = summary.get("targetMonth")
+    total = _count_push_rows(batch_id, target_year=target_year, target_month=target_month)
+    committed = _count_push_rows(batch_id, "committed", target_year, target_month)
+    skipped = _count_push_rows(batch_id, "skipped", target_year, target_month)
+    blocked = _count_push_rows(batch_id, "blocked", target_year, target_month)
+    ready = _count_push_rows(batch_id, "ready", target_year, target_month)
+    warning = _count_push_rows(batch_id, "warning", target_year, target_month)
     processed = committed + skipped + blocked
     percent = round((processed / total) * 100, 1) if total else 0
-    summary = batch_data.get("summary") or {}
-
     return {
         "batchId": batch_id,
         "status": batch_data.get("status"),
@@ -1519,6 +1590,8 @@ def get_commit_progress(batch_id: str) -> dict[str, Any]:
         "committedAt": batch_data.get("committed_at"),
         "updatedAt": batch_data.get("updated_at"),
         "error": summary.get("commitError"),
+        "targetYear": target_year,
+        "targetMonth": target_month,
     }
 
 
@@ -1573,6 +1646,8 @@ def commit_batch(
     parish_mappings: list[dict[str, Any]] | None = None,
     import_mode: str = "skip_existing",
     committed_by: str | None = None,
+    target_year: int | None = None,
+    target_month: int | None = None,
 ) -> dict[str, Any]:
     accounts = {row["account_code"]: row for row in list_accounts() if row.get("account_code")}
     mapping_by_key = {m["key"]: m for m in mappings}
@@ -1583,6 +1658,15 @@ def commit_batch(
     }
     if not approved:
         raise ValueError("No approved mappings were provided.")
+    if import_mode == "patch_selected":
+        if target_year is None:
+            raise ValueError("Patch one column requires the workbook year.")
+        if target_year < 2000 or target_year > 2100:
+            raise ValueError("The selected patch year is invalid.")
+        if target_month is not None and target_month not in range(1, 13):
+            raise ValueError("The selected patch month is invalid.")
+        if len(approved) != 1:
+            raise ValueError("Single-column patch mode requires exactly one mapped source column.")
     reviewed_parishes = {
         (normalize_source_code(mapping.get("sourceCode")), normalize_name(mapping.get("sourceName"))): mapping.get("institutionId")
         for mapping in parish_mappings or []
@@ -1590,8 +1674,15 @@ def commit_batch(
     }
 
     rows = _load_push_rows_for_commit(batch_id)
+    if import_mode == "patch_selected":
+        rows = [
+            row
+            for row in rows
+            if row.get("reporting_year") == target_year
+            and (target_month is None or row.get("reporting_month") == target_month)
+        ]
     if not rows:
-        raise ValueError("No parish rows were staged for this file. Validate the workbook again before pushing.")
+        raise ValueError("No parish rows were staged for the selected patch year.")
 
     committed = skipped = blocked = line_items_created = 0
     for row in rows:
@@ -1724,6 +1815,8 @@ def commit_batch(
                 "skippedRows": skipped,
                 "blockedRows": blocked,
                 "lineItemsCreated": line_items_created,
+                "targetYear": target_year,
+                "targetMonth": target_month,
             },
         }
     ).eq("id", batch_id).execute()
@@ -1734,4 +1827,6 @@ def commit_batch(
         "skippedRows": skipped,
         "blockedRows": blocked,
         "lineItemsCreated": line_items_created,
+        "targetYear": target_year,
+        "targetMonth": target_month,
     }

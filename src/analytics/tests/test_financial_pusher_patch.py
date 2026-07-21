@@ -1,6 +1,8 @@
 from types import SimpleNamespace
 from unittest import TestCase
-from unittest.mock import patch
+from unittest.mock import call, patch
+
+from openpyxl import Workbook
 
 from app.services import financial_pusher
 
@@ -57,7 +59,7 @@ class FakeQuery:
 
 
 class FinancialPusherPatchTest(TestCase):
-    def test_patch_updates_only_selected_account(self):
+    def test_patch_updates_only_selected_account_across_all_months(self):
         calls = []
         accounts = [
             {
@@ -76,13 +78,26 @@ class FinancialPusherPatchTest(TestCase):
                 "parish_code": "P-1",
                 "parish_name": "Test Parish",
                 "reporting_year": 2025,
-                "reporting_month": 1,
+                "reporting_month": 12,
                 "validation_status": "ready",
                 "source_row_number": 7,
                 "raw_values": {"charge-key": 123.45},
                 "cleaned_values": {"charge-key": 123.45},
                 "issues": [],
-            }
+            },
+            {
+                "id": "push-row-november",
+                "institution_id": "parish-id",
+                "parish_code": "P-1",
+                "parish_name": "Test Parish",
+                "reporting_year": 2025,
+                "reporting_month": 11,
+                "validation_status": "ready",
+                "source_row_number": 7,
+                "raw_values": {"charge-key": 999.99},
+                "cleaned_values": {"charge-key": 999.99},
+                "issues": [],
+            },
         ]
         mappings = [
             {
@@ -99,16 +114,58 @@ class FinancialPusherPatchTest(TestCase):
         with (
             patch.object(financial_pusher, "list_accounts", return_value=accounts),
             patch.object(financial_pusher, "_load_push_rows_for_commit", return_value=rows),
-            patch.object(financial_pusher, "_get_existing_record", return_value="financial-record"),
+            patch.object(financial_pusher, "_get_existing_record", return_value="financial-record") as existing_record,
             patch.object(financial_pusher, "get_table", side_effect=fake_table),
         ):
-            result = financial_pusher.commit_batch("batch", mappings, import_mode="patch_selected")
+            result = financial_pusher.commit_batch(
+                "batch",
+                mappings,
+                import_mode="patch_selected",
+                target_year=2025,
+                target_month=None,
+            )
 
         line_calls = [call for call in calls if call["table"] == "iafr_line_items"]
         self.assertFalse(any(call["operation"] == "delete" for call in line_calls))
         updates = [call for call in line_calls if call["operation"] == "update"]
-        self.assertEqual(len(updates), 1)
-        self.assertEqual(updates[0]["payload"]["amount"], 123.45)
-        self.assertIn(("eq", "id", "existing-b306-line"), updates[0]["filters"])
-        self.assertEqual(result["committedRows"], 1)
-        self.assertEqual(result["lineItemsCreated"], 1)
+        self.assertEqual(len(updates), 2)
+        self.assertEqual([update["payload"]["amount"] for update in updates], [123.45, 999.99])
+        self.assertTrue(all(("eq", "id", "existing-b306-line") in update["filters"] for update in updates))
+        self.assertEqual(
+            existing_record.call_args_list,
+            [
+                call("parish-id", 2025, "Dec"),
+                call("parish-id", 2025, "Nov"),
+            ],
+        )
+        self.assertEqual(result["committedRows"], 2)
+        self.assertEqual(result["lineItemsCreated"], 2)
+        self.assertEqual(result["targetYear"], 2025)
+        self.assertIsNone(result["targetMonth"])
+
+    def test_2025_unlabeled_sacrament_amount_is_recovered(self):
+        workbook = Workbook()
+        sheet = workbook.active
+        sheet.title = "December 2025"
+        sheet.merge_cells("C3:J3")
+        sheet["C3"] = "Sacraments"
+        sheet.merge_cells("D4:J4")
+        sheet["D4"] = "Baptism (Infant)"
+        sheet["D6"] = "Rate Amount"
+        sheet["E5"] = "Quantity"
+        sheet["E6"] = "GRATIS"
+        sheet["F6"] = "CHARGEABLE"
+        # G5/G6 were accidentally left blank in the real 2025 template.
+        sheet["H5"] = "Over/Above Amount"
+        sheet["I5"] = "Total Amount as Over/Above"
+        sheet["J5"] = "Total Amount"
+        sheet["A7"] = "D1-1"
+        sheet["B7"] = "Test Parish"
+        sheet["G7"] = 1600
+
+        columns = financial_pusher._source_columns(sheet, {}, 2025)
+        repaired = next(column for column in columns if column.column == "G")
+
+        self.assertEqual(repaired.source_header, "Total Amount as Prescribed")
+        self.assertEqual(repaired.suggested_account_code, "A.1.02.01")
+        self.assertEqual(repaired.suggested_field, "sacrament_prescribed_total")

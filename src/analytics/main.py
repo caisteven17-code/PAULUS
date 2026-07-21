@@ -7,9 +7,9 @@ from fastapi.middleware.cors import CORSMiddleware
 from app.config import (
     LITURGICAL_APPROVAL_POLL_SECONDS,
     LITURGICAL_APPROVAL_SYNC_ENABLED,
+    WAREHOUSE_BRONZE_COMPARISON_ENABLED,
     WAREHOUSE_EDUCATION_POLL_SECONDS,
     WAREHOUSE_EDUCATION_SYNC_ENABLED,
-    WAREHOUSE_BRONZE_COMPARISON_ENABLED,
     WAREHOUSE_GOLD_INCREMENTAL_ENABLED,
     WAREHOUSE_INSTITUTION_POLL_SECONDS,
     WAREHOUSE_INSTITUTION_SYNC_ENABLED,
@@ -141,6 +141,7 @@ async def warehouse_pilot_status():
         "sync_all_parishes": WAREHOUSE_SYNC_ALL_PARISHES,
         "poll_seconds": WAREHOUSE_PILOT_POLL_SECONDS,
         "worker_running": _warehouse_worker_task is not None and not _warehouse_worker_task.done(),
+        "worker": warehouse_worker.worker_status(),
         "silver_source": "supabase_direct",
         "bronze_comparison_enabled": WAREHOUSE_BRONZE_COMPARISON_ENABLED,
         "gold_incremental_enabled": WAREHOUSE_GOLD_INCREMENTAL_ENABLED,

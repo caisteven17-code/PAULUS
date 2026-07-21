@@ -15,6 +15,7 @@ import { Login } from './views/Login';
 import { Home } from './views/Home';
 import { Projects } from './views/Projects';
 import { WhatIfSimulator } from './views/WhatIfSimulator';
+import { PriestReassignmentManagement } from './views/PriestReassignmentManagement';
 import { DigitalTwin } from './views/DigitalTwin';
 import { DigitalTwinControlsPanel, SandboxState } from './components/layout/DigitalTwinControlsPanel';
 import { Announcements } from './views/Announcements';
@@ -788,7 +789,7 @@ export default function App() {
         case 'parish-aitwin':
           return <WhatIfSimulator mode="parish" />;
         case 'priest-aitwin':
-          return <WhatIfSimulator mode="priest" />;
+          return <PriestReassignmentManagement />;
         case 'announcements':
           return <Announcements />;
         case 'events':
@@ -1158,7 +1159,7 @@ export default function App() {
           // Priest reassignment simulator is gated by the Priest Assignment
           // Simulator permission only, matching canAccessTab and the sidebar.
           if (permissions.manage_assignments !== true) return renderAccessDenied();
-          return <WhatIfSimulator mode="priest" />;
+          return <PriestReassignmentManagement />;
         case 'seminaries':
           if (permissions.view_seminary_dashboard !== true) return renderAccessDenied();
           return (
@@ -1323,7 +1324,7 @@ export default function App() {
         case 'priest-aitwin':
           // Priest reassignment simulator is gated by the Priest Assignment
           // Simulator permission only, matching canAccessTab and the sidebar.
-          return permissions.manage_assignments === true ? <WhatIfSimulator mode="priest" /> : renderAccessDenied();
+          return permissions.manage_assignments === true ? <PriestReassignmentManagement /> : renderAccessDenied();
         case 'seminaries':
           if (permissions.view_seminary_dashboard !== true) {
             return renderAccessDenied();

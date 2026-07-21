@@ -24,6 +24,8 @@ import {
   Users,
   Layers,
   ArrowUpDown,
+  History,
+  GripVertical,
 } from 'lucide-react';
 import { Parish, Seminary, DiocesanSchool, EntityClass } from '../../types';
 import { VICARIATES, CLASSES, ALL_PARISHES, INITIAL_PARISHES } from '../../constants';
@@ -43,6 +45,7 @@ interface EntityManagementControlProps {
   onUpdateSchools: (schools: DiocesanSchool[]) => void;
   onNavigate?: (page: string) => void;
   accounts?: any[];
+  currentUser?: any;
 }
 
 const stripVicariatePrefix = (name: string) => name.replace('Vicariate of ', '');
@@ -61,7 +64,7 @@ const VICARIATE_TO_DISTRICT: Record<string, string> = {
   'Sta. Rosa De Lima': 'District II',
   'St. Polycarp': 'District II',
   'St. John the Baptist': 'District II',
-  'Immaculate Conception': 'District III',
+  'Immaculate Conception': 'District II',
   'St. Paul the First Hermit': 'District III',
   'San Bartolome': 'District III',
   'San Antonio De Padua': 'District III',
@@ -262,6 +265,7 @@ export function EntityManagementControl({
   onUpdateSchools,
   onNavigate,
   accounts = [],
+  currentUser,
 }: EntityManagementControlProps) {
   const [activeSubTab, setActiveSubTab] = useState<'parishes' | 'seminaries' | 'schools'>('parishes');
   const [searchQuery, setSearchQuery] = useState('');
@@ -279,6 +283,21 @@ export function EntityManagementControl({
   const [entityToDelete, setEntityToDelete] = useState<any | null>(null);
   const [viewEntity, setViewEntity] = useState<any | null>(null); // read-only detail modal
   const [showSuccess, setShowSuccess] = useState<{ show: boolean; message: string }>({ show: false, message: '' });
+  const [renumberingPreview, setRenumberingPreview] = useState<any | null>(null);
+  const [renumberingConfirmation, setRenumberingConfirmation] = useState('');
+  const [renumberingError, setRenumberingError] = useState('');
+  const [isSaving, setIsSaving] = useState(false);
+  const [historyOpen, setHistoryOpen] = useState(false);
+  const [renumberingHistory, setRenumberingHistory] = useState<any[]>([]);
+  const [historyLoading, setHistoryLoading] = useState(false);
+  const [bulkReorderOpen, setBulkReorderOpen] = useState(false);
+  const [bulkDistrict, setBulkDistrict] = useState(DISTRICTS[0]);
+  const [bulkOrder, setBulkOrder] = useState<Parish[]>([]);
+  const [bulkPreview, setBulkPreview] = useState<any | null>(null);
+  const [bulkConfirmation, setBulkConfirmation] = useState('');
+  const [bulkError, setBulkError] = useState('');
+  const [bulkSaving, setBulkSaving] = useState(false);
+  const [draggedParishId, setDraggedParishId] = useState<string | null>(null);
 
   const [deleteState, setDeleteState] = useState<{
     isChecked: boolean;
@@ -915,6 +934,9 @@ export function EntityManagementControl({
   }, [formState.name, activeSubTab, isModalOpen, editingEntity, lastGeocodedName, suggestions]);
 
   const handleOpenModal = (entity?: any) => {
+    setRenumberingPreview(null);
+    setRenumberingConfirmation('');
+    setRenumberingError('');
     if (entity) {
       setEditingEntity(entity);
       const rawAddress = entity.address || '';
@@ -963,6 +985,139 @@ export function EntityManagementControl({
     setIsModalOpen(true);
   };
 
+  const openRenumberingHistory = async () => {
+    setHistoryOpen(true);
+    setHistoryLoading(true);
+    try {
+      const response = await fetch('/api/admin/entities/parish-renumbering/history', {
+        headers: {
+          'x-user-id': String(currentUser?.id || currentUser?.uid || ''),
+          'x-user-name': String(currentUser?.displayName || currentUser?.name || currentUser?.email || 'Authorized user'),
+          'x-user-role': String(currentUser?.accessRole || currentUser?.roleId || currentUser?.role || ''),
+        },
+      });
+      const body = await response.json().catch(() => []);
+      if (!response.ok) throw new Error(body?.error || 'Unable to load renumbering history.');
+      setRenumberingHistory(Array.isArray(body) ? body : []);
+    } catch (error) {
+      setRenumberingHistory([]);
+      setRenumberingError(error instanceof Error ? error.message : 'Unable to load renumbering history.');
+    } finally {
+      setHistoryLoading(false);
+    }
+  };
+
+  const parishesForDistrict = (district: string) =>
+    parishes
+      .filter((parish) => parish.status !== 'inactive')
+      .filter((parish) => (parish.district || VICARIATE_TO_DISTRICT[parish.vicariate]) === district)
+      .sort((left, right) =>
+        getInstitutionCode(left).localeCompare(getInstitutionCode(right), undefined, { numeric: true }),
+      );
+
+  const openBulkReorder = () => {
+    const district = DISTRICTS[0];
+    setBulkDistrict(district);
+    setBulkOrder(parishesForDistrict(district));
+    setBulkPreview(null);
+    setBulkConfirmation('');
+    setBulkError('');
+    setBulkReorderOpen(true);
+  };
+
+  const changeBulkDistrict = (district: string) => {
+    setBulkDistrict(district);
+    setBulkOrder(parishesForDistrict(district));
+    setBulkPreview(null);
+    setBulkConfirmation('');
+    setBulkError('');
+  };
+
+  const moveBulkParish = (fromId: string, toId: string) => {
+    if (fromId === toId) return;
+    setBulkOrder((current) => {
+      const fromIndex = current.findIndex((parish) => parish.id === fromId);
+      const toIndex = current.findIndex((parish) => parish.id === toId);
+      if (fromIndex < 0 || toIndex < 0) return current;
+      const next = [...current];
+      const [moved] = next.splice(fromIndex, 1);
+      next.splice(toIndex, 0, moved);
+      return next;
+    });
+    setBulkPreview(null);
+    setBulkConfirmation('');
+    setBulkError('');
+  };
+
+  const bulkRequestHeaders = () => ({
+    'Content-Type': 'application/json',
+    'x-user-id': String(currentUser?.id || currentUser?.uid || ''),
+    'x-user-name': String(currentUser?.displayName || currentUser?.name || currentUser?.email || 'Authorized user'),
+    'x-user-role': String(currentUser?.accessRole || currentUser?.roleId || currentUser?.role || ''),
+  });
+
+  const previewBulkReorder = async () => {
+    setBulkError('');
+    setBulkSaving(true);
+    try {
+      const response = await fetch('/api/admin/entities/parish-renumbering/bulk-preview', {
+        method: 'POST',
+        headers: bulkRequestHeaders(),
+        body: JSON.stringify({ district: bulkDistrict, order: bulkOrder.map((parish) => parish.id) }),
+      });
+      const body = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(body.error || 'Unable to preview this parish order.');
+      if (!body.affectedParishCount) throw new Error('Move at least one parish before reviewing the reorder.');
+      setBulkPreview(body);
+      setBulkConfirmation('');
+    } catch (error) {
+      setBulkError(error instanceof Error ? error.message : 'Unable to preview this parish order.');
+    } finally {
+      setBulkSaving(false);
+    }
+  };
+
+  const executeBulkReorder = async () => {
+    if (!bulkPreview) return previewBulkReorder();
+    if (bulkConfirmation !== 'REORDER') {
+      setBulkError('Type REORDER exactly to confirm these source-code changes.');
+      return;
+    }
+    setBulkError('');
+    setBulkSaving(true);
+    try {
+      const response = await fetch('/api/admin/entities/parish-renumbering/bulk-execute', {
+        method: 'POST',
+        headers: bulkRequestHeaders(),
+        body: JSON.stringify({
+          district: bulkDistrict,
+          order: bulkOrder.map((parish) => parish.id),
+        }),
+      });
+      const body = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(body.error || 'The bulk reorder failed. No source codes were changed.');
+
+      const newCodes = new Map(
+        (bulkPreview.changes || []).map((change: any) => [change.institutionId, change.newSourceCode]),
+      );
+      onUpdateParishes(
+        parishes.map((parish) => {
+          const newCode = newCodes.get(parish.id) as string | undefined;
+          return newCode ? { ...parish, institutionCode: newCode, iafrSourceCode: newCode } : parish;
+        }),
+      );
+      setBulkReorderOpen(false);
+      setShowSuccess({
+        show: true,
+        message: `${body.affectedParishCount ?? bulkPreview.affectedParishCount} parish source code(s) were reordered in ${bulkDistrict}.`,
+      });
+    } catch (error) {
+      setBulkError(error instanceof Error ? error.message : 'The bulk reorder failed. No source codes were changed.');
+    } finally {
+      setBulkSaving(false);
+    }
+  };
+
   const entityIdentity = (entity: any) => ({
     id: entity?.id?.toString(),
     name: entity?.name?.trim().toLowerCase(),
@@ -1009,6 +1164,87 @@ export function EntityManagementControl({
     e.preventDefault();
     const id = editingEntity ? editingEntity.id : Math.random().toString(36).substr(2, 9);
     const type = activeSubTab === 'parishes' ? 'parish' : activeSubTab === 'seminaries' ? 'seminary' : 'school';
+
+    const requestedSourceCode = normalizeInstitutionCode(formState.iafrSourceCode);
+    const requestHeaders = {
+      'Content-Type': 'application/json',
+      'x-user-id': String(currentUser?.id || currentUser?.uid || ''),
+      'x-user-name': String(currentUser?.displayName || currentUser?.name || currentUser?.email || 'Authorized user'),
+      'x-user-role': String(currentUser?.accessRole || currentUser?.roleId || currentUser?.role || ''),
+    };
+
+    if (activeSubTab === 'parishes' && !editingEntity) {
+      setRenumberingError('');
+      if (!/^D[1-4]-[1-9][0-9]*$/.test(requestedSourceCode)) {
+        setRenumberingError('Enter the official source code in D#-# format, for example D2-42.');
+        return;
+      }
+      if (renumberingPreview?.requestedSourceCode !== requestedSourceCode) {
+        setIsSaving(true);
+        try {
+          const previewResponse = await fetch(
+            `/api/admin/entities/parish-renumbering/preview?sourceCode=${encodeURIComponent(requestedSourceCode)}`,
+            { headers: requestHeaders },
+          );
+          const previewBody = await previewResponse.json().catch(() => ({}));
+          if (!previewResponse.ok) throw new Error(previewBody.error || 'Unable to calculate the renumbering preview.');
+          setRenumberingPreview(previewBody);
+          setRenumberingConfirmation('');
+        } catch (error) {
+          setRenumberingError(error instanceof Error ? error.message : 'Unable to calculate the renumbering preview.');
+        } finally {
+          setIsSaving(false);
+        }
+        return;
+      }
+
+      if (renumberingConfirmation !== requestedSourceCode) {
+        setRenumberingError(`Type ${requestedSourceCode} exactly to confirm the renumbering.`);
+        return;
+      }
+
+      setIsSaving(true);
+      try {
+        const executeResponse = await fetch('/api/admin/entities/parish-renumbering/execute', {
+          method: 'POST',
+          headers: requestHeaders,
+          body: JSON.stringify({
+            requestedSourceCode,
+            parish: {
+              name: formState.name,
+              district: formState.district,
+              vicariate: formState.vicariate,
+              class: formState.class,
+              address: formState.address,
+              lat: formState.lat,
+              lng: formState.lng,
+            },
+          }),
+        });
+        const savedEntity = await executeResponse.json().catch(() => ({}));
+        if (!executeResponse.ok) throw new Error(savedEntity.error || 'The parish was not created. No codes were changed.');
+
+        const insertionPosition = Number(requestedSourceCode.split('-')[1]);
+        const shifted = parishes.map((parish) => {
+          const code = normalizeInstitutionCode(getInstitutionCode(parish));
+          const match = code.match(/^(D[1-4])-([1-9][0-9]*)$/);
+          if (!match || Number(match[2]) < insertionPosition) return parish;
+          const newCode = `${match[1]}-${Number(match[2]) + 1}`;
+          return { ...parish, institutionCode: newCode, iafrSourceCode: newCode };
+        });
+        onUpdateParishes([...shifted, savedEntity]);
+        setIsModalOpen(false);
+        setShowSuccess({
+          show: true,
+          message: `Parish created at ${requestedSourceCode}. ${savedEntity?.renumbering?.affectedParishCount ?? renumberingPreview.affectedParishCount} existing source code(s) were updated.`,
+        });
+      } catch (error) {
+        setRenumberingError(error instanceof Error ? error.message : 'The parish was not created. No codes were changed.');
+      } finally {
+        setIsSaving(false);
+      }
+      return;
+    }
 
     const baseData = {
       name: formState.name,
@@ -1081,7 +1317,7 @@ export function EntityManagementControl({
         : '/api/admin/entities';
       const res = await fetch(endpoint, {
         method,
-        headers: { 'Content-Type': 'application/json' },
+        headers: requestHeaders,
         body: JSON.stringify(payload),
       });
       if (!res.ok) {
@@ -1604,20 +1840,80 @@ export function EntityManagementControl({
                       </label>
                       <input
                         type="text"
+                        disabled={Boolean(editingEntity)}
                         value={formState.iafrSourceCode}
                         onChange={(e) =>
-                          setFormState({
-                            ...formState,
-                            iafrSourceCode: normalizeInstitutionCode(e.target.value),
-                          })
+                          {
+                            setFormState({
+                              ...formState,
+                              iafrSourceCode: normalizeInstitutionCode(e.target.value),
+                            });
+                            setRenumberingPreview(null);
+                            setRenumberingConfirmation('');
+                            setRenumberingError('');
+                          }
                         }
                         placeholder="e.g. D3-67"
-                        className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-gray-900 focus:outline-none focus:border-[#D4AF37] focus:ring-1 focus:ring-[#D4AF37] transition-all placeholder:text-gray-400 font-mono font-bold"
+                        className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-gray-900 focus:outline-none focus:border-[#D4AF37] focus:ring-1 focus:ring-[#D4AF37] transition-all placeholder:text-gray-400 font-mono font-bold disabled:cursor-not-allowed disabled:opacity-60"
                       />
                       <p className="mt-1.5 ml-1 text-[10px] text-gray-400">
-                        Official parish code from the IAFR workbook format.
+                        {editingEntity
+                          ? 'Official parish code from the IAFR workbook format.'
+                          : 'Existing parish codes at this number and above will be moved down automatically.'}
                       </p>
                     </div>
+
+                    {!editingEntity && (
+                      <>
+                        {renumberingPreview && (
+                          <div className="rounded-2xl border border-amber-200 bg-amber-50 p-4">
+                            <div className="flex items-start gap-3">
+                              <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0 text-amber-600" />
+                              <div className="min-w-0 flex-1">
+                                <p className="text-sm font-black text-amber-950">Review source-code changes</p>
+                                <p className="mt-1 text-xs leading-relaxed text-amber-800">
+                                  The new parish will receive <strong>{renumberingPreview.requestedSourceCode}</strong>.{' '}
+                                  {renumberingPreview.affectedParishCount} existing parish code(s) will move down by one.
+                                </p>
+                                <div className="mt-3 max-h-36 space-y-1 overflow-y-auto rounded-xl bg-white/70 p-3">
+                                  {(renumberingPreview.changes || []).slice(0, 20).map((change: any) => (
+                                    <div key={change.institutionId} className="flex items-center justify-between gap-3 text-[11px]">
+                                      <span className="truncate font-semibold text-slate-600">{change.parishName}</span>
+                                      <span className="shrink-0 font-mono font-black text-slate-900">
+                                        {change.oldSourceCode} → {change.newSourceCode}
+                                      </span>
+                                    </div>
+                                  ))}
+                                  {renumberingPreview.affectedParishCount > 20 && (
+                                    <p className="pt-1 text-[10px] font-bold text-amber-700">
+                                      And {renumberingPreview.affectedParishCount - 20} more parish(es)
+                                    </p>
+                                  )}
+                                </div>
+                                <label className="mt-3 block text-[10px] font-black uppercase tracking-wider text-amber-900">
+                                  Type {renumberingPreview.requestedSourceCode} to confirm
+                                </label>
+                                <input
+                                  type="text"
+                                  value={renumberingConfirmation}
+                                  onChange={(e) => {
+                                    setRenumberingConfirmation(normalizeInstitutionCode(e.target.value));
+                                    setRenumberingError('');
+                                  }}
+                                  className="mt-1.5 w-full rounded-xl border border-amber-300 bg-white px-3 py-2 font-mono text-sm font-black text-slate-900 outline-none focus:border-amber-500"
+                                />
+                              </div>
+                            </div>
+                          </div>
+                        )}
+
+                        {renumberingError && (
+                          <div className="rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-xs font-semibold text-rose-700">
+                            {renumberingError}
+                          </div>
+                        )}
+                      </>
+                    )}
 
                     <div>
                       <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-2 ml-1">
@@ -2106,9 +2402,18 @@ export function EntityManagementControl({
                 </button>
                 <button
                   type="submit"
-                  className="flex-1 px-6 py-3 bg-[#D4AF37] text-white rounded-xl font-bold hover:bg-[#B5952F] transition-colors shadow-lg shadow-[#D4AF37]/20 text-sm"
+                  disabled={isSaving}
+                  className="flex-1 px-6 py-3 bg-[#D4AF37] text-white rounded-xl font-bold hover:bg-[#B5952F] transition-colors shadow-lg shadow-[#D4AF37]/20 text-sm disabled:cursor-not-allowed disabled:opacity-60"
                 >
-                  {editingEntity ? 'Update' : 'Create'}
+                  {isSaving
+                    ? 'Processing…'
+                    : editingEntity
+                      ? 'Update'
+                      : activeSubTab === 'parishes'
+                        ? renumberingPreview
+                          ? 'Confirm and Create Parish'
+                          : 'Review Renumbering'
+                        : 'Create'}
                 </button>
               </div>
             </form>
@@ -2209,6 +2514,188 @@ export function EntityManagementControl({
         </div>
       )}
 
+      {historyOpen && (
+        <div className="fixed inset-0 z-[190] flex items-center justify-center bg-black/55 p-6 backdrop-blur-sm">
+          <div className="flex max-h-[80vh] w-full max-w-3xl flex-col overflow-hidden rounded-3xl bg-white shadow-2xl">
+            <div className="flex items-center justify-between bg-slate-950 px-6 py-5 text-white">
+              <div>
+                <p className="text-[10px] font-black uppercase tracking-[0.2em] text-gold-400">Parish Management</p>
+                <h3 className="mt-1 font-serif text-2xl font-bold">Renumbering History</h3>
+              </div>
+              <button type="button" onClick={() => setHistoryOpen(false)} className="rounded-xl p-2 text-white/60 hover:bg-white/10 hover:text-white">
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+            <div className="overflow-y-auto p-6">
+              {historyLoading ? (
+                <div className="flex items-center justify-center gap-2 py-12 text-sm font-bold text-slate-500">
+                  <Loader2 className="h-5 w-5 animate-spin" /> Loading history…
+                </div>
+              ) : renumberingHistory.length === 0 ? (
+                <div className="rounded-2xl border border-dashed border-slate-200 py-12 text-center text-sm font-semibold text-slate-400">
+                  No parish renumbering operations have been recorded yet.
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {renumberingHistory.map((entry) => (
+                    <div key={entry.id} className="rounded-2xl border border-slate-200 p-4">
+                      <div className="flex flex-wrap items-start justify-between gap-3">
+                        <div>
+                          <p className="font-mono text-base font-black text-slate-950">
+                            {entry.operation_type === 'bulk_reorder'
+                              ? `Bulk reorder · ${String(entry.requested_source_code || '').replace('BULK-D', 'District ')}`
+                              : `Inserted at ${entry.requested_source_code}`}
+                          </p>
+                        </div>
+                        <span className="rounded-full bg-emerald-50 px-3 py-1 text-[10px] font-black uppercase tracking-wider text-emerald-700">
+                          {entry.status}
+                        </span>
+                      </div>
+                      <div className="mt-3 flex flex-wrap gap-x-5 gap-y-1 text-[11px] font-semibold text-slate-500">
+                        <span>{entry.affected_parish_count} code(s) updated</span>
+                        <span>{new Date(entry.executed_at).toLocaleString()}</span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {bulkReorderOpen && (
+        <div className="fixed inset-0 z-[195] flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm md:p-6">
+          <div className="flex max-h-[92vh] w-full max-w-5xl flex-col overflow-hidden rounded-3xl bg-white shadow-2xl">
+            <div className="flex items-center justify-between bg-slate-950 px-6 py-5 text-white">
+              <div>
+                <p className="text-[10px] font-black uppercase tracking-[0.22em] text-gold-400">Parish Management</p>
+                <h3 className="mt-1 font-serif text-2xl font-bold">Bulk Reorder Parishes</h3>
+                <p className="mt-1 text-xs font-medium text-white/50">Drag parishes into their official order. Codes are calculated automatically.</p>
+              </div>
+              <button type="button" onClick={() => setBulkReorderOpen(false)} className="rounded-xl p-2 text-white/60 hover:bg-white/10 hover:text-white">
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+
+            <div className="grid min-h-0 flex-1 grid-cols-1 overflow-hidden lg:grid-cols-[minmax(0,1fr)_360px]">
+              <div className="flex min-h-0 flex-col border-r border-slate-100 p-5">
+                <label className="text-[10px] font-black uppercase tracking-[0.18em] text-slate-400">District to reorder</label>
+                <select
+                  value={bulkDistrict}
+                  onChange={(event) => changeBulkDistrict(event.target.value)}
+                  className="mt-2 rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-bold text-slate-900 outline-none focus:border-gold-500"
+                >
+                  {DISTRICTS.map((district) => <option key={district}>{district}</option>)}
+                </select>
+
+                <div className="mt-4 flex items-center justify-between">
+                  <p className="text-xs font-bold text-slate-600">Official order</p>
+                  <span className="rounded-full bg-slate-100 px-3 py-1 text-[10px] font-black text-slate-500">{bulkOrder.length} parishes</span>
+                </div>
+
+                <div className="mt-3 min-h-0 flex-1 space-y-2 overflow-y-auto pr-1">
+                  {bulkOrder.map((parish, index) => (
+                    <div
+                      key={parish.id}
+                      draggable
+                      onDragStart={() => setDraggedParishId(parish.id)}
+                      onDragEnd={() => setDraggedParishId(null)}
+                      onDragOver={(event) => event.preventDefault()}
+                      onDrop={() => {
+                        if (draggedParishId) moveBulkParish(draggedParishId, parish.id);
+                        setDraggedParishId(null);
+                      }}
+                      className={`flex cursor-grab items-center gap-3 rounded-2xl border px-3 py-3 transition-all active:cursor-grabbing ${
+                        draggedParishId === parish.id ? 'border-gold-400 bg-gold-50 opacity-60' : 'border-slate-200 bg-white hover:border-gold-300 hover:shadow-sm'
+                      }`}
+                    >
+                      <GripVertical className="h-5 w-5 shrink-0 text-slate-300" />
+                      <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-slate-950 text-xs font-black text-white">{index + 1}</span>
+                      <div className="min-w-0 flex-1">
+                        <p className="truncate text-sm font-bold text-slate-900">{parish.name}</p>
+                        <p className="text-[10px] font-semibold text-slate-400">{parish.vicariate}</p>
+                      </div>
+                      <span className="shrink-0 rounded-lg bg-slate-100 px-2.5 py-1 font-mono text-xs font-black text-slate-700">{getInstitutionCode(parish)}</span>
+                      <div className="flex shrink-0 flex-col">
+                        <button
+                          type="button"
+                          disabled={index === 0}
+                          onClick={() => index > 0 && moveBulkParish(parish.id, bulkOrder[index - 1].id)}
+                          className="rounded px-2 py-0.5 text-[10px] font-black text-slate-400 hover:bg-slate-100 disabled:opacity-20"
+                          aria-label={`Move ${parish.name} up`}
+                        >
+                          UP
+                        </button>
+                        <button
+                          type="button"
+                          disabled={index === bulkOrder.length - 1}
+                          onClick={() => index < bulkOrder.length - 1 && moveBulkParish(parish.id, bulkOrder[index + 1].id)}
+                          className="rounded px-2 py-0.5 text-[10px] font-black text-slate-400 hover:bg-slate-100 disabled:opacity-20"
+                          aria-label={`Move ${parish.name} down`}
+                        >
+                          DOWN
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              <div className="overflow-y-auto bg-slate-50 p-5">
+                <p className="text-[10px] font-black uppercase tracking-[0.18em] text-slate-400">Reorder details</p>
+                {bulkPreview ? (
+                  <div className="mt-5 rounded-2xl border border-amber-200 bg-amber-50 p-4">
+                    <div className="flex gap-2">
+                      <AlertTriangle className="h-5 w-5 shrink-0 text-amber-600" />
+                      <div>
+                        <p className="text-sm font-black text-amber-950">{bulkPreview.affectedParishCount} code(s) will change</p>
+                        <p className="mt-1 text-[11px] font-medium leading-relaxed text-amber-800">Review the complete mapping before confirming.</p>
+                      </div>
+                    </div>
+                    <div className="mt-3 max-h-48 space-y-1.5 overflow-y-auto rounded-xl bg-white/80 p-3">
+                      {(bulkPreview.changes || []).filter((change: any) => change.changed).map((change: any) => (
+                        <div key={change.institutionId} className="text-[11px]">
+                          <p className="truncate font-bold text-slate-700">{change.parishName}</p>
+                          <p className="font-mono font-black text-slate-950">{change.oldSourceCode} → {change.newSourceCode}</p>
+                        </div>
+                      ))}
+                    </div>
+                    <label className="mt-3 block text-[10px] font-black uppercase tracking-wider text-amber-900">Type REORDER to confirm</label>
+                    <input
+                      value={bulkConfirmation}
+                      onChange={(event) => {
+                        setBulkConfirmation(event.target.value.toUpperCase());
+                        setBulkError('');
+                      }}
+                      className="mt-1.5 w-full rounded-xl border border-amber-300 bg-white px-3 py-2 font-mono text-sm font-black outline-none focus:border-amber-500"
+                    />
+                  </div>
+                ) : (
+                  <div className="mt-5 rounded-2xl border border-blue-100 bg-blue-50 p-4 text-xs font-medium leading-relaxed text-blue-800">
+                    Move the parishes into the desired order, then select <strong>Review Changes</strong>. Nothing is changed during preview.
+                  </div>
+                )}
+
+                {bulkError && <div className="mt-3 rounded-xl border border-rose-200 bg-rose-50 p-3 text-xs font-semibold text-rose-700">{bulkError}</div>}
+              </div>
+            </div>
+
+            <div className="flex flex-col-reverse gap-2 border-t border-slate-100 bg-white px-6 py-4 sm:flex-row sm:justify-end">
+              <button type="button" onClick={() => setBulkReorderOpen(false)} className="rounded-xl border border-slate-200 px-5 py-2.5 text-xs font-black text-slate-500 hover:bg-slate-50">Cancel</button>
+              <button
+                type="button"
+                disabled={bulkSaving || bulkOrder.length === 0}
+                onClick={bulkPreview ? executeBulkReorder : previewBulkReorder}
+                className="rounded-xl bg-gold-500 px-5 py-2.5 text-xs font-black text-slate-950 shadow-lg shadow-gold-500/20 hover:bg-gold-400 disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                {bulkSaving ? 'Processing…' : bulkPreview ? 'Confirm and Apply Reorder' : 'Review Changes'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       <section className="relative overflow-hidden rounded-[28px] bg-slate-950 px-6 py-7 text-white shadow-[0_24px_60px_rgba(15,23,42,0.18)] md:px-8">
         <div className="absolute -right-20 -top-24 h-64 w-64 rounded-full border border-gold-500/15" />
         <div className="absolute -right-4 -top-10 h-40 w-40 rounded-full bg-gold-500/10 blur-3xl" />
@@ -2270,13 +2757,33 @@ export function EntityManagementControl({
               Schools
             </button>
           </div>
-          <button
-            onClick={() => handleOpenModal()}
-            className="flex items-center justify-center gap-2 whitespace-nowrap rounded-2xl bg-gold-500 px-5 py-3 text-xs font-black uppercase tracking-[0.14em] text-slate-950 shadow-lg shadow-gold-500/20 transition-all hover:bg-gold-400"
-          >
-            <Plus className="w-4 h-4" />
-            Add {activeSubTab === 'parishes' ? 'Parish' : activeSubTab === 'seminaries' ? 'Seminary' : 'School'}
-          </button>
+          <div className="flex flex-wrap gap-2">
+            {activeSubTab === 'parishes' && (
+              <button
+                type="button"
+                onClick={openBulkReorder}
+                className="flex items-center justify-center gap-2 whitespace-nowrap rounded-2xl border border-slate-200 bg-white px-5 py-3 text-xs font-black uppercase tracking-[0.12em] text-slate-600 transition-all hover:bg-slate-50"
+              >
+                <ArrowUpDown className="h-4 w-4" /> Bulk Reorder
+              </button>
+            )}
+            {activeSubTab === 'parishes' && (
+              <button
+                type="button"
+                onClick={openRenumberingHistory}
+                className="flex items-center justify-center gap-2 whitespace-nowrap rounded-2xl border border-slate-200 bg-white px-5 py-3 text-xs font-black uppercase tracking-[0.12em] text-slate-600 transition-all hover:bg-slate-50"
+              >
+                <History className="h-4 w-4" /> History
+              </button>
+            )}
+            <button
+              onClick={() => handleOpenModal()}
+              className="flex items-center justify-center gap-2 whitespace-nowrap rounded-2xl bg-gold-500 px-5 py-3 text-xs font-black uppercase tracking-[0.14em] text-slate-950 shadow-lg shadow-gold-500/20 transition-all hover:bg-gold-400"
+            >
+              <Plus className="w-4 h-4" />
+              Add {activeSubTab === 'parishes' ? 'Parish' : activeSubTab === 'seminaries' ? 'Seminary' : 'School'}
+            </button>
+          </div>
         </div>
       </section>
 

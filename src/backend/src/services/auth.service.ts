@@ -125,9 +125,9 @@ const ROLE_PERMISSION_DEFINITIONS = [
   },
   {
     id: 'manage_assignments',
-    name: 'Priest Assignment Simulator',
+    name: 'Manage Parish Priest Reassignments',
     category: 'Priest Management',
-    description: 'Allows the user to launch scenario planning and simulate clergy assignments.',
+    description: 'Allows authorized diocesan users to execute Parish Priest transfers, swaps, and rotations.',
   },
   {
     id: 'view_audit_logs',

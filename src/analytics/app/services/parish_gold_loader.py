@@ -271,7 +271,7 @@ def _load_monthly(cur) -> int:
           parish_key, date_key, submission_key,
           sacraments_arancel_confirmation_incl, sacraments_parish_share,
           sacraments_over_above_confirmation_incl, collections_mass,
-          collections_other_receipts, total_collections, collections_other_net,
+          collections_other_receipts, total_collections, collection_other,
           expenses_pastoral_mass_stipend, expenses_parish, total_expenses,
           net_receipts_deficit, mass_intentions_not_claimed_by_parish_priest,
           mass_intentions_claimed_by_parish_priest, special_collections,
@@ -285,7 +285,7 @@ def _load_monthly(cur) -> int:
           parish_key, date_key, submission_key,
           sacraments_arancel_confirmation_incl, sacraments_parish_share,
           sacraments_over_above_confirmation_incl, collections_mass,
-          collections_other_receipts, total_collections, collections_other_net,
+          collections_other_receipts, total_collections, collection_other,
           expenses_pastoral_mass_stipend, expenses_parish, total_expenses,
           net_receipts_deficit, mass_intentions_not_claimed_by_parish_priest,
           mass_intentions_claimed_by_parish_priest, special_collections,
@@ -303,7 +303,7 @@ def _load_monthly(cur) -> int:
           collections_mass = EXCLUDED.collections_mass,
           collections_other_receipts = EXCLUDED.collections_other_receipts,
           total_collections = EXCLUDED.total_collections,
-          collections_other_net = EXCLUDED.collections_other_net,
+          collection_other = EXCLUDED.collection_other,
           expenses_pastoral_mass_stipend = EXCLUDED.expenses_pastoral_mass_stipend,
           expenses_parish = EXCLUDED.expenses_parish,
           total_expenses = EXCLUDED.total_expenses,
@@ -377,7 +377,7 @@ def _reconcile(cur, candidate_count: int) -> list[Check]:
            OR f.collections_mass IS DISTINCT FROM s.collections_mass
            OR f.collections_other_receipts IS DISTINCT FROM s.collections_other_receipts
            OR f.total_collections IS DISTINCT FROM s.total_collections
-           OR f.collections_other_net IS DISTINCT FROM s.collections_other_net
+           OR f.collection_other IS DISTINCT FROM s.collection_other
            OR f.expenses_pastoral_mass_stipend IS DISTINCT FROM s.expenses_pastoral_mass_stipend
            OR f.expenses_parish IS DISTINCT FROM s.expenses_parish
            OR f.total_expenses IS DISTINCT FROM s.total_expenses

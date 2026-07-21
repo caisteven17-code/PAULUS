@@ -49,6 +49,8 @@ class CommitRequest(BaseModel):
         pattern="^(skip_existing|replace_existing|version_existing|patch_selected)$",
     )
     committedBy: str | None = None
+    targetYear: int | None = Field(default=None, ge=2000, le=2100)
+    targetMonth: int | None = Field(default=None, ge=1, le=12)
 
 
 class CreateCanonicalAccountRequest(BaseModel):
@@ -100,6 +102,8 @@ def _run_commit_job(body: CommitRequest):
             parish_mappings=[mapping.model_dump() for mapping in body.parishMappings],
             import_mode=body.importMode,
             committed_by=body.committedBy,
+            target_year=body.targetYear,
+            target_month=body.targetMonth,
         )
     except Exception as exc:
         financial_pusher.mark_commit_failed(body.batchId, str(exc))
@@ -108,7 +112,13 @@ def _run_commit_job(body: CommitRequest):
 @router.post("/commit")
 async def commit(body: CommitRequest, background_tasks: BackgroundTasks):
     try:
-        started = financial_pusher.start_commit_batch(body.batchId, body.importMode, body.committedBy)
+        started = financial_pusher.start_commit_batch(
+            body.batchId,
+            body.importMode,
+            body.committedBy,
+            body.targetYear,
+            body.targetMonth,
+        )
         if started["status"] == "committing":
             background_tasks.add_task(_run_commit_job, body)
         return started
