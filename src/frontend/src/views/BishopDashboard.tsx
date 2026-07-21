@@ -27,6 +27,7 @@ import {
   CheckCircle,
   FileText,
   Activity,
+  Loader2,
 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/Card';
 import ReactECharts from 'echarts-for-react';
@@ -151,6 +152,8 @@ const getDiocesanMonthly = (entityType: string, year: CmpYear) => {
     disbursements: Math.round(d.disbursements * factor),
   }));
 };
+
+const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 const seasonalityData = [
   { month: 'Jan', value: 130 },
@@ -1042,14 +1045,27 @@ export function BishopDashboard({
   const [error, setError] = useState<string | null>(null);
   const [selectedDiagnostic, setSelectedDiagnostic] = useState<DiagnosticResult | null>(null);
   const [healthScores, setHealthScores] = useState<FinancialHealthScore[]>([]);
-  const [collectionsTimeframe, setCollectionsTimeframe] = useState<'6m' | '12m'>('12m');
-  const [disbursementsTimeframe, setDisbursementsTimeframe] = useState<'6m' | '12m'>('12m');
+  const [isHealthScoreLoading, setIsHealthScoreLoading] = useState(false);
+  // 'scoped' = follows the Year/Timeframe selection above (the default —
+  // matches the other 3 KPI tiles); 'overall' = the parish's full trailing
+  // history regardless of Year/Timeframe, for when a single-year snapshot
+  // isn't what's wanted. Independent of filterMode — available whether
+  // viewing the whole diocese or one selected parish.
+  const [healthScoreViewMode, setHealthScoreViewMode] = useState<'scoped' | 'overall'>('scoped');
   const [collectionsFilter, setCollectionsFilter] = useState<
-    'all' | 'collections_mass' | 'sacraments_rate' | 'collections_other'
+    'all' | 'collections_mass' | 'sacraments_rate' | 'other_receipts' | 'other_collections'
   >('all');
   const [disbursementsFilter, setDisbursementsFilter] = useState<'all' | 'expenses_parish' | 'expenses_pastoral'>(
     'all',
   );
+  const [apiParishFinancialTrend, setApiParishFinancialTrend] = useState<any | null>(null);
+  const [apiParishSeasonality, setApiParishSeasonality] = useState<any | null>(null);
+  const [apiParishProjects, setApiParishProjects] = useState<any | null>(null);
+  // True while a filter/year/parish change is refetching real data. The old
+  // values stay on screen until the new response lands (avoids a jarring
+  // flash to empty), so without this flag there's no way to tell "updating"
+  // apart from "done" — exactly what made filter changes look stuck before.
+  const [isDescriptiveLoading, setIsDescriptiveLoading] = useState(false);
   const [priestGapFilter, setPriestGapFilter] = useState<'all' | 'retirements' | 'ordinations'>('all');
   const [enrollmentFilter, setEnrollmentFilter] = useState<'all' | 'enrollment' | 'capacity'>('all');
   const [formationFilter, setFormationFilter] = useState<'all' | 'propaedeutic' | 'philosophy' | 'theology'>('all');
@@ -1059,13 +1075,102 @@ export function BishopDashboard({
     'all' | 'collections' | 'disbursements'
   >('all');
 
-  const filteredCollectionsData = useMemo(() => {
-    return collectionsTimeframe === '6m' ? trendData.slice(-6) : trendData;
-  }, [collectionsTimeframe]);
+  const parishTrendData = useMemo(() => {
+    // apiParishFinancialTrend now always carries the full real history (see
+    // the fetch effect below — one request instead of two), so the year
+    // filter that the server used to apply is replicated here client-side.
+    const allRows = apiParishFinancialTrend?.monthly_series;
+    if (!Array.isArray(allRows) || allRows.length === 0) return null;
+    const rows = allRows.filter((row: any) => String(row.period ?? '').startsWith(`${year}-`));
+    if (rows.length === 0) return null;
+    return rows.map((row: any) => {
+      const period = String(row.period ?? '');
+      const [, monthNum] = period.split('-');
+      const monthIndex = Number(monthNum) - 1;
+      const month = CMP_MONTHS[monthIndex] ?? period;
+      return {
+        month,
+        period,
+        collections: Number(row.total_receipts ?? 0),
+        total_receipts: Number(row.total_receipts ?? 0),
+        total_expenses: Number(row.total_expenses ?? 0),
+        forecast: Number(row.trend ?? row.total_receipts ?? 0),
+        expenses_parish: Number(row.expenses_parish ?? 0),
+        expenses_pastoral: Number(row.expenses_pastoral ?? 0),
+        collections_mass: Number(row.collections_mass ?? 0),
+        sacraments_rate: Number(row.sacraments ?? 0),
+        other_receipts: Number(row.other_receipts ?? 0),
+        other_collections: Number(row.other_collections ?? 0),
+      };
+    });
+  }, [apiParishFinancialTrend, year]);
 
-  const filteredDisbursementsData = useMemo(() => {
-    return disbursementsTimeframe === '6m' ? trendData.slice(-6) : trendData;
-  }, [disbursementsTimeframe]);
+  // Parishes has a real AWS-backed data source, so if it comes back empty or
+  // fails, that's an honest "no data for this scope" — never silently
+  // substitute the mock trendData, which would show fabricated numbers
+  // indistinguishable from real ones. Seminaries/Schools have no real
+  // per-institution financial pipeline yet, so they keep the mock fallback.
+  const activeTrendData = useMemo(() => {
+    if (entityType === 'Parishes') return parishTrendData ?? [];
+    return trendData;
+  }, [entityType, parishTrendData]);
+
+  // Single month-window control for both the Collections and Disbursement
+  // Breakdown charts, driven by the global Timeframe prop (top nav) instead
+  // of two separate local 6M/12M toggles. 'all' shows everything
+  // activeTrendData has, which is already at most 12 months since it's
+  // year-scoped upstream (parishTrendData).
+  const windowedTrendData = useMemo(() => {
+    if (timeframe === '6m') return activeTrendData.slice(-6);
+    if (timeframe === '1y') return activeTrendData.slice(-12);
+    return activeTrendData;
+  }, [activeTrendData, timeframe]);
+
+  const activeTopDisbursementCategories = useMemo(() => {
+    // AWS gold responses include the six IAFR Section D groups summed over the
+    // last 12 months; the coarse parish/pastoral split is the fallback when
+    // only monthly totals are available (Supabase path).
+    const serverCategories = apiParishFinancialTrend?.disbursement_categories;
+    if (Array.isArray(serverCategories) && serverCategories.length > 0) {
+      const serverTotal = serverCategories.reduce((sum: number, c: any) => sum + Number(c.amount ?? 0), 0);
+      if (serverTotal > 0) {
+        return serverCategories.map((c: any) => ({
+          category: String(c.category ?? ''),
+          amount: Number(c.amount ?? 0),
+          percentage: Math.round((Number(c.amount ?? 0) / serverTotal) * 100),
+        }));
+      }
+    }
+    if (entityType === 'Parishes') {
+      // Real AWS data source for this tier — an empty/failed fetch is an
+      // honest "no data," never a silent fall-through to mock categories.
+      if (!parishTrendData) return [];
+      const totals = parishTrendData.reduce(
+        (acc, row) => {
+          acc.expenses_parish += Number(row.expenses_parish ?? 0);
+          acc.expenses_pastoral += Number(row.expenses_pastoral ?? 0);
+          return acc;
+        },
+        { expenses_parish: 0, expenses_pastoral: 0 },
+      );
+      const total = totals.expenses_parish + totals.expenses_pastoral;
+      if (total <= 0) return [];
+      return [
+        {
+          category: 'Parish Expenses',
+          amount: totals.expenses_parish,
+          percentage: Math.round((totals.expenses_parish / total) * 100),
+        },
+        {
+          category: 'Pastoral Expenses',
+          amount: totals.expenses_pastoral,
+          percentage: Math.round((totals.expenses_pastoral / total) * 100),
+        },
+      ].sort((a, b) => b.amount - a.amount);
+    }
+    // Seminaries/Schools: no real per-institution disbursement pipeline yet.
+    return topDisbursementCategories;
+  }, [entityType, apiParishFinancialTrend, parishTrendData]);
 
   const handleDiagnosticRequest = async (month: string) => {
     try {
@@ -1105,14 +1210,54 @@ export function BishopDashboard({
   }, []);
 
   const [liveDeclineData, setLiveDeclineData] = useState<any[]>([]);
+  const [parishProfileIdByName, setParishProfileIdByName] = useState<Record<string, string>>({});
+  // Real entity list (name/vicariate/class/collections) backing the entity
+  // dropdown + all downstream filters, for whichever tab (Parishes/Diocesan
+  // Schools/Seminaries) is active. Replaces the static mock lists
+  // (ALL_PARISHES and the equivalents baked into getEntitiesData) once
+  // loaded, so selecting an entity resolves to a real institution_id instead
+  // of silently failing the name lookup and falling back to mock data.
+  // null = not yet fetched for the current tab (render mock while loading);
+  // [] = fetched successfully and the diocese genuinely has none of this type
+  // (render a real empty state, never fall back to mock).
+  const [realEntities, setRealEntities] = useState<
+    { id: string; name: string; vicariate: string; class: string; district: string; collections: number }[] | null
+  >(null);
   useEffect(() => {
     const apiType = entityType === 'Diocesan Schools' ? 'school' : entityType === 'Seminaries' ? 'seminary' : 'parish';
+    let cancelled = false;
+    setRealEntities(null);
     apiClient
       .getFinancialProfiles(apiType as any)
       .then((data) => {
-        if (!data?.length) return;
+        if (cancelled) return;
+        const rows = data ?? [];
+        if (apiType === 'parish') {
+          // Backend fallback profiles carry synthetic numeric ids; only real
+          // institution UUIDs are usable for the descriptive analytics calls.
+          const map: Record<string, string> = {};
+          rows.forEach((p: any) => {
+            if (p?.name && typeof p?.id === 'string' && UUID_PATTERN.test(p.id)) map[p.name] = p.id;
+          });
+          setParishProfileIdByName(map);
+        }
+        setRealEntities(
+          rows
+            .filter((p: any) => p?.name)
+            .map((p: any) => {
+              const hist: number[] = p.collectionsHistory ?? [];
+              return {
+                id: p?.id != null ? String(p.id) : '',
+                name: p.name as string,
+                vicariate: (p.location as string) ?? '',
+                class: (p.class as string) ?? '',
+                district: (p.district as string) || 'Unassigned',
+                collections: hist.reduce((sum, v) => sum + (Number(v) || 0), 0),
+              };
+            }),
+        );
         setLiveDeclineData(
-          data.map((p: any) => {
+          rows.map((p: any) => {
             const hist: number[] = p.collectionsHistory ?? [];
             const last4 = hist.slice(-4);
             const [w1 = 0, w2 = 0, w3 = 0, w4 = 0] = last4;
@@ -1121,6 +1266,7 @@ export function BishopDashboard({
               name: p.name,
               vicariate: p.location ?? '',
               class: p.class ?? '',
+              district: (p.district as string) || 'Unassigned',
               w1,
               w2,
               w3,
@@ -1132,6 +1278,9 @@ export function BishopDashboard({
         );
       })
       .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
   }, [entityType]);
 
   const [sortConfig, setSortConfig] = useState<{ key: string; direction: 'asc' | 'desc' } | null>(null);
@@ -1153,6 +1302,218 @@ export function BishopDashboard({
   const [cmpYear1, setCmpYear1] = useState<CmpYear>('2025');
   const [cmpMonth2, setCmpMonth2] = useState<CmpMonth>('Jan');
   const [cmpYear2, setCmpYear2] = useState<CmpYear>('2026');
+
+  // Parish names in local state come from the static ALL_PARISHES list, but the
+  // descriptive analytics endpoints need real diocese.institutions UUIDs.
+  // Financial profiles cover every active parish; geo institutions only the
+  // geocoded subset, so profiles win on conflicts.
+  const parishIdByName = useMemo(() => {
+    const map: Record<string, string> = {};
+    geoInstitutions.forEach((inst: any) => {
+      if (inst?.name && typeof inst?.id === 'string' && UUID_PATTERN.test(inst.id)) map[inst.name] = inst.id;
+    });
+    Object.assign(map, parishProfileIdByName);
+    return map;
+  }, [geoInstitutions, parishProfileIdByName]);
+
+  const selectedParishInstitutionId = useMemo(() => {
+    if (entityType !== 'Parishes' || filterMode !== 'per-entity') return null;
+    if (!entityFilter || entityFilter === 'All Entities') return null;
+    return parishIdByName[entityFilter] ?? null;
+  }, [entityType, filterMode, entityFilter, parishIdByName]);
+
+  // Vicariate to scope the diocese-wide ("all") descriptive fetch to, when
+  // the Vicariate filter alone is active (vicariate is a real, first-class
+  // warehouse column, so this stays a lightweight name-based filter). District
+  // is NOT resolved here — the real data shows a single vicariate can span
+  // multiple districts (or none), so district can't be expressed as a
+  // vicariate set. Any District selection is instead resolved to concrete
+  // institution ids below, alongside Class.
+  const selectedVicariateScope = useMemo(() => {
+    if (entityType !== 'Parishes' || filterMode !== 'all') return null;
+    if (vicariateFilter !== 'All Vicariates') return [vicariateFilter];
+    return null;
+  }, [entityType, filterMode, vicariateFilter]);
+
+  // Institution IDs to scope the real fetch to when District and/or Class is
+  // active (combined with whatever Vicariate filter is also active).
+  // `vicariates` alone can't express "District I" or "Class A" — the
+  // warehouse query needs concrete institution ids for that, hence resolving
+  // the combined filter against the real per-parish list fetched for the
+  // entity dropdown (which now carries each institution's real district,
+  // not a vicariate-derived guess). Returns null when neither District nor
+  // Class is the differentiator, leaving the existing vicariates-only path
+  // (Vicariate filter alone) untouched.
+  const selectedInstitutionScopeIds = useMemo(() => {
+    if (entityType !== 'Parishes' || filterMode !== 'all') return null;
+    if (classFilter === 'All Classes' && districtFilter === 'All Districts') return null;
+    if (!Array.isArray(realEntities)) return null;
+    return realEntities
+      .filter((e) => {
+        const cMatch = classFilter === 'All Classes' || e.class === classFilter;
+        const vMatch = vicariateFilter === 'All Vicariates' || e.vicariate === vicariateFilter;
+        const dMatch = districtFilter === 'All Districts' || e.district === districtFilter;
+        return cMatch && vMatch && dMatch;
+      })
+      .map((e) => e.id)
+      .filter((id): id is string => Boolean(id));
+  }, [entityType, filterMode, classFilter, vicariateFilter, districtFilter, realEntities]);
+
+  // Real descriptive analytics (Parishes only). Each chart keeps its mock
+  // dataset as the fallback: a failed or insufficient response leaves the
+  // corresponding api* state null and the existing static rendering intact.
+  const [apiParishCluster, setApiParishCluster] = useState<any | null>(null);
+  useEffect(() => {
+    if (entityType !== 'Parishes') return;
+    let cancelled = false;
+    apiClient
+      .getParishCluster()
+      .then((res: any) => {
+        if (cancelled) return;
+        if (res?.data_sufficient !== false && res?.cluster_counts && (res?.parishes?.length ?? 0) > 0) {
+          setApiParishCluster(res);
+        }
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, [entityType]);
+
+  useEffect(() => {
+    if (entityType !== 'Parishes') {
+      setApiParishFinancialTrend(null);
+      setApiParishSeasonality(null);
+      setApiParishProjects(null);
+      setIsDescriptiveLoading(false);
+      return;
+    }
+    if (filterMode === 'per-entity' && !selectedParishInstitutionId) {
+      setApiParishFinancialTrend(null);
+      setApiParishSeasonality(null);
+      setApiParishProjects(null);
+      setIsDescriptiveLoading(false);
+      return;
+    }
+
+    const institutionId = filterMode === 'per-entity' ? selectedParishInstitutionId! : 'all';
+    const vicariates = selectedVicariateScope ?? undefined;
+    const institutionIds = selectedInstitutionScopeIds ?? undefined;
+    if (institutionIds && institutionIds.length === 0) {
+      // District/Class filter (combined with Vicariate) matched zero real
+      // parishes — sending institution_ids=[] would be indistinguishable
+      // from "no filter" to the API client, which would silently fall back
+      // to unscoped diocese-wide data. Treat this the same as the
+      // per-entity-with-no-selection case above: an honest "no data" state.
+      setApiParishFinancialTrend(null);
+      setApiParishSeasonality(null);
+      setApiParishProjects(null);
+      setIsDescriptiveLoading(false);
+      return;
+    }
+    let cancelled = false;
+    setIsDescriptiveLoading(true);
+
+    Promise.all([
+      // Always fetch the full real history (no year, timeframe: 'all') in a
+      // single request — parishTrendData/kpiData/kpiYoyTrends all filter
+      // this down client-side (by year, then by 6m/12m). This used to be
+      // two separate requests (one year-scoped for display, one unscoped
+      // for the YoY trend badges), each running the same expensive
+      // diocese-wide query + STL decomposition + isolation forest
+      // independently — halving that load directly cuts the concurrent
+      // request pile-up that made filter/year changes look stuck.
+      apiClient
+        .getFinancialTrend(
+          'parish',
+          institutionId,
+          institutionIds
+            ? { timeframe: 'all', institutionIds }
+            : { timeframe: 'all', vicariates },
+        )
+        .then((res: any) => {
+          if (
+            !cancelled &&
+            res?.data_sufficient !== false &&
+            Array.isArray(res?.monthly_series) &&
+            res.monthly_series.length > 0
+          ) {
+            setApiParishFinancialTrend(res);
+          }
+        })
+        .catch(() => {
+          if (!cancelled) setApiParishFinancialTrend(null);
+        }),
+      apiClient
+        .getSeasonalityTrend('parish', institutionId, {
+          year,
+          timeframe: timeframe === '6m' ? '6m' : timeframe === '1y' ? '12m' : 'all',
+        })
+        .then((res: any) => {
+          if (
+            !cancelled &&
+            res?.data_sufficient !== false &&
+            Array.isArray(res?.monthly_trend) &&
+            res.monthly_trend.length > 0
+          ) {
+            setApiParishSeasonality(res);
+          }
+        })
+        .catch(() => {
+          if (!cancelled) setApiParishSeasonality(null);
+        }),
+      apiClient
+        .getProjectsDescriptive(institutionId)
+        .then((res: any) => {
+          if (!cancelled && res?.data_sufficient !== false && res?.aggregates) {
+            setApiParishProjects(res);
+          }
+        })
+        .catch(() => {
+          if (!cancelled) setApiParishProjects(null);
+        }),
+    ]).then(() => {
+      // Guarded the same way as every state update above — if a newer filter
+      // change already superseded this request, let *that* effect run be the
+      // one that clears the loading flag once it finishes, not this stale one.
+      if (!cancelled) setIsDescriptiveLoading(false);
+    });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [
+    entityType,
+    filterMode,
+    selectedParishInstitutionId,
+    selectedVicariateScope,
+    selectedInstitutionScopeIds,
+    timeframe,
+    year,
+  ]);
+
+  // Same-month-last-year % change for each KPI tile, matching the "VS LY"
+  // label. "Latest" here is the latest month of the *selected year*
+  // (parishTrendData, consistent with what the KPI tile itself displays),
+  // while the prior-year comparison point is looked up from the full
+  // unfiltered history (apiParishFinancialTrend always carries every real
+  // month now, in the single consolidated fetch above) since it can fall
+  // outside the selected year's own filtered range.
+  const kpiYoyTrends = useMemo(() => {
+    const latest = parishTrendData?.[parishTrendData.length - 1];
+    const allRows = apiParishFinancialTrend?.monthly_series;
+    if (!latest || !Array.isArray(allRows)) return null;
+    const [yStr, mStr] = String(latest.period ?? '').split('-');
+    const priorPeriod = `${Number(yStr) - 1}-${mStr}`;
+    const prior = allRows.find((r: any) => r.period === priorPeriod);
+    if (!prior) return null;
+    const pct = (curr: number, base: number) => (base ? ((curr - base) / Math.abs(base)) * 100 : null);
+    return {
+      collections: pct(latest.total_receipts, Number(prior.total_receipts ?? 0)),
+      mass: pct(latest.collections_mass, Number(prior.collections_mass ?? 0)),
+      disbursements: pct(latest.total_expenses, Number(prior.total_expenses ?? 0)),
+    };
+  }, [parishTrendData, apiParishFinancialTrend]);
 
   useEffect(() => {
     if (!initialEntityFilter) return;
@@ -1254,23 +1615,51 @@ export function BishopDashboard({
   ];
   const SEMINARY_COST_COLORS = ['#1a472a', '#D4AF37', '#4ade80', '#E6C27A', '#1a472a'];
 
-  const currentEntities = useMemo(() => getEntitiesData(entityType), [entityType]);
+  // null while the real list for this tab is still loading (mock renders
+  // briefly instead of flashing empty); once loaded, real data always wins —
+  // including a genuinely empty [] for entity types with no institutions yet.
+  const currentEntities = useMemo(() => {
+    if (realEntities === null) return getEntitiesData(entityType);
+    // realEntities already carries each institution's real per-institution
+    // district (added by getFinancialProfiles) — no need to re-derive one
+    // from vicariate. The real data shows a single vicariate can span
+    // multiple districts (or none), so a vicariate-keyed lookup was never a
+    // valid stand-in to begin with.
+    return realEntities;
+  }, [entityType, realEntities]);
 
   useEffect(() => {
+    let cancelled = false;
     const fetchHealthScores = async () => {
+      setIsHealthScoreLoading(true);
       // Single batch request — per-entity requests (90+) starve the browser
-      // connection pool and block every other API call in dev.
+      // connection pool and block every other API call in dev. In 'scoped'
+      // mode, year/timeframe narrow the score to the same window the rest
+      // of the dashboard is looking at; in 'overall' mode both are omitted
+      // so the backend falls back to each entity's full trailing history.
       const scores = await dataService.calculateHealthScores(
-        currentEntities.map((e) => ({
-          entityId: e.name,
+        currentEntities.map((e: any) => ({
+          // Real entities carry their institution UUID (e.id) — that's what
+          // financial_records is actually keyed on. Falling back to e.name
+          // only applies to the mock placeholder shown while realEntities is
+          // still loading, which was never going to resolve to a real record
+          // anyway.
+          entityId: e.id ?? e.name,
           entityType: entityType === 'Parishes' ? 'parish' : entityType === 'Seminaries' ? 'seminary' : 'school',
           entityClass: e.class,
         })),
+        healthScoreViewMode === 'scoped' ? year : undefined,
+        healthScoreViewMode === 'scoped' ? (timeframe === '6m' ? '6m' : timeframe === '1y' ? '12m' : 'all') : undefined,
       );
+      if (cancelled) return;
       setHealthScores(scores);
+      setIsHealthScoreLoading(false);
     };
     if (!isLoading) fetchHealthScores();
-  }, [isLoading, entityType, currentEntities]);
+    return () => {
+      cancelled = true;
+    };
+  }, [isLoading, entityType, currentEntities, year, timeframe, healthScoreViewMode]);
 
   const filteredEntities = useMemo(() => {
     return currentEntities.filter((p: any) => {
@@ -1284,6 +1673,34 @@ export function BishopDashboard({
   }, [currentEntities, districtFilter, vicariateFilter, classFilter, entityFilter, entityType]);
 
   const barChartData = useMemo(() => {
+    if (entityType === 'Parishes' && apiParishFinancialTrend) {
+      const rows = selectedBarVicariate
+        ? apiParishFinancialTrend.parish_totals
+            ?.filter((row: any) => row.vicariate === selectedBarVicariate)
+            .map((row: any) => ({
+              name: row.name,
+              collections: Number(row.total_receipts ?? 0),
+              disbursements: Number(row.total_expenses ?? 0),
+            }))
+        : apiParishFinancialTrend.vicariate_totals?.map((row: any) => ({
+            name: row.vicariate,
+            collections: Number(row.total_receipts ?? 0),
+            disbursements: Number(row.total_expenses ?? 0),
+            isVicariate: true,
+          }));
+      if (Array.isArray(rows) && rows.length > 0) {
+        return [...rows].sort((a: any, b: any) => b.collections - a.collections);
+      }
+      // vicariate_totals/parish_totals are diocese-wide-only rollups the
+      // backend deliberately omits once already scoped to a specific
+      // Vicariate/District (see financial_trend.py) — real data was
+      // fetched, this particular breakdown just isn't meaningful for that
+      // scope. Falling through to the filteredEntities grouping below would
+      // silently substitute a different, Supabase-derived data source that
+      // ignores the real AWS-backed scope entirely — worse than empty.
+      return [];
+    }
+
     if (entityType === 'Seminaries') {
       return filteredEntities.map((e) => ({
         ...e,
@@ -1320,7 +1737,7 @@ export function BishopDashboard({
         isVicariate: true,
       }))
       .sort((a, b) => b.collections - a.collections);
-  }, [filteredEntities, selectedBarVicariate, entityType]);
+  }, [filteredEntities, selectedBarVicariate, entityType, apiParishFinancialTrend]);
 
   useEffect(() => {
     setSelectedBarVicariate(null);
@@ -1343,56 +1760,85 @@ export function BishopDashboard({
   }, [entityType, districtFilter, vicariateFilter, classFilter, entityFilter]);
 
   const dynamicTrendData = useMemo(() => {
+    // Real AWS data source for Parishes — an empty/failed fetch is an
+    // honest "no data," never a silent fall-through to the scaled mock.
+    if (entityType === 'Parishes') return parishTrendData ?? [];
     const scale = filteredEntities.length / (currentEntities.length || 1);
     return filteredTrendData.map((d) => ({
       ...d,
       collections: d.collections * scale,
       forecast: d.forecast * scale,
     }));
-  }, [filteredEntities, currentEntities, filteredTrendData]);
+  }, [entityType, parishTrendData, filteredEntities, currentEntities, filteredTrendData]);
 
   const dynamicSeasonalityData = useMemo(() => {
+    if (entityType === 'Parishes') {
+      if (Array.isArray(apiParishSeasonality?.monthly_trend) && apiParishSeasonality.monthly_trend.length > 0) {
+        return apiParishSeasonality.monthly_trend.map((row: any) => ({
+          month: row.month,
+          value: Number(row.avg_collection ?? 0),
+        }));
+      }
+      return [];
+    }
     const scale = filteredEntities.length / (currentEntities.length || 1);
     return filteredSeasonalityData.map((d) => ({
       ...d,
       value: d.value * scale,
     }));
-  }, [filteredEntities, currentEntities, filteredSeasonalityData]);
+  }, [entityType, apiParishSeasonality, filteredEntities, currentEntities, filteredSeasonalityData]);
 
+  const parishSeasonalityHighlights = useMemo(() => {
+    const events = apiParishSeasonality?.event_averages;
+    if (!Array.isArray(events) || events.length === 0) return [];
+    return [...events]
+      .sort((a: any, b: any) => Number(b.vs_baseline_pct ?? 0) - Number(a.vs_baseline_pct ?? 0))
+      .slice(0, 3);
+  }, [apiParishSeasonality]);
+
+  const parishProjectMetrics = useMemo(() => {
+    const aggregates = apiParishProjects?.aggregates ?? {};
+    const totalRaised = Number(aggregates.total_raised ?? 0);
+    const totalTarget = Number(aggregates.total_target ?? 0);
+    return [
+      {
+        label: 'Project Completion',
+        value: Number(aggregates.project_completion_pct ?? 0),
+        detail: `${Number(aggregates.completed_count ?? 0)} of ${Number(aggregates.count ?? 0)} completed`,
+      },
+      {
+        label: 'Funds Raised vs Target',
+        value: Number(aggregates.overall_completion_pct ?? 0),
+        detail: `${formatCurrency(totalRaised)} of ${formatCurrency(totalTarget)}`,
+      },
+      {
+        label: 'Fund Raising Progress',
+        value: Number(aggregates.fundraising_progress_pct ?? aggregates.overall_completion_pct ?? 0),
+        detail: `${Number(aggregates.active_count ?? 0)} active projects`,
+      },
+    ];
+  }, [apiParishProjects]);
+
+  // Latest-month figures for the 3 top KPI tiles, read from the same
+  // AWS-warehouse-backed fetch that powers the Collections Breakdown chart
+  // below — real numbers, correctly scoped to whatever parish/vicariate/
+  // district filter is active. 'N/A' (not a fabricated ratio) when no real
+  // data is available for the current scope.
   const kpiData = useMemo(() => {
-    const useFilteredEntityTotals = entityFilter !== 'All Entities' || records.length === 0;
-    const totalCollections = !useFilteredEntityTotals
-      ? records.reduce((sum, e) => sum + (e.collections || 0), 0)
-      : filteredEntities.reduce((sum, e) => sum + e.collections, 0);
-
-    const totalConsumable = !useFilteredEntityTotals
-      ? records.reduce((sum, e) => sum + (e.consumableCollections || 0), 0)
-      : totalCollections * 0.22;
-
-    const totalDisbursements = !useFilteredEntityTotals
-      ? records.reduce((sum, e) => sum + (e.disbursements || 0), 0)
-      : totalCollections * 0.76;
-
-    // Calculate class breakdown
-    const classCounts: Record<string, number> = {};
-    filteredEntities.forEach((e) => {
-      const cls = e.class.replace('Class ', '');
-      classCounts[cls] = (classCounts[cls] || 0) + 1;
-    });
-    const classBreakdown = Object.entries(classCounts)
-      .sort((a, b) => a[0].localeCompare(b[0]))
-      .map(([cls, count]) => `${cls}:${count}`)
-      .join(' | ');
-
-    return {
-      collections: formatCurrency(totalCollections),
-      consumable: formatCurrency(totalConsumable),
-      disbursements: formatCurrency(totalDisbursements),
-      count: formatNumber(filteredEntities.length),
-      classBreakdown: classBreakdown || 'None',
-      totalEnrollment: formatNumber(filteredEntities.reduce((sum, e) => sum + (e.enrollment || 0), 0)),
-    };
-  }, [entityFilter, filteredEntities, records]);
+    // parishTrendData is already year-filtered, so "latest" here means the
+    // latest month of the selected year — not just the latest month overall
+    // (which apiParishFinancialTrend.monthly_series now always contains,
+    // since that fetch covers the full history in one request).
+    if (entityType === 'Parishes' && parishTrendData && parishTrendData.length > 0) {
+      const latest = parishTrendData[parishTrendData.length - 1];
+      return {
+        collections: formatCurrency(latest.total_receipts),
+        massCollections: formatCurrency(latest.collections_mass),
+        disbursements: formatCurrency(latest.total_expenses),
+      };
+    }
+    return { collections: 'N/A', massCollections: 'N/A', disbursements: 'N/A' };
+  }, [entityType, parishTrendData]);
 
   const districts = useMemo(
     () => ['All Districts', ...new Set(currentEntities.map((p) => p.district))].sort(),
@@ -1405,33 +1851,75 @@ export function BishopDashboard({
         : currentEntities.filter((p) => p.district === districtFilter);
     return ['All Vicariates', ...new Set(filtered.map((p) => p.vicariate))].sort();
   }, [currentEntities, districtFilter]);
-  const classes = ['All Classes', 'Class A', 'Class B', 'Class C', 'Class D', 'Class E'];
+  const classes = ['All Classes', 'Class A', 'Class B', 'Class C', 'Class D'];
   const entityNames = ['All Entities', ...new Set(currentEntities.map((p) => p.name))];
 
+  // score.entityId is now a real institution UUID (see fetchHealthScores
+  // above) — this resolves it back to a display name for the rankings list.
+  const entityNameById = useMemo(
+    () => new Map(currentEntities.map((e: any) => [e.id ?? e.name, e.name])),
+    [currentEntities],
+  );
+
   const filteredHealthScores = useMemo(() => {
-    const filteredNames = new Set(filteredEntities.map((e) => e.name));
-    return healthScores.filter((s) => filteredNames.has(s.entityId));
+    // Matches the entityId ?? name fallback used when the scores were
+    // fetched, so real entities (keyed by UUID) and mock placeholders
+    // (keyed by name) both resolve correctly here.
+    const filteredIds = new Set(filteredEntities.map((e: any) => e.id ?? e.name));
+    return healthScores.filter((s) => filteredIds.has(s.entityId));
   }, [healthScores, filteredEntities]);
 
+  // Now that Health Score can be scoped to the selected Year/Timeframe, a
+  // request can genuinely have too little data to score (e.g. year 2026,
+  // before any records exist) — dataSufficient=false marks those as
+  // placeholders, not real measurements, so they're excluded from every
+  // aggregate/ranking below rather than quietly dragging the average down.
+  const sufficientHealthScores = useMemo(
+    () => filteredHealthScores.filter((s) => s.dataSufficient !== false),
+    [filteredHealthScores],
+  );
+
   const averageScore = useMemo(() => {
-    if (filteredHealthScores.length === 0) return 72;
-    return Math.round(filteredHealthScores.reduce((sum, s) => sum + s.compositeScore, 0) / filteredHealthScores.length);
-  }, [filteredHealthScores]);
+    if (sufficientHealthScores.length === 0) return null;
+    return Math.round(
+      sufficientHealthScores.reduce((sum, s) => sum + s.compositeScore, 0) / sufficientHealthScores.length,
+    );
+  }, [sufficientHealthScores]);
+
+  // The actual year range the displayed score(s) were computed from — spans
+  // the earliest periodStartYear to the latest periodEndYear across every
+  // entity folded into averageScore, so the label is honest even when
+  // several parishes (each with a slightly different history) are averaged
+  // together. null when none of them returned a real (non-default) period.
+  const healthScorePeriodLabel = useMemo(() => {
+    let start: number | undefined;
+    let end: number | undefined;
+    for (const s of sufficientHealthScores) {
+      if (s.periodStartYear == null || s.periodEndYear == null) continue;
+      start = start == null ? s.periodStartYear : Math.min(start, s.periodStartYear);
+      end = end == null ? s.periodEndYear : Math.max(end, s.periodEndYear);
+    }
+    if (start == null || end == null) return null;
+    return start === end ? `${start}` : `${start}-${end}`;
+  }, [sufficientHealthScores]);
 
   const averageDimensions = useMemo(() => {
-    if (filteredHealthScores.length === 0)
+    if (sufficientHealthScores.length === 0)
       return { liquidity: 75, sustainability: 68, efficiency: 82, stability: 65, growth: 55 };
-    const count = filteredHealthScores.length;
+    const count = sufficientHealthScores.length;
     return {
-      liquidity: Math.round(filteredHealthScores.reduce((sum, s) => sum + s.dimensions.liquidity, 0) / count),
-      sustainability: Math.round(filteredHealthScores.reduce((sum, s) => sum + s.dimensions.sustainability, 0) / count),
-      efficiency: Math.round(filteredHealthScores.reduce((sum, s) => sum + s.dimensions.efficiency, 0) / count),
-      stability: Math.round(filteredHealthScores.reduce((sum, s) => sum + s.dimensions.stability, 0) / count),
-      growth: Math.round(filteredHealthScores.reduce((sum, s) => sum + s.dimensions.growth, 0) / count),
+      liquidity: Math.round(sufficientHealthScores.reduce((sum, s) => sum + s.dimensions.liquidity, 0) / count),
+      sustainability: Math.round(
+        sufficientHealthScores.reduce((sum, s) => sum + s.dimensions.sustainability, 0) / count,
+      ),
+      efficiency: Math.round(sufficientHealthScores.reduce((sum, s) => sum + s.dimensions.efficiency, 0) / count),
+      stability: Math.round(sufficientHealthScores.reduce((sum, s) => sum + s.dimensions.stability, 0) / count),
+      growth: Math.round(sufficientHealthScores.reduce((sum, s) => sum + s.dimensions.growth, 0) / count),
     };
-  }, [filteredHealthScores]);
+  }, [sufficientHealthScores]);
 
   const trendText = useMemo(() => {
+    if (averageScore == null) return 'Insufficient Data';
     if (averageScore > 75) return 'Optimal';
     if (averageScore > 60) return 'Stable';
     return 'Needs Attention';
@@ -1439,6 +1927,35 @@ export function BishopDashboard({
 
   // Period Comparison derived data
   const cmpResult = useMemo(() => {
+    if (entityType === 'Parishes' && parishTrendData) {
+      const monthly = new Map<string, { collections: number; disbursements: number }>();
+      parishTrendData.forEach((row) => {
+        if (!row.period) return;
+        monthly.set(row.period, {
+          collections: Number(row.collections ?? 0),
+          disbursements: Number(row.expenses_parish ?? 0) + Number(row.expenses_pastoral ?? 0),
+        });
+      });
+      const monthKey = (m: CmpMonth, y: CmpYear) => `${y}-${String(CMP_MONTHS.indexOf(m) + 1).padStart(2, '0')}`;
+      const m1 = monthly.get(monthKey(cmpMonth1, cmpYear1));
+      const m2 = monthly.get(monthKey(cmpMonth2, cmpYear2));
+      if (m1 && m2) {
+        const v1 = m1[cmpMetric];
+        const v2 = m2[cmpMetric];
+        const delta = v2 - v1;
+        const pct = v1 > 0 ? (delta / v1) * 100 : 0;
+        return {
+          p1: { label: `${cmpMonth1} ${cmpYear1}`, value: v1 },
+          p2: { label: `${cmpMonth2} ${cmpYear2}`, value: v2 },
+          delta,
+          pct,
+          barData: [
+            { period: `${cmpMonth1} ${cmpYear1}`, value: v1 },
+            { period: `${cmpMonth2} ${cmpYear2}`, value: v2 },
+          ],
+        };
+      }
+    }
     const monthly1 = getDiocesanMonthly(entityType, cmpYear1);
     const monthly2 = getDiocesanMonthly(entityType, cmpYear2);
     const m1 = monthly1.find((d) => d.month === cmpMonth1);
@@ -1458,15 +1975,12 @@ export function BishopDashboard({
         { period: `${cmpMonth2} ${cmpYear2}`, value: v2 },
       ],
     };
-  }, [entityType, cmpMetric, cmpMonth1, cmpYear1, cmpMonth2, cmpYear2]);
+  }, [entityType, parishTrendData, cmpMetric, cmpMonth1, cmpYear1, cmpMonth2, cmpYear2]);
 
   const filteredDeclineData = useMemo(() => {
-    let data = liveDeclineData
-      .map((item) => ({
-        ...item,
-        district: VICARIATE_TO_DISTRICT[item.vicariate] || 'Other',
-      }))
-      .filter((p: any) => {
+    // liveDeclineData already carries each parish's real district (see the
+    // setLiveDeclineData population above) — no vicariate-derived stand-in.
+    let data = liveDeclineData.filter((p: any) => {
         const dMatch =
           entityType === 'Seminaries' || districtFilter === 'All Districts' || p.district === districtFilter;
         const vMatch =
@@ -1491,6 +2005,77 @@ export function BishopDashboard({
     );
   };
 
+  // Renders a KPI tile's "vs LY" badge from a real same-month-last-year %
+  // (kpiYoyTrends), or an honest "N/A" when there isn't a year-ago period to
+  // compare against. `increaseIsGood` flips the color/icon semantics for
+  // disbursements, where a rise is a bad sign, not a good one.
+  // Skeleton pulse instead of the value itself while a filter/year/parish
+  // change is refetching — so the tile visibly says "updating" rather than
+  // silently holding the previous number with no indication anything is
+  // happening (which is what made switches look stuck before).
+  const renderKpiValue = (value: string) => {
+    if (entityType === 'Parishes' && isDescriptiveLoading) {
+      return <div className="h-[1.6rem] md:h-[1.9rem] w-[70%] bg-gray-100 rounded-lg animate-pulse" />;
+    }
+    return value;
+  };
+
+  // Semi-transparent overlay for chart containers while a filter/year/parish
+  // change is refetching — the old chart stays visible-but-dimmed underneath
+  // instead of flashing to empty, so it reads as "updating" not "broken."
+  // Caller's wrapping element needs position: relative.
+  const renderChartLoadingOverlay = () =>
+    entityType === 'Parishes' &&
+    isDescriptiveLoading && (
+      <div className="absolute inset-0 bg-white/70 backdrop-blur-[1px] flex items-center justify-center z-10 rounded-2xl">
+        <div className="flex flex-col items-center gap-2">
+          <Loader2 className="w-6 h-6 text-church-green animate-spin" />
+          <span className="text-[10px] font-bold uppercase tracking-wider text-gray-500">Updating...</span>
+        </div>
+      </div>
+    );
+
+  // Same gating as renderChartLoadingOverlay, but styled for the dark
+  // (bg-[#1A1A1A]) Event Trends card instead of the light chart cards.
+  const renderDarkChartLoadingOverlay = () =>
+    entityType === 'Parishes' &&
+    isDescriptiveLoading && (
+      <div className="absolute inset-0 bg-black/60 backdrop-blur-[1px] flex items-center justify-center z-10 rounded-2xl">
+        <div className="flex flex-col items-center gap-2">
+          <Loader2 className="w-6 h-6 text-gold-500 animate-spin" />
+          <span className="text-[10px] font-bold uppercase tracking-wider text-white/60">Updating...</span>
+        </div>
+      </div>
+    );
+
+  const renderYoyBadge = (pct: number | null | undefined, increaseIsGood: boolean) => {
+    if (entityType === 'Parishes' && isDescriptiveLoading) {
+      return (
+        <span className="flex items-center gap-1 bg-gray-50 text-gray-400 px-2.5 py-1 rounded-lg text-[10px] font-black border border-gray-100 shadow-sm">
+          <Loader2 className="w-3 h-3 animate-spin" /> Updating
+        </span>
+      );
+    }
+    if (pct === null || pct === undefined) {
+      return (
+        <span className="flex items-center gap-1 bg-gray-50 text-gray-500 px-2.5 py-1 rounded-lg text-[10px] font-black border border-gray-100 shadow-sm">
+          N/A
+        </span>
+      );
+    }
+    const good = (pct >= 0) === increaseIsGood;
+    const Icon = pct >= 0 ? ArrowUpRight : ArrowDownRight;
+    const colorClasses = good
+      ? 'bg-emerald-50 text-emerald-700 border-emerald-100'
+      : 'bg-red-50 text-red-700 border-red-100';
+    return (
+      <span className={`flex items-center gap-1 px-2.5 py-1 rounded-lg text-[10px] font-black border shadow-sm ${colorClasses}`}>
+        <Icon className="w-3 h-3" /> {pct >= 0 ? '+' : ''}
+        {pct.toFixed(1)}%
+      </span>
+    );
+  };
+
   if (isLoading) {
     return (
       <div className="flex items-center justify-center h-[calc(100vh-80px)]">
@@ -1512,6 +2097,26 @@ export function BishopDashboard({
           >
             Retry
           </button>
+        </div>
+      </div>
+    );
+  }
+
+  // Diocesan Schools currently has zero registered institutions in the
+  // system. Showing the fabricated mock dashboard here would misrepresent
+  // real diocesan finances, so this tab tells the truth instead: nothing to
+  // show yet. Seminaries (1 real institution) still render normally below —
+  // its per-entity list is real even though its financial charts remain
+  // Section-D mock data pending real submissions.
+  if (entityType === 'Diocesan Schools' && realEntities !== null && realEntities.length === 0) {
+    return (
+      <div className="flex items-center justify-center h-[calc(100vh-80px)]">
+        <div className="text-center p-8 bg-gray-50 rounded-2xl border border-gray-200 max-w-md">
+          <Info className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+          <h2 className="text-xl font-bold text-church-black mb-2">No Schools Registered Yet</h2>
+          <p className="text-gray-500">
+            No diocesan schools have been added to the system, so there is no financial data to display for this tab.
+          </p>
         </div>
       </div>
     );
@@ -1542,16 +2147,16 @@ export function BishopDashboard({
               <div className="flex items-center gap-2 md:gap-6 flex-1 overflow-x-auto [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none] pb-1 md:pb-0">
                 <div className="flex items-center bg-white/5 border border-white/10 rounded-xl p-1 shrink-0">
                   <button
-                    disabled={lockEntityFilter}
+                    disabled={lockEntityFilter || isDescriptiveLoading}
                     onClick={() => {
-                      if (lockEntityFilter) return;
+                      if (lockEntityFilter || isDescriptiveLoading) return;
                       setFilterMode('all');
                       setEntityFilter('All Entities');
                     }}
                     className={`px-4 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all duration-300 whitespace-nowrap ${
                       filterMode === 'all'
                         ? 'bg-gold-500 text-black shadow-lg'
-                        : lockEntityFilter
+                        : lockEntityFilter || isDescriptiveLoading
                           ? 'text-white/20 cursor-not-allowed'
                           : 'text-white/40 hover:text-white hover:bg-white/5'
                     }`}
@@ -1559,7 +2164,9 @@ export function BishopDashboard({
                     All
                   </button>
                   <button
+                    disabled={isDescriptiveLoading}
                     onClick={() => {
+                      if (isDescriptiveLoading) return;
                       setFilterMode('per-entity');
                       setVicariateFilter('All Vicariates');
                       setClassFilter('All Classes');
@@ -1567,7 +2174,9 @@ export function BishopDashboard({
                     className={`px-4 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all duration-300 whitespace-nowrap ${
                       filterMode === 'per-entity'
                         ? 'bg-gold-500 text-black shadow-lg'
-                        : 'text-white/40 hover:text-white hover:bg-white/5'
+                        : isDescriptiveLoading
+                          ? 'text-white/20 cursor-not-allowed'
+                          : 'text-white/40 hover:text-white hover:bg-white/5'
                     }`}
                   >
                     Individual
@@ -1584,11 +2193,14 @@ export function BishopDashboard({
                           <div className="relative group min-w-[120px]">
                             <select
                               value={districtFilter}
+                              disabled={isDescriptiveLoading}
                               onChange={(e) => {
                                 setDistrictFilter(e.target.value);
                                 setVicariateFilter('All Vicariates');
                               }}
-                              className="w-full bg-transparent text-xs md:text-sm font-medium hover:text-gold-400 transition-colors appearance-none pr-6 cursor-pointer focus:outline-none"
+                              className={`w-full bg-transparent text-xs md:text-sm font-medium transition-colors appearance-none pr-6 focus:outline-none ${
+                                isDescriptiveLoading ? 'opacity-40 cursor-not-allowed' : 'hover:text-gold-400 cursor-pointer'
+                              }`}
                             >
                               {districts.map((d) => (
                                 <option key={d} value={d} className="bg-church-green">
@@ -1606,8 +2218,11 @@ export function BishopDashboard({
                         <div className="relative group min-w-[120px]">
                           <select
                             value={vicariateFilter}
+                            disabled={isDescriptiveLoading}
                             onChange={(e) => setVicariateFilter(e.target.value)}
-                            className="w-full bg-transparent text-xs md:text-sm font-medium hover:text-gold-400 transition-colors appearance-none pr-6 cursor-pointer focus:outline-none"
+                            className={`w-full bg-transparent text-xs md:text-sm font-medium transition-colors appearance-none pr-6 focus:outline-none ${
+                              isDescriptiveLoading ? 'opacity-40 cursor-not-allowed' : 'hover:text-gold-400 cursor-pointer'
+                            }`}
                           >
                             {vicariates.map((v) => (
                               <option key={v} value={v} className="bg-church-green">
@@ -1622,8 +2237,11 @@ export function BishopDashboard({
                       <div className="relative group min-w-[100px]">
                         <select
                           value={classFilter}
+                          disabled={isDescriptiveLoading}
                           onChange={(e) => setClassFilter(e.target.value)}
-                          className="w-full bg-transparent text-xs md:text-sm font-medium hover:text-gold-400 transition-colors appearance-none pr-6 cursor-pointer focus:outline-none"
+                          className={`w-full bg-transparent text-xs md:text-sm font-medium transition-colors appearance-none pr-6 focus:outline-none ${
+                            isDescriptiveLoading ? 'opacity-40 cursor-not-allowed' : 'hover:text-gold-400 cursor-pointer'
+                          }`}
                         >
                           {classes.map((c) => (
                             <option key={c} value={c} className="bg-church-green">
@@ -1641,11 +2259,15 @@ export function BishopDashboard({
                       <select
                         value={entityFilter}
                         onChange={(e) => {
-                          if (!lockEntityFilter) setEntityFilter(e.target.value);
+                          if (!lockEntityFilter && !isDescriptiveLoading) setEntityFilter(e.target.value);
                         }}
-                        disabled={lockEntityFilter}
+                        disabled={lockEntityFilter || isDescriptiveLoading}
                         className={`w-full bg-transparent text-xs md:text-sm font-medium transition-colors appearance-none pr-6 focus:outline-none ${
-                          lockEntityFilter ? 'text-gold-300 cursor-default' : 'hover:text-gold-400 cursor-pointer'
+                          lockEntityFilter
+                            ? 'text-gold-300 cursor-default'
+                            : isDescriptiveLoading
+                              ? 'opacity-40 cursor-not-allowed'
+                              : 'hover:text-gold-400 cursor-pointer'
                         }`}
                       >
                         {entityNames.map((p) => (
@@ -2039,12 +2661,10 @@ export function BishopDashboard({
               Monthly Total Collections
             </p>
             <div className="text-[clamp(1.3rem,1.6vw,1.9rem)] font-black text-church-green tracking-tight leading-none">
-              {kpiData.collections}
+              {renderKpiValue(kpiData.collections)}
             </div>
             <div className="flex items-center gap-2 mt-auto">
-              <span className="flex items-center gap-1 bg-emerald-50 text-emerald-700 px-2.5 py-1 rounded-lg text-[10px] font-black border border-emerald-100 shadow-sm">
-                <ArrowUpRight className="w-3 h-3" /> +12.5%
-              </span>
+              {renderYoyBadge(kpiYoyTrends?.collections, true)}
               <span className="text-[10px] text-gray-400 font-bold uppercase tracking-wider">vs LY</span>
               <button
                 onClick={() => handleDiagnosticRequest('Jan')}
@@ -2056,18 +2676,16 @@ export function BishopDashboard({
             </div>
           </div>
 
-          {/* KPI Card — Consumable Collections */}
+          {/* KPI Card — Mass Collections */}
           <div className="bg-white rounded-2xl shadow-xl group hover:-translate-y-1 transition-all duration-500 min-h-[150px] flex flex-col p-5 gap-3">
             <p className="text-gray-400 text-[11px] font-black uppercase tracking-[0.2em] leading-tight">
-              Consumable Collections
+              Mass Collections
             </p>
             <div className="text-[clamp(1.3rem,1.6vw,1.9rem)] font-black text-church-green tracking-tight leading-none">
-              {kpiData.consumable}
+              {renderKpiValue(kpiData.massCollections)}
             </div>
             <div className="flex items-center gap-2 mt-auto">
-              <span className="flex items-center gap-1 bg-emerald-50 text-emerald-700 px-2.5 py-1 rounded-lg text-[10px] font-black border border-emerald-100 shadow-sm">
-                <ArrowUpRight className="w-3 h-3" /> +8.1%
-              </span>
+              {renderYoyBadge(kpiYoyTrends?.mass, true)}
               <span className="text-[10px] text-gray-400 font-bold uppercase tracking-wider">vs LY</span>
             </div>
           </div>
@@ -2078,23 +2696,71 @@ export function BishopDashboard({
               Monthly Disbursements
             </p>
             <div className="text-[clamp(1.3rem,1.6vw,1.9rem)] font-black text-church-green tracking-tight leading-none">
-              {kpiData.disbursements}
+              {renderKpiValue(kpiData.disbursements)}
             </div>
             <div className="flex items-center gap-2 mt-auto">
-              <span className="flex items-center gap-1 bg-red-50 text-red-700 px-2.5 py-1 rounded-lg text-[10px] font-black border border-red-100 shadow-sm">
-                <ArrowUp className="w-3 h-3" /> +5.2%
-              </span>
+              {renderYoyBadge(kpiYoyTrends?.disbursements, false)}
               <span className="text-[10px] text-gray-400 font-bold uppercase tracking-wider">vs LY</span>
             </div>
           </div>
 
-          {/* KPI Card — Financial Health Score */}
+          {/* KPI Card — Financial Health Score. Two modes, toggled here:
+              'scoped' follows the Year/Timeframe selection above like the
+              three tiles to its left (a single-year snapshot, honestly N/A
+              when that period has too little data); 'overall' ignores
+              Year/Timeframe and always uses the entity's full trailing
+              history (a multi-year trend view). Available in both All and
+              Individual filter modes — the toggle is independent of that. */}
           <div className="bg-white rounded-2xl shadow-xl group hover:-translate-y-1 transition-all duration-500 min-h-[150px] flex flex-col p-5 gap-3">
-            <p className="text-gray-400 text-[11px] font-black uppercase tracking-[0.2em] leading-tight">
-              Financial Health Score
-            </p>
+            <div className="flex items-start justify-between gap-2">
+              <p
+                className="text-gray-400 text-[11px] font-black uppercase tracking-[0.2em] leading-tight"
+                title={
+                  healthScorePeriodLabel
+                    ? `Computed from financial records in ${healthScorePeriodLabel}.`
+                    : 'Not enough financial records in the selected year/timeframe to compute a score.'
+                }
+              >
+                Financial Health Score
+                {healthScorePeriodLabel && <span className="text-gray-300"> ({healthScorePeriodLabel})</span>}
+              </p>
+              <div className="flex items-center bg-gray-50 border border-gray-100 rounded-lg p-0.5 shrink-0">
+                <button
+                  type="button"
+                  disabled={isHealthScoreLoading}
+                  onClick={() => setHealthScoreViewMode('scoped')}
+                  title="Follows the Year/Timeframe filter above"
+                  className={`px-1.5 py-0.5 rounded-md text-[8px] font-black uppercase tracking-wider transition-colors ${
+                    healthScoreViewMode === 'scoped'
+                      ? 'bg-white text-church-green shadow-sm'
+                      : 'text-gray-400 hover:text-gray-600'
+                  } ${isHealthScoreLoading ? 'cursor-not-allowed opacity-60' : 'cursor-pointer'}`}
+                >
+                  This Year
+                </button>
+                <button
+                  type="button"
+                  disabled={isHealthScoreLoading}
+                  onClick={() => setHealthScoreViewMode('overall')}
+                  title="Full trailing history, regardless of the Year/Timeframe filter above"
+                  className={`px-1.5 py-0.5 rounded-md text-[8px] font-black uppercase tracking-wider transition-colors ${
+                    healthScoreViewMode === 'overall'
+                      ? 'bg-white text-church-green shadow-sm'
+                      : 'text-gray-400 hover:text-gray-600'
+                  } ${isHealthScoreLoading ? 'cursor-not-allowed opacity-60' : 'cursor-pointer'}`}
+                >
+                  Overall
+                </button>
+              </div>
+            </div>
             <div className="text-[clamp(1.8rem,2.2vw,2.6rem)] font-black text-gold-600 tracking-tight leading-none">
-              {averageScore}
+              {isHealthScoreLoading ? (
+                <div className="h-[1.6rem] md:h-[1.9rem] w-[70%] bg-gray-100 rounded-lg animate-pulse" />
+              ) : averageScore == null ? (
+                'N/A'
+              ) : (
+                averageScore
+              )}
             </div>
             <div className="flex flex-wrap items-center gap-2 mt-auto">
               <span className="bg-gold-50 text-gold-700 px-2.5 py-1 rounded-lg text-[10px] font-black border border-gold-100">
@@ -2176,8 +2842,8 @@ export function BishopDashboard({
                             </div>
                           </div>
                           <p className="text-sm text-gray-400 font-medium ml-13">
-                            Composite analysis across {filteredHealthScores.length} {entityType.toLowerCase()}{' '}
-                            {filteredHealthScores.length === healthScores.length
+                            Composite analysis across {sufficientHealthScores.length} {entityType.toLowerCase()}{' '}
+                            {sufficientHealthScores.length === healthScores.length
                               ? 'in the diocese'
                               : 'in the selected filter'}
                           </p>
@@ -2197,9 +2863,13 @@ export function BishopDashboard({
                         <div className="lg:col-span-5 flex flex-col items-center justify-center relative">
                           <div className="absolute inset-0 bg-radial-gradient from-gold-500/10 to-transparent opacity-50 blur-2xl"></div>
                           <FinancialHealthGauge
-                            score={averageScore}
+                            score={averageScore ?? 0}
                             size={220}
-                            description={`The diocese is currently in the ${trendText} Zone. Resource allocation is being monitored.`}
+                            description={
+                              averageScore == null
+                                ? 'Not enough financial records in the selected year/timeframe to compute a score.'
+                                : `The diocese is currently in the ${trendText} Zone. Resource allocation is being monitored.`
+                            }
                           />
                         </div>
                         <div className="lg:col-span-7">
@@ -2263,7 +2933,7 @@ export function BishopDashboard({
                             <h4 className="text-xs font-bold text-emerald-600 uppercase tracking-widest mb-2">
                               Top Performers
                             </h4>
-                            {[...filteredHealthScores]
+                            {[...sufficientHealthScores]
                               .sort((a, b) => b.compositeScore - a.compositeScore)
                               .slice(0, 5)
                               .map((score, idx) => (
@@ -2275,7 +2945,9 @@ export function BishopDashboard({
                                     <span className="w-6 h-6 rounded-full bg-emerald-200 text-emerald-800 flex items-center justify-center text-[10px] font-bold">
                                       {idx + 1}
                                     </span>
-                                    <span className="text-sm font-bold text-gray-800">{score.entityId}</span>
+                                    <span className="text-sm font-bold text-gray-800">
+                                      {entityNameById.get(score.entityId) ?? score.entityId}
+                                    </span>
                                   </div>
                                   <span className="text-sm font-bold text-emerald-700">{score.compositeScore}</span>
                                 </div>
@@ -2285,7 +2957,7 @@ export function BishopDashboard({
                             <h4 className="text-xs font-bold text-red-600 uppercase tracking-widest mb-2">
                               Needs Attention
                             </h4>
-                            {[...filteredHealthScores]
+                            {[...sufficientHealthScores]
                               .sort((a, b) => a.compositeScore - b.compositeScore)
                               .slice(0, 5)
                               .map((score, idx) => (
@@ -2297,7 +2969,9 @@ export function BishopDashboard({
                                     <span className="w-6 h-6 rounded-full bg-red-200 text-red-800 flex items-center justify-center text-[10px] font-bold">
                                       {idx + 1}
                                     </span>
-                                    <span className="text-sm font-bold text-gray-800">{score.entityId}</span>
+                                    <span className="text-sm font-bold text-gray-800">
+                                      {entityNameById.get(score.entityId) ?? score.entityId}
+                                    </span>
                                   </div>
                                   <span className="text-sm font-bold text-red-700">{score.compositeScore}</span>
                                 </div>
@@ -2322,38 +2996,23 @@ export function BishopDashboard({
                           The overall financial health is{' '}
                           <span
                             className={`font-bold ${
-                              filteredHealthScores.length > 0 &&
-                              filteredHealthScores.reduce((sum, s) => sum + s.compositeScore, 0) /
-                                filteredHealthScores.length >
-                                70
-                                ? 'text-emerald-400'
-                                : filteredHealthScores.length > 0 &&
-                                    filteredHealthScores.reduce((sum, s) => sum + s.compositeScore, 0) /
-                                      filteredHealthScores.length >
-                                      40
-                                  ? 'text-gold-400'
-                                  : 'text-red-400'
+                              averageScore == null
+                                ? 'text-white/50'
+                                : averageScore > 70
+                                  ? 'text-emerald-400'
+                                  : averageScore > 40
+                                    ? 'text-gold-400'
+                                    : 'text-red-400'
                             }`}
                           >
-                            {filteredHealthScores.length > 0
-                              ? filteredHealthScores.reduce((sum, s) => sum + s.compositeScore, 0) /
-                                  filteredHealthScores.length >
-                                70
-                                ? 'Excellent'
-                                : filteredHealthScores.reduce((sum, s) => sum + s.compositeScore, 0) /
-                                      filteredHealthScores.length >
-                                    40
-                                  ? 'Stable'
-                                  : 'Critical'
-                              : 'Calculating...'}
+                            {averageScore == null ? 'Insufficient Data' : averageScore > 70 ? 'Excellent' : averageScore > 40 ? 'Stable' : 'Critical'}
                           </span>
-                          .
-                          {filteredHealthScores.length > 0 &&
-                          filteredHealthScores.reduce((sum, s) => sum + s.compositeScore, 0) /
-                            filteredHealthScores.length >
-                            40
-                            ? 'Most entities show positive cash flow and sustainable reserve levels. Efficiency ratios are within acceptable benchmarks.'
-                            : 'Several entities require immediate financial intervention due to high disbursement-to-collection ratios.'}
+                          .{' '}
+                          {averageScore == null
+                            ? 'Not enough financial records in the selected year/timeframe to assess this yet.'
+                            : averageScore > 40
+                              ? 'Most entities show positive cash flow and sustainable reserve levels. Efficiency ratios are within acceptable benchmarks.'
+                              : 'Several entities require immediate financial intervention due to high disbursement-to-collection ratios.'}
                         </p>
                       </div>
                       <div className="space-y-3">
@@ -2861,7 +3520,14 @@ export function BishopDashboard({
                           </div>
                         </CardHeader>
                         <CardContent className="mt-4 px-8 pb-4">
-                          <div className="h-[400px] w-full mt-4">
+                          {entityType === 'Parishes' && barChartData.length === 0 && (
+                            <p className="text-sm text-gray-400 text-center py-8">
+                              Per-vicariate breakdown isn't available once already scoped to a specific
+                              Vicariate/District — select "All Vicariates" and "All Districts" to see this chart.
+                            </p>
+                          )}
+                          <div className="relative h-[400px] w-full mt-4">
+                            {renderChartLoadingOverlay()}
                             <ReactECharts
                               option={{
                                 color: ['#6366f1', '#8b5cf6', '#06b6d4', '#10b981', '#f59e0b', '#ef4444'],
@@ -3015,20 +3681,6 @@ export function BishopDashboard({
                           <p className="text-sm text-gray-400 mt-1">Breakdown of collections across the diocese.</p>
                         </div>
                         <div className="flex items-center gap-4">
-                          <div className="flex bg-gray-100 p-1 rounded-lg">
-                            <button
-                              onClick={() => setCollectionsTimeframe('6m')}
-                              className={`px-3 py-1 text-[10px] font-bold rounded-md transition-all ${collectionsTimeframe === '6m' ? 'bg-white text-church-green shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}
-                            >
-                              6M
-                            </button>
-                            <button
-                              onClick={() => setCollectionsTimeframe('12m')}
-                              className={`px-3 py-1 text-[10px] font-bold rounded-md transition-all ${collectionsTimeframe === '12m' ? 'bg-white text-church-green shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}
-                            >
-                              12M
-                            </button>
-                          </div>
                           <select
                             value={collectionsFilter}
                             onChange={(e) => setCollectionsFilter(e.target.value as any)}
@@ -3037,12 +3689,19 @@ export function BishopDashboard({
                             <option value="all">ALL CATEGORIES</option>
                             <option value="collections_mass">MASS COLLECTIONS</option>
                             <option value="sacraments_rate">SACRAMENTS</option>
-                            <option value="collections_other">OTHER COLLECTIONS</option>
+                            <option value="other_receipts">OTHER RECEIPTS</option>
+                            <option value="other_collections">OTHER COLLECTIONS</option>
                           </select>
                         </div>
                       </CardHeader>
                       <CardContent className="mt-4">
-                        <div className="h-[350px] flex items-center">
+                        {entityType === 'Parishes' && windowedTrendData.length === 0 && !isDescriptiveLoading && (
+                          <p className="text-sm text-gray-400 text-center py-8">
+                            No collections data available for the selected scope.
+                          </p>
+                        )}
+                        <div className="relative h-[350px] flex items-center">
+                          {renderChartLoadingOverlay()}
                           <div className="w-6 flex-shrink-0 flex items-center justify-center h-full">
                             <span className="text-[10px] font-bold text-gray-400 uppercase tracking-[0.2em] -rotate-90 whitespace-nowrap">
                               Amount (Millions)
@@ -3059,7 +3718,7 @@ export function BishopDashboard({
                               grid: { top: 20, right: 30, left: 55, bottom: 30 },
                               xAxis: {
                                 type: 'category',
-                                data: filteredCollectionsData.map((d) => d.month),
+                                data: windowedTrendData.map((d) => d.month),
                                 axisLabel: { color: '#6B7280', fontSize: 12 },
                               },
                               yAxis: {
@@ -3077,7 +3736,7 @@ export function BishopDashboard({
                                       {
                                         name: 'Mass Collections',
                                         type: 'bar',
-                                        data: filteredCollectionsData.map((d) => ({
+                                        data: windowedTrendData.map((d) => ({
                                           value: d.collections_mass,
                                           itemStyle: { color: '#D4AF37', borderRadius: [4, 4, 0, 0] },
                                         })),
@@ -3090,7 +3749,7 @@ export function BishopDashboard({
                                       {
                                         name: 'Sacraments',
                                         type: 'bar',
-                                        data: filteredCollectionsData.map((d) => ({
+                                        data: windowedTrendData.map((d) => ({
                                           value: d.sacraments_rate,
                                           itemStyle: { color: '#1a472a', borderRadius: [4, 4, 0, 0] },
                                         })),
@@ -3098,14 +3757,27 @@ export function BishopDashboard({
                                       },
                                     ]
                                   : []),
-                                ...(collectionsFilter === 'all' || collectionsFilter === 'collections_other'
+                                ...(collectionsFilter === 'all' || collectionsFilter === 'other_receipts'
+                                  ? [
+                                      {
+                                        name: 'Other Receipts',
+                                        type: 'bar',
+                                        data: windowedTrendData.map((d: any) => ({
+                                          value: d.other_receipts ?? 0,
+                                          itemStyle: { color: '#4ade80', borderRadius: [4, 4, 0, 0] },
+                                        })),
+                                        barWidth: collectionsFilter === 'all' ? 20 : 40,
+                                      },
+                                    ]
+                                  : []),
+                                ...(collectionsFilter === 'all' || collectionsFilter === 'other_collections'
                                   ? [
                                       {
                                         name: 'Other Collections',
                                         type: 'bar',
-                                        data: filteredCollectionsData.map((d) => ({
-                                          value: d.collections_other,
-                                          itemStyle: { color: '#4ade80', borderRadius: [4, 4, 0, 0] },
+                                        data: windowedTrendData.map((d: any) => ({
+                                          value: d.other_collections ?? 0,
+                                          itemStyle: { color: '#06b6d4', borderRadius: [4, 4, 0, 0] },
                                         })),
                                         barWidth: collectionsFilter === 'all' ? 20 : 40,
                                       },
@@ -3137,10 +3809,20 @@ export function BishopDashboard({
                             </span>
                           </div>
                           <div
-                            className={`flex items-center gap-2 transition-opacity ${collectionsFilter === 'all' || collectionsFilter === 'collections_other' ? 'opacity-100' : 'opacity-30'}`}
+                            className={`flex items-center gap-2 transition-opacity ${collectionsFilter === 'all' || collectionsFilter === 'other_receipts' ? 'opacity-100' : 'opacity-30'}`}
                           >
                             <div className="w-3 h-3 rounded-full bg-[#4ade80]"></div>
-                            <span className="text-[10px] font-bold text-gray-500 uppercase tracking-wider">Other</span>
+                            <span className="text-[10px] font-bold text-gray-500 uppercase tracking-wider">
+                              Other Receipts
+                            </span>
+                          </div>
+                          <div
+                            className={`flex items-center gap-2 transition-opacity ${collectionsFilter === 'all' || collectionsFilter === 'other_collections' ? 'opacity-100' : 'opacity-30'}`}
+                          >
+                            <div className="w-3 h-3 rounded-full bg-[#06b6d4]"></div>
+                            <span className="text-[10px] font-bold text-gray-500 uppercase tracking-wider">
+                              Other Collections
+                            </span>
                           </div>
                         </div>
                       </CardContent>
@@ -3158,20 +3840,6 @@ export function BishopDashboard({
                               <p className="text-sm text-gray-400 mt-1">Breakdown of expenses across the diocese.</p>
                             </div>
                             <div className="flex items-center gap-3 flex-shrink-0 pt-1">
-                              <div className="flex bg-gray-100 p-1 rounded-lg">
-                                <button
-                                  onClick={() => setDisbursementsTimeframe('6m')}
-                                  className={`px-3 py-1 text-[10px] font-bold rounded-md transition-all ${disbursementsTimeframe === '6m' ? 'bg-white text-church-green shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}
-                                >
-                                  6M
-                                </button>
-                                <button
-                                  onClick={() => setDisbursementsTimeframe('12m')}
-                                  className={`px-3 py-1 text-[10px] font-bold rounded-md transition-all ${disbursementsTimeframe === '12m' ? 'bg-white text-church-green shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}
-                                >
-                                  12M
-                                </button>
-                              </div>
                               <select
                                 value={disbursementsFilter}
                                 onChange={(e) => setDisbursementsFilter(e.target.value as any)}
@@ -3185,7 +3853,13 @@ export function BishopDashboard({
                           </div>
                         </CardHeader>
                         <CardContent className="mt-4">
-                          <div className="h-[350px] flex items-center">
+                          {entityType === 'Parishes' && windowedTrendData.length === 0 && !isDescriptiveLoading && (
+                            <p className="text-sm text-gray-400 text-center py-8">
+                              No disbursements data available for the selected scope.
+                            </p>
+                          )}
+                          <div className="relative h-[350px] flex items-center">
+                            {renderChartLoadingOverlay()}
                             <div className="w-6 flex-shrink-0 flex items-center justify-center h-full">
                               <span className="text-[10px] font-bold text-gray-400 uppercase tracking-[0.2em] -rotate-90 whitespace-nowrap">
                                 Amount (Millions)
@@ -3202,7 +3876,7 @@ export function BishopDashboard({
                                 grid: { top: 20, right: 30, left: 55, bottom: 30 },
                                 xAxis: {
                                   type: 'category',
-                                  data: filteredDisbursementsData.map((d) => d.month),
+                                  data: windowedTrendData.map((d) => d.month),
                                   axisLabel: { color: '#6B7280', fontSize: 12 },
                                 },
                                 yAxis: {
@@ -3220,7 +3894,7 @@ export function BishopDashboard({
                                         {
                                           name: 'Parish Expenses',
                                           type: 'bar',
-                                          data: filteredDisbursementsData.map((d) => ({
+                                          data: windowedTrendData.map((d) => ({
                                             value: d.expenses_parish,
                                             itemStyle: { color: '#1a472a', borderRadius: [4, 4, 0, 0] },
                                           })),
@@ -3233,7 +3907,7 @@ export function BishopDashboard({
                                         {
                                           name: 'Pastoral Expenses',
                                           type: 'bar',
-                                          data: filteredDisbursementsData.map((d) => ({
+                                          data: windowedTrendData.map((d) => ({
                                             value: d.expenses_pastoral,
                                             itemStyle: { color: '#D4AF37', borderRadius: [4, 4, 0, 0] },
                                           })),
@@ -3278,7 +3952,13 @@ export function BishopDashboard({
                           <p className="text-sm text-gray-400 mt-1">Largest expense drivers year-to-date.</p>
                         </CardHeader>
                         <CardContent className="mt-4">
-                          <div className="h-[350px] flex items-center">
+                          {entityType === 'Parishes' && activeTopDisbursementCategories.length === 0 && !isDescriptiveLoading && (
+                            <p className="text-sm text-gray-400 text-center py-8">
+                              No disbursement category data available for the selected scope.
+                            </p>
+                          )}
+                          <div className="relative h-[350px] flex items-center">
+                            {renderChartLoadingOverlay()}
                             <div className="w-6 flex-shrink-0 flex items-center justify-center h-full">
                               <span className="text-[10px] font-bold text-gray-400 uppercase tracking-[0.2em] -rotate-90 whitespace-nowrap">
                                 Category
@@ -3306,13 +3986,13 @@ export function BishopDashboard({
                                 yAxis: {
                                   type: 'category',
                                   inverse: true,
-                                  data: topDisbursementCategories.map((d) => d.category),
+                                  data: activeTopDisbursementCategories.map((d) => d.category),
                                   axisLabel: { color: '#6B7280', fontSize: 10 },
                                 },
                                 series: [
                                   {
                                     type: 'bar',
-                                    data: topDisbursementCategories.map((d) => ({
+                                    data: activeTopDisbursementCategories.map((d) => ({
                                       value: d.amount,
                                       itemStyle: { color: '#1a472a', borderRadius: [0, 6, 6, 0] },
                                     })),
@@ -3610,7 +4290,13 @@ export function BishopDashboard({
                   </CardHeader>
                   <CardContent className="p-6 lg:p-10 space-y-12">
                     <div className="space-y-6">
-                      <div className="h-[320px] flex items-center">
+                      {entityType === 'Parishes' && dynamicSeasonalityData.length === 0 && !isDescriptiveLoading && (
+                        <p className="text-sm text-white/40 text-center py-8">
+                          No seasonal trend data available for the selected scope.
+                        </p>
+                      )}
+                      <div className="relative h-[320px] flex items-center">
+                        {renderDarkChartLoadingOverlay()}
                         <div className="w-10 flex-shrink-0 flex items-center justify-center h-full">
                           <span className="text-[10px] font-bold text-gray-500 uppercase tracking-[0.2em] -rotate-90 whitespace-nowrap">
                             Value
@@ -3628,7 +4314,7 @@ export function BishopDashboard({
                               grid: { top: 10, right: 10, left: 50, bottom: 30 },
                               xAxis: {
                                 type: 'category',
-                                data: dynamicSeasonalityData.map((d) => d.month),
+                                data: dynamicSeasonalityData.map((d: any) => d.month),
                                 axisLabel: { color: '#9CA3AF', fontSize: 10, fontWeight: 600 },
                                 axisLine: { lineStyle: { color: '#333' } },
                                 axisTick: { show: false },
@@ -3647,7 +4333,7 @@ export function BishopDashboard({
                               series: [
                                 {
                                   type: 'line',
-                                  data: dynamicSeasonalityData.map((d) => d.value),
+                                  data: dynamicSeasonalityData.map((d: any) => d.value),
                                   smooth: true,
                                   lineStyle: { color: '#D4AF37', width: 3 },
                                   itemStyle: { color: '#D4AF37' },
@@ -3710,33 +4396,29 @@ export function BishopDashboard({
                         </>
                       ) : (
                         <>
-                          <div className="bg-white/5 border border-white/10 rounded-2xl p-6 hover:bg-white/10 transition-all group">
-                            <p className="text-[10px] font-bold text-gold-500 tracking-wider uppercase mb-2 flex items-center gap-2">
-                              <span className="w-1.5 h-1.5 rounded-full bg-gold-500" />
-                              Highlight
+                          {parishSeasonalityHighlights.map((event: any, index: number) => {
+                            const pct = Number(event.vs_baseline_pct ?? 0);
+                            return (
+                              <div
+                                key={`${event.event_name}-${index}`}
+                                className="bg-white/5 border border-white/10 rounded-2xl p-6 hover:bg-white/10 transition-all group"
+                              >
+                                <p className="text-[10px] font-bold text-gold-500 tracking-wider uppercase mb-2 flex items-center gap-2">
+                                  <span className="w-1.5 h-1.5 rounded-full bg-gold-500" />
+                                  Highlight
+                                </p>
+                                <p className="font-bold text-white text-lg group-hover:text-gold-400 transition-colors">
+                                  {event.event_name} ({pct >= 0 ? '+' : ''}
+                                  {pct.toFixed(0)}%)
+                                </p>
+                              </div>
+                            );
+                          })}
+                          {parishSeasonalityHighlights.length === 0 && !isDescriptiveLoading && (
+                            <p className="text-sm text-white/40 col-span-full">
+                              No seasonal event data available for this scope yet.
                             </p>
-                            <p className="font-bold text-white text-lg group-hover:text-gold-400 transition-colors">
-                              Christmas Uplift (+42%)
-                            </p>
-                          </div>
-                          <div className="bg-white/5 border border-white/10 rounded-2xl p-6 hover:bg-white/10 transition-all group">
-                            <p className="text-[10px] font-bold text-gold-500 tracking-wider uppercase mb-2 flex items-center gap-2">
-                              <span className="w-1.5 h-1.5 rounded-full bg-gold-500" />
-                              Highlight
-                            </p>
-                            <p className="font-bold text-white text-lg group-hover:text-gold-400 transition-colors">
-                              Lent/Holy Week (+12%)
-                            </p>
-                          </div>
-                          <div className="bg-white/5 border border-white/10 rounded-2xl p-6 hover:bg-white/10 transition-all group">
-                            <p className="text-[10px] font-bold text-gold-500 tracking-wider uppercase mb-2 flex items-center gap-2">
-                              <span className="w-1.5 h-1.5 rounded-full bg-gold-500" />
-                              Highlight
-                            </p>
-                            <p className="font-bold text-white text-lg group-hover:text-gold-400 transition-colors">
-                              Patronal Fiestas (+24%)
-                            </p>
-                          </div>
+                          )}
                         </>
                       )}
                     </div>
@@ -3755,15 +4437,59 @@ export function BishopDashboard({
                       'Class D': '#F87171',
                       'Class E': '#A78BFA',
                     };
-                    const classCounts: Record<string, number> = {};
-                    filteredTopTierData.forEach((e) => {
-                      const c = e.class || 'Other';
-                      classCounts[c] = (classCounts[c] || 0) + 1;
-                    });
-                    const pieData = Object.entries(classCounts)
-                      .sort((a, b) => a[0].localeCompare(b[0]))
-                      .map(([name, value]) => ({ name, value, color: CLASS_COLORS[name] || '#6B7280' }));
-                    const total = filteredTopTierData.length;
+                    const CLUSTER_COLORS: Record<string, string> = {
+                      'High-Performing': '#D4AF37',
+                      Growing: '#10B981',
+                      Stable: '#60A5FA',
+                      'At-Risk': '#F87171',
+                    };
+                    const realCluster = apiParishCluster;
+                    let pieData: { name: string; value: number; color: string }[];
+                    let listRows: { name: string; subtitle: string; label: string; color: string }[];
+                    let total: number;
+                    let clusterKpis: { purity: number; coverage: number } | null = null;
+
+                    if (realCluster) {
+                      pieData = Object.entries(CLUSTER_COLORS)
+                        .map(([name, color]) => ({
+                          name,
+                          value: (realCluster.cluster_counts?.[name] as number) ?? 0,
+                          color,
+                        }))
+                        .filter((d) => d.value > 0);
+                      const ranked = [...realCluster.parishes].sort(
+                        (a: any, b: any) => (b.avg_monthly_collection ?? 0) - (a.avg_monthly_collection ?? 0),
+                      );
+                      listRows = ranked.map((p: any) => ({
+                        name: p.institution_name || p.institution_id,
+                        subtitle: `${formatCurrency(p.avg_monthly_collection ?? 0)}/mo avg • ${
+                          (p.growth_rate ?? 0) >= 0 ? '+' : ''
+                        }${Math.round((p.growth_rate ?? 0) * 100)}% growth`,
+                        label: p.cluster_label,
+                        color: CLUSTER_COLORS[p.cluster_label] || '#6B7280',
+                      }));
+                      total = realCluster.parishes.length;
+                      clusterKpis = {
+                        purity: Math.round((realCluster.kpis?.cluster_purity ?? 0) * 100),
+                        coverage: Math.round((realCluster.kpis?.rule_coverage_rate ?? 0) * 100),
+                      };
+                    } else {
+                      const classCounts: Record<string, number> = {};
+                      filteredTopTierData.forEach((e) => {
+                        const c = e.class || 'Other';
+                        classCounts[c] = (classCounts[c] || 0) + 1;
+                      });
+                      pieData = Object.entries(classCounts)
+                        .sort((a, b) => a[0].localeCompare(b[0]))
+                        .map(([name, value]) => ({ name, value, color: CLASS_COLORS[name] || '#6B7280' }));
+                      listRows = filteredTopTierData.map((entity) => ({
+                        name: entity.name,
+                        subtitle: `${entity.location}${entity.vicariate ? ` • ${stripVicariatePrefix(entity.vicariate)}` : ''}`,
+                        label: entity.class || 'Other',
+                        color: CLASS_COLORS[entity.class || ''] || '#6B7280',
+                      }));
+                      total = filteredTopTierData.length;
+                    }
 
                     return (
                       <Card className="bg-[#1A1A1A] text-white border-none shadow-sm relative overflow-hidden rounded-xl flex flex-col">
@@ -3780,42 +4506,47 @@ export function BishopDashboard({
                               </p>
                               <h3 className="text-xl font-bold text-white">Parish Clustering</h3>
                               <p className="text-xs text-gray-500 mt-2 leading-relaxed max-w-sm">
-                                Parishes are grouped by collection volume and pastoral capacity. Class A parishes are
-                                high-performing anchors; lower classes represent developing communities requiring
-                                targeted diocesan support.
+                                {realCluster
+                                  ? 'Parishes are segmented by rule-based analysis of their actual financial history — average collections, growth trend, volatility, and deficit frequency — into four performance clusters.'
+                                  : 'Parishes are grouped by collection volume and pastoral capacity. Class A parishes are high-performing anchors; lower classes represent developing communities requiring targeted diocesan support.'}
                               </p>
+                              {clusterKpis && (
+                                <div className="flex gap-4 mt-3">
+                                  <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">
+                                    Cluster Purity: <span className="text-[#D4AF37]">{clusterKpis.purity}%</span>
+                                  </span>
+                                  <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">
+                                    Rule Coverage: <span className="text-[#D4AF37]">{clusterKpis.coverage}%</span>
+                                  </span>
+                                </div>
+                              )}
                             </div>
 
                             <div className="flex-1 overflow-y-auto pr-1 space-y-2 scrollbar-dark max-h-[380px]">
-                              {filteredTopTierData.map((entity, i) => {
-                                const cls = entity.class || 'Other';
-                                const dot = CLASS_COLORS[cls] || '#6B7280';
-                                return (
-                                  <div
-                                    key={i}
-                                    className="flex items-center justify-between bg-white/5 hover:bg-white/10 transition-colors p-3 rounded-lg border border-white/5"
-                                  >
-                                    <div className="flex items-center gap-3">
-                                      <div className="w-8 h-8 rounded-full border border-[#D4AF37]/40 text-[#D4AF37] flex items-center justify-center font-bold text-xs shrink-0">
-                                        {i + 1}
-                                      </div>
-                                      <div>
-                                        <p className="font-bold text-white text-sm leading-tight">{entity.name}</p>
-                                        <p className="text-[10px] font-bold text-gray-500 tracking-wider uppercase mt-0.5">
-                                          {entity.location}
-                                          {entity.vicariate && ` • ${stripVicariatePrefix(entity.vicariate)}`}
-                                        </p>
-                                      </div>
+                              {listRows.map((row, i) => (
+                                <div
+                                  key={i}
+                                  className="flex items-center justify-between bg-white/5 hover:bg-white/10 transition-colors p-3 rounded-lg border border-white/5"
+                                >
+                                  <div className="flex items-center gap-3">
+                                    <div className="w-8 h-8 rounded-full border border-[#D4AF37]/40 text-[#D4AF37] flex items-center justify-center font-bold text-xs shrink-0">
+                                      {i + 1}
                                     </div>
-                                    <div className="flex items-center gap-2 shrink-0">
-                                      <div className="w-2 h-2 rounded-full" style={{ backgroundColor: dot }} />
-                                      <span className="font-bold text-sm" style={{ color: dot }}>
-                                        {cls}
-                                      </span>
+                                    <div>
+                                      <p className="font-bold text-white text-sm leading-tight">{row.name}</p>
+                                      <p className="text-[10px] font-bold text-gray-500 tracking-wider uppercase mt-0.5">
+                                        {row.subtitle}
+                                      </p>
                                     </div>
                                   </div>
-                                );
-                              })}
+                                  <div className="flex items-center gap-2 shrink-0">
+                                    <div className="w-2 h-2 rounded-full" style={{ backgroundColor: row.color }} />
+                                    <span className="font-bold text-sm" style={{ color: row.color }}>
+                                      {row.label}
+                                    </span>
+                                  </div>
+                                </div>
+                              ))}
                             </div>
                           </div>
 
@@ -3823,10 +4554,10 @@ export function BishopDashboard({
                           <div className="lg:col-span-5 flex flex-col items-center justify-center px-6 py-6 gap-5">
                             <div className="text-center">
                               <p className="text-[10px] font-black text-[#D4AF37]/70 uppercase tracking-[0.3em] mb-0.5">
-                                Class Distribution
+                                {realCluster ? 'Cluster Distribution' : 'Class Distribution'}
                               </p>
                               <p className="text-xs text-gray-500">
-                                {total} parishes across {pieData.length} classes
+                                {total} parishes across {pieData.length} {realCluster ? 'clusters' : 'classes'}
                               </p>
                             </div>
 
@@ -3900,6 +4631,41 @@ export function BishopDashboard({
                   })()}
 
                 {/* Row 6: Geospatial Analysis — diocese-wide view only */}
+                {entityType === 'Parishes' && (
+                  <Card className="border-none shadow-sm">
+                    <CardHeader>
+                      <h3 className="text-2xl font-bold text-church-green uppercase tracking-wide">
+                        Project Funding Progress
+                      </h3>
+                      <p className="text-sm text-gray-400 mt-1">
+                        Completion and fundraising status for parish projects.
+                      </p>
+                    </CardHeader>
+                    <CardContent className="space-y-5">
+                      {parishProjectMetrics.map((metric) => {
+                        const pct = Math.max(0, Math.min(100, Number(metric.value || 0)));
+                        return (
+                          <div key={metric.label}>
+                            <div className="flex items-center justify-between gap-4 mb-2">
+                              <div>
+                                <p className="text-sm font-bold text-church-green">{metric.label}</p>
+                                <p className="text-xs text-gray-400 mt-0.5">{metric.detail}</p>
+                              </div>
+                              <span className="text-sm font-black text-gold-600">{pct.toFixed(0)}%</span>
+                            </div>
+                            <div className="h-2.5 rounded-full bg-gray-100 overflow-hidden">
+                              <div
+                                className="h-full rounded-full bg-church-green transition-all duration-500"
+                                style={{ width: `${pct}%` }}
+                              />
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </CardContent>
+                  </Card>
+                )}
+
                 {entityType === 'Parishes' && !lockEntityFilter && filterMode !== 'per-entity' && (
                   <Card className="border-none shadow-sm">
                     <CardHeader>

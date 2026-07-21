@@ -25,7 +25,33 @@ def get_pool() -> ConnectionPool:
     if _pool is None:
         if not ANALYTICS_DB_URL:
             raise RuntimeError("ANALYTICS_DB_URL must be set in .env")
-        _pool = ConnectionPool(ANALYTICS_DB_URL, min_size=0, max_size=4, open=True)
+        # min_size=0 meant every request after an idle gap paid for a fresh
+        # TCP/TLS handshake to RDS with no connect timeout — under real
+        # traffic (the frontend fires financial-trend + seasonality
+        # concurrently on every filter change), several of these cold opens
+        # would stack up and, if any one of them stalled, block the entire
+        # single-worker service from accepting *any* request for 30-90s.
+        # min_size keeps warm connections ready; connect_timeout caps how
+        # long a bad connection attempt can block the pool; RDS allows 81
+        # connections total (16 in use at last check), so max_size=8 leaves
+        # plenty of headroom for other services sharing the instance.
+        # check + max_idle: long-running callers (e.g. weather_collector.py,
+        # which spends 30-40+ min fetching external APIs before ever
+        # touching this pool) would get handed a connection RDS had already
+        # silently closed after sitting idle — "server closed the connection
+        # unexpectedly" on the very first query. check validates/repairs a
+        # connection before handing it out; max_idle recycles connections
+        # proactively instead of waiting for them to go stale.
+        _pool = ConnectionPool(
+            ANALYTICS_DB_URL,
+            min_size=2,
+            max_size=8,
+            timeout=30,
+            max_idle=120,
+            kwargs={"connect_timeout": 10},
+            check=ConnectionPool.check_connection,
+            open=True,
+        )
     return _pool
 
 

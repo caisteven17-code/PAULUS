@@ -66,6 +66,7 @@ def _score_from_records(
     expense_cols: list[str],
     _consumable_col: str,
     entity_type: str,
+    timeframe: str | None = None,
 ) -> HealthScoreResponse | None:
     if df.empty:
         return None
@@ -74,6 +75,18 @@ def _score_from_records(
     df = df.copy()
     df["month_idx"] = df["month"].map({m: i for i, m in enumerate(MONTH_ORDER)})
     df = df.sort_values(["year", "month_idx"]).reset_index(drop=True)
+
+    # Timeframe narrows to the trailing N months *within* whatever the query
+    # already scoped (e.g. a single year, if one was requested) — same
+    # 6m/12m/all convention used by the descriptive financial-trend endpoint.
+    window = {"6m": 6, "12m": 12}.get(timeframe or "")
+    if window:
+        df = df.tail(window).reset_index(drop=True)
+
+    # Fewer than 2 points means there's no month-over-month growth to
+    # measure at all — an honest "insufficient," not a noisy real number.
+    if len(df) < 2:
+        return None
 
     for col in receipt_cols + expense_cols:
         if col not in df.columns:
@@ -132,6 +145,8 @@ def _score_from_records(
         percentage_change=round(growth_rate * 100, 2),
         analysis=analysis,
         recommendations=recs,
+        period_start_year=int(df["year"].min()),
+        period_end_year=int(df["year"].max()),
         timestamp=datetime.now(timezone.utc).isoformat(),
     )
 
@@ -146,6 +161,7 @@ def _default_score(entity_id: str, entity_type: str) -> HealthScoreResponse:
         percentage_change=2.4,
         analysis="Insufficient financial records to compute a score. Showing default estimate.",
         recommendations=["Submit monthly financial records to enable accurate scoring."],
+        data_sufficient=False,
         timestamp=datetime.now(timezone.utc).isoformat(),
     )
 
@@ -267,6 +283,8 @@ async def get_health_score(
     institution_id: str,
     entity_type: str,
     entity_class: Optional[str] = None,
+    year: Optional[int] = None,
+    timeframe: Optional[str] = None,
 ) -> HealthScoreResponse:
     if entity_type not in _SCHEMA_MAP:
         raise ValueError(f"Unknown entity type: {entity_type}")
@@ -282,26 +300,32 @@ async def get_health_score(
             select_cols.append(c)
             seen.add(c)
 
-    result = (
+    query = (
         get_table(schema, "financial_records")
         .select(", ".join(select_cols))
         .eq("institution_id", institution_id)
         .eq("is_current_version", True)
         .is_("deleted_at", "null")
-        .order("year")
-        .execute()
     )
+    if year:
+        query = query.eq("year", year)
+    result = query.order("year").execute()
 
     if not result.data:
         return _default_score(institution_id, entity_type)
 
     df = pd.DataFrame(result.data)
-    score = _score_from_records(df, receipt_cols, expense_cols, consumable_col, entity_type)
+    score = _score_from_records(df, receipt_cols, expense_cols, consumable_col, entity_type, timeframe)
     if score is None:
         return _default_score(institution_id, entity_type)
 
     score.entity_class = entity_class
-    _write_snapshot(institution_id, entity_type, score)
+    # Only the unscoped ("full history") request represents this
+    # institution's actual current standing — a year/timeframe-narrowed
+    # score is a what-if slice for the dashboard, not a new data point for
+    # the historical snapshot trend.
+    if year is None and (timeframe is None or timeframe == "all"):
+        _write_snapshot(institution_id, entity_type, score)
     return score
 
 

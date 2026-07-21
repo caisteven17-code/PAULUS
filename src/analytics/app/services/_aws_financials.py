@@ -1,0 +1,99 @@
+"""AWS gold-layer readers shared by the diagnostic, predictive, and
+prescriptive services.
+
+Every function returns None when the warehouse is disabled, unreachable, or has
+no rows for the request — callers then fall back to their existing Supabase
+path. Returned DataFrames are date-sorted and always carry `date`,
+`year`, `month_num`, `month` (Jan-style name), `total_receipts`, and
+`total_expenses`, so downstream statistical code is identical for both sources.
+"""
+
+from __future__ import annotations
+
+import logging
+
+import pandas as pd
+
+from app.services import analytics_db
+from app.services.data_definitions import MONTH_ORDER
+
+logger = logging.getLogger(__name__)
+
+# Warehouse expense-breakdown columns keyed by the Supabase financial_records
+# column names the services (and the frontend) already use as category keys.
+EXPENSE_CATEGORY_COLS = {
+    "salaries_wages_benefits": "expenses_parish_salaries_wages_benefits",
+    "govt_contributions": "expenses_parish_government_contributions",
+    "utilities": "expenses_parish_utilities",
+    "communications": "expenses_parish_communications",
+    "other_rectory_expenses": "expenses_parish_other_rectory",
+    "mass_stipend": "expenses_pastoral_mass_stipend",
+}
+
+_CATEGORY_SELECTS = ",\n           ".join(
+    f'SUM(COALESCE(f.{src}, 0))::float8 AS "{alias}"' for alias, src in EXPENSE_CATEGORY_COLS.items()
+)
+
+_ONE_PARISH_SQL = f"""
+    SELECT f.date_key,
+           SUM(COALESCE(f.total_collections, 0))::float8 AS total_receipts,
+           SUM(COALESCE(f.total_expenses, 0))::float8 AS total_expenses,
+           {_CATEGORY_SELECTS}
+    FROM parish_analytics.fact_parish_monthly_financials f
+    JOIN parish_analytics.dim_parishes dp ON dp.parish_key = f.parish_key
+    JOIN shared_analytics.dim_institutions di ON di.institution_key = dp.institution_key
+    WHERE di.institution_id = %s
+    GROUP BY f.date_key
+    ORDER BY f.date_key
+"""
+
+_ALL_PARISHES_SQL = """
+    SELECT di.institution_id,
+           f.date_key,
+           SUM(COALESCE(f.total_collections, 0))::float8 AS total_receipts,
+           SUM(COALESCE(f.total_expenses, 0))::float8 AS total_expenses
+    FROM parish_analytics.fact_parish_monthly_financials f
+    JOIN parish_analytics.dim_parishes dp ON dp.parish_key = f.parish_key
+    JOIN shared_analytics.dim_institutions di ON di.institution_key = dp.institution_key
+    GROUP BY di.institution_id, f.date_key
+    ORDER BY di.institution_id, f.date_key
+"""
+
+
+def _finalize(df: pd.DataFrame) -> pd.DataFrame:
+    df["date"] = pd.to_datetime(df["date_key"].astype(str), format="%Y%m")
+    df["year"] = df["date"].dt.year
+    df["month_num"] = df["date"].dt.month
+    df["month"] = df["month_num"].map(lambda m: MONTH_ORDER[m - 1])
+    return df.sort_values("date").reset_index(drop=True)
+
+
+def parish_monthly_df(institution_id: str) -> pd.DataFrame | None:
+    """Monthly series for one parish, including expense category columns
+    (named after their Supabase counterparts). None → caller falls back."""
+    if not analytics_db.enabled():
+        return None
+    try:
+        rows = analytics_db.fetch_query(_ONE_PARISH_SQL, [institution_id])
+    except Exception:
+        logger.exception("AWS monthly series read failed for %s; falling back to Supabase", institution_id)
+        return None
+    if not rows:
+        return None
+    return _finalize(pd.DataFrame(rows))
+
+
+def all_parish_monthly_dfs() -> list[tuple[str, pd.DataFrame]] | None:
+    """(institution_id, monthly df) for every parish in the warehouse, one
+    round trip. None → caller falls back to per-parish Supabase reads."""
+    if not analytics_db.enabled():
+        return None
+    try:
+        rows = analytics_db.fetch_query(_ALL_PARISHES_SQL)
+    except Exception:
+        logger.exception("AWS all-parish series read failed; falling back to Supabase")
+        return None
+    if not rows:
+        return None
+    df = pd.DataFrame(rows)
+    return [(iid, _finalize(g.drop(columns=["institution_id"]))) for iid, g in df.groupby("institution_id")]

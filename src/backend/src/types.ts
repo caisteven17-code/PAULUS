@@ -148,6 +148,13 @@ export interface FinancialHealthScore {
   percentageChange: number;
   analysis?: string;
   recommendations?: string[];
+  // Earliest/latest year of financial records actually used to compute this
+  // score. Undefined when a default (no-data) score was returned.
+  periodStartYear?: number;
+  periodEndYear?: number;
+  // False when there weren't enough records (for the whole entity, or for
+  // the requested year/timeframe window) to compute a real score.
+  dataSufficient?: boolean;
   timestamp: any;
 }
 

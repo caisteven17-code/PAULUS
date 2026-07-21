@@ -700,7 +700,7 @@ export class EntityService {
       const { data: institutions } = await this.supabaseService.admin
         .schema('diocese')
         .from('institutions')
-        .select('id, name, vicariate, class, institution_code')
+        .select('id, name, vicariate, class, district, institution_code')
         .eq('institution_type', 'parish')
         .eq('is_active', true)
         .is('deleted_at', null)
@@ -765,6 +765,11 @@ export class EntityService {
             location: inst.vicariate ?? '',
             class: inst.class ? `Class ${inst.class}` : '',
             classRaw: inst.class ?? '',
+            // Real per-institution assignment — deliberately NOT derived from
+            // vicariate (the real data shows a single vicariate can span
+            // multiple districts, or none), and most parishes don't have one
+            // recorded yet. 'Unassigned' is honest, not a fabricated guess.
+            district: inst.district ?? 'Unassigned',
             healthScore,
             risk,
             currentBalance,

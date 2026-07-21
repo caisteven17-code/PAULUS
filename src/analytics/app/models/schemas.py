@@ -23,6 +23,15 @@ class HealthScoreResponse(BaseModel):
     percentage_change: float
     analysis: str
     recommendations: List[str]
+    # Earliest/latest year actually used to compute this score — None when a
+    # default (no-data) score was returned. Lets the UI show the real window
+    # ("2021-2025") instead of a vague "all-time" label.
+    period_start_year: Optional[int] = None
+    period_end_year: Optional[int] = None
+    # False when there weren't enough records for the requested institution
+    # (or requested year/timeframe window) to compute a real score — the
+    # numeric fields are a placeholder, not a measurement, in that case.
+    data_sufficient: bool = True
     timestamp: str
 
 

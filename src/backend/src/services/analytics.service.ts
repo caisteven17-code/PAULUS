@@ -77,10 +77,15 @@ export class AnalyticsService {
     entityId: string,
     entityType: 'parish' | 'seminary' | 'school',
     entityClass?: EntityClass,
+    year?: number,
+    timeframe?: '6m' | '12m' | 'all',
   ): Promise<FinancialHealthScore> {
-    const python = await this.callPython(
-      `/analytics/health/${entityType}/${entityId}${entityClass ? `?entity_class=${entityClass}` : ''}`,
-    );
+    const params = new URLSearchParams();
+    if (entityClass) params.set('entity_class', entityClass);
+    if (year) params.set('year', String(year));
+    if (timeframe) params.set('timeframe', timeframe);
+    const query = params.toString();
+    const python = await this.callPython(`/analytics/health/${entityType}/${entityId}${query ? `?${query}` : ''}`);
     if (python) {
       return {
         entityId: python.entity_id,
@@ -92,12 +97,21 @@ export class AnalyticsService {
         percentageChange: python.percentage_change,
         analysis: python.analysis,
         recommendations: python.recommendations,
+        periodStartYear: python.period_start_year,
+        periodEndYear: python.period_end_year,
+        dataSufficient: python.data_sufficient,
         timestamp: python.timestamp,
       } as FinancialHealthScore;
     }
 
-    const records = await this.financialService.getRecords(entityId, entityType, entityClass);
-    if (records.length === 0) return this.getDefaultHealthScore(entityId, entityType);
+    let records = await this.financialService.getRecords(entityId, entityType, entityClass);
+    if (year) records = records.filter((r) => r.year === year);
+    const window = timeframe === '6m' ? 6 : timeframe === '12m' ? 12 : undefined;
+    if (window) records = records.slice(-window);
+    // Fewer than 2 points means there's no month-over-month growth to
+    // measure — an honest "insufficient," not a noisy real number, same
+    // threshold the Python path uses.
+    if (records.length < 2) return this.getDefaultHealthScore(entityId, entityType);
 
     const totalCollections = records.reduce((s, r) => s + r.collections, 0);
     const totalDisbursements = records.reduce((s, r) => s + r.disbursements, 0);
@@ -157,6 +171,15 @@ export class AnalyticsService {
       percentageChange: growthRate * 100,
       analysis,
       recommendations,
+      periodStartYear: records.reduce<number | undefined>(
+        (min, r) => (r.year != null && (min == null || r.year < min) ? r.year : min),
+        undefined,
+      ),
+      periodEndYear: records.reduce<number | undefined>(
+        (max, r) => (r.year != null && (max == null || r.year > max) ? r.year : max),
+        undefined,
+      ),
+      dataSufficient: true,
       timestamp: new Date().toISOString(),
     };
   }
@@ -169,6 +192,7 @@ export class AnalyticsService {
       dimensions: { liquidity: 75, sustainability: 68, efficiency: 82, stability: 65, growth: 55 },
       trend: 'stable',
       percentageChange: 2.4,
+      dataSufficient: false,
       timestamp: new Date().toISOString(),
     };
   }

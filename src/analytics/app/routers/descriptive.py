@@ -19,9 +19,25 @@ EntityType = Literal["parish", "school", "seminary"]
 
 
 @router.get("/financial-trend/{entity_type}/{institution_id}")
-async def financial_trend(entity_type: EntityType, institution_id: str):
+async def financial_trend(
+    entity_type: EntityType,
+    institution_id: str,
+    year: int | None = None,
+    timeframe: Literal["6m", "12m", "all"] | None = None,
+    vicariates: str | None = None,
+    institution_ids: str | None = None,
+):
     try:
-        return await svc_ft.get_financial_trend(institution_id, entity_type)
+        vicariate_list = [v for v in vicariates.split(",") if v] if vicariates else None
+        institution_id_list = [i for i in institution_ids.split(",") if i] if institution_ids else None
+        return await svc_ft.get_financial_trend(
+            institution_id,
+            entity_type,
+            year=year,
+            timeframe=timeframe,
+            vicariates=vicariate_list,
+            institution_ids=institution_id_list,
+        )
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc))
     except Exception as exc:
@@ -45,9 +61,14 @@ async def parish_cluster():
 
 
 @router.get("/seasonality/{entity_type}/{institution_id}")
-async def seasonality_trend(entity_type: EntityType, institution_id: str):
+async def seasonality_trend(
+    entity_type: EntityType,
+    institution_id: str,
+    year: int | None = None,
+    timeframe: Literal["6m", "12m", "all"] | None = None,
+):
     try:
-        return await svc_st.get_seasonality_trend(institution_id, entity_type)
+        return await svc_st.get_seasonality_trend(institution_id, entity_type, year=year, timeframe=timeframe)
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc))
     except Exception as exc:

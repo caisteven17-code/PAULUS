@@ -15,9 +15,11 @@ async def compute_health_score(
     entity_type: EntityType,
     institution_id: str,
     entity_class: Optional[str] = Query(default=None),
+    year: Optional[int] = Query(default=None),
+    timeframe: Optional[Literal["6m", "12m", "all"]] = Query(default=None),
 ):
     try:
-        return await health_scoring.get_health_score(institution_id, entity_type, entity_class)
+        return await health_scoring.get_health_score(institution_id, entity_type, entity_class, year, timeframe)
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc))
     except Exception as exc:

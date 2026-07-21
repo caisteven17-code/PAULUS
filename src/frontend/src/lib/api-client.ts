@@ -16,14 +16,21 @@ import type {
   ProjectExpense,
 } from '../types';
 import { auth } from '../firebase';
+import { supabaseBrowser } from './supabase';
 
 // Get JWT token from session or localStorage demo session
 async function getAuthToken(): Promise<string | null> {
   try {
     const sessionUser = auth.currentUser;
     if (sessionUser?.id || sessionUser?.uid) {
-      // Try to get the actual JWT token from Supabase
-      const { data } = (await (window as any).supabase?.auth?.getSession()) || {};
+      // Try to get the actual JWT token from Supabase. Must use the real
+      // imported client — `window.supabase` is never set anywhere in this
+      // app, so reading it here always resolved to undefined, which meant
+      // every real, fully-authenticated Supabase session still silently
+      // fell through to the "Bearer demo-*" token below. The gateway
+      // rejects demo-* tokens outright for descriptive analytics, so real
+      // users saw the exact same blank charts as an actual demo session.
+      const { data } = await supabaseBrowser.auth.getSession();
       if (data?.session?.access_token) {
         return `Bearer ${data.session.access_token}`;
       }
@@ -179,13 +186,22 @@ function createPoller(
   intervalMs = 30000, // 30 seconds (reduces request frequency & terminal noise in dev)
 ): () => void {
   let active = true;
+  let inFlight = false;
 
   const tick = async () => {
-    if (!active) return;
+    if (!active || inFlight) return;
+    // setInterval fires on a strict wall-clock schedule regardless of
+    // whether the previous fetch finished — without this guard, a fetcher
+    // slower than intervalMs (analytics calls can take 10s+) causes
+    // requests to pile up indefinitely the longer the page stays mounted,
+    // each new tick adding to the backlog instead of waiting its turn.
+    inFlight = true;
     try {
       callback(await fetcher());
     } catch {
       /* ignore */
+    } finally {
+      inFlight = false;
     }
   };
 
@@ -263,16 +279,27 @@ export const apiClient = {
     entityId: string,
     entityType: 'parish' | 'seminary' | 'school',
     entityClass?: EntityClass,
+    year?: number,
+    timeframe?: '6m' | '12m' | 'all',
   ): Promise<FinancialHealthScore> {
-    return get('/api/analytics/health', { entityId, entityType, entityClass });
+    return get('/api/analytics/health', {
+      entityId,
+      entityType,
+      entityClass,
+      year: year ? String(year) : undefined,
+      timeframe,
+    });
   },
 
   // Batch variant — one request scores every entity; use this from dashboards
-  // instead of firing one request per institution.
+  // instead of firing one request per institution. year/timeframe are a
+  // single global selection applied to every entity in the batch.
   async calculateHealthScores(
     entities: { entityId: string; entityType: 'parish' | 'seminary' | 'school'; entityClass?: EntityClass }[],
+    year?: number,
+    timeframe?: '6m' | '12m' | 'all',
   ): Promise<FinancialHealthScore[]> {
-    return post('/api/analytics/health', { entities });
+    return post('/api/analytics/health', { entities, year, timeframe });
   },
 
   async getDiagnostic(entityId: string, month: string): Promise<DiagnosticResult> {
@@ -282,16 +309,37 @@ export const apiClient = {
   // ----------------------------------------------------------------
   // Analytics — descriptive
   // ----------------------------------------------------------------
-  getFinancialTrend: (entityType: string, institutionId: string) =>
-    get(`/api/analytics/descriptive/financial-trend/${entityType}/${institutionId}`),
+  getFinancialTrend: (
+    entityType: string,
+    institutionId: string,
+    params?: {
+      year?: number;
+      timeframe?: '6m' | '12m' | 'all';
+      vicariates?: string[];
+      institutionIds?: string[];
+    },
+  ) =>
+    get(`/api/analytics/descriptive/financial-trend/${entityType}/${institutionId}`, {
+      year: params?.year ? String(params.year) : undefined,
+      timeframe: params?.timeframe,
+      vicariates: params?.vicariates?.length ? params.vicariates.join(',') : undefined,
+      institution_ids: params?.institutionIds?.length ? params.institutionIds.join(',') : undefined,
+    }),
 
   getPastoralAssignment: (institutionId: string) =>
     get(`/api/analytics/descriptive/pastoral-assignment/${institutionId}`),
 
   getParishCluster: () => get('/api/analytics/descriptive/parish-cluster'),
 
-  getSeasonalityTrend: (entityType: string, institutionId: string) =>
-    get(`/api/analytics/descriptive/seasonality/${entityType}/${institutionId}`),
+  getSeasonalityTrend: (
+    entityType: string,
+    institutionId: string,
+    params?: { year?: number; timeframe?: '6m' | '12m' | 'all' },
+  ) =>
+    get(`/api/analytics/descriptive/seasonality/${entityType}/${institutionId}`, {
+      year: params?.year ? String(params.year) : undefined,
+      timeframe: params?.timeframe,
+    }),
 
   getProjectsDescriptive: (institutionId: string) => get(`/api/analytics/descriptive/projects/${institutionId}`),
 
