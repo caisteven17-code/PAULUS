@@ -111,7 +111,11 @@ BEGIN
 
   SELECT count(*) INTO v_move_count FROM _proposed_priest_moves;
 
-  IF EXISTS (SELECT 1 FROM _proposed_priest_moves WHERE priest_id IS NULL) THEN
+  IF EXISTS (
+    SELECT 1
+    FROM _proposed_priest_moves proposed
+    WHERE proposed.priest_id IS NULL
+  ) THEN
     RAISE EXCEPTION 'Select a priest for every movement.';
   END IF;
   IF (SELECT count(DISTINCT proposed.priest_id) FROM _proposed_priest_moves proposed) <> v_move_count THEN

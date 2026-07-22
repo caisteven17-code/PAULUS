@@ -357,6 +357,9 @@ export class AuthController {
       });
       return res.status(HttpStatus.OK).json(user);
     } catch (err: any) {
+      if (err?.message === 'ACTIVE_PARISH_ASSIGNMENT') {
+        return res.status(HttpStatus.CONFLICT).json({ code: 'ACTIVE_PARISH_ASSIGNMENT', error: 'Resolve this priest’s active parish assignment before archiving the account.' });
+      }
       return res.status(HttpStatus.BAD_REQUEST).json({ error: err.message });
     }
   }

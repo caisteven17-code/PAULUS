@@ -799,24 +799,25 @@ export function Announcements() {
   const EmptyIcon = TAB_META[tab].icon;
 
   return (
-    <div className="min-h-screen bg-[#f5f5f5] pt-8 pb-20 px-4 sm:px-6 lg:px-8">
+    <div className="min-h-screen bg-[#FDFCFB] pb-20">
+      <div className="relative border-b border-gold-500/30 bg-[radial-gradient(circle_at_10%_0%,rgba(225,183,48,0.24),transparent_32%),linear-gradient(135deg,#090909_0%,#030711_56%,#000000_100%)] px-4 pb-16 pt-8 text-white sm:px-6 lg:px-8">
       <div className="mx-auto w-full max-w-7xl">
 
         {/* ── Masthead ── */}
-        <div className="relative mb-6 overflow-hidden rounded-3xl border border-black/10 bg-slate-950 text-white shadow-[0_18px_48px_rgba(15,23,42,0.12)]">
+        <div className="relative mb-6 overflow-hidden text-white">
           <div className="absolute inset-x-0 top-0 h-[3px] bg-gold-500" />
-          <div className="flex flex-col gap-4 p-6 md:flex-row md:items-end md:justify-between md:px-8 md:py-7">
+          <div className="flex flex-col gap-8 py-4 md:flex-row md:items-end md:justify-between">
             <div className="min-w-0">
               <div className="flex items-center gap-3">
                 <Bell className="h-4 w-4 text-gold-400" />
                 <p className="text-[10px] font-black uppercase tracking-[0.3em] text-gold-400">
-                  Official Bulletin · Chancellor&apos;s Office
+                  Official Bulletin
                 </p>
               </div>
-              <h1 className="mt-3 font-serif text-3xl font-bold leading-none tracking-normal text-white md:text-4xl">
-                Chancellor&apos;s Board
+              <h1 className="mt-4 max-w-4xl font-serif text-5xl font-bold leading-[0.95] tracking-normal text-white md:text-7xl">
+                Announcement <span className="text-gold-400 italic">Board</span>
               </h1>
-              <p className="mt-3 max-w-2xl text-sm font-medium leading-relaxed text-white/50">
+              <p className="mt-5 max-w-2xl text-base font-medium leading-relaxed text-white/62">
                 Central posting space for diocesan updates, directives, financial notices, and event reminders.
               </p>
               {canManage && (
@@ -828,33 +829,33 @@ export function Announcements() {
                     setFeedMode('general');
                     setShowForm(false);
                   }}
-                  className={`mt-5 inline-flex h-11 items-center justify-center gap-2 rounded-2xl px-5 text-[10px] font-black uppercase tracking-[0.18em] transition-all ${
-                    isManagementMode
-                      ? 'border border-white/15 bg-white/10 text-white hover:bg-white/15'
-                      : 'bg-gold-500 text-slate-950 shadow-lg shadow-gold-500/20 hover:bg-gold-400'
+                    className={`mt-7 inline-flex h-12 items-center justify-center gap-2 rounded-full px-6 text-[10px] font-black uppercase tracking-[0.18em] transition-all ${
+                      isManagementMode
+                        ? 'border border-white/15 bg-white/10 text-white hover:bg-white/15'
+                        : 'border border-gold-300 bg-gold-500 text-black shadow-[0_10px_24px_rgba(225,183,48,0.18)] hover:bg-gold-400'
                   }`}
                 >
                   {isManagementMode ? <Globe2 className="h-4 w-4" /> : <ClipboardList className="h-4 w-4" />}
-                  {isManagementMode ? 'Return to view-only board' : 'Manage announcements'}
+                  {isManagementMode ? 'View board' : 'Manage announcements'}
                 </button>
               )}
             </div>
             <div className="shrink-0 space-y-2.5">
               <p className="text-[10px] font-black uppercase tracking-[0.2em] text-white/35 md:text-right">
-                As of {formatDate(new Date())}
+                Live as of {formatDate(new Date())}
               </p>
-              <div className="flex items-stretch divide-x divide-white/10 overflow-hidden rounded-2xl border border-white/10 bg-white/[0.03] sm:min-w-[360px]">
+              <div className="grid grid-cols-3 gap-3 sm:min-w-[420px]">
                 {summaryCards.map((card) => {
                   const Icon = card.icon;
                   return (
-                    <div key={card.label} className="flex-1 px-4 py-3">
+                    <div key={card.label} className="rounded-3xl border border-gold-400/20 bg-black/35 p-4 shadow-xl shadow-black/20 backdrop-blur">
                       <div className="flex items-center gap-2">
-                        <Icon className="h-3.5 w-3.5 shrink-0 text-gold-400" />
+                        <Icon className="h-4 w-4 shrink-0 text-gold-300" />
                         <span className="truncate text-[10px] font-black uppercase tracking-[0.14em] text-white/40">
                           {card.label}
                         </span>
                       </div>
-                      <p className="mt-1.5 font-serif text-2xl font-bold leading-none text-white">{card.value}</p>
+                      <p className="mt-4 font-serif text-4xl font-bold leading-none text-white">{card.value}</p>
                     </div>
                   );
                 })}
@@ -864,18 +865,22 @@ export function Announcements() {
         </div>
 
         {/* ── Sidebar + feed ── */}
+        </div>
+      </div>
+
+      <div className="relative mx-auto mt-6 w-full max-w-7xl px-4 sm:px-6 lg:px-8">
         <div className={`grid grid-cols-1 gap-6 lg:items-start ${isManagementMode ? 'lg:grid-cols-[280px_minmax(0,1fr)]' : ''}`}>
           {isManagementMode && (
-          <aside className="custom-scrollbar space-y-4 lg:sticky lg:top-2 lg:max-h-[calc(100vh-9rem)] lg:overflow-y-auto">
+          <aside className="custom-scrollbar space-y-4 lg:sticky lg:top-4 lg:max-h-[calc(100vh-9rem)] lg:overflow-y-auto">
               <button
                 onClick={() => { resetForm(); setShowForm(true); }}
-                className="inline-flex h-12 w-full items-center justify-center gap-2 rounded-2xl bg-gold-500 px-5 text-[11px] font-black uppercase tracking-[0.18em] text-black shadow-lg shadow-gold-500/20 transition-all hover:bg-gold-400"
+                className="inline-flex h-12 w-full items-center justify-center gap-2 rounded-full border border-gold-300 bg-gold-500 px-5 text-[11px] font-black uppercase tracking-[0.18em] text-black shadow-[0_10px_22px_rgba(225,183,48,0.16)] transition-all hover:bg-gold-400"
               >
                 <Plus className="h-4 w-4" />
                 New Announcement
               </button>
 
-              <nav className="rounded-3xl border border-slate-200 bg-white p-2 shadow-[0_12px_32px_rgba(15,23,42,0.05)]">
+              <nav className="rounded-[2rem] border border-slate-200/80 bg-white/95 p-2 shadow-[0_18px_42px_rgba(15,23,42,0.08)] backdrop-blur">
                 <p className="px-4 pb-1 pt-3 text-[10px] font-black uppercase tracking-[0.2em] text-slate-400">
                   Board Sections
                 </p>
@@ -890,7 +895,7 @@ export function Announcements() {
                       className={`flex w-full items-center gap-3 rounded-2xl px-4 py-3 text-left text-[11px] font-black uppercase tracking-[0.14em] transition-all ${
                         isActive
                           ? 'bg-slate-950 text-white shadow-lg shadow-slate-950/15'
-                          : 'text-slate-500 hover:bg-slate-50 hover:text-slate-800'
+                          : 'text-slate-500 hover:bg-gold-50 hover:text-slate-800'
                       }`}
                     >
                       <Icon className={`h-4 w-4 shrink-0 ${isActive ? 'text-gold-400' : 'text-slate-400'}`} />
@@ -905,7 +910,7 @@ export function Announcements() {
                     </button>
                   );
                 })}
-                <p className="m-2 rounded-2xl bg-slate-50 px-3.5 py-3 text-[11px] font-medium leading-relaxed text-slate-500">
+                <p className="m-2 rounded-3xl bg-gold-50 px-3.5 py-3 text-[11px] font-bold leading-relaxed text-slate-600">
                   {TAB_META[tab].description}
                 </p>
               </nav>
@@ -914,17 +919,17 @@ export function Announcements() {
 
           <div className="min-w-0">
         {tab === 'active' && (
-          <div className="mb-4 grid grid-cols-2 gap-2 rounded-3xl border border-slate-200 bg-white p-2 shadow-[0_12px_32px_rgba(15,23,42,0.05)]">
-            <button onClick={() => setFeedMode('general')} className={`flex items-center justify-center gap-2 rounded-2xl px-4 py-3 text-sm font-black transition-all ${feedMode === 'general' ? 'bg-slate-950 text-white shadow-lg' : 'text-slate-500 hover:bg-slate-50'}`}>
+          <div className="mb-4 grid grid-cols-2 gap-2 rounded-[2rem] border border-slate-200/80 bg-white/95 p-2 shadow-[0_14px_36px_rgba(15,23,42,0.06)] backdrop-blur">
+            <button onClick={() => setFeedMode('general')} className={`flex min-h-12 items-center justify-center gap-2 rounded-3xl px-4 py-3 text-sm font-black transition-all ${feedMode === 'general' ? 'bg-slate-950 text-white shadow-lg' : 'text-slate-500 hover:bg-slate-50'}`}>
               <Globe2 className="h-4 w-4" /> General announcements
             </button>
-            <button onClick={() => setFeedMode(isManagementMode ? 'specific' : 'for-me')} className={`flex items-center justify-center gap-2 rounded-2xl px-4 py-3 text-sm font-black transition-all ${(isManagementMode ? feedMode === 'specific' : feedMode === 'for-me') ? 'bg-gold-500 text-slate-950 shadow-lg' : 'text-slate-500 hover:bg-slate-50'}`}>
+            <button onClick={() => setFeedMode(isManagementMode ? 'specific' : 'for-me')} className={`flex min-h-12 items-center justify-center gap-2 rounded-3xl px-4 py-3 text-sm font-black transition-all ${(isManagementMode ? feedMode === 'specific' : feedMode === 'for-me') ? 'bg-gold-500 text-slate-950 shadow-lg shadow-gold-500/20' : 'text-slate-500 hover:bg-slate-50'}`}>
               <Users className="h-4 w-4" /> {isManagementMode ? 'Targeted announcements' : 'For you'}
             </button>
           </div>
         )}
         {/* ── Filter bar — search inline, everything else in the modal ── */}
-        <div className="mb-4 flex flex-col gap-2 rounded-3xl border border-slate-200 bg-white p-3 shadow-[0_12px_32px_rgba(15,23,42,0.05)] sm:flex-row sm:items-center">
+        <div className="sticky top-0 z-20 mb-6 flex flex-col gap-2 rounded-[2rem] border border-slate-200/80 bg-white/95 p-3 shadow-[0_14px_38px_rgba(15,23,42,0.08)] backdrop-blur sm:flex-row sm:items-center">
           <div className="relative flex-1">
             <Search className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
             <input
@@ -932,7 +937,7 @@ export function Announcements() {
               value={filters.search}
               onChange={(e) => setFilters({ ...filters, search: e.target.value })}
               placeholder="Search announcements…"
-              className="h-11 w-full rounded-2xl border border-slate-200 bg-slate-50 pl-11 pr-4 text-sm font-semibold text-slate-800 transition-all placeholder:text-slate-400 focus:border-gold-500 focus:bg-white focus:outline-none focus:ring-4 focus:ring-gold-500/10"
+              className="h-12 w-full rounded-3xl border border-slate-200 bg-slate-50 pl-11 pr-4 text-sm font-semibold text-slate-800 transition-all placeholder:text-slate-400 focus:border-gold-500 focus:bg-white focus:outline-none focus:ring-4 focus:ring-gold-500/10"
             />
           </div>
           {hasActiveFilters && (
@@ -1014,7 +1019,7 @@ export function Announcements() {
             <InlineLoader label="Loading announcements" />
           </div>
         ) : displayed.length === 0 ? (
-          <div className="flex flex-col items-center justify-center gap-5 rounded-3xl border border-dashed border-slate-300 bg-white py-24">
+          <div className="flex flex-col items-center justify-center gap-5 rounded-[2rem] border border-dashed border-gold-300/70 bg-gradient-to-br from-white via-white to-gold-50/60 py-20 shadow-[0_14px_36px_rgba(15,23,42,0.05)]">
             <div className="flex h-20 w-20 items-center justify-center rounded-3xl border border-dashed border-slate-200 bg-slate-50">
               <EmptyIcon className="h-9 w-9 text-slate-300" />
             </div>
@@ -1036,7 +1041,7 @@ export function Announcements() {
             )}
           </div>
         ) : (
-          <div className="space-y-3">
+          <div className="grid gap-4 xl:grid-cols-2">
             <AnimatePresence mode="popLayout">
               {displayed.map((a, i) => (
                 <AnnouncementRow
@@ -1577,16 +1582,18 @@ function AnnouncementRow({
       transition={{ delay: index * 0.04 }}
       onClick={onView}
       onKeyDown={(e) => e.key === 'Enter' && onView()}
-      className={`group relative cursor-pointer overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-[0_8px_26px_rgba(15,23,42,0.04)] transition-all hover:border-slate-300 hover:shadow-[0_18px_42px_rgba(15,23,42,0.08)] ${
+      className={`group relative min-h-[260px] cursor-pointer overflow-hidden rounded-[2rem] border border-slate-200 bg-white shadow-[0_12px_34px_rgba(15,23,42,0.06)] transition-all hover:-translate-y-1 hover:border-gold-300 hover:shadow-[0_24px_58px_rgba(15,23,42,0.12)] ${
         muted ? 'opacity-70' : ''
       }`}
     >
-      <div className={`absolute left-0 top-0 bottom-0 w-1 ${rail}`} />
+      <div className={`absolute inset-x-0 top-0 h-1.5 ${rail}`} />
+      <div className="absolute -right-14 -top-14 h-36 w-36 rounded-full bg-gold-400/10 transition-transform duration-500 group-hover:scale-125" />
+      <div className="absolute bottom-0 right-0 h-28 w-28 bg-gradient-to-tl from-gold-100/70 to-transparent" />
 
-      <div className="grid gap-5 p-5 pl-6 md:grid-cols-[82px_minmax(0,1fr)] md:p-6 md:pl-8">
+      <div className="relative grid gap-5 p-5 md:grid-cols-[82px_minmax(0,1fr)] md:p-6">
         {/* Date column — dark tile with gold accent (Events uses a light one) */}
-        <div className={`flex h-20 w-20 shrink-0 flex-col items-center justify-center rounded-2xl text-center ${
-          muted ? 'border border-slate-200 bg-slate-100' : 'bg-slate-950'
+        <div className={`flex h-20 w-20 shrink-0 flex-col items-center justify-center rounded-[1.7rem] text-center shadow-xl ${
+          muted ? 'border border-slate-200 bg-slate-100 shadow-slate-200/60' : 'bg-slate-950 shadow-slate-950/20'
         }`}>
           <div className={`text-[10px] font-black uppercase tracking-widest ${muted ? 'text-slate-400' : 'text-gold-400'}`}>{tile.month}</div>
           <div className={`mt-1 font-serif text-3xl font-bold leading-none ${muted ? 'text-slate-500' : 'text-white'}`}>{tile.day}</div>
@@ -1595,7 +1602,7 @@ function AnnouncementRow({
 
         <div className="min-w-0 flex-1">
           <div className="flex items-start justify-between gap-3">
-            <h2 className={`font-serif text-xl font-bold leading-tight md:text-2xl ${muted ? 'text-slate-600' : 'text-slate-950'}`}>
+            <h2 className={`font-serif text-2xl font-bold leading-tight md:text-3xl ${muted ? 'text-slate-600' : 'text-slate-950'}`}>
               {a.title}
             </h2>
 

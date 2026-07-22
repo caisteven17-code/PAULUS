@@ -28,6 +28,9 @@ export interface AuthUser {
   entityName?: string;
   entityType?: string;
   entityId?: string;
+  assignmentStatus?: 'assigned' | 'unassigned';
+  hasParishAccess?: boolean;
+  accountStatus?: 'active' | 'archived';
   displayName?: string;
   name?: string;
   status?: string;

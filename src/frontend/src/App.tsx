@@ -177,6 +177,13 @@ const appRoleToRole = (appRole: string): Role => {
 const wait = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 const LOGOUT_TRANSITION_DURATION = 3;
 const INACTIVITY_TIMEOUT_MS = 30 * 60 * 1000;
+const SIDEBAR_STORAGE_KEY = 'paulus.sidebarOpen';
+const sameAuthUser = (a: AuthUser | null, b: AuthUser | null) =>
+  (a?.id || a?.uid || a?.email || '') === (b?.id || b?.uid || b?.email || '') &&
+  a?.role === b?.role &&
+  a?.entityId === b?.entityId &&
+  a?.entityName === b?.entityName &&
+  a?.assignmentStatus === b?.assignmentStatus;
 
 const TAB_TO_PATH: Record<string, string> = {
   home: '/',
@@ -241,8 +248,13 @@ export default function App() {
   const inactivityTimeoutRef = React.useRef<ReturnType<typeof setTimeout> | null>(null);
   const [roleChangedModal, setRoleChangedModal] = useState(false);
   const trackedRoleRef = React.useRef<string>('');
+  const lastAuthUserRef = React.useRef<AuthUser | null>(null);
 
   const [role, setRole] = useState<Role>('bishop');
+  const [isSidebarOpen, setIsSidebarOpen] = useState(() => {
+    if (typeof window === 'undefined') return true;
+    return window.localStorage.getItem(SIDEBAR_STORAGE_KEY) !== 'false';
+  });
   const [activeTab, setActiveTab] = useState(() =>
     typeof window === 'undefined' ? 'home' : tabFromPath(window.location.pathname),
   );
@@ -271,6 +283,11 @@ export default function App() {
   const [dtPendingYear, setDtPendingYear] = useState<number>(year ?? new Date().getFullYear());
 
   useEffect(() => {
+    if (typeof window === 'undefined') return;
+    window.localStorage.setItem(SIDEBAR_STORAGE_KEY, String(isSidebarOpen));
+  }, [isSidebarOpen]);
+
+  useEffect(() => {
     const roleDefaultTab: Record<Role, string> = {
       bishop: 'home',
       admin: 'home',
@@ -280,6 +297,12 @@ export default function App() {
     };
 
     const unsubscribe = auth.onAuthStateChanged((user: AuthUser | null) => {
+      if (sameAuthUser(lastAuthUserRef.current, user)) {
+        setIsAuthReady(true);
+        return;
+      }
+      lastAuthUserRef.current = user;
+
       if (user?.role) {
         if (isLoginTransitionPending()) {
           setIsAuthReady(true);
@@ -553,7 +576,7 @@ export default function App() {
   }, [isAuthenticated, isAuthReady, showPusher, user?.email]);
 
   if (!isAuthReady) {
-    return <div className="min-h-screen bg-slate-50" />;
+    return <div className="min-h-screen bg-church-light" />;
   }
 
   // Black-with-crest reveal shown right after a successful login.
@@ -907,6 +930,8 @@ export default function App() {
             role={digitalTwinSession.viewRole}
             timeframe={timeframe}
             onTimeframeChange={setTimeframe}
+            isOpen={isSidebarOpen}
+            onToggle={() => setIsSidebarOpen((open) => !open)}
           />
 
           <div className="flex flex-col flex-1 min-w-0 h-screen overflow-hidden">
@@ -1438,6 +1463,29 @@ export default function App() {
         <OnboardingModal user={onboardingUser} onComplete={() => setOnboardingUser(null)} onLogout={requestLogout} />
       ) : !onboardingChecked ? (
         <LoadingScreen label={logoutInProgress ? 'Signing out' : 'Signing in'} />
+      ) : user?.role === 'parish_priest' && user.assignmentStatus === 'unassigned' ? (
+        activeTab === 'profile' || activeTab === 'change-password' ? (
+          <div className="min-h-screen bg-slate-50">
+            <div className="mx-auto max-w-5xl p-6">
+              <button onClick={() => setActiveTab('awaiting-assignment')} className="mb-4 inline-flex items-center gap-2 text-sm font-bold text-slate-600"><ArrowLeft className="h-4 w-4" />Back</button>
+              {renderContent()}
+            </div>
+          </div>
+        ) : (
+          <div className="flex min-h-screen items-center justify-center bg-slate-950 p-6">
+            <div className="w-full max-w-xl rounded-[32px] border border-white/10 bg-white p-8 text-center shadow-2xl md:p-12">
+              <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-2xl bg-amber-50 text-amber-600"><ShieldAlert className="h-8 w-8" /></div>
+              <p className="mt-6 text-[10px] font-black uppercase tracking-[0.24em] text-amber-600">Parish Priest Account</p>
+              <h1 className="mt-2 font-serif text-3xl font-bold text-slate-950">Awaiting Parish Assignment</h1>
+              <p className="mx-auto mt-4 max-w-md text-sm font-medium leading-relaxed text-slate-500">You currently have no parish assignment. Your account remains active, but parish information will become available only after the Chancery assigns you to a parish.</p>
+              <div className="mt-8 grid gap-3 sm:grid-cols-2">
+                <button onClick={() => setActiveTab('profile')} className="rounded-2xl border border-slate-200 px-5 py-3 text-sm font-black text-slate-700 hover:bg-slate-50">View Profile</button>
+                <button onClick={() => setActiveTab('change-password')} className="rounded-2xl border border-slate-200 px-5 py-3 text-sm font-black text-slate-700 hover:bg-slate-50">Change Password</button>
+              </div>
+              <button onClick={requestLogout} className="mt-3 w-full rounded-2xl bg-slate-950 px-5 py-3 text-sm font-black text-white hover:bg-slate-800">Sign Out</button>
+            </div>
+          </div>
+        )
       ) : (
         <ErrorBoundary>
           <div className="flex flex-row min-h-screen bg-church-light font-sans">
@@ -1448,6 +1496,8 @@ export default function App() {
               role={role}
               timeframe={timeframe}
               onTimeframeChange={setTimeframe}
+              isOpen={isSidebarOpen}
+              onToggle={() => setIsSidebarOpen((open) => !open)}
             />
 
             <div className="flex flex-col flex-1 min-w-0 h-screen overflow-hidden">
@@ -1461,8 +1511,19 @@ export default function App() {
                 onYearChange={setYear}
                 onLogout={requestLogout}
               />
-              <main ref={mainScrollRef} className="flex-1 overflow-y-auto pb-20 md:pb-0">
-                {renderContent()}
+              <main ref={mainScrollRef} className="flex-1 overflow-y-auto bg-church-light pb-20 md:pb-0">
+                <AnimatePresence mode="wait" initial={false}>
+                  <motion.div
+                    key={activeTab}
+                    initial={{ opacity: 0.96 }}
+                    animate={{ opacity: 1 }}
+                    exit={{ opacity: 0.96 }}
+                    transition={{ duration: 0.08, ease: 'linear' }}
+                    className="min-h-[calc(100vh-80px)] bg-church-light"
+                  >
+                    {renderContent()}
+                  </motion.div>
+                </AnimatePresence>
                 <Footer />
               </main>
             </div>

@@ -336,8 +336,9 @@ export class AuditLogService {
     dateFrom?: string;
     dateTo?: string;
   }): Promise<AuditLogEntry[]> {
-    const limit = filters?.limit ?? 500;
-    const fetchLimit = Math.max(limit, 2000);
+    const requestedLimit = Number.isFinite(filters?.limit) ? Number(filters?.limit) : 300;
+    const limit = Math.min(Math.max(Math.trunc(requestedLimit), 1), 500);
+    const fetchLimit = Math.min(Math.max(limit * 2, 200), 1000);
 
     const [mutationsResult, appEventsResult] = await Promise.all([
       this.supabaseService.admin

@@ -40,6 +40,7 @@ import { dataService } from '../services/dataService';
 import { supabaseBrowser } from '../lib/supabase';
 import { getInitials } from '../lib/initials';
 import { FilterModal, FilterField } from '../components/ui/FilterModal';
+import { Avatar } from '../components/ui/Avatar';
 
 interface SettingsProps {
   onBack: () => void;
@@ -222,6 +223,9 @@ export function Settings({ onBack, onLogout, onNavigate, role = 'bishop', initia
         status: u.status || 'active',
         entityId: u.entityId,
         entityType: u.entityType,
+        assignmentStatus: u.assignmentStatus,
+        hasParishAccess: u.hasParishAccess,
+        accountStatus: u.accountStatus,
         birthday:
           u.birthday || u.birthDate || u.dateOfBirth || u.user_metadata?.birthday || u.user_metadata?.birthDate || '',
         avatarUrl: u.avatarUrl || u.photoURL || '',
@@ -604,6 +608,7 @@ export function Settings({ onBack, onLogout, onNavigate, role = 'bishop', initia
 
   const [searchQuery, setSearchQuery] = useState('');
   const [roleFilter, setRoleFilter] = useState('all');
+  const [assignmentFilter, setAssignmentFilter] = useState('all');
   const [typeFilter, setTypeFilter] = useState('all'); // institution type
   const [institutionFilter, setInstitutionFilter] = useState('all'); // specific institution
 
@@ -619,6 +624,8 @@ export function Settings({ onBack, onLogout, onNavigate, role = 'bishop', initia
   });
   const [showInstitutionSuggestions, setShowInstitutionSuggestions] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
+  const editingAccount = editingAccountId === null ? null : accounts.find((account) => account.id?.toString() === editingAccountId.toString());
+  const assignmentLocked = editingAccount?.assignmentStatus === 'assigned' && normalizeAccessRole(formState.role) === 'parish_priest';
 
   const institutionOptions: { id: InstitutionType; label: string }[] = [
     { id: 'diocese', label: 'Diocese' },
@@ -771,9 +778,10 @@ export function Settings({ onBack, onLogout, onNavigate, role = 'bishop', initia
     };
   };
 
-  const handleSaveAccount = async (e: React.FormEvent) => {
+  const handleSaveAccount = async (e: React.FormEvent, createUnassignedAndRedirect = false) => {
     e.preventDefault();
-    if (!formState.institutionType || !formState.entity || !formState.email || !formState.role) return;
+    const unassignedPriest = normalizeAccessRole(formState.role) === 'parish_priest' && !formState.entity;
+    if (!formState.institutionType || (!formState.entity && !unassignedPriest) || !formState.email || !formState.role) return;
     if (editingAccountId === null && !formState.password) {
       setShowAccountSuccess({ show: true, message: 'Error: Password is required for new accounts.' });
       setTimeout(() => setShowAccountSuccess({ show: false, message: '' }), 4000);
@@ -784,7 +792,7 @@ export function Settings({ onBack, onLogout, onNavigate, role = 'bishop', initia
       const accessRole = normalizeAccessRole(formState.role);
 
       // One-priest-per-parish rule: warn before creating/reassigning a second parish_priest.
-      if (accessRole === 'parish_priest' && formState.institutionType === 'parish' && formState.entity) {
+      if (!createUnassignedAndRedirect && accessRole === 'parish_priest' && formState.institutionType === 'parish' && formState.entity) {
         // Account rows carry the institution under `entity` (and the normalized
         // role under `roleId`) — matching on the non-existent `a.entityName`
         // with the role label is why the warning never fired and duplicates
@@ -809,7 +817,10 @@ export function Settings({ onBack, onLogout, onNavigate, role = 'bishop', initia
         }
       }
 
-      const selectedEntity = findSelectedEntity(formState.entity, accessRole);
+      const requestedParishName = formState.entity;
+      const requestedParish = parishes.find((parish) => parish.name === requestedParishName);
+      const effectiveEntityName = createUnassignedAndRedirect ? '' : formState.entity;
+      const selectedEntity = findSelectedEntity(effectiveEntityName, accessRole);
       const roleLabel = getAccessRoleLabel(accessRole);
       const constructedLeaderName =
         `${formState.firstName} ${formState.lastName}`.trim() || `${formState.entity} ${roleLabel}`;
@@ -828,7 +839,7 @@ export function Settings({ onBack, onLogout, onNavigate, role = 'bishop', initia
             email: formState.email,
             displayName: constructedLeaderName,
             role: accessRole,
-            entityName: formState.entity,
+            entityName: effectiveEntityName,
             entityType: selectedEntity.entityType,
             entityId: selectedEntity.entityId,
           }),
@@ -853,7 +864,7 @@ export function Settings({ onBack, onLogout, onNavigate, role = 'bishop', initia
             password: tempPassword,
             displayName: constructedLeaderName,
             role: accessRole,
-            entityName: formState.entity,
+            entityName: effectiveEntityName,
             entityType: selectedEntity.entityType,
             entityId: selectedEntity.entityId,
           }),
@@ -866,7 +877,15 @@ export function Settings({ onBack, onLogout, onNavigate, role = 'bishop', initia
           }
           throw new Error(body.error ?? 'Create failed');
         }
-        setShowAccountSuccess({ show: true, message: 'New account created successfully!' });
+        const createdUser = await res.json().catch(() => ({}));
+        setShowAccountSuccess({ show: true, message: createUnassignedAndRedirect ? 'Priest created as unassigned.' : 'New account created successfully!' });
+        if (createUnassignedAndRedirect) {
+          sessionStorage.setItem('priest_reassignment_prefill', JSON.stringify({
+            action: 'assign',
+            priestId: createdUser.id,
+            destinationParishId: requestedParish?.id || '',
+          }));
+        }
 
         // If it was a local mock user, remove it from localStorage since it is now successfully saved in Supabase!
         if (editingAccountId !== null) {
@@ -886,6 +905,11 @@ export function Settings({ onBack, onLogout, onNavigate, role = 'bishop', initia
           parishName: '',
           onProceed: () => {},
         });
+        return;
+      }
+      if (!(err instanceof TypeError)) {
+        setShowAccountSuccess({ show: true, message: `Error: ${err.message}` });
+        setTimeout(() => setShowAccountSuccess({ show: false, message: '' }), 4000);
         return;
       }
       console.error('Error saving account, falling back to local storage:', err);
@@ -938,6 +962,7 @@ export function Settings({ onBack, onLogout, onNavigate, role = 'bishop', initia
 
     setTimeout(() => setShowAccountSuccess({ show: false, message: '' }), 4000);
     closeModal();
+    if (createUnassignedAndRedirect) onNavigate?.('priest-aitwin');
   };
 
   const handleEditClick = (account: any) => {
@@ -967,6 +992,12 @@ export function Settings({ onBack, onLogout, onNavigate, role = 'bishop', initia
   };
 
   const handleArchiveAccount = (id: string | number) => {
+    const account = accounts.find((item) => item.id.toString() === id.toString());
+    if (account?.assignmentStatus === 'assigned') {
+      sessionStorage.setItem('priest_reassignment_prefill', JSON.stringify({ action: 'relieve', priestId: account.id }));
+      onNavigate?.('priest-aitwin');
+      return;
+    }
     setAccountToArchive(id);
     setIsArchiveModalOpen(true);
   };
@@ -1061,10 +1092,14 @@ export function Settings({ onBack, onLogout, onNavigate, role = 'bishop', initia
   );
 
   const userFilterCount =
-    (roleFilter !== 'all' ? 1 : 0) + (typeFilter !== 'all' ? 1 : 0) + (institutionFilter !== 'all' ? 1 : 0);
+    (roleFilter !== 'all' ? 1 : 0) +
+    (assignmentFilter !== 'all' ? 1 : 0) +
+    (typeFilter !== 'all' ? 1 : 0) +
+    (institutionFilter !== 'all' ? 1 : 0);
 
   const clearUserFilters = () => {
     setRoleFilter('all');
+    setAssignmentFilter('all');
     setTypeFilter('all');
     setInstitutionFilter('all');
   };
@@ -1085,6 +1120,7 @@ export function Settings({ onBack, onLogout, onNavigate, role = 'bishop', initia
       acc.status === 'active' &&
       matchesSearch &&
       (roleFilter === 'all' || acc.role === roleFilter) &&
+      (assignmentFilter === 'all' || acc.assignmentStatus === assignmentFilter) &&
       (typeFilter === 'all' || (acc.entityType || '') === typeFilter) &&
       (institutionFilter === 'all' || acc.entity === institutionFilter)
     );
@@ -1255,8 +1291,8 @@ export function Settings({ onBack, onLogout, onNavigate, role = 'bishop', initia
                       </select>
                     ) : (
                       <select
-                        required
-                        disabled={!formState.institutionType}
+                        required={formState.role !== 'parish_priest'}
+                        disabled={!formState.institutionType || assignmentLocked}
                         value={formState.entity}
                         onChange={(e) => setFormState({ ...formState, entity: e.target.value })}
                         className={`w-full px-4 py-3 border rounded-xl text-gray-700 focus:outline-none focus:border-[#D4AF37] focus:ring-1 focus:ring-[#D4AF37] transition-all appearance-none bg-white ${
@@ -1265,8 +1301,8 @@ export function Settings({ onBack, onLogout, onNavigate, role = 'bishop', initia
                             : 'border-gray-100 bg-gray-50 text-gray-400 cursor-not-allowed'
                         }`}
                       >
-                        <option value="" disabled>
-                          {institutionNamePlaceholder}
+                        <option value="" disabled={formState.role !== 'parish_priest'}>
+                          {formState.role === 'parish_priest' ? 'No Parish — Create as Unassigned' : institutionNamePlaceholder}
                         </option>
                         {institutionNames.map((item) => (
                           <option key={item.name} value={item.name}>
@@ -1274,6 +1310,17 @@ export function Settings({ onBack, onLogout, onNavigate, role = 'bishop', initia
                           </option>
                         ))}
                       </select>
+                    )}
+                    {formState.role === 'parish_priest' && !formState.entity && (
+                      <div className="mt-2 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs font-semibold leading-relaxed text-amber-800">
+                        This priest may sign in, but will have no parish data access until assigned through Parish Priest Reassignment.
+                      </div>
+                    )}
+                    {assignmentLocked && (
+                      <div className="mt-2 rounded-xl border border-blue-200 bg-blue-50 px-3 py-2 text-xs font-semibold leading-relaxed text-blue-800">
+                        This parish assignment is managed through Parish Priest Reassignment. You may still edit the priest's account details.
+                        <button type="button" onClick={() => { closeModal(); sessionStorage.setItem('priest_reassignment_prefill', JSON.stringify({ action: 'transfer', priestId: editingAccount?.id })); onNavigate?.('priest-aitwin'); }} className="mt-2 block font-black text-blue-900 underline">Open Reassignment</button>
+                      </div>
                     )}
                   </div>
 
@@ -1435,20 +1482,12 @@ export function Settings({ onBack, onLogout, onNavigate, role = 'bishop', initia
                     <div className="pointer-events-none absolute bottom-0 left-0 h-px w-full bg-gradient-to-r from-transparent via-[#D4AF37]/60 to-transparent" />
                     <div className="flex items-center gap-4">
                       <div className="relative shrink-0">
-                        {avatarUrl ? (
-                          // eslint-disable-next-line @next/next/no-img-element
-                          <img
-                            src={avatarUrl}
-                            alt="Profile"
-                            className="w-16 h-16 rounded-2xl object-cover shadow-lg ring-2 ring-[#D4AF37]/40"
-                          />
-                        ) : (
-                          <div className="w-16 h-16 rounded-2xl bg-[#D4AF37] text-black flex items-center justify-center text-2xl font-black shadow-lg shadow-[#D4AF37]/25">
-                            {getInitials(
-                              `${profileForm.firstName} ${profileForm.lastName}`.trim() || profileForm.email,
-                            )}
-                          </div>
-                        )}
+                        <Avatar
+                          name={`${profileForm.firstName} ${profileForm.lastName}`.trim() || profileForm.email}
+                          photoUrl={avatarUrl}
+                          size={64}
+                          className="shadow-lg shadow-[#D4AF37]/25 ring-2 ring-[#D4AF37]/40"
+                        />
                         {isEditingProfile && (
                           <>
                             <label
@@ -2086,6 +2125,14 @@ export function Settings({ onBack, onLogout, onNavigate, role = 'bishop', initia
                       </select>
                     </FilterField>
 
+                    <FilterField label="Assignment status">
+                      <select value={assignmentFilter} onChange={(e) => setAssignmentFilter(e.target.value)} className={selectField(assignmentFilter !== 'all', 'h-11 w-full rounded-2xl px-4 text-sm font-bold')}>
+                        <option value="all">All assignments</option>
+                        <option value="assigned">Assigned</option>
+                        <option value="unassigned">Unassigned</option>
+                      </select>
+                    </FilterField>
+
                     <FilterField label="Institution">
                       <select
                         value={institutionFilter}
@@ -2111,27 +2158,21 @@ export function Settings({ onBack, onLogout, onNavigate, role = 'bishop', initia
                   <table className="w-full text-left border-collapse">
                     <thead>
                       <tr className="border-b border-slate-200 bg-slate-50/80">
-                        <th className="pb-3.5 font-bold text-gray-400 text-[10px] uppercase tracking-widest w-1/5">
-                          Institution Name
-                        </th>
-                        <th className="pb-3.5 font-bold text-gray-400 text-[10px] uppercase tracking-widest w-[15%]">
-                          Institution Type
-                        </th>
-                        <th className="pb-3.5 font-bold text-gray-400 text-[10px] uppercase tracking-widest w-1/5">
+                        <th className="pb-3.5 font-bold text-gray-400 text-[10px] uppercase tracking-widest w-[24%]">
                           Full Name
                         </th>
-                        <th className="pb-3.5 font-bold text-gray-400 text-[10px] uppercase tracking-widest w-1/5">
-                          Email Address
-                        </th>
-                        <th className="pb-3.5 font-bold text-gray-400 text-[10px] uppercase tracking-widest w-[15%]">
+                        <th className="pb-3.5 font-bold text-gray-400 text-[10px] uppercase tracking-widest w-[14%]">
                           Role
                         </th>
+                        <th className="pb-3.5 font-bold text-gray-400 text-[10px] uppercase tracking-widest w-[24%]">Institution</th>
+                        <th className="pb-3.5 font-bold text-gray-400 text-[10px] uppercase tracking-widest w-[13%]">Institution Type</th>
+                        <th className="pb-3.5 font-bold text-gray-400 text-[10px] uppercase tracking-widest w-[20%]">Email Address</th>
                         <th className="pb-3.5 font-bold text-gray-400 text-[10px] uppercase tracking-widest text-right">
                           Actions
                         </th>
                       </tr>
                     </thead>
-                    <tbody className="divide-y divide-gray-50">
+                    <tbody className="divide-y divide-slate-100">
                       {filteredAccounts.length > 0 ? (
                         filteredAccounts.map((account) => (
                           <tr
@@ -2139,23 +2180,14 @@ export function Settings({ onBack, onLogout, onNavigate, role = 'bishop', initia
                             onClick={() => setViewAccount(account)}
                             className="group cursor-pointer transition-colors hover:bg-gold-50/45"
                           >
-                            <td className="py-4 pr-4">
-                              <div className="font-bold text-gray-900 text-sm">{account.entity}</div>
-                            </td>
-                            <td className="py-4 pr-4 text-gray-600 text-sm font-medium capitalize">
-                              <span className="inline-flex rounded-full border border-gold-200 bg-gold-50 px-2.5 py-1 text-[9px] font-black uppercase tracking-wider text-gold-700">
-                                {account.entityType || 'Institution'}
-                              </span>
-                            </td>
                             <td className="py-4 pr-4 text-gray-800 text-sm font-semibold">
                               <div className="flex items-center gap-3">
-                                <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-black to-slate-700 text-[10px] font-black text-gold-400 shadow-sm">
+                                <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-black text-[10px] font-black text-gold-400 shadow-sm ring-1 ring-gold-500/35">
                                   {getInitials(account.leader || account.email)}
                                 </span>
                                 <span>{getFormattedFullName(account.leader)}</span>
                               </div>
                             </td>
-                            <td className="py-4 pr-4 text-gray-500 font-mono text-xs">{account.email}</td>
                             <td className="py-4 pr-4">
                               <span
                                 className={`px-3 py-1 rounded-full text-[9px] font-bold uppercase tracking-wider ${
@@ -2169,8 +2201,23 @@ export function Settings({ onBack, onLogout, onNavigate, role = 'bishop', initia
                                 {account.role}
                               </span>
                             </td>
+                            <td className="py-4 pr-4">
+                              <div className={`text-sm font-bold ${account.assignmentStatus === 'unassigned' ? 'text-amber-700' : 'text-gray-900'}`}>{account.entity || 'No Parish'}</div>
+                              {account.assignmentStatus === 'unassigned' && <span className="mt-1 inline-flex rounded-full bg-amber-50 px-2 py-0.5 text-[8px] font-black uppercase tracking-wider text-amber-700">Unassigned</span>}
+                            </td>
+                            <td className="py-4 pr-4 text-gray-600 text-sm font-medium capitalize">
+                              <span className="inline-flex rounded-full border border-gold-200 bg-gold-50 px-2.5 py-1 text-[9px] font-black uppercase tracking-wider text-gold-700">
+                                {account.entityType || 'Institution'}
+                              </span>
+                            </td>
+                            <td className="py-4 pr-4 text-gray-500 font-mono text-xs">{account.email}</td>
                             <td className="py-4 text-right">
                               <div className="flex items-center justify-end gap-1 opacity-60 transition-opacity group-hover:opacity-100">
+                                {viewMode === 'active' && (
+                                  account.assignmentStatus === 'unassigned' ? (
+                                    <button onClick={(e) => { e.stopPropagation(); sessionStorage.setItem('priest_reassignment_prefill', JSON.stringify({ action: 'assign', priestId: account.id })); onNavigate?.('priest-aitwin'); }} className="rounded-lg px-2 py-1.5 text-[10px] font-black text-amber-700 hover:bg-amber-50" title="Assign Parish">Assign Parish</button>
+                                  ) : null
+                                )}
                                 {viewMode === 'active' && (
                                   <button
                                     onClick={(e) => {
@@ -2228,9 +2275,6 @@ export function Settings({ onBack, onLogout, onNavigate, role = 'bishop', initia
             {viewAccount &&
               (() => {
                 const isArchived = viewAccount.status === 'archived' || viewAccount.status === 'inactive';
-                // Use the raw "First Last" name (not the "Last, First" display form) so
-                // initials match the audit log, e.g. "drive justyn" -> "DJ".
-                const initial = getInitials(viewAccount.leader || viewAccount.email);
                 const Field = ({
                   icon: Icon,
                   label,
@@ -2261,18 +2305,12 @@ export function Settings({ onBack, onLogout, onNavigate, role = 'bishop', initia
                       {/* Dark header */}
                       <div className="flex items-start justify-between gap-4 bg-slate-900 p-6 text-white">
                         <div className="flex min-w-0 items-center gap-4">
-                          {viewAccount.avatarUrl ? (
-                            // eslint-disable-next-line @next/next/no-img-element
-                            <img
-                              src={viewAccount.avatarUrl}
-                              alt={getFormattedFullName(viewAccount.leader) || viewAccount.email}
-                              className="h-12 w-12 shrink-0 rounded-2xl object-cover ring-2 ring-gold-500/40"
-                            />
-                          ) : (
-                            <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-gold-500 font-serif text-lg font-bold text-black">
-                              {initial}
-                            </div>
-                          )}
+                          <Avatar
+                            name={getFormattedFullName(viewAccount.leader) || viewAccount.email}
+                            photoUrl={viewAccount.avatarUrl}
+                            size={48}
+                            className="ring-2 ring-gold-500/40"
+                          />
                           <div className="min-w-0">
                             <div className="flex items-center gap-2">
                               <span className="rounded-md border border-white/15 bg-white/10 px-2 py-0.5 text-[10px] font-black uppercase tracking-wider text-white/70">
@@ -2491,10 +2529,9 @@ export function Settings({ onBack, onLogout, onNavigate, role = 'bishop', initia
 
             {/* Actions */}
             <div className="border-t border-slate-100 px-6 pb-6 pt-4 space-y-2">
-              {/* Primary CTA: open the atomic reassignment planner */}
               <button
                 type="button"
-                onClick={() => {
+                onClick={(event) => {
                   setDuplicatePriestModal({
                     open: false,
                     existingPriest: '',
@@ -2502,12 +2539,11 @@ export function Settings({ onBack, onLogout, onNavigate, role = 'bishop', initia
                     parishName: '',
                     onProceed: () => {},
                   });
-                  closeModal();
-                  onNavigate?.('priest-aitwin');
+                  void handleSaveAccount(event as unknown as React.FormEvent, true);
                 }}
                 className="w-full rounded-2xl bg-slate-950 px-4 py-3.5 text-sm font-black text-white transition-colors hover:bg-slate-800"
               >
-                Go to Parish Priest Reassignment
+                Create as Unassigned &amp; Continue to Reassignment
               </button>
 
               <div>
@@ -2524,9 +2560,10 @@ export function Settings({ onBack, onLogout, onNavigate, role = 'bishop', initia
                   }
                   className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-black text-slate-600 transition-colors hover:bg-slate-50"
                 >
-                  Cancel
+                  Choose Another Parish
                 </button>
               </div>
+              <button type="button" onClick={() => { setDuplicatePriestModal({ open: false, existingPriest: '', existingPriestEmail: '', parishName: '', onProceed: () => {} }); closeModal(); }} className="w-full px-4 py-2 text-xs font-bold text-slate-400 hover:text-slate-700">Cancel</button>
             </div>
           </div>
         </div>

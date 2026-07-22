@@ -23,6 +23,17 @@ body {
   font-family: var(--font-sans);
 }
 
+html,
+body {
+  min-height: 100%;
+}
+
+body,
+#root,
+#__next {
+  background-color: var(--color-church-light);
+}
+
 /* Custom Scrollbar Utilities */
 .scrollbar-hide {
   -ms-overflow-style: none; /* IE and Edge */
