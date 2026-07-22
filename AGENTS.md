@@ -77,6 +77,8 @@ Browser → apiClient (src/lib/api-client.ts)
 
 ### Supabase database
 - Postgres organized into **domain-partitioned schemas**: `diocese` (roles, permissions, role_permissions, profiles, projects, donations, project_expenses, announcements, audit_logs), `parishes`, `schools`, `seminaries` (each with `details` + `financial_records`).
+- **Schema boundary rule:** `operations` is workflow-only. It may contain batches, validation/reconciliation results, approvals, import/staging workflow state, execution metadata, and other records describing how a task was processed. Do not place permanent domain master records or long-lived business history in `operations`. Put permanent records in their owning domain schema instead (for example, clergy identity/assignment history in `clergy`, parish records in `parishes`, and organization identity/RBAC in `diocese`). A workflow table may reference permanent domain records across schemas.
+- Permanent Parish Priest assignment history belongs in `clergy.priest_assignments`. `operations.priest_reassignment_batches` remains in `operations` because it records execution of a reassignment workflow, while `parishes.details.assigned_priest_id` remains the current parish snapshot.
 - SQL lives in `supabase/` (`schema.sql`, `complete-domain-partitioned-schema.sql`, `admin-schema.sql`, `migration-roles-permissions.sql`, seeds). Human-readable docs and ER diagrams are the `DATABASE_*.md` / `*SchemaDiagram*.md` files at the repo root.
 - A Supabase MCP server is available in this environment for inspecting the live project (`list_tables`, `execute_sql`, `apply_migration`, etc.) — prefer `list_tables`/`get_advisors` before schema changes.
 

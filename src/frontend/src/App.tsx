@@ -176,7 +176,7 @@ const appRoleToRole = (appRole: string): Role => {
 
 const wait = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 const LOGOUT_TRANSITION_DURATION = 3;
-const INACTIVITY_TIMEOUT_MS = 5 * 60 * 1000;
+const INACTIVITY_TIMEOUT_MS = 30 * 60 * 1000;
 
 const TAB_TO_PATH: Record<string, string> = {
   home: '/',
@@ -505,11 +505,11 @@ export default function App() {
       category: 'auth',
       severity: 'info',
       action: 'Logout due to inactivity',
-      detail: `${currentUser.displayName || currentUser.email || 'User'} was signed out after 5 minutes of inactivity`,
+      detail: `${currentUser.displayName || currentUser.email || 'User'} was signed out after 30 minutes of inactivity`,
       entity: currentUser.entityName,
       metadata: {
         reason: 'inactivity_timeout',
-        timeoutMinutes: 5,
+        timeoutMinutes: 30,
       },
     });
 

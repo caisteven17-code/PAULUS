@@ -798,25 +798,14 @@ export function Settings({ onBack, onLogout, onNavigate, role = 'bishop', initia
             (editingAccountId === null || a.id?.toString() !== editingAccountId?.toString()),
         );
         if (existing) {
-          await new Promise<void>((resolve, reject) => {
-            setDuplicatePriestModal({
-              open: true,
-              existingPriest: existing.displayName || existing.email || 'another priest',
-              existingPriestEmail: existing.email || existing.displayName || '',
-              parishName: formState.entity,
-              onProceed: resolve,
-            });
-            setTimeout(() => reject(new Error('DUPLICATE_CANCELLED')), 300_000);
-          }).catch(() => {
-            throw new Error('DUPLICATE_CANCELLED');
-          });
           setDuplicatePriestModal({
-            open: false,
-            existingPriest: '',
-            existingPriestEmail: '',
-            parishName: '',
+            open: true,
+            existingPriest: existing.displayName || existing.email || 'another priest',
+            existingPriestEmail: existing.email || existing.displayName || '',
+            parishName: formState.entity,
             onProceed: () => {},
           });
+          return;
         }
       }
 
@@ -844,7 +833,14 @@ export function Settings({ onBack, onLogout, onNavigate, role = 'bishop', initia
             entityId: selectedEntity.entityId,
           }),
         });
-        if (!res.ok) throw new Error((await res.json()).error ?? 'Update failed');
+        if (!res.ok) {
+          const body = await res.json();
+          if (body.code === 'PARISH_PRIEST_ASSIGNMENT_CONFLICT') {
+            setDuplicatePriestModal({ open: true, existingPriest: body.existingPriest, existingPriestEmail: '', parishName: body.parishName, onProceed: () => {} });
+            return;
+          }
+          throw new Error(body.error ?? 'Update failed');
+        }
         setShowAccountSuccess({ show: true, message: 'Account updated successfully!' });
       } else {
         // ── Create new user (or promote offline user to Supabase) ──────────
@@ -862,7 +858,14 @@ export function Settings({ onBack, onLogout, onNavigate, role = 'bishop', initia
             entityId: selectedEntity.entityId,
           }),
         });
-        if (!res.ok) throw new Error((await res.json()).error ?? 'Create failed');
+        if (!res.ok) {
+          const body = await res.json();
+          if (body.code === 'PARISH_PRIEST_ASSIGNMENT_CONFLICT') {
+            setDuplicatePriestModal({ open: true, existingPriest: body.existingPriest, existingPriestEmail: '', parishName: body.parishName, onProceed: () => {} });
+            return;
+          }
+          throw new Error(body.error ?? 'Create failed');
+        }
         setShowAccountSuccess({ show: true, message: 'New account created successfully!' });
 
         // If it was a local mock user, remove it from localStorage since it is now successfully saved in Supabase!
@@ -2481,13 +2484,14 @@ export function Settings({ onBack, onLogout, onNavigate, role = 'bishop', initia
                 <p className="mt-0.5 text-sm font-bold text-slate-900">{duplicatePriestModal.existingPriest}</p>
               </div>
               <p className="text-sm leading-relaxed text-slate-500">
-                Would you like to find and manage the existing priest first, or proceed with this new assignment?
+                This parish cannot be assigned to another priest here. Use Parish Priest Reassignment to transfer,
+                swap, rotate, or relieve the current priest without losing assignment history.
               </p>
             </div>
 
             {/* Actions */}
             <div className="border-t border-slate-100 px-6 pb-6 pt-4 space-y-2">
-              {/* Primary CTA: find the existing priest */}
+              {/* Primary CTA: open the atomic reassignment planner */}
               <button
                 type="button"
                 onClick={() => {
@@ -2499,15 +2503,14 @@ export function Settings({ onBack, onLogout, onNavigate, role = 'bishop', initia
                     onProceed: () => {},
                   });
                   closeModal();
-                  setSearchQuery(duplicatePriestModal.existingPriestEmail || duplicatePriestModal.existingPriest);
+                  onNavigate?.('priest-aitwin');
                 }}
                 className="w-full rounded-2xl bg-slate-950 px-4 py-3.5 text-sm font-black text-white transition-colors hover:bg-slate-800"
               >
-                Find &amp; Manage Existing Priest
+                Go to Parish Priest Reassignment
               </button>
 
-              <div className="flex items-center gap-2">
-                {/* Cancel */}
+              <div>
                 <button
                   type="button"
                   onClick={() =>
@@ -2519,20 +2522,9 @@ export function Settings({ onBack, onLogout, onNavigate, role = 'bishop', initia
                       onProceed: () => {},
                     })
                   }
-                  className="flex-1 rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-black text-slate-600 transition-colors hover:bg-slate-50"
+                  className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-black text-slate-600 transition-colors hover:bg-slate-50"
                 >
                   Cancel
-                </button>
-
-                {/* Proceed anyway */}
-                <button
-                  type="button"
-                  onClick={() => {
-                    duplicatePriestModal.onProceed();
-                  }}
-                  className="flex-1 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-black text-amber-700 transition-colors hover:bg-amber-100"
-                >
-                  Proceed Anyway
                 </button>
               </div>
             </div>

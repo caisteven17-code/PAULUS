@@ -7,6 +7,17 @@ const OTP_TTL_MS = 10 * 60 * 1000; // codes live 10 minutes
 const OTP_RESEND_THROTTLE_MS = 55 * 1000; // server-side guard behind the 60s client timer
 const OTP_VERIFIED_WINDOW_MS = 15 * 60 * 1000; // verified code usable for follow-up action
 
+export class ParishPriestAssignmentConflictError extends Error {
+  readonly code = 'PARISH_PRIEST_ASSIGNMENT_CONFLICT';
+
+  constructor(
+    readonly parishName: string,
+    readonly existingPriest: string,
+  ) {
+    super(`${parishName} is already handled by ${existingPriest}. Use Parish Priest Reassignment to make this change.`);
+  }
+}
+
 const ROLE_PERMISSION_DEFINITIONS = [
   {
     id: 'view_diocese',
@@ -309,6 +320,103 @@ export class AppAuthService {
     throw insertErr;
   }
 
+  private async assertParishPriestDestinationAvailable(body: any, excludedExternalAuthId?: string): Promise<string | null> {
+    if (body?.role !== 'parish_priest' || body?.entityType !== 'parish') return null;
+    const institutionId = await this.resolveInstitutionId(body.entityId, body.entityName, body.entityType);
+    if (!institutionId) return null;
+
+    const { data: assignments, error } = await this.supabaseService.admin
+      .schema('clergy')
+      .from('priest_assignments')
+      .select('priest_id')
+      .eq('institution_id', institutionId)
+      .eq('assignment_role', 'parish_priest')
+      .eq('is_active', true)
+      .is('deleted_at', null)
+      .limit(1);
+    if (error) throw error;
+    let occupantId = assignments?.[0]?.priest_id as string | undefined;
+    if (!occupantId) {
+      const { data: parishDetails, error: detailsError } = await this.supabaseService.admin
+        .schema('parishes')
+        .from('details')
+        .select('assigned_priest_id')
+        .eq('institution_id', institutionId)
+        .maybeSingle();
+      if (detailsError) throw detailsError;
+      occupantId = parishDetails?.assigned_priest_id || undefined;
+    }
+    if (!occupantId) return institutionId;
+
+    if (excludedExternalAuthId) {
+      const { data: editingProfile } = await this.supabaseService.admin
+        .schema('diocese')
+        .from('profiles')
+        .select('id')
+        .eq('external_auth_id', excludedExternalAuthId)
+        .maybeSingle();
+      if (editingProfile?.id === occupantId) return institutionId;
+    }
+
+    const [{ data: parish }, { data: priest }] = await Promise.all([
+      this.supabaseService.admin.schema('diocese').from('institutions').select('name').eq('id', institutionId).maybeSingle(),
+      this.supabaseService.admin.schema('diocese').from('profiles').select('full_name,email').eq('id', occupantId).maybeSingle(),
+    ]);
+    throw new ParishPriestAssignmentConflictError(
+      parish?.name || body.entityName || 'This parish',
+      priest?.full_name || priest?.email || 'another Parish Priest',
+    );
+  }
+
+  private async ensureInitialParishPriestAssignment(userId: string, institutionId: string | null): Promise<void> {
+    if (!institutionId) return;
+    const { data: priest, error: priestError } = await this.supabaseService.admin
+      .schema('diocese')
+      .from('profiles')
+      .select('id')
+      .eq('external_auth_id', userId)
+      .eq('role_id', 'parish_priest')
+      .eq('is_active', true)
+      .is('deleted_at', null)
+      .maybeSingle();
+    if (priestError) throw priestError;
+    if (!priest?.id) return;
+
+    const { data: current, error: currentError } = await this.supabaseService.admin
+      .schema('clergy')
+      .from('priest_assignments')
+      .select('id,institution_id')
+      .eq('priest_id', priest.id)
+      .eq('is_active', true)
+      .is('deleted_at', null)
+      .maybeSingle();
+    if (currentError) throw currentError;
+    if (current && current.institution_id !== institutionId) {
+      throw new Error('This priest already has an active parish. Use Parish Priest Reassignment to change it.');
+    }
+
+    if (!current) {
+      const { error: assignmentError } = await this.supabaseService.admin
+        .schema('clergy')
+        .from('priest_assignments')
+        .insert({
+          priest_id: priest.id,
+          institution_id: institutionId,
+          assignment_role: 'parish_priest',
+          start_date: new Date().toISOString().slice(0, 10),
+          status: 'active',
+          is_active: true,
+        });
+      if (assignmentError) throw assignmentError;
+    }
+
+    const { error: detailsError } = await this.supabaseService.admin
+      .schema('parishes')
+      .from('details')
+      .upsert({ institution_id: institutionId, assigned_priest_id: priest.id, updated_at: new Date().toISOString() }, { onConflict: 'institution_id' });
+    if (detailsError) throw detailsError;
+  }
+
   private mapSupabaseUser(supabaseUser: any): AuthUser {
     const meta = supabaseUser.user_metadata ?? supabaseUser.raw_user_meta_data ?? {};
     return {
@@ -400,6 +508,7 @@ export class AppAuthService {
 
   async createUser(body: any) {
     const { email, password, displayName, role, entityName, entityType, entityId } = body;
+    const parishPriestInstitutionId = await this.assertParishPriestDestinationAvailable(body);
     const { data, error } = await this.supabaseService.supabaseServer.auth.admin.createUser({
       email,
       password,
@@ -422,6 +531,7 @@ export class AppAuthService {
       // The profile row can be repaired once the diocese schema/roles are seeded.
       console.error('[auth.service] Profile upsert failed for user', data.user.id, ':', (profileError as any)?.message ?? profileError);
     }
+    await this.ensureInitialParishPriestAssignment(data.user.id, parishPriestInstitutionId);
 
     return {
       id: data.user.id,
@@ -438,6 +548,7 @@ export class AppAuthService {
 
   async updateUser(id: string, body: any) {
     const { email, displayName, role, entityName, entityType, entityId } = body;
+    const parishPriestInstitutionId = await this.assertParishPriestDestinationAvailable(body, id);
     const updates: Record<string, any> = {
       user_metadata: { displayName, role, entityName, entityType, entityId },
     };
@@ -453,6 +564,7 @@ export class AppAuthService {
       entityType,
       entityId,
     });
+    await this.ensureInitialParishPriestAssignment(id, parishPriestInstitutionId);
     const meta = data.user.user_metadata ?? {};
     return {
       id: data.user.id,

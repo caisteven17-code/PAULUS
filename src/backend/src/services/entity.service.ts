@@ -570,7 +570,7 @@ export class EntityService {
         .is('deleted_at', null)
         .order('name'),
       this.supabaseService.admin
-        .schema('operations')
+        .schema('clergy')
         .from('priest_assignments')
         .select('id, priest_id, institution_id, start_date, end_date, status, is_active, reassignment_batch_id, previous_assignment_id, created_at')
         .eq('assignment_role', 'parish_priest')

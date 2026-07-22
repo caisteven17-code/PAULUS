@@ -1,6 +1,6 @@
 import { Controller, Post, Get, Body, Headers, Req, Res, HttpStatus } from '@nestjs/common';
 import { Request, Response } from 'express';
-import { AppAuthService } from '../services/auth.service';
+import { AppAuthService, ParishPriestAssignmentConflictError } from '../services/auth.service';
 import { AuditLogService } from '../services/audit-log.service';
 
 function clientIp(req: Request): string {
@@ -297,6 +297,14 @@ export class AuthController {
       });
       return res.status(HttpStatus.CREATED).json(user);
     } catch (err: any) {
+      if (err instanceof ParishPriestAssignmentConflictError) {
+        return res.status(HttpStatus.CONFLICT).json({
+          error: err.message,
+          code: err.code,
+          parishName: err.parishName,
+          existingPriest: err.existingPriest,
+        });
+      }
       return res.status(HttpStatus.BAD_REQUEST).json({ error: err.message });
     }
   }
@@ -319,6 +327,14 @@ export class AuthController {
       });
       return res.status(HttpStatus.OK).json(user);
     } catch (err: any) {
+      if (err instanceof ParishPriestAssignmentConflictError) {
+        return res.status(HttpStatus.CONFLICT).json({
+          error: err.message,
+          code: err.code,
+          parishName: err.parishName,
+          existingPriest: err.existingPriest,
+        });
+      }
       return res.status(HttpStatus.BAD_REQUEST).json({ error: err.message });
     }
   }
