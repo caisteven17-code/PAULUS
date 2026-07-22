@@ -1462,7 +1462,9 @@ export default function App() {
       ) : onboardingUser ? (
         <OnboardingModal user={onboardingUser} onComplete={() => setOnboardingUser(null)} onLogout={requestLogout} />
       ) : !onboardingChecked ? (
-        <LoadingScreen label={logoutInProgress ? 'Signing out' : 'Signing in'} />
+        <div className="flex min-h-screen items-center justify-center bg-church-light">
+          <div className="h-8 w-8 animate-spin rounded-full border-2 border-slate-200 border-t-slate-700" />
+        </div>
       ) : user?.role === 'parish_priest' && user.assignmentStatus === 'unassigned' ? (
         activeTab === 'profile' || activeTab === 'change-password' ? (
           <div className="min-h-screen bg-slate-50">
@@ -1512,18 +1514,7 @@ export default function App() {
                 onLogout={requestLogout}
               />
               <main ref={mainScrollRef} className="flex-1 overflow-y-auto bg-church-light pb-20 md:pb-0">
-                <AnimatePresence mode="wait" initial={false}>
-                  <motion.div
-                    key={activeTab}
-                    initial={{ opacity: 0.96 }}
-                    animate={{ opacity: 1 }}
-                    exit={{ opacity: 0.96 }}
-                    transition={{ duration: 0.08, ease: 'linear' }}
-                    className="min-h-[calc(100vh-80px)] bg-church-light"
-                  >
-                    {renderContent()}
-                  </motion.div>
-                </AnimatePresence>
+                <div className="min-h-[calc(100vh-80px)] bg-church-light">{renderContent()}</div>
                 <Footer />
               </main>
             </div>

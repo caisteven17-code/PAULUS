@@ -22,6 +22,13 @@ import {
   Phone,
   Cake,
   CheckCircle,
+  AtSign,
+  BadgeCheck,
+  LockKeyhole,
+  MapPin,
+  NotebookPen,
+  Sparkles,
+  UserRound,
 } from 'lucide-react';
 
 import { Role } from '../App';
@@ -1126,6 +1133,46 @@ export function Settings({ onBack, onLogout, onNavigate, role = 'bishop', initia
     );
   });
 
+  const profileDisplayName =
+    [profileForm.firstName, profileForm.lastName].filter(Boolean).join(' ') ||
+    auth.currentUser?.displayName ||
+    profileForm.email ||
+    'My Profile';
+  const profileRoleLabel = getAccessRoleLabel(auth.currentUser?.role) || profileForm.position || 'User';
+  const profileInstitutionName = auth.currentUser?.entityName || profileForm.entityName || 'Diocese of San Pablo';
+  const profileStatus = auth.currentUser?.status || 'Active';
+  const completedProfileFields = [
+    profileForm.firstName,
+    profileForm.lastName,
+    profileForm.email,
+    profileForm.contactNumber,
+    profileForm.birthday,
+    profileForm.address,
+    profileForm.emergencyContact,
+  ].filter((value) => String(value || '').trim()).length;
+  const profileCompletion = Math.round((completedProfileFields / 7) * 100);
+  const profileFieldGroups = [
+    [
+      { id: 'firstName', label: 'First Name', type: 'text', placeholder: 'First name', icon: UserRound },
+      { id: 'lastName', label: 'Last Name', type: 'text', placeholder: 'Last name', icon: UserRound },
+      { id: 'nickName', label: 'Nick Name', type: 'text', placeholder: 'Preferred name', icon: Sparkles },
+    ],
+    [
+      { id: 'email', label: 'Email Address', type: 'email', placeholder: 'name@diocese.ph', icon: AtSign },
+      { id: 'contactNumber', label: 'Contact Number', type: 'tel', placeholder: '+63 900 000 0000', icon: Phone },
+      { id: 'birthday', label: 'Birthday', type: 'date', placeholder: '', icon: Cake },
+    ],
+    [
+      {
+        id: 'emergencyContact',
+        label: 'Emergency Contact',
+        type: 'text',
+        placeholder: 'Name and number',
+        icon: ShieldCheck,
+      },
+    ],
+  ];
+
   return (
     <>
       <div className="min-h-[calc(100vh-80px)] bg-[#F3F4F6] flex flex-col">
@@ -1472,152 +1519,275 @@ export function Settings({ onBack, onLogout, onNavigate, role = 'bishop', initia
             )}
 
             {activeTab === 'profile' && (
-              <div className="grid grid-cols-1 xl:grid-cols-3 gap-8">
-                <form
-                  onSubmit={handleProfileSave}
-                  className="xl:col-span-2 overflow-hidden rounded-[32px] border border-slate-200 bg-white shadow-[0_18px_55px_rgba(15,23,42,0.08)]"
-                >
-                  <div className="relative flex items-start justify-between gap-6 overflow-hidden bg-slate-950 p-8 text-white sm:p-10">
-                    <div className="pointer-events-none absolute -right-16 -top-16 h-44 w-44 rounded-full bg-[#D4AF37]/15 blur-3xl" />
-                    <div className="pointer-events-none absolute bottom-0 left-0 h-px w-full bg-gradient-to-r from-transparent via-[#D4AF37]/60 to-transparent" />
-                    <div className="flex items-center gap-4">
-                      <div className="relative shrink-0">
-                        <Avatar
-                          name={`${profileForm.firstName} ${profileForm.lastName}`.trim() || profileForm.email}
-                          photoUrl={avatarUrl}
-                          size={64}
-                          className="shadow-lg shadow-[#D4AF37]/25 ring-2 ring-[#D4AF37]/40"
-                        />
-                        {isEditingProfile && (
-                          <>
-                            <label
-                              htmlFor="profile-photo"
-                              title="Change photo"
-                              className="absolute -bottom-1.5 -right-1.5 flex h-7 w-7 cursor-pointer items-center justify-center rounded-full bg-white text-slate-950 shadow-md transition-colors hover:bg-[#F5D98A]"
-                            >
-                              {avatarBusy ? (
-                                <span className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-slate-400 border-t-transparent" />
-                              ) : (
-                                <Camera className="h-3.5 w-3.5" />
-                              )}
-                            </label>
-                            <input
-                              id="profile-photo"
-                              type="file"
-                              accept="image/png,image/jpeg,image/webp,image/gif"
-                              className="hidden"
-                              onChange={handleAvatarChange}
-                              disabled={avatarBusy}
-                            />
-                          </>
-                        )}
+              <div className="grid grid-cols-1 gap-7 xl:grid-cols-[minmax(280px,0.78fr)_minmax(0,1.45fr)]">
+                <aside className="space-y-6">
+                  <div className="relative overflow-hidden rounded-[28px] border border-slate-900 bg-slate-950 text-white shadow-[0_24px_70px_rgba(15,23,42,0.16)]">
+                    <div className="absolute inset-x-0 top-0 h-1.5 bg-[#D4AF37]" />
+                    <div className="absolute -right-20 top-12 h-44 w-44 rounded-full border border-[#D4AF37]/30" />
+                    <div className="absolute -right-10 top-28 h-28 w-28 rounded-full border border-white/10" />
+                    <div className="relative p-7">
+                      <div className="flex items-start justify-between gap-4">
+                        <div className="relative">
+                          <Avatar
+                            name={profileDisplayName}
+                            photoUrl={avatarUrl}
+                            size={92}
+                            className="shadow-2xl shadow-black/30 ring-4 ring-white/10"
+                          />
+                          {isEditingProfile && (
+                            <>
+                              <label
+                                htmlFor="profile-photo"
+                                title="Change photo"
+                                className="absolute -bottom-2 -right-2 flex h-10 w-10 cursor-pointer items-center justify-center rounded-full border-2 border-slate-950 bg-[#D4AF37] text-slate-950 shadow-lg transition-all hover:bg-[#E5C04B]"
+                              >
+                                {avatarBusy ? (
+                                  <span className="h-4 w-4 animate-spin rounded-full border-2 border-slate-950/30 border-t-slate-950" />
+                                ) : (
+                                  <Camera className="h-4 w-4" />
+                                )}
+                              </label>
+                              <input
+                                id="profile-photo"
+                                type="file"
+                                accept="image/png,image/jpeg,image/webp,image/gif"
+                                className="hidden"
+                                onChange={handleAvatarChange}
+                                disabled={avatarBusy}
+                              />
+                            </>
+                          )}
+                        </div>
+                        <span className="rounded-full border border-emerald-300/25 bg-emerald-400/10 px-3 py-1 text-[10px] font-black uppercase tracking-[0.16em] text-emerald-200">
+                          {profileStatus}
+                        </span>
                       </div>
-                      <div>
-                        <p className="text-[10px] font-black uppercase tracking-[0.22em] text-[#D4AF37]">
+
+                      <div className="mt-7">
+                        <p className="text-[10px] font-black uppercase tracking-[0.24em] text-[#D4AF37]">
                           Personnel Record
                         </p>
-                        <h3 className="mt-1 text-3xl font-serif font-bold text-white">My Profile</h3>
-                        <p className="text-sm text-white/55 mt-1">
-                          {isEditingProfile
-                            ? 'Update your personal information and contact details.'
-                            : 'Your personal information and contact details.'}
-                        </p>
-                        {isEditingProfile && avatarUrl && (
-                          <button
-                            type="button"
-                            onClick={handleAvatarRemove}
-                            disabled={avatarBusy}
-                            className="mt-2 text-[11px] font-bold text-rose-300 hover:text-rose-200 disabled:opacity-50"
-                          >
-                            Remove photo
-                          </button>
-                        )}
+                        <h3 className="mt-2 font-serif text-4xl font-bold leading-tight text-white">
+                          {profileDisplayName}
+                        </h3>
+                        <p className="mt-2 text-sm font-semibold text-white/60">{profileRoleLabel}</p>
                       </div>
+
+                      <div className="mt-7 rounded-[22px] border border-white/10 bg-white/[0.06] p-4">
+                        <div className="flex items-center justify-between gap-3">
+                          <p className="text-[11px] font-black uppercase tracking-[0.18em] text-white/45">
+                            Profile Strength
+                          </p>
+                          <p className="text-sm font-black text-[#F5D98A]">{profileCompletion}%</p>
+                        </div>
+                        <div className="mt-3 h-2 overflow-hidden rounded-full bg-white/10">
+                          <div
+                            className="h-full rounded-full bg-[#D4AF37] transition-all"
+                            style={{ width: `${profileCompletion}%` }}
+                          />
+                        </div>
+                        <p className="mt-3 text-xs leading-relaxed text-white/50">
+                          Complete contact and emergency details to make this profile easier to use during coordination.
+                        </p>
+                      </div>
+
+                      {isEditingProfile && avatarUrl && (
+                        <button
+                          type="button"
+                          onClick={handleAvatarRemove}
+                          disabled={avatarBusy}
+                          className="mt-4 text-xs font-bold text-rose-200 transition-colors hover:text-rose-100 disabled:opacity-50"
+                        >
+                          Remove photo
+                        </button>
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 gap-3 sm:grid-cols-3 xl:grid-cols-1">
+                    {[
+                      { label: 'Email', value: profileForm.email || 'Not provided', icon: AtSign },
+                      { label: 'Phone', value: profileForm.contactNumber || 'Add phone number', icon: Phone },
+                      { label: 'Institution', value: profileInstitutionName, icon: Building2 },
+                    ].map((item) => {
+                      const Icon = item.icon;
+                      return (
+                        <div
+                          key={item.label}
+                          className="rounded-[24px] border border-slate-200 bg-white p-4 shadow-[0_14px_38px_rgba(15,23,42,0.05)]"
+                        >
+                          <div className="flex items-center gap-3">
+                            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-[#FFF4CF] text-[#9A7A17]">
+                              <Icon className="h-4 w-4" />
+                            </div>
+                            <div className="min-w-0">
+                              <p className="text-[10px] font-black uppercase tracking-[0.18em] text-slate-400">
+                                {item.label}
+                              </p>
+                              <p className="truncate text-sm font-extrabold text-slate-900">{item.value}</p>
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+
+                  <div className="rounded-[28px] border border-[#D4AF37]/30 bg-[#FFF8E5] p-5 shadow-[0_14px_40px_rgba(180,131,12,0.08)]">
+                    <div className="flex items-center gap-3">
+                      <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-[#D4AF37] text-slate-950">
+                        <LockKeyhole className="h-5 w-5" />
+                      </div>
+                      <div>
+                        <p className="text-[10px] font-black uppercase tracking-[0.18em] text-[#9A7A17]">
+                          Security
+                        </p>
+                        <h4 className="font-serif text-xl font-bold text-slate-950">Password Access</h4>
+                      </div>
+                    </div>
+                    <p className="mt-4 text-sm leading-relaxed text-slate-600">
+                      Keep account access protected with a fresh password when credentials change hands.
+                    </p>
+                    <button
+                      type="button"
+                      onClick={() => onNavigate?.('change-password')}
+                      className="mt-5 flex w-full items-center justify-between rounded-[18px] bg-slate-950 px-5 py-4 text-sm font-black text-white transition-all hover:bg-slate-800 active:scale-[0.98]"
+                    >
+                      Change Password
+                      <ArrowRight className="h-5 w-5" />
+                    </button>
+                  </div>
+                </aside>
+                <form
+                  onSubmit={handleProfileSave}
+                  className="overflow-hidden rounded-[28px] border border-slate-200 bg-white shadow-[0_24px_70px_rgba(15,23,42,0.08)]"
+                >
+                  <div className="flex flex-col gap-5 border-b border-slate-100 bg-white p-6 sm:flex-row sm:items-center sm:justify-between sm:p-8">
+                    <div>
+                      <div className="inline-flex items-center gap-2 rounded-full bg-slate-950 px-3 py-1 text-[10px] font-black uppercase tracking-[0.18em] text-[#F5D98A]">
+                        <BadgeCheck className="h-3.5 w-3.5" />
+                        Personal Details
+                      </div>
+                      <h3 className="mt-3 font-serif text-3xl font-bold text-slate-950">
+                        {isEditingProfile ? 'Update Your Record' : 'Profile Workspace'}
+                      </h3>
+                      <p className="mt-1 max-w-2xl text-sm leading-relaxed text-slate-500">
+                        {isEditingProfile
+                          ? 'Edit the fields that people rely on when they need to reach you quickly.'
+                          : 'Review your contact information, assigned institution, and account access at a glance.'}
+                      </p>
                     </div>
                     {!isEditingProfile ? (
                       <button
                         type="button"
                         onClick={() => setIsEditingProfile(true)}
-                        className="relative z-10 inline-flex items-center gap-2 rounded-2xl bg-white px-5 py-3 text-sm font-bold text-slate-950 transition-all hover:bg-[#F5D98A] active:scale-[0.98]"
+                        className="inline-flex items-center justify-center gap-2 rounded-[18px] bg-[#D4AF37] px-5 py-3 text-sm font-black text-slate-950 shadow-lg shadow-[#D4AF37]/20 transition-all hover:bg-[#E5C04B] active:scale-[0.98]"
                       >
-                        <Pencil className="w-4 h-4" />
+                        <Pencil className="h-4 w-4" />
                         Edit Profile
                       </button>
                     ) : (
-                      <div className="flex items-center gap-2">
+                      <div className="grid grid-cols-2 gap-2 sm:flex">
                         <button
                           type="button"
                           onClick={() => {
                             resetProfileForm();
                             setIsEditingProfile(false);
                           }}
-                          className="rounded-2xl border border-white/15 bg-white/10 px-5 py-3 text-sm font-bold text-white/70 transition-all hover:bg-white hover:text-slate-950"
+                          className="rounded-[18px] border border-slate-200 px-5 py-3 text-sm font-black text-slate-500 transition-all hover:bg-slate-50"
                         >
                           Cancel
                         </button>
                         <button
                           type="submit"
-                          className="inline-flex items-center gap-2 rounded-2xl bg-[#D4AF37] px-6 py-3 text-sm font-bold text-black shadow-lg shadow-[#D4AF37]/20 transition-all hover:bg-[#E5C04B] active:scale-[0.98]"
+                          className="inline-flex items-center justify-center gap-2 rounded-[18px] bg-slate-950 px-6 py-3 text-sm font-black text-white shadow-lg shadow-slate-950/15 transition-all hover:bg-slate-800 active:scale-[0.98]"
                         >
-                          <Save className="w-4 h-4" />
+                          <Save className="h-4 w-4" />
                           Save
                         </button>
                       </div>
                     )}
                   </div>
 
-                  <div className="p-8 sm:p-10">
+                  <div className="space-y-7 p-6 sm:p-8">
                     {showProfileSuccess && (
-                      <div className="mb-8 p-5 bg-emerald-50 border border-emerald-100 text-emerald-700 rounded-2xl text-sm font-bold animate-in fade-in slide-in-from-top-2 flex items-center gap-3">
-                        <div className="w-8 h-8 bg-emerald-100 rounded-full flex items-center justify-center flex-shrink-0">
-                          <ShieldCheck className="w-5 h-5" />
+                      <div className="rounded-[22px] border border-emerald-100 bg-emerald-50 p-5 text-sm font-bold text-emerald-700 animate-in fade-in slide-in-from-top-2">
+                        <div className="flex items-center gap-3">
+                          <div className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-2xl bg-emerald-100">
+                            <ShieldCheck className="h-5 w-5" />
+                          </div>
+                          Profile updated successfully!
                         </div>
-                        Profile updated successfully!
                       </div>
                     )}
 
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                      {[
-                        { id: 'firstName', label: 'First Name', type: 'text', placeholder: 'First name' },
-                        { id: 'lastName', label: 'Last Name', type: 'text', placeholder: 'Last name' },
-                        { id: 'nickName', label: 'Nick Name', type: 'text', placeholder: 'Preferred name' },
-                        { id: 'email', label: 'Email Address', type: 'email', placeholder: 'name@diocese.ph' },
-                        { id: 'contactNumber', label: 'Contact Number', type: 'tel', placeholder: '+63 900 000 0000' },
-                        { id: 'birthday', label: 'Birthday', type: 'date', placeholder: '' },
-                        {
-                          id: 'emergencyContact',
-                          label: 'Emergency Contact',
-                          type: 'text',
-                          placeholder: 'Name and number',
-                        },
-                      ].map((field) => (
-                        <div key={field.id} className="space-y-2">
-                          <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest ml-1">
-                            {field.label}
-                            {field.id === 'email' && isEditingProfile && (
-                              <span className="ml-1.5 normal-case font-medium text-gray-300">(verified by code)</span>
-                            )}
-                          </label>
-                          <input
-                            type={field.type}
-                            value={(profileForm as any)[field.id]}
-                            disabled={!isEditingProfile}
-                            max={field.type === 'date' ? new Date().toISOString().split('T')[0] : undefined}
-                            onChange={(event) =>
-                              setProfileForm((prev) => ({ ...prev, [field.id]: event.target.value }))
-                            }
-                            placeholder={field.placeholder}
-                            className={`w-full px-5 py-4 rounded-2xl border text-gray-900 transition-all font-medium placeholder:text-gray-300 ${
-                              isEditingProfile
-                                ? 'bg-white border-slate-200 shadow-sm focus:outline-none focus:border-[#D4AF37] focus:ring-4 focus:ring-[#D4AF37]/10'
-                                : 'cursor-default border-slate-100 bg-slate-50 text-gray-700'
-                            }`}
-                          />
+                    <div className="grid grid-cols-1 gap-5 lg:grid-cols-3">
+                      <div className="rounded-[24px] border border-slate-200 bg-slate-50 p-5 lg:col-span-2">
+                        <div className="flex items-center gap-3">
+                          <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-white text-slate-950 shadow-sm">
+                            <UserRound className="h-5 w-5" />
+                          </div>
+                          <div className="min-w-0">
+                            <p className="text-[10px] font-black uppercase tracking-[0.18em] text-slate-400">
+                              Primary Identity
+                            </p>
+                            <p className="truncate text-lg font-extrabold text-slate-950">{profileDisplayName}</p>
+                          </div>
                         </div>
-                      ))}
+                      </div>
+                      <div className="rounded-[24px] border border-[#D4AF37]/30 bg-[#FFFAEA] p-5">
+                        <p className="text-[10px] font-black uppercase tracking-[0.18em] text-[#9A7A17]">
+                          Access Role
+                        </p>
+                        <p className="mt-2 text-lg font-extrabold text-slate-950">{profileRoleLabel}</p>
+                        <p className="mt-1 text-xs font-semibold capitalize text-slate-500">
+                          {auth.currentUser?.entityType || 'Diocese'} account
+                        </p>
+                      </div>
+                    </div>
 
-                      <div className="md:col-span-2 space-y-2">
-                        <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest ml-1">
+                    <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
+                      {profileFieldGroups.flat().map((field) => {
+                        const Icon = field.icon;
+                        return (
+                          <div
+                            key={field.id}
+                            className={`space-y-2 rounded-[24px] border border-slate-200 bg-white p-4 shadow-[0_8px_30px_rgba(15,23,42,0.04)] ${
+                              field.id === 'email'
+                                ? 'xl:col-span-2'
+                                : field.id === 'emergencyContact'
+                                  ? 'xl:col-span-3'
+                                  : ''
+                            }`}
+                          >
+                            <label className="flex items-center gap-2 text-[10px] font-bold uppercase tracking-widest text-slate-400">
+                              <Icon className="h-3.5 w-3.5 text-[#B5952F]" />
+                              {field.label}
+                              {field.id === 'email' && isEditingProfile && (
+                                <span className="normal-case tracking-normal text-slate-300">verified by code</span>
+                              )}
+                            </label>
+                            <input
+                              type={field.type}
+                              value={(profileForm as any)[field.id]}
+                              disabled={!isEditingProfile}
+                              max={field.type === 'date' ? new Date().toISOString().split('T')[0] : undefined}
+                              onChange={(event) =>
+                                setProfileForm((prev) => ({ ...prev, [field.id]: event.target.value }))
+                              }
+                              placeholder={field.placeholder}
+                              className={`w-full rounded-[18px] border px-4 py-3.5 text-sm font-bold text-slate-950 transition-all placeholder:text-slate-300 ${
+                                isEditingProfile
+                                  ? 'border-slate-200 bg-white shadow-sm focus:border-[#D4AF37] focus:outline-none focus:ring-4 focus:ring-[#D4AF37]/10'
+                                  : 'cursor-default border-transparent bg-slate-50 text-slate-700'
+                              }`}
+                            />
+                          </div>
+                        );
+                      })}
+
+                      <div className="space-y-2 rounded-[24px] border border-slate-200 bg-white p-4 shadow-[0_8px_30px_rgba(15,23,42,0.04)] xl:col-span-3">
+                        <label className="flex items-center gap-2 text-[10px] font-bold uppercase tracking-widest text-slate-400">
+                          <MapPin className="h-3.5 w-3.5 text-[#B5952F]" />
                           Address
                         </label>
                         <input
@@ -1626,16 +1796,17 @@ export function Settings({ onBack, onLogout, onNavigate, role = 'bishop', initia
                           disabled={!isEditingProfile}
                           onChange={(event) => setProfileForm((prev) => ({ ...prev, address: event.target.value }))}
                           placeholder="Complete address"
-                          className={`w-full px-5 py-4 rounded-2xl border text-gray-900 transition-all font-medium placeholder:text-gray-300 ${
+                          className={`w-full rounded-[18px] border px-4 py-3.5 text-sm font-bold text-slate-950 transition-all placeholder:text-slate-300 ${
                             isEditingProfile
-                              ? 'bg-white border-slate-200 shadow-sm focus:outline-none focus:border-[#D4AF37] focus:ring-4 focus:ring-[#D4AF37]/10'
-                              : 'cursor-default border-slate-100 bg-slate-50 text-gray-700'
+                              ? 'border-slate-200 bg-white shadow-sm focus:border-[#D4AF37] focus:outline-none focus:ring-4 focus:ring-[#D4AF37]/10'
+                              : 'cursor-default border-transparent bg-slate-50 text-slate-700'
                           }`}
                         />
                       </div>
 
-                      <div className="md:col-span-2 space-y-2">
-                        <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest ml-1">
+                      <div className="space-y-2 rounded-[24px] border border-slate-200 bg-white p-4 shadow-[0_8px_30px_rgba(15,23,42,0.04)] xl:col-span-3">
+                        <label className="flex items-center gap-2 text-[10px] font-bold uppercase tracking-widest text-slate-400">
+                          <NotebookPen className="h-3.5 w-3.5 text-[#B5952F]" />
                           Additional Notes
                         </label>
                         <textarea
@@ -1644,73 +1815,16 @@ export function Settings({ onBack, onLogout, onNavigate, role = 'bishop', initia
                           onChange={(event) => setProfileForm((prev) => ({ ...prev, notes: event.target.value }))}
                           placeholder="Office hours, alternate contact, or other profile notes"
                           rows={4}
-                          className={`w-full px-5 py-4 rounded-2xl border text-gray-900 transition-all font-medium placeholder:text-gray-300 resize-none ${
+                          className={`w-full resize-none rounded-[18px] border px-4 py-3.5 text-sm font-bold text-slate-950 transition-all placeholder:text-slate-300 ${
                             isEditingProfile
-                              ? 'bg-white border-slate-200 shadow-sm focus:outline-none focus:border-[#D4AF37] focus:ring-4 focus:ring-[#D4AF37]/10'
-                              : 'cursor-default border-slate-100 bg-slate-50 text-gray-700'
+                              ? 'border-slate-200 bg-white shadow-sm focus:border-[#D4AF37] focus:outline-none focus:ring-4 focus:ring-[#D4AF37]/10'
+                              : 'cursor-default border-transparent bg-slate-50 text-slate-700'
                           }`}
                         />
                       </div>
                     </div>
                   </div>
                 </form>
-
-                <div className="space-y-8">
-                  <div className="overflow-hidden rounded-[32px] border border-slate-200 bg-white shadow-[0_18px_45px_rgba(15,23,42,0.06)]">
-                    <div className="border-b border-slate-100 bg-gradient-to-br from-[#FFF8E5] to-white p-6">
-                      <p className="text-[10px] font-black uppercase tracking-[0.2em] text-[#B5952F]">Access Summary</p>
-                      <h4 className="mt-1 text-xl font-serif font-bold text-gray-900">Account Details</h4>
-                    </div>
-                    <div className="space-y-4 p-6">
-                      <div>
-                        <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Access Role</p>
-                        <p className="text-sm font-bold text-gray-900 mt-1">
-                          {getAccessRoleLabel(auth.currentUser?.role) || profileForm.position || 'User'}
-                        </p>
-                      </div>
-                      <div>
-                        <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Status</p>
-                        <span className="inline-flex mt-2 px-3 py-1 rounded-full bg-emerald-50 text-emerald-700 text-[10px] font-black uppercase tracking-wider border border-emerald-100">
-                          {auth.currentUser?.status || 'Active'}
-                        </span>
-                      </div>
-                      <div>
-                        <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">
-                          Institution Type
-                        </p>
-                        <p className="text-sm font-bold text-gray-900 mt-1 capitalize">
-                          {auth.currentUser?.entityType || 'Diocese'}
-                        </p>
-                      </div>
-                      <div>
-                        <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">
-                          Assigned Institution
-                        </p>
-                        <p className="text-sm font-bold text-gray-900 mt-1">
-                          {auth.currentUser?.entityName || profileForm.entityName || 'Diocese of San Pablo'}
-                        </p>
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="rounded-[32px] border border-slate-800 bg-slate-950 p-8 text-white shadow-xl shadow-slate-950/10">
-                    <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-[#D4AF37] text-slate-950">
-                      <Shield className="h-5 w-5" />
-                    </div>
-                    <h4 className="mt-5 text-lg font-bold text-white">Password & Security</h4>
-                    <p className="mt-2 text-sm leading-relaxed text-white/55">
-                      Verify your current password and choose a stronger replacement on the secure password page.
-                    </p>
-                    <button
-                      type="button"
-                      onClick={() => onNavigate?.('change-password')}
-                      className="mt-6 flex w-full items-center justify-between rounded-2xl bg-[#D4AF37] px-5 py-4 font-bold text-slate-950 transition-all hover:bg-[#E2BF43] active:scale-[0.98]"
-                    >
-                      Change Password
-                      <ArrowRight className="h-5 w-5" />
-                    </button>
-                  </div>
-                </div>
 
                 {/* ── Email change OTP verification ── */}
                 {emailOtp.open && (
@@ -2182,9 +2296,12 @@ export function Settings({ onBack, onLogout, onNavigate, role = 'bishop', initia
                           >
                             <td className="py-4 pr-4 text-gray-800 text-sm font-semibold">
                               <div className="flex items-center gap-3">
-                                <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-black text-[10px] font-black text-gold-400 shadow-sm ring-1 ring-gold-500/35">
-                                  {getInitials(account.leader || account.email)}
-                                </span>
+                                <Avatar
+                                  name={account.leader || account.email}
+                                  photoUrl={account.avatarUrl || account.photoURL}
+                                  size={32}
+                                  className="shadow-sm"
+                                />
                                 <span>{getFormattedFullName(account.leader)}</span>
                               </div>
                             </td>
@@ -2302,34 +2419,9 @@ export function Settings({ onBack, onLogout, onNavigate, role = 'bishop', initia
                       onClick={(e) => e.stopPropagation()}
                       className="flex max-h-[88vh] w-full max-w-2xl flex-col overflow-hidden rounded-3xl bg-white shadow-2xl"
                     >
-                      {/* Dark header */}
-                      <div className="flex items-start justify-between gap-4 bg-slate-900 p-6 text-white">
-                        <div className="flex min-w-0 items-center gap-4">
-                          <Avatar
-                            name={getFormattedFullName(viewAccount.leader) || viewAccount.email}
-                            photoUrl={viewAccount.avatarUrl}
-                            size={48}
-                            className="ring-2 ring-gold-500/40"
-                          />
-                          <div className="min-w-0">
-                            <div className="flex items-center gap-2">
-                              <span className="rounded-md border border-white/15 bg-white/10 px-2 py-0.5 text-[10px] font-black uppercase tracking-wider text-white/70">
-                                {viewAccount.role}
-                              </span>
-                              <span
-                                className={`rounded-md px-2 py-0.5 text-[10px] font-black uppercase tracking-wider ${
-                                  isArchived ? 'bg-rose-500/20 text-rose-200' : 'bg-emerald-500/20 text-emerald-200'
-                                }`}
-                              >
-                                {isArchived ? 'Archived' : 'Active'}
-                              </span>
-                            </div>
-                            <h3 className="mt-1.5 truncate font-serif text-2xl font-bold">
-                              {getFormattedFullName(viewAccount.leader) || viewAccount.email}
-                            </h3>
-                          </div>
-                        </div>
-                        <div className="flex shrink-0 items-center gap-1">
+                      {/* Centered profile header */}
+                      <div className="relative bg-slate-950 px-6 pb-8 pt-6 text-white">
+                        <div className="absolute right-5 top-5 flex shrink-0 items-center gap-1">
                           {!isArchived && (
                             <button
                               onClick={() => {
@@ -2362,6 +2454,33 @@ export function Settings({ onBack, onLogout, onNavigate, role = 'bishop', initia
                           >
                             <X className="h-5 w-5" />
                           </button>
+                        </div>
+                        <div className="mx-auto flex max-w-md flex-col items-center pt-8 text-center">
+                          <div className="rounded-full bg-gradient-to-br from-gold-300 via-gold-500 to-gold-600 p-1.5 shadow-[0_18px_45px_rgba(212,175,55,0.32)]">
+                            <Avatar
+                              name={getFormattedFullName(viewAccount.leader) || viewAccount.email}
+                              photoUrl={viewAccount.avatarUrl}
+                              size={104}
+                              className="border-4 border-slate-950 ring-2 ring-gold-400/70"
+                            />
+                          </div>
+                          <h3 className="mt-4 max-w-full truncate font-serif text-3xl font-bold text-white">
+                            {getFormattedFullName(viewAccount.leader) || viewAccount.email}
+                          </h3>
+                          <div className="mt-3 flex max-w-full flex-wrap items-center justify-center gap-2">
+                            <span className="rounded-full border border-gold-400/35 bg-gold-500/15 px-3 py-1 text-[10px] font-black uppercase tracking-wider text-gold-300">
+                              {viewAccount.role}
+                            </span>
+                            <span
+                              className={`rounded-full px-3 py-1 text-[10px] font-black uppercase tracking-wider ${
+                                isArchived
+                                  ? 'bg-rose-500/20 text-rose-200 ring-1 ring-rose-300/20'
+                                  : 'bg-emerald-500/20 text-emerald-200 ring-1 ring-emerald-300/20'
+                              }`}
+                            >
+                              {isArchived ? 'Archived' : 'Active'}
+                            </span>
+                          </div>
                         </div>
                       </div>
 

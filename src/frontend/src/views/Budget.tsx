@@ -269,12 +269,6 @@ function InstitutionBudget({
   }, [amounts, savedAmounts]);
 
   const showReminder = canManage && !loading && year === currentYear && Object.keys(savedAmounts).length === 0;
-  const nextEmptyMonth = useMemo(() => {
-    for (let m = 1; m <= 12; m++) {
-      if (amounts[m] === undefined || amounts[m] === '') return MONTH_NAMES[m - 1];
-    }
-    return 'Ready';
-  }, [amounts]);
 
   const handleSave = async () => {
     if (isPastYear) {
@@ -316,55 +310,35 @@ function InstitutionBudget({
 
   return (
     <div className="mx-auto max-w-7xl px-4 py-6 sm:px-6 md:py-8">
-      <section className="relative overflow-hidden border border-black/10 bg-[#fffdf7] shadow-2xl shadow-black/10">
-        <div className="grid lg:grid-cols-[330px_minmax(0,1fr)]">
-          <aside className="relative bg-church-black p-6 text-white md:p-8">
-            <div className="absolute right-0 top-0 h-full w-7 bg-gold-500 [clip-path:polygon(0_0,100%_0,34%_100%,0_100%)]" />
-            <div className="relative">
-              <div className="inline-flex items-center gap-2 border border-gold-500/35 px-3 py-2 text-[10px] font-black uppercase tracking-[0.22em] text-gold-300">
-                <Sparkles className="h-3.5 w-3.5" />
-                Budget studio
-              </div>
-              <h1 className="mt-7 font-serif text-4xl font-bold leading-none md:text-5xl">Budget workspace</h1>
-              <p className="mt-4 text-sm font-medium leading-6 text-white/58">
-                {canManage
-                  ? `Plan ${institutionName || 'your institution'} month by month with the full annual picture always visible.`
-                  : `Review ${institutionName || 'this institution'} in a focused annual budget workspace.`}
-              </p>
-              <div className="mt-8">
-                <YearSelector year={year} onChange={setYear} dark />
-              </div>
+      <section className="relative overflow-hidden rounded-[2.25rem] bg-church-black p-6 text-white shadow-2xl shadow-black/15 md:p-8">
+        <div className="absolute right-0 top-0 h-full w-1/3 bg-gold-500/20 [clip-path:polygon(38%_0,100%_0,100%_100%,0_100%)]" />
+        <div className="relative grid gap-8 lg:grid-cols-[1fr_320px] lg:items-center">
+          <div>
+            <div className="mb-5 inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/10 px-4 py-2 text-[10px] font-black uppercase tracking-[0.22em] text-gold-300">
+              <Sparkles className="h-3.5 w-3.5" />
+              Budget studio
             </div>
-          </aside>
-
-          <div className="relative p-5 md:p-8">
-            <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(90deg,rgba(0,0,0,0.035)_1px,transparent_1px),linear-gradient(180deg,rgba(0,0,0,0.035)_1px,transparent_1px)] bg-[size:42px_42px]" />
-            <div className="relative grid gap-4 md:grid-cols-[minmax(0,1fr)_180px]">
-              <div className="border-b-4 border-black bg-white p-5 shadow-lg shadow-black/5">
-                <p className="text-[10px] font-black uppercase tracking-[0.22em] text-gray-400">Annual allocation</p>
-                <p className="mt-3 break-words font-serif text-5xl font-bold leading-none text-church-black md:text-6xl">
-                  {peso.format(totalEntered)}
-                </p>
-                <div className="mt-5 grid gap-3 sm:grid-cols-3">
-                  <div className="border-l-4 border-gold-500 bg-[#fbfaf2] px-4 py-3">
-                    <p className="text-[10px] font-black uppercase tracking-widest text-gray-400">Months set</p>
-                    <p className="mt-1 font-serif text-2xl font-bold text-church-black">{monthsSet} / 12</p>
-                  </div>
-                  <div className="border-l-4 border-black bg-[#fbfaf2] px-4 py-3">
-                    <p className="text-[10px] font-black uppercase tracking-widest text-gray-400">Average</p>
-                    <p className="mt-1 font-serif text-2xl font-bold text-church-black">
-                      {monthsSet > 0 ? peso.format(average) : 'None'}
-                    </p>
-                  </div>
-                  <div className="border-l-4 border-gold-500 bg-[#fbfaf2] px-4 py-3">
-                    <p className="text-[10px] font-black uppercase tracking-widest text-gray-400">Next focus</p>
-                    <p className="mt-1 font-serif text-2xl font-bold text-church-black">{nextEmptyMonth}</p>
-                  </div>
-                </div>
-              </div>
-
-              <div className="flex items-center justify-center bg-black p-5 text-white">
+            <h1 className="max-w-3xl font-serif text-4xl font-bold leading-[0.98] tracking-tight md:text-6xl">
+              Shape the monthly plan without losing the full year.
+            </h1>
+            <p className="mt-4 max-w-2xl text-sm font-medium leading-6 text-white/60 md:text-base">
+              {canManage
+                ? `Set the planned monthly budget for ${institutionName || 'your institution'} with fast scanning, clear progress, and a sticky save action.`
+                : `Review the monthly budget submitted for ${institutionName || 'your institution'} in a focused annual view.`}
+            </p>
+          </div>
+          <div className="flex flex-col gap-4">
+            <YearSelector year={year} onChange={setYear} dark />
+            <div className="rounded-[2rem] border border-white/10 bg-white/10 p-5">
+              <div className="flex items-center justify-between gap-4">
                 <ProgressRing value={completion} label="planned" />
+                <div className="min-w-0 text-right">
+                  <p className="text-[10px] font-black uppercase tracking-[0.2em] text-white/45">Annual total</p>
+                  <p className="mt-2 break-words font-serif text-3xl font-bold leading-tight text-gold-300">
+                    {peso.format(totalEntered)}
+                  </p>
+                  <p className="mt-2 text-xs font-semibold text-white/45">{monthsSet} of 12 months set</p>
+                </div>
               </div>
             </div>
           </div>
@@ -406,7 +380,7 @@ function InstitutionBudget({
         )}
       </AnimatePresence>
 
-      <section className="mt-6 grid gap-3 md:grid-cols-3">
+      <section className="mt-6 grid gap-4 md:grid-cols-3">
         <SpotlightMetric
           icon={Target}
           label="Months set"
@@ -433,38 +407,34 @@ function InstitutionBudget({
         </div>
       ) : (
         <>
-          <section className="mt-6 overflow-hidden border border-black/10 bg-white shadow-xl shadow-black/5">
-            <div className="flex flex-col gap-3 border-b-4 border-black bg-[#fbfaf7] px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
+          <section className="mt-6 overflow-hidden rounded-[2rem] border border-black/10 bg-white shadow-sm">
+            <div className="flex flex-col gap-3 border-b border-black/5 bg-[#fbfaf7] px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
               <div>
                 <p className="text-[10px] font-black uppercase tracking-[0.2em] text-gold-600">Monthly planner</p>
-                <h2 className="mt-1 font-serif text-2xl font-bold text-church-black">Twelve-month ledger</h2>
+                <h2 className="mt-1 font-serif text-2xl font-bold text-church-black">Twelve-month budget map</h2>
               </div>
-              <div className="flex flex-wrap gap-1.5">
+              <div className="flex flex-wrap gap-2">
                 {MONTH_SHORT.map((label, idx) => {
                   const isSet = amounts[idx + 1] !== undefined && amounts[idx + 1] !== '';
                   return (
                     <span
                       key={label}
-                      className={`h-8 w-8 border text-center text-[9px] font-black leading-8 ${
-                        isSet ? 'border-black bg-gold-500 text-black' : 'border-gray-200 bg-white text-gray-300'
-                      }`}
+                      className={`h-2.5 w-7 rounded-full ${isSet ? 'bg-gold-500' : 'bg-gray-200'}`}
                       aria-label={`${label} ${isSet ? 'set' : 'not set'}`}
-                    >
-                      {label[0]}
-                    </span>
+                    />
                   );
                 })}
               </div>
             </div>
 
-            <div className="grid grid-cols-1 lg:grid-cols-[260px_1fr]">
+            <div className="grid grid-cols-1 divide-y divide-black/5 md:grid-cols-2 md:divide-x md:divide-y-0 xl:grid-cols-[280px_1fr]">
               <aside className="bg-church-black p-5 text-white">
                 <p className="text-[10px] font-black uppercase tracking-[0.22em] text-gold-300">Planning pulse</p>
                 <p className="mt-3 font-serif text-4xl font-bold leading-none">{monthsSet}</p>
                 <p className="mt-2 text-sm font-semibold text-white/55">months already prepared for {year}</p>
-                <div className="mt-6 space-y-4">
-                  <div className="h-4 border border-white/15 bg-white/5">
-                    <div className="h-full bg-gold-500" style={{ width: `${completion}%` }} />
+                <div className="mt-6 space-y-3">
+                  <div className="h-3 overflow-hidden rounded-full bg-white/10">
+                    <div className="h-full rounded-full bg-gold-500" style={{ width: `${completion}%` }} />
                   </div>
                   <p className="text-xs font-medium text-white/50">
                     {monthsSet === 12
@@ -485,15 +455,15 @@ function InstitutionBudget({
                       initial={{ opacity: 0, y: 10 }}
                       animate={{ opacity: 1, y: 0 }}
                       transition={{ delay: idx * 0.025 }}
-                      className={`group min-h-[172px] border-b border-black/10 p-5 transition-colors sm:border-r ${
-                        isSet ? 'bg-white hover:bg-[#fffaf0]' : 'bg-[#f7f7f7] hover:bg-white'
+                      className={`group border-b border-black/5 p-5 transition-colors sm:odd:border-r xl:border-r ${
+                        isSet ? 'bg-white' : 'bg-gray-50/70'
                       }`}
                     >
                       <div className="mb-4 flex items-center justify-between gap-3">
                         <div className="flex items-center gap-3">
                           <span
-                            className={`flex h-10 w-10 items-center justify-center border font-serif text-lg font-bold ${
-                              isSet ? 'border-black bg-gold-500 text-black' : 'border-gray-200 bg-white text-gray-300'
+                            className={`flex h-10 w-10 items-center justify-center rounded-2xl font-serif text-lg font-bold ${
+                              isSet ? 'bg-gold-500 text-black' : 'bg-white text-gray-300 ring-1 ring-gray-200'
                             }`}
                           >
                             {month}
@@ -506,7 +476,7 @@ function InstitutionBudget({
                           </div>
                         </div>
                         {isSet && (
-                          <span className="flex h-7 w-7 items-center justify-center bg-black text-gold-400">
+                          <span className="flex h-7 w-7 items-center justify-center rounded-full bg-green-50 text-green-600 ring-1 ring-green-100">
                             <Check className="h-4 w-4" />
                           </span>
                         )}
@@ -524,7 +494,7 @@ function InstitutionBudget({
                             value={value}
                             onChange={(e) => setAmounts((prev) => ({ ...prev, [month]: e.target.value }))}
                             placeholder="0.00"
-                            className="h-14 w-full border border-gray-200 bg-white pl-14 pr-4 text-base font-bold text-church-black shadow-sm transition-all placeholder:text-gray-300 focus:border-gold-500 focus:outline-none focus:ring-4 focus:ring-gold-500/10 [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
+                            className="h-14 w-full rounded-2xl border border-gray-200 bg-white pl-14 pr-4 text-base font-bold text-church-black shadow-sm transition-all placeholder:text-gray-300 focus:border-gold-500 focus:outline-none focus:ring-4 focus:ring-gold-500/10 [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
                           />
                         </label>
                       ) : (
@@ -541,9 +511,9 @@ function InstitutionBudget({
 
           {canEdit && (
             <div className="sticky bottom-4 z-20 mt-8">
-              <div className="flex flex-col gap-4 border border-black/10 bg-white/95 p-4 shadow-2xl shadow-black/15 backdrop-blur md:flex-row md:items-center">
+              <div className="flex flex-col gap-4 rounded-[2rem] border border-black/10 bg-white/95 p-4 shadow-2xl shadow-black/15 backdrop-blur md:flex-row md:items-center">
                 <div className="flex flex-1 items-center gap-4">
-                  <div className="flex h-12 w-12 items-center justify-center bg-black text-gold-400">
+                  <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-black text-gold-400">
                     <Wallet className="h-5 w-5" />
                   </div>
                   <div>
@@ -571,7 +541,7 @@ function InstitutionBudget({
                   whileTap={{ scale: 0.97 }}
                   onClick={handleSave}
                   disabled={isSaving || !hasUnsaved}
-                  className="inline-flex h-14 items-center justify-center gap-3 bg-gold-500 px-7 text-sm font-black uppercase tracking-widest text-black shadow-xl shadow-gold-500/20 transition-all hover:bg-gold-600 disabled:opacity-50"
+                  className="inline-flex h-14 items-center justify-center gap-3 rounded-2xl bg-gold-500 px-7 text-sm font-black uppercase tracking-widest text-black shadow-xl shadow-gold-500/20 transition-all hover:bg-gold-600 disabled:opacity-50"
                 >
                   {isSaving ? (
                     <div className="h-5 w-5 animate-spin rounded-full border-2 border-black/30 border-t-black" />
@@ -683,18 +653,18 @@ function DioceseBudgetOverview() {
 
   return (
     <div className="mx-auto max-w-7xl px-4 py-6 sm:px-6 md:py-8">
-      <section className="grid overflow-hidden border border-black/10 bg-white shadow-2xl shadow-black/10 lg:grid-cols-[minmax(0,1fr)_360px]">
-        <div className="relative overflow-hidden bg-church-black p-6 text-white md:p-8">
-          <div className="absolute right-0 top-0 h-full w-12 bg-gold-500 [clip-path:polygon(58%_0,100%_0,42%_100%,0_100%)]" />
+      <section className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_360px]">
+        <div className="relative overflow-hidden rounded-[2.25rem] bg-church-black p-6 text-white shadow-2xl shadow-black/15 md:p-8">
+          <div className="absolute bottom-0 right-0 h-40 w-72 bg-gold-500/20 [clip-path:polygon(30%_0,100%_0,100%_100%,0_100%)]" />
           <div className="relative flex flex-col gap-8">
             <div className="flex flex-col gap-5 sm:flex-row sm:items-start sm:justify-between">
               <div>
-                <div className="inline-flex items-center gap-2 border border-white/10 bg-white/5 px-4 py-2 text-[10px] font-black uppercase tracking-[0.22em] text-gold-300">
+                <div className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/10 px-4 py-2 text-[10px] font-black uppercase tracking-[0.22em] text-gold-300">
                   <Landmark className="h-3.5 w-3.5" />
                   Diocese budget board
                 </div>
                 <h1 className="mt-5 max-w-3xl font-serif text-4xl font-bold leading-[0.98] tracking-tight md:text-6xl">
-                  Budget command center
+                  Budget Overview
                 </h1>
                 <p className="mt-4 max-w-2xl text-sm font-medium leading-6 text-white/60 md:text-base">
                   Monitor submissions, spot planning gaps, and open each institution for month-by-month detail.
@@ -728,16 +698,15 @@ function DioceseBudgetOverview() {
           </div>
         </div>
 
-        <aside className="relative border-l border-black/10 p-6 md:p-8">
-          <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(90deg,rgba(0,0,0,0.04)_1px,transparent_1px),linear-gradient(180deg,rgba(0,0,0,0.04)_1px,transparent_1px)] bg-[size:36px_36px]" />
-          <div className="relative flex items-center justify-between gap-4">
+        <aside className="rounded-[2.25rem] border border-black/10 bg-white p-6 shadow-sm">
+          <div className="flex items-center justify-between gap-4">
             <div>
               <p className="text-[10px] font-black uppercase tracking-[0.2em] text-gray-400">Annual readiness</p>
-              <h2 className="mt-2 font-serif text-5xl font-bold text-church-black">{Math.round(submittedProgress)}%</h2>
+              <h2 className="mt-2 font-serif text-3xl font-bold text-church-black">{Math.round(submittedProgress)}%</h2>
             </div>
             <ProgressRing value={submittedProgress} label="ready" />
           </div>
-          <div className="relative mt-7 border-t-4 border-black pt-5">
+          <div className="mt-7 border-t border-black/5 pt-5">
             <p className="text-[10px] font-black uppercase tracking-[0.2em] text-gray-400">Highest visible budget</p>
             <p className="mt-2 line-clamp-2 font-serif text-xl font-bold leading-tight text-church-black">
               {highestInstitution?.name ?? 'No institution yet'}
@@ -749,7 +718,7 @@ function DioceseBudgetOverview() {
         </aside>
       </section>
 
-      <section className="mt-6 border border-black/10 bg-white p-4 shadow-sm md:p-5">
+      <section className="mt-6 rounded-[2rem] border border-black/10 bg-white p-4 shadow-sm md:p-5">
         <div className="flex flex-col gap-3 md:flex-row md:items-center">
           <div className="relative flex-1">
             <Search className="absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-300" />
@@ -758,13 +727,13 @@ function DioceseBudgetOverview() {
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               placeholder="Search institution..."
-              className="h-12 w-full border border-gray-200 bg-gray-50/70 pl-11 pr-4 text-sm font-semibold text-church-black transition-all placeholder:text-gray-300 focus:border-gold-500 focus:bg-white focus:outline-none focus:ring-4 focus:ring-gold-500/10"
+              className="h-12 w-full rounded-2xl border border-gray-200 bg-gray-50/70 pl-11 pr-4 text-sm font-semibold text-church-black transition-all placeholder:text-gray-300 focus:border-gold-500 focus:bg-white focus:outline-none focus:ring-4 focus:ring-gold-500/10"
             />
           </div>
           <FilterModal
             activeCount={budgetFilterCount}
             onClear={clearBudgetFilters}
-            triggerClassName="h-12 rounded-none border-black/10"
+            triggerClassName="h-12 rounded-2xl border-black/10"
           >
             <FilterField label="Institution type">
               <select
@@ -773,7 +742,7 @@ function DioceseBudgetOverview() {
                   setTypeFilter(e.target.value as 'all' | 'parish' | 'school' | 'seminary');
                   setInstitutionFilter('all');
                 }}
-                className={selectField(typeFilter !== 'all', 'h-11 w-full rounded-none px-4 text-sm font-bold')}
+                className={selectField(typeFilter !== 'all', 'h-11 w-full rounded-2xl px-4 text-sm font-bold')}
               >
                 <option value="all">All types</option>
                 <option value="parish">Parishes</option>
@@ -786,7 +755,7 @@ function DioceseBudgetOverview() {
               <select
                 value={institutionFilter}
                 onChange={(e) => setInstitutionFilter(e.target.value)}
-                className={selectField(institutionFilter !== 'all', 'h-11 w-full rounded-none px-4 text-sm font-bold')}
+                className={selectField(institutionFilter !== 'all', 'h-11 w-full rounded-2xl px-4 text-sm font-bold')}
               >
                 <option value="all">All institutions</option>
                 {institutionOptions.map((name) => (
@@ -805,8 +774,8 @@ function DioceseBudgetOverview() {
           <InlineLoader label="Loading budgets" />
         </div>
       ) : filtered.length === 0 ? (
-        <div className="mt-6 flex flex-col items-center justify-center border border-dashed border-black/10 bg-white py-20 text-center">
-          <div className="flex h-20 w-20 items-center justify-center bg-gray-50 text-gray-300">
+        <div className="mt-6 flex flex-col items-center justify-center rounded-[2rem] border border-dashed border-black/10 bg-white py-20 text-center">
+          <div className="flex h-20 w-20 items-center justify-center rounded-[1.75rem] bg-gray-50 text-gray-300">
             <Wallet className="h-9 w-9" />
           </div>
           <p className="mt-5 font-serif text-2xl font-bold text-church-black">No budgets submitted</p>
@@ -817,8 +786,8 @@ function DioceseBudgetOverview() {
           </p>
         </div>
       ) : (
-        <section className="mt-6 overflow-hidden border border-black/10 bg-white shadow-xl shadow-black/5">
-          <div className="grid grid-cols-[1fr_auto_auto] gap-4 border-b-4 border-black bg-[#fbfaf7] px-5 py-4 text-[10px] font-black uppercase tracking-[0.2em] text-gray-400">
+        <section className="mt-6 overflow-hidden rounded-[2rem] border border-black/10 bg-white shadow-sm">
+          <div className="grid grid-cols-[1fr_auto_auto] gap-4 border-b border-black/5 bg-[#fbfaf7] px-5 py-4 text-[10px] font-black uppercase tracking-[0.2em] text-gray-400">
             <span>Institution</span>
             <span className="hidden text-right md:block">Plan map</span>
             <span className="text-right">Total</span>
@@ -836,17 +805,17 @@ function DioceseBudgetOverview() {
                   animate={{ opacity: 1, y: 0 }}
                   exit={{ opacity: 0, y: -8 }}
                   transition={{ delay: idx * 0.025 }}
-                  className="border-b border-black/10 last:border-b-0"
+                  className="border-b border-black/5 last:border-b-0"
                 >
                   <button
                     onClick={() => setExpanded(isOpen ? null : inst.institutionId)}
-                    className="group grid w-full grid-cols-1 gap-4 px-5 py-5 text-left transition-colors hover:bg-[#fffaf0] md:grid-cols-[minmax(0,1fr)_260px_150px_auto] md:items-center"
+                    className="group grid w-full grid-cols-1 gap-4 px-5 py-5 text-left transition-colors hover:bg-gray-50/70 md:grid-cols-[minmax(0,1fr)_260px_150px_auto] md:items-center"
                   >
                     <div className="flex min-w-0 items-center gap-4">
-                      <div className={`h-14 w-2 bg-gradient-to-b ${badge.rail}`} />
+                      <div className={`h-14 w-1.5 rounded-full bg-gradient-to-b ${badge.rail}`} />
                       <div className="min-w-0">
                         <span
-                          className={`inline-flex items-center gap-1.5 border px-3 py-1 text-[10px] font-black uppercase tracking-widest ${badge.className}`}
+                          className={`inline-flex items-center gap-1.5 rounded-lg px-3 py-1 text-[10px] font-black uppercase tracking-widest ${badge.className}`}
                         >
                           <BadgeIcon className="h-3 w-3" />
                           {badge.label}
@@ -857,14 +826,14 @@ function DioceseBudgetOverview() {
                       </div>
                     </div>
 
-                    <div className="hidden items-center gap-1 md:flex">
+                    <div className="hidden items-center gap-1.5 md:flex">
                       {MONTH_SHORT.map((label, mIdx) => {
                         const set = inst.months[mIdx + 1] !== undefined;
                         return (
                           <span
                             key={label}
                             title={`${label}: ${set ? peso.format(inst.months[mIdx + 1]) : 'Not set'}`}
-                            className={`h-8 flex-1 border ${set ? 'border-black bg-gold-500' : 'border-gray-200 bg-gray-100'}`}
+                            className={`h-8 flex-1 rounded-lg ${set ? 'bg-gold-500' : 'bg-gray-200'}`}
                           />
                         );
                       })}
@@ -887,7 +856,7 @@ function DioceseBudgetOverview() {
                       </div>
                     </div>
 
-                    <div className="hidden h-10 w-10 items-center justify-center bg-gray-50 text-gray-300 transition-all group-hover:bg-black group-hover:text-gold-400 md:flex">
+                    <div className="hidden h-10 w-10 items-center justify-center rounded-full bg-gray-50 text-gray-300 transition-all group-hover:bg-black group-hover:text-gold-400 md:flex">
                       <ChevronDown
                         className={`h-5 w-5 transition-transform duration-300 ${isOpen ? 'rotate-180' : ''}`}
                       />
@@ -902,19 +871,19 @@ function DioceseBudgetOverview() {
                         exit={{ opacity: 0, height: 0 }}
                         transition={{ duration: 0.22 }}
                       >
-                        <div className="border-t border-black/10 bg-[#fbfaf7] px-5 py-5">
+                        <div className="border-t border-black/5 bg-[#fbfaf7] px-5 py-5">
                           <div className="mb-4 flex items-center gap-2 text-xs font-black uppercase tracking-widest text-gold-600">
                             <ArrowUpRight className="h-4 w-4" />
                             Monthly breakdown
                           </div>
-                          <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-6">
+                          <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
                             {MONTH_SHORT.map((label, mIdx) => {
                               const amount = inst.months[mIdx + 1];
                               const set = amount !== undefined;
                               return (
                                 <div
                                   key={label}
-                                  className={`border p-3 ${
+                                  className={`rounded-2xl border p-3 ${
                                     set ? 'border-black/10 bg-white' : 'border-dashed border-gray-200 bg-white/60'
                                   }`}
                                 >

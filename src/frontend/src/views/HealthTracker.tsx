@@ -13,6 +13,7 @@ import { getSubmissionStatus, type SubmissionStatus } from '../lib/healthDeadlin
 import { getPriestHealthReminder } from '../lib/healthAnnouncements';
 import { FilterModal, FilterField } from '../components/ui/FilterModal';
 import { selectField } from '../lib/formStyles';
+import { getInitials } from '../lib/initials';
 
 interface PriestRecord {
   id: string;
@@ -28,6 +29,8 @@ interface PriestRecord {
   phone: string;
   documentName?: string;
   documentUrl?: string;
+  avatarUrl?: string;
+  photoURL?: string;
 }
 
 // Neutral, restrained palette — a small status dot carries the colour, not the whole chip.
@@ -61,6 +64,35 @@ interface PriestGroup {
   latest: PriestRecord;
   records: PriestRecord[]; // full history, newest first
   matchedIds: string[]; // ids matching the active filter
+}
+
+function priestAvatarUrl(record?: Partial<PriestRecord> | null) {
+  return record?.avatarUrl || record?.photoURL || '';
+}
+
+function PriestAvatar({
+  name,
+  photoUrl,
+  size = 'md',
+  className = '',
+}: {
+  name?: string | null;
+  photoUrl?: string | null;
+  size?: 'md' | 'lg';
+  className?: string;
+}) {
+  const dim = size === 'lg' ? 'h-14 w-14 text-xl' : 'h-12 w-12 text-lg';
+  if (photoUrl) {
+    return (
+      // eslint-disable-next-line @next/next/no-img-element
+      <img src={photoUrl} alt={name ?? 'Priest avatar'} className={`${dim} shrink-0 rounded-2xl object-cover ${className}`} />
+    );
+  }
+  return (
+    <div className={`${dim} flex shrink-0 items-center justify-center rounded-2xl bg-black font-serif font-bold text-gold-400 ring-1 ring-gold-500/35 ${className}`}>
+      {getInitials(name)}
+    </div>
+  );
 }
 
 const HEALTH_STATUS_ICONS = {
@@ -822,6 +854,16 @@ export function HealthTracker() {
     historyByKey.get(k)!.push(p);
   }
 
+  const avatarByPriestKey = new Map<string, string>();
+  for (const profile of allProfiles) {
+    const avatar = profile.avatarUrl || profile.photoURL || profile.photoUrl || '';
+    if (!avatar) continue;
+    const emailKey = String(profile.email || '').trim().toLowerCase();
+    const nameKey = String(profile.displayName || profile.leader || '').trim().toLowerCase();
+    if (emailKey) avatarByPriestKey.set(emailKey, avatar);
+    if (nameKey) avatarByPriestKey.set(nameKey, avatar);
+  }
+
   const groupMap = new Map<string, PriestGroup>();
   for (const p of filteredPriests) {
     const k = groupKey(p);
@@ -831,15 +873,21 @@ export function HealthTracker() {
         .sort((a, b) => new Date(b.lastCheckup || 0).getTime() - new Date(a.lastCheckup || 0).getTime());
       const latest = records[0] || p;
       const withBirth = records.find((r) => r.birthDate) || latest;
+      const profileAvatar =
+        priestAvatarUrl(latest) ||
+        avatarByPriestKey.get(String(latest.email || '').trim().toLowerCase()) ||
+        avatarByPriestKey.get(String(latest.name || '').trim().toLowerCase()) ||
+        '';
+      const latestWithAvatar = profileAvatar ? { ...latest, avatarUrl: profileAvatar } : latest;
       groupMap.set(k, {
         key: k,
-        name: latest.name,
-        position: latest.position,
-        parish: latest.parish,
-        email: latest.email,
-        phone: latest.phone,
+        name: latestWithAvatar.name,
+        position: latestWithAvatar.position,
+        parish: latestWithAvatar.parish,
+        email: latestWithAvatar.email,
+        phone: latestWithAvatar.phone,
         birthDate: withBirth.birthDate,
-        latest,
+        latest: latestWithAvatar,
         records,
         matchedIds: [],
       });
@@ -864,40 +912,44 @@ export function HealthTracker() {
   const myReminder = isPriestView && myRecord ? getPriestHealthReminder(myRecord) : null;
 
   return (
-    <div className="min-h-screen bg-[#f5f5f5] pt-8 pb-20 px-4 sm:px-6 lg:px-8">
-      <div className="max-w-6xl mx-auto">
+    <div className="min-h-screen bg-[#f4f3ef] pt-8 pb-20 px-4 sm:px-6 lg:px-8">
+      <div className="mx-auto max-w-7xl">
         {/* ------ Header ------ */}
-        <div className="mb-6 overflow-hidden rounded-3xl border border-black/10 bg-black text-white shadow-[0_18px_48px_rgba(15,23,42,0.12)]">
-          <div className="flex flex-col gap-6 p-6 md:p-8 lg:flex-row lg:items-center lg:justify-between">
-            <div className="flex min-w-0 items-center gap-4">
-              <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl border border-gold-500/25 bg-white/5">
-                <Heart className="h-5 w-5 text-gold-400" />
-              </div>
-              <div className="min-w-0">
-                <p className="text-[10px] font-black uppercase tracking-[0.28em] text-gold-400">Clergy Wellbeing</p>
-                <h1 className="mt-1 font-serif text-3xl font-bold leading-none text-white md:text-4xl">Health Tracker</h1>
-                <p className="mt-2 max-w-2xl text-sm font-medium leading-relaxed text-white/55">
-                  Monitor priest health check-ups, upcoming birthdays, and wellbeing records.
-                </p>
+        <div className="mb-6 overflow-hidden rounded-[2rem] border border-black/10 bg-black text-white shadow-[0_18px_48px_rgba(15,23,42,0.12)]">
+          <div className="grid lg:grid-cols-[minmax(0,1fr)_390px]">
+            <div className="relative p-6 md:p-8">
+              <div className="absolute bottom-0 right-0 h-full w-24 bg-gold-500 [clip-path:polygon(64%_0,100%_0,46%_100%,0_100%)]" />
+              <div className="relative flex min-w-0 items-start gap-4">
+                <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl border border-gold-500/30 bg-white/5">
+                  <Heart className="h-6 w-6 text-gold-400" />
+                </div>
+                <div className="min-w-0">
+                  <p className="text-[10px] font-black uppercase tracking-[0.28em] text-gold-400">Clergy Wellbeing</p>
+                  <h1 className="mt-2 font-serif text-4xl font-bold leading-none text-white md:text-6xl">Health Tracker</h1>
+                  <p className="mt-4 max-w-2xl text-sm font-medium leading-relaxed text-white/58">
+                    Monitor priest health check-ups, upcoming birthdays, and wellbeing records with fast scanning and clear follow-up cues.
+                  </p>
+                </div>
               </div>
             </div>
 
-            <div className="flex items-center gap-3">
-              <div className="grid grid-cols-3 gap-2 sm:min-w-[300px]">
+            <div className="border-t border-white/10 bg-white/[0.04] p-5 lg:border-l lg:border-t-0">
+              <div className="grid grid-cols-3 gap-2">
                 {[
                   { label: 'Priests', value: activePriests.length, Icon: Users },
                   { label: 'Birthdays', value: upcomingBirthdays.filter((p) => !isArchived(p)).length, Icon: Cake },
                   { label: 'Check-ups', value: priestsNeedingCheckup.filter((p) => !isArchived(p)).length, Icon: Stethoscope },
                 ].map(({ label, value, Icon }) => (
-                  <div key={label} className="rounded-2xl border border-white/10 bg-white/[0.06] p-3">
+                  <div key={label} className="rounded-2xl border border-white/10 bg-black/30 p-3">
                     <div className="flex items-center justify-between gap-2">
-                      <span className="text-[10px] font-black uppercase tracking-[0.14em] text-white/35">{label}</span>
+                      <span className="text-[9px] font-black uppercase tracking-[0.14em] text-white/38">{label}</span>
                       <Icon className="h-3.5 w-3.5 text-gold-400" />
                     </div>
-                    <p className="mt-2 text-2xl font-black leading-none text-white">{value}</p>
+                    <p className="mt-2 text-3xl font-black leading-none text-white">{value}</p>
                   </div>
                 ))}
               </div>
+
               {canManageRecords && (
                 <button
                   onClick={() => {
@@ -915,7 +967,7 @@ export function HealthTracker() {
                     });
                     setShowForm(true);
                   }}
-                  className="inline-flex h-11 shrink-0 items-center justify-center gap-2 rounded-2xl bg-gold-500 px-5 text-[11px] font-black uppercase tracking-[0.18em] text-black shadow-lg shadow-gold-500/20 transition-all hover:bg-gold-400"
+                  className="mt-4 inline-flex h-12 w-full shrink-0 items-center justify-center gap-2 rounded-2xl bg-gold-500 px-5 text-[11px] font-black uppercase tracking-[0.18em] text-black shadow-lg shadow-gold-500/20 transition-all hover:bg-gold-400"
                 >
                   <Plus className="h-4 w-4" />
                   Add Record
@@ -943,9 +995,9 @@ export function HealthTracker() {
           </div>
         )}
         {/* ------ Filter / search bar ------ */}
-        <div className="mb-6 rounded-3xl border border-slate-200 bg-white p-3 shadow-[0_12px_32px_rgba(15,23,42,0.06)]">
-          <div className="flex flex-col gap-3 lg:flex-row lg:items-center">
-            <div className="flex flex-wrap gap-2">
+        <div className="mb-6 rounded-[2rem] border border-black/10 bg-white p-3 shadow-[0_12px_32px_rgba(15,23,42,0.06)]">
+          <div className="grid gap-3 xl:grid-cols-[minmax(0,1fr)_420px] xl:items-center">
+            <div className="grid grid-cols-2 gap-2 md:grid-cols-4">
               {([
                 { id: 'all', label: 'All', Icon: Users },
                 { id: 'birthdays', label: 'Birthdays', Icon: Cake },
@@ -965,14 +1017,14 @@ export function HealthTracker() {
                   <button
                     key={id}
                     onClick={() => setFilter(id)}
-                    className={`inline-flex h-11 items-center gap-2 rounded-2xl px-4 text-[11px] font-black uppercase tracking-[0.12em] transition-all ${
+                    className={`inline-flex h-12 min-w-0 items-center justify-center gap-2 rounded-2xl px-3 text-[10px] font-black uppercase tracking-[0.1em] transition-all ${
                       active
                         ? 'bg-black text-white shadow-lg shadow-black/10'
-                        : 'border border-transparent text-slate-500 hover:border-slate-200 hover:bg-slate-50 hover:text-slate-800'
+                        : 'border border-slate-100 text-slate-500 hover:border-slate-300 hover:bg-slate-50 hover:text-slate-800'
                     }`}
                   >
                     <Icon className={`h-4 w-4 ${active ? 'text-gold-400' : 'text-slate-400'}`} />
-                    {label}
+                    <span className="truncate">{label}</span>
                     <span
                       className={`rounded-full px-2 py-0.5 text-[9px] font-black tabular-nums ${
                         active ? 'bg-white/20 text-white' : 'bg-slate-100 text-slate-500'
@@ -985,15 +1037,15 @@ export function HealthTracker() {
               })}
             </div>
 
-            <div className="flex flex-1 flex-col gap-2 sm:flex-row sm:items-center sm:justify-end">
-              <div className="relative w-full sm:max-w-xs sm:flex-1">
+            <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-end">
+              <div className="relative w-full sm:flex-1">
                 <Search className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
                 <input
                   type="text"
                   value={search}
                   onChange={(e) => setSearch(e.target.value)}
                   placeholder="Search name, position, parish..."
-                  className="h-11 w-full rounded-2xl border border-slate-200 bg-slate-50 pl-11 pr-4 text-sm font-semibold text-slate-800 transition-all placeholder:text-slate-400 focus:border-rose-400 focus:bg-white focus:outline-none focus:ring-4 focus:ring-rose-400/10"
+                  className="h-12 w-full rounded-2xl border border-slate-200 bg-slate-50 pl-11 pr-4 text-sm font-semibold text-slate-800 transition-all placeholder:text-slate-400 focus:border-gold-500 focus:bg-white focus:outline-none focus:ring-4 focus:ring-gold-500/10"
                 />
               </div>
               <FilterModal activeCount={healthFilterCount} onClear={clearHealthFilters}>
@@ -1273,7 +1325,7 @@ export function HealthTracker() {
           </div>
         ) : (
           <>
-            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+            <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
               {pagedGroups.map((group) => {
                 const age = group.birthDate ? calculateAge(group.birthDate) : 0;
                 const daysToBirthday = group.birthDate ? getDaysUntilBirthday(group.birthDate) : 999;
@@ -1284,12 +1336,11 @@ export function HealthTracker() {
                     key={group.key}
                     initial={{ opacity: 0, y: 12 }}
                     animate={{ opacity: 1, y: 0 }}
-                    className={`group relative flex flex-col rounded-3xl border border-slate-200 bg-white p-5 shadow-[0_4px_18px_rgba(15,23,42,0.04)] transition-all hover:-translate-y-0.5 hover:border-slate-300 hover:shadow-[0_14px_36px_rgba(15,23,42,0.08)] ${archived ? 'opacity-80' : ''}`}
+                    className={`group relative flex flex-col overflow-hidden rounded-[1.75rem] border border-slate-200 bg-white shadow-[0_4px_18px_rgba(15,23,42,0.04)] transition-all hover:-translate-y-0.5 hover:border-slate-300 hover:shadow-[0_14px_36px_rgba(15,23,42,0.08)] ${archived ? 'opacity-80' : ''}`}
                   >
-                    <button onClick={() => setSelectedGroup(group)} className="flex w-full items-start gap-3 text-left">
-                      <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-slate-100 font-serif text-lg font-bold text-slate-700">
-                        {group.name?.charAt(0)?.toUpperCase() || '?'}
-                      </div>
+                    <div className="h-1.5 bg-gradient-to-r from-black via-gold-500 to-transparent" />
+                    <button onClick={() => setSelectedGroup(group)} className="flex w-full items-start gap-3 px-5 pb-4 pt-5 text-left">
+                      <PriestAvatar name={group.name} photoUrl={priestAvatarUrl(group.latest)} size="lg" />
                       <div className="min-w-0 flex-1">
                         <p className="truncate font-serif text-lg font-bold text-slate-900">{group.name}</p>
                         <p className="truncate text-xs font-semibold text-slate-400">
@@ -1298,7 +1349,7 @@ export function HealthTracker() {
                       </div>
                     </button>
 
-                    <div className="mt-4 space-y-2.5 text-sm">
+                    <div className="space-y-2.5 px-5 pb-5 text-sm">
                       <div className="flex items-center justify-between gap-2">
                         <span className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-slate-400">
                           <Cake className="h-3.5 w-3.5" /> Birthday
@@ -1331,7 +1382,7 @@ export function HealthTracker() {
                     </div>
 
                     {canManageRecords && (
-                      <div className="mt-4 flex items-center justify-end gap-1 border-t border-slate-100 pt-3">
+                      <div className="flex items-center justify-end gap-1 border-t border-slate-100 bg-slate-50/70 px-4 py-3">
                         {archived ? (
                           <button
                             onClick={(e) => {
@@ -1424,9 +1475,11 @@ export function HealthTracker() {
               >
                 <div className="flex items-start justify-between gap-4 bg-slate-900 p-6 text-white">
                   <div className="flex min-w-0 items-center gap-3.5">
-                    <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-white/10 font-serif text-lg font-bold text-white">
-                      {selectedGroup.name?.charAt(0)?.toUpperCase() || '?'}
-                    </div>
+                    <PriestAvatar
+                      name={selectedGroup.name}
+                      photoUrl={priestAvatarUrl(selectedGroup.latest)}
+                      className="ring-gold-500/45"
+                    />
                     <div className="min-w-0">
                       <h2 className="truncate font-serif text-2xl font-bold">{selectedGroup.name}</h2>
                       <p className="truncate text-sm text-white/55">

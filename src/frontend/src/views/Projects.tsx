@@ -4,12 +4,10 @@ import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import {
   Plus,
   Search,
-  Filter,
   LayoutGrid,
   ChevronDown,
   ChevronLeft,
   ChevronRight,
-  Check,
   Target,
   User,
   Building2,
@@ -17,9 +15,12 @@ import {
   GraduationCap,
   School,
   Archive,
-  ArrowUpDown,
   Eye,
   Briefcase,
+  WalletCards,
+  TrendingUp,
+  Clock3,
+  SlidersHorizontal,
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Project, Donation, ProjectCategory, EntityType, ProjectExpense } from '../types';
@@ -31,6 +32,7 @@ import { auth } from '../firebase';
 import { usePermissions } from '../hooks/usePermissions';
 import { dateField, roundedField, selectField } from '../lib/formStyles';
 import { FilterModal, FilterField } from '../components/ui/FilterModal';
+import { formatCurrency } from '../lib/format';
 
 interface ProjectsProps {
   role?: string;
@@ -77,7 +79,7 @@ export function Projects({ role }: ProjectsProps) {
   const { permissions } = usePermissions();
   const canAccessProjects = permissions.view_projects === true || permissions.manage_projects === true;
 
-  // ── Role-based visibility ──────────────────────────────────────────────────
+  // Role-based visibility
   const isDiocese = permissions.view_diocese === true;
   // Oversight roles (e.g. School Superintendent) see every school's projects but
   // do not own any single institution, so they are view-only like the diocese.
@@ -88,8 +90,7 @@ export function Projects({ role }: ProjectsProps) {
   // school overseers are fully view-only; institution owners manage their own.
   const canCreate = permissions.manage_projects === true && !isSchoolOverseer;
   const canManageProject = (p?: Project | null) =>
-    permissions.manage_projects === true &&
-    (isDiocese ? p?.entityType === 'diocese' : isSchoolOverseer ? false : true);
+    permissions.manage_projects === true && (isDiocese ? p?.entityType === 'diocese' : isSchoolOverseer ? false : true);
 
   // Client-side soft archive (projects have no archive column yet).
   const [archivedIds, setArchivedIds] = useState<string[]>(() => {
@@ -164,11 +165,11 @@ export function Projects({ role }: ProjectsProps) {
     ? { id: userContext.id, name: userContext.name, type: userContext.type }
     : null;
 
-  // ── Filtering + sorting + pagination ───────────────────────────────────────
+  // Filtering + sorting + pagination
   const filteredProjects = useMemo(() => {
     let out = projects.slice();
 
-    // School overseers receive every type from the API — keep only schools.
+    // School overseers receive every type from the API, so keep only schools.
     if (isSchoolOverseer) out = out.filter((p) => p.entityType === 'school');
 
     // Diocese view: apply the entity-type dropdown filter client-side so the
@@ -202,7 +203,20 @@ export function Projects({ role }: ProjectsProps) {
       return new Date(b.startDate).getTime() - new Date(a.startDate).getTime(); // recent
     });
     return out;
-  }, [projects, isSchoolOverseer, isDiocese, filterEntityType, filterStatus, filterInstitution, isArchived, searchQuery, filterCategory, dateFrom, dateTo, sortBy]);
+  }, [
+    projects,
+    isSchoolOverseer,
+    isDiocese,
+    filterEntityType,
+    filterStatus,
+    filterInstitution,
+    isArchived,
+    searchQuery,
+    filterCategory,
+    dateFrom,
+    dateTo,
+    sortBy,
+  ]);
 
   // Specific-institution options (per-institution filter, like the Events tab),
   // scoped to the currently selected entity type.
@@ -226,7 +240,10 @@ export function Projects({ role }: ProjectsProps) {
   const pagedProjects = filteredProjects.slice((safePage - 1) * PAGE_SIZE, safePage * PAGE_SIZE);
 
   const visibleForStats = useMemo(
-    () => (isSchoolOverseer ? projects.filter((p) => p.entityType === 'school') : projects).filter((p) => !isArchived(p.id)),
+    () =>
+      (isSchoolOverseer ? projects.filter((p) => p.entityType === 'school') : projects).filter(
+        (p) => !isArchived(p.id),
+      ),
     [projects, isSchoolOverseer, isArchived],
   );
 
@@ -270,7 +287,7 @@ export function Projects({ role }: ProjectsProps) {
     setDateTo('');
   };
 
-  // ── Handlers (unchanged behaviour) ─────────────────────────────────────────
+  // Handlers
   const handleAddProject = (
     newProject: Omit<Project, 'id' | 'currentAmount' | 'healthScore' | 'successProbability' | 'recommendation'>,
   ) => {
@@ -418,71 +435,148 @@ export function Projects({ role }: ProjectsProps) {
     );
   }
 
+  const totalRaised = visibleForStats.reduce((a, p) => a + p.currentAmount, 0);
+  const totalGoal = visibleForStats.reduce((a, p) => a + p.targetAmount, 0);
+  const portfolioProgress = totalGoal > 0 ? Math.min(100, Math.round((totalRaised / totalGoal) * 100)) : 0;
+  const activeProjects = visibleForStats.filter((p) => p.status === 'active').length;
+  const dueSoonProjects = visibleForStats.filter((p) => {
+    const daysLeft = Math.ceil((new Date(p.endDate).getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24));
+    return p.status === 'active' && daysLeft >= 0 && daysLeft <= 30;
+  }).length;
+
   const summaryCards = [
     { label: 'Total', value: visibleForStats.length, icon: LayoutGrid },
     {
       label: 'Raised',
-      value: `₱${visibleForStats.reduce((a, p) => a + p.currentAmount, 0).toLocaleString()}`,
-      icon: Target,
+      value: formatCurrency(totalRaised),
+      icon: WalletCards,
     },
     {
       label: 'Goal',
-      value: `₱${visibleForStats.reduce((a, p) => a + p.targetAmount, 0).toLocaleString()}`,
+      value: formatCurrency(totalGoal),
       icon: Target,
     },
-    { label: 'Donors', value: donations.filter((d) => visibleForStats.some((p) => p.id === d.projectId)).length, icon: User },
+    {
+      label: 'Donors',
+      value: donations.filter((d) => visibleForStats.some((p) => p.id === d.projectId)).length,
+      icon: User,
+    },
   ];
 
   return (
-    <div className="min-h-screen bg-[#f5f5f5] pt-8 pb-20 px-4 sm:px-6 lg:px-8">
+    <div className="min-h-screen bg-[#f5f5f5] pt-6 pb-20 px-4 sm:px-6 lg:px-8">
       <div className="mx-auto w-full max-w-[1500px]">
-        {/* ── Header ── */}
-        <div className="mb-6 overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-[0_18px_48px_rgba(15,23,42,0.08)]">
+        {/* Header */}
+        <div className="mb-5 overflow-hidden rounded-[32px] border border-slate-200 bg-white shadow-[0_24px_60px_rgba(15,23,42,0.08)]">
           <div className="grid gap-0 lg:grid-cols-[minmax(0,1fr)_420px]">
-            <div className="relative p-6 md:p-8">
-              <div className="absolute inset-y-8 left-0 w-1 rounded-r-full bg-gold-500" />
-            <div className="flex min-w-0 items-center gap-4">
-              <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl border border-slate-200 bg-slate-950">
-                <Briefcase className="h-5 w-5 text-gold-400" />
-              </div>
-              <div className="min-w-0">
-                <div className="flex flex-wrap items-center gap-2">
-                  <p className="text-[10px] font-black uppercase tracking-[0.28em] text-gold-400">Diocesan Projects</p>
-                  {isSchoolOverseer && (
-                    <span className="inline-flex items-center gap-1 rounded-md border border-slate-200 bg-slate-100 px-2 py-0.5 text-[9px] font-black uppercase tracking-wider text-slate-500">
-                      <Eye className="h-3 w-3" /> View only
-                    </span>
-                  )}
+            <div className="relative overflow-hidden bg-slate-950 p-6 text-white md:p-8">
+              <div className="absolute right-[-80px] top-[-140px] h-72 w-72 rounded-full border border-gold-400/20" />
+              <div className="absolute bottom-[-110px] right-20 h-60 w-60 rounded-full border border-white/10" />
+              <div className="flex min-w-0 items-center gap-4">
+                <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl border border-gold-400/30 bg-gold-400/10">
+                  <Briefcase className="h-6 w-6 text-gold-400" />
                 </div>
-                <h1 className="mt-1 font-serif text-3xl font-bold leading-none text-slate-950 md:text-4xl">Projects</h1>
-                <p className="mt-2 max-w-2xl text-sm font-medium leading-relaxed text-slate-500">
-                  {isDiocese
-                    ? 'Track fundraising and delivery across every institution in the diocese.'
-                    : isSchoolOverseer
-                      ? 'Oversee fundraising and delivery across all diocesan schools.'
-                      : `Manage and track projects for ${userContext?.name || 'your institution'}.`}
-                </p>
+                <div className="min-w-0">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <p className="text-[10px] font-black uppercase tracking-[0.28em] text-gold-400">
+                      Diocesan Projects
+                    </p>
+                    {isSchoolOverseer && (
+                      <span className="inline-flex items-center gap-1 rounded-full border border-white/10 bg-white/10 px-2.5 py-1 text-[9px] font-black uppercase tracking-wider text-white/70">
+                        <Eye className="h-3 w-3" /> View only
+                      </span>
+                    )}
+                  </div>
+                  <h1 className="mt-2 font-serif text-4xl font-bold leading-none md:text-6xl">Projects</h1>
+                  <p className="mt-3 max-w-2xl text-base font-semibold leading-relaxed text-white/72">
+                    {isDiocese
+                      ? 'Track fundraising momentum, deadlines, and delivery across every institution in the diocese.'
+                      : isSchoolOverseer
+                        ? 'Oversee fundraising momentum and delivery across all diocesan schools.'
+                        : `Manage project funding, timing, and follow-through for ${userContext?.name || 'your institution'}.`}
+                  </p>
+                  <div className="mt-6 grid max-w-xl grid-cols-2 gap-3 sm:grid-cols-3">
+                    <button
+                      type="button"
+                      onClick={() => setFilterStatus('active')}
+                      className="rounded-2xl border border-white/10 bg-white/[0.07] p-3 text-left transition hover:border-gold-400/40 hover:bg-white/[0.1]"
+                    >
+                      <Clock3 className="mb-3 h-4 w-4 text-gold-400" />
+                      <p className="text-2xl font-black leading-none">{activeProjects}</p>
+                      <p className="mt-1 text-[9px] font-black uppercase tracking-[0.18em] text-white/40">Active</p>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setSortBy('progress')}
+                      className="rounded-2xl border border-white/10 bg-white/[0.07] p-3 text-left transition hover:border-gold-400/40 hover:bg-white/[0.1]"
+                    >
+                      <TrendingUp className="mb-3 h-4 w-4 text-gold-400" />
+                      <p className="text-2xl font-black leading-none">{portfolioProgress}%</p>
+                      <p className="mt-1 text-[9px] font-black uppercase tracking-[0.18em] text-white/40">Funded</p>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setDateTo(new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0])
+                      }
+                      className="col-span-2 rounded-2xl border border-white/10 bg-white/[0.07] p-3 text-left transition hover:border-gold-400/40 hover:bg-white/[0.1] sm:col-span-1"
+                    >
+                      <Target className="mb-3 h-4 w-4 text-gold-400" />
+                      <p className="text-2xl font-black leading-none">{dueSoonProjects}</p>
+                      <p className="mt-1 text-[9px] font-black uppercase tracking-[0.18em] text-white/40">Due Soon</p>
+                    </button>
+                  </div>
+                </div>
               </div>
-            </div>
 
               {canCreate && (
                 <button
                   onClick={() => setIsCreateModalOpen(true)}
-                  className="mt-6 inline-flex h-11 shrink-0 items-center justify-center gap-2 rounded-2xl bg-gold-500 px-5 text-[11px] font-black uppercase tracking-[0.18em] text-black shadow-lg shadow-gold-500/20 transition-all hover:bg-gold-400"
+                  className="mt-6 inline-flex h-12 shrink-0 items-center justify-center gap-2 rounded-full bg-gold-500 px-5 text-[11px] font-black uppercase tracking-[0.18em] text-black shadow-lg shadow-gold-500/20 transition-all hover:-translate-y-0.5 hover:bg-gold-400"
                 >
                   <Plus className="h-4 w-4" /> New Project
                 </button>
               )}
             </div>
-            <div className="border-t border-slate-200 bg-slate-950 p-4 lg:border-l lg:border-t-0 md:p-6">
-              <div className="grid h-full grid-cols-2 gap-3">
+            <div className="border-t border-slate-200 bg-[#fbfaf6] p-5 lg:border-l lg:border-t-0 md:p-7">
+              <div className="mb-5 flex items-center justify-between gap-4">
+                <div>
+                  <p className="text-[10px] font-black uppercase tracking-[0.22em] text-slate-400">Portfolio Pulse</p>
+                  <p className="mt-1 text-sm font-semibold text-slate-500">Live funding summary for visible projects</p>
+                </div>
+                <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-slate-950 text-gold-400">
+                  <SlidersHorizontal className="h-5 w-5" />
+                </div>
+              </div>
+              <div className="mb-6">
+                <div className="mb-2 flex items-end justify-between gap-3">
+                  <div>
+                    <p className="font-serif text-3xl font-bold leading-none text-slate-950">
+                      {formatCurrency(totalRaised)}
+                    </p>
+                    <p className="mt-1 text-[10px] font-black uppercase tracking-[0.18em] text-slate-400">
+                      Raised of {formatCurrency(totalGoal)}
+                    </p>
+                  </div>
+                  <p className="font-serif text-4xl font-bold leading-none text-gold-600">{portfolioProgress}%</p>
+                </div>
+                <div className="h-3 overflow-hidden rounded-full bg-white shadow-inner">
+                  <div
+                    className="h-full rounded-full bg-gradient-to-r from-gold-400 via-gold-500 to-slate-950"
+                    style={{ width: `${portfolioProgress}%` }}
+                  />
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-3">
                 {summaryCards.map((c) => (
-                  <div key={c.label} className="rounded-2xl border border-white/10 bg-white/[0.06] p-4">
+                  <div key={c.label} className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
                     <div className="flex items-center justify-between gap-2">
-                      <span className="text-[9px] font-black uppercase tracking-[0.12em] text-white/35">{c.label}</span>
-                      <c.icon className="h-3 w-3 text-gold-400" />
+                      <span className="text-[9px] font-black uppercase tracking-[0.14em] text-slate-400">
+                        {c.label}
+                      </span>
+                      <c.icon className="h-4 w-4 text-gold-500" />
                     </div>
-                    <p className="mt-2 truncate text-xl font-black leading-none text-white">{c.value}</p>
+                    <p className="mt-3 truncate text-xl font-black leading-none text-slate-950">{c.value}</p>
                   </div>
                 ))}
               </div>
@@ -492,43 +586,75 @@ export function Projects({ role }: ProjectsProps) {
 
         {/* Diocese breakdown */}
         {isDiocese && (
-          <div className="mb-6 grid grid-cols-2 gap-3 md:grid-cols-4">
+          <div className="mb-5 grid grid-cols-2 gap-3 md:grid-cols-4">
             {[
               { label: 'Diocese', value: projectSummary.dioceseProjects, icon: Building2 },
               { label: 'Parish', value: projectSummary.parishProjects, icon: Church },
               { label: 'Seminary', value: projectSummary.seminaryProjects, icon: GraduationCap },
               { label: 'School', value: projectSummary.schoolProjects, icon: School },
             ].map((item) => (
-              <div key={item.label} className="rounded-3xl border border-slate-200 bg-white px-5 py-4">
+              <button
+                type="button"
+                key={item.label}
+                onClick={() => {
+                  setFilterEntityType(item.label.toLowerCase() as EntityType);
+                  setFilterInstitution('all');
+                }}
+                className="group rounded-3xl border border-slate-200 bg-white px-5 py-4 text-left transition-all hover:-translate-y-0.5 hover:border-gold-400/70 hover:shadow-lg hover:shadow-slate-200/60"
+              >
                 <div className="flex items-center justify-between gap-4">
                   <div>
                     <p className="text-[10px] font-black uppercase tracking-[0.18em] text-slate-400">{item.label}</p>
                     <p className="mt-1.5 font-serif text-2xl font-bold text-slate-900">{item.value}</p>
                   </div>
-                  <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-slate-100 text-slate-600">
+                  <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-slate-100 text-slate-600 transition group-hover:bg-slate-950 group-hover:text-gold-400">
                     <item.icon className="h-5 w-5" />
                   </div>
                 </div>
-              </div>
+              </button>
             ))}
           </div>
         )}
 
-        {/* ── Filter bar ── */}
-        <div className="mb-6 rounded-3xl border border-slate-200 bg-white p-3 shadow-[0_12px_32px_rgba(15,23,42,0.05)]">
-          <div className="flex flex-col gap-2 lg:flex-row lg:flex-wrap lg:items-center">
+        {/* Filter bar */}
+        <div className="sticky top-3 z-30 mb-6 rounded-[28px] border border-slate-200 bg-white/92 p-3 shadow-[0_16px_36px_rgba(15,23,42,0.07)] backdrop-blur">
+          <div className="flex flex-col gap-3 lg:flex-row lg:flex-wrap lg:items-center">
             <div className="relative min-w-[220px] flex-1">
               <Search className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
               <input
                 type="text"
-                placeholder="Search projects…"
+                placeholder="Search projects..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className={roundedField(Boolean(searchQuery.trim()), 'h-11 w-full rounded-2xl pl-11 pr-4 text-sm font-semibold')}
+                className={roundedField(
+                  Boolean(searchQuery.trim()),
+                  'h-12 w-full rounded-2xl pl-11 pr-4 text-sm font-semibold',
+                )}
               />
             </div>
 
-            {/* All secondary filters live in a pop-up modal to keep the bar clean */}
+            <div className="flex gap-2 overflow-x-auto pb-1 lg:pb-0">
+              {[
+                ['all', 'All'],
+                ['active', 'Active'],
+                ['completed', 'Completed'],
+                ['on-hold', 'On hold'],
+              ].map(([value, label]) => (
+                <button
+                  key={value}
+                  type="button"
+                  onClick={() => setFilterStatus(value as any)}
+                  className={`h-12 shrink-0 rounded-2xl px-4 text-xs font-black uppercase tracking-[0.14em] transition ${
+                    filterStatus === value
+                      ? 'bg-slate-950 text-white shadow-lg shadow-slate-900/15'
+                      : 'border border-slate-200 bg-white text-slate-500 hover:bg-slate-50'
+                  }`}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+
             <FilterModal activeCount={modalFilterCount} onClear={clearFilters}>
               <FilterField label="Status">
                 <select
@@ -551,7 +677,10 @@ export function Projects({ role }: ProjectsProps) {
                       setFilterEntityType(e.target.value as any);
                       setFilterInstitution('all');
                     }}
-                    className={selectField(filterEntityType !== 'All', 'h-11 w-full rounded-2xl px-4 text-sm font-bold capitalize')}
+                    className={selectField(
+                      filterEntityType !== 'All',
+                      'h-11 w-full rounded-2xl px-4 text-sm font-bold capitalize',
+                    )}
                   >
                     <option value="All">All types</option>
                     <option value="diocese">Diocese</option>
@@ -598,7 +727,7 @@ export function Projects({ role }: ProjectsProps) {
                   className={selectField(sortBy !== 'recent', 'h-11 w-full rounded-2xl px-4 text-sm font-bold')}
                 >
                   <option value="recent">Most recent</option>
-                  <option value="name">Name (A–Z)</option>
+                  <option value="name">Name (A-Z)</option>
                   <option value="progress">Progress</option>
                   <option value="raised">Amount raised</option>
                 </select>
@@ -627,43 +756,75 @@ export function Projects({ role }: ProjectsProps) {
           </div>
         </div>
 
-        {/* ── Project grid ── */}
+        {/* Project grid */}
         {pagedProjects.length > 0 ? (
           <>
-            <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3">
-              {pagedProjects.map((project, index) => {
-                return (
-                  <motion.div
-                    key={project.id}
-                    initial={{ opacity: 0, y: 16 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ delay: index * 0.04 }}
-                    className="group relative"
-                  >
-                    <ProjectDashboardCard project={project} onClick={setSelectedProject} />
-                    {/* Archive / restore — owners only */}
-                    {canManageProject(project) && (
+            <div className="grid gap-6 xl:grid-cols-[260px_minmax(0,1fr)]">
+              <aside className="hidden xl:block">
+                <div className="sticky top-28 overflow-hidden rounded-[28px] border border-slate-200 bg-white shadow-sm">
+                  <div className="border-b border-slate-100 bg-slate-950 p-5 text-white">
+                    <p className="text-[10px] font-black uppercase tracking-[0.22em] text-gold-400">Focus Board</p>
+                    <p className="mt-2 text-sm font-semibold leading-relaxed text-white/65">
+                      Use search, quick status tabs, and filters to narrow the worklist.
+                    </p>
+                  </div>
+                  <div className="space-y-3 p-5">
+                    <div className="rounded-2xl bg-slate-50 p-4">
+                      <p className="text-[9px] font-black uppercase tracking-[0.18em] text-slate-400">Visible</p>
+                      <p className="mt-1 font-serif text-3xl font-bold text-slate-950">{filteredProjects.length}</p>
+                    </div>
+                    <div className="rounded-2xl bg-[#fbfaf6] p-4">
+                      <p className="text-[9px] font-black uppercase tracking-[0.18em] text-slate-400">Page</p>
+                      <p className="mt-1 font-serif text-3xl font-bold text-slate-950">
+                        {safePage}
+                        <span className="text-base text-slate-400">/{totalPages}</span>
+                      </p>
+                    </div>
+                    {hasActiveFilters && (
                       <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setArchiveConfirm({ id: project.id, name: project.name });
-                        }}
-                        className="absolute right-4 top-4 z-10 inline-flex items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-2.5 py-1.5 text-[10px] font-black uppercase tracking-wide text-slate-500 opacity-0 shadow-sm transition-all hover:bg-rose-500 hover:text-white group-hover:opacity-100"
-                        title="Archive project"
+                        onClick={clearFilters}
+                        className="w-full rounded-2xl border border-gold-400/60 bg-gold-400/10 px-4 py-3 text-xs font-black uppercase tracking-[0.16em] text-slate-950 transition hover:bg-gold-400/20"
                       >
-                        <Archive className="h-3 w-3" />
-                        Archive
+                        Clear Filters
                       </button>
                     )}
-                  </motion.div>
-                );
-              })}
+                  </div>
+                </div>
+              </aside>
+
+              <div className="grid grid-cols-1 gap-5 md:grid-cols-2 2xl:grid-cols-3">
+                {pagedProjects.map((project, index) => {
+                  return (
+                    <motion.div
+                      key={project.id}
+                      initial={{ opacity: 0, y: 16 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ delay: index * 0.04 }}
+                      className="group relative"
+                    >
+                      <ProjectDashboardCard project={project} onClick={setSelectedProject} />
+                      {canManageProject(project) && (
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setArchiveConfirm({ id: project.id, name: project.name });
+                          }}
+                          className="absolute right-4 top-4 z-10 inline-flex h-9 w-9 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-500 opacity-0 shadow-sm transition-all hover:bg-rose-500 hover:text-white group-hover:opacity-100"
+                          title="Archive project"
+                        >
+                          <Archive className="h-4 w-4" />
+                        </button>
+                      )}
+                    </motion.div>
+                  );
+                })}
+              </div>
             </div>
 
             {/* Pagination */}
-            <div className="mt-8 flex items-center justify-between rounded-2xl border border-slate-200 bg-white px-5 py-3">
+            <div className="mt-8 flex flex-col gap-3 rounded-[26px] border border-slate-200 bg-white px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
               <p className="text-xs font-semibold text-slate-400">
-                Showing {(safePage - 1) * PAGE_SIZE + 1}–{Math.min(safePage * PAGE_SIZE, filteredProjects.length)} of{' '}
+                Showing {(safePage - 1) * PAGE_SIZE + 1}-{Math.min(safePage * PAGE_SIZE, filteredProjects.length)} of{' '}
                 {filteredProjects.length} project{filteredProjects.length === 1 ? '' : 's'}
               </p>
               {totalPages > 1 && (
@@ -794,9 +955,10 @@ function Select({
       <select
         value={value}
         onChange={(e) => onChange(e.target.value)}
-        className={selectField(value !== 'all' && value !== 'All' && value !== 'recent', `h-11 rounded-2xl ${
-          icon ? 'pl-9' : 'pl-4'
-        } pr-9 text-sm font-bold`)}
+        className={selectField(
+          value !== 'all' && value !== 'All' && value !== 'recent',
+          `h-11 rounded-2xl ${icon ? 'pl-9' : 'pl-4'} pr-9 text-sm font-bold`,
+        )}
       >
         {options.map(([v, l]) => (
           <option key={v} value={v}>
