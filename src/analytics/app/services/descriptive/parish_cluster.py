@@ -15,7 +15,7 @@ from typing import Any
 import numpy as np
 import pandas as pd
 
-from app.services import _aws_financials, _parish_quadrant, _singleflight, analytics_db
+from app.services import _aws_financials, _parish_quadrant, _ttl_cache, analytics_db
 from app.services._institution_pool import run_parallel
 from app.services.data_definitions import (
     PARISH_EXPENSES,
@@ -228,8 +228,9 @@ def _fetch_and_process_aws() -> dict[str, Any]:
 async def get_parish_cluster() -> dict[str, Any]:
     # Diocese-wide, identical for every caller, no request parameters — the
     # same duplicate-concurrent-request risk as financial-trend applies here
-    # too (see _singleflight.py).
-    return await _singleflight.coalesce("parish_cluster", _get_parish_cluster_uncached)
+    # too, plus a short cache so requests moments apart also skip RDS (see
+    # _ttl_cache.py).
+    return await _ttl_cache.cached("parish_cluster", _ttl_cache.DEFAULT_TTL_SECONDS, _get_parish_cluster_uncached)
 
 
 async def _get_parish_cluster_uncached() -> dict[str, Any]:

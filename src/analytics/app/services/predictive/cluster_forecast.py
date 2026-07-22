@@ -12,7 +12,7 @@ from typing import Any
 import numpy as np
 import pandas as pd
 
-from app.services import _aws_financials, _parish_quadrant, _singleflight
+from app.services import _aws_financials, _parish_quadrant, _ttl_cache
 from app.services._institution_pool import run_parallel
 from app.services.data_definitions import (
     PARISH_EXPENSES,
@@ -191,5 +191,8 @@ def _fetch_and_process() -> dict[str, Any]:
 async def get_cluster_forecast() -> dict[str, Any]:
     # Diocese-wide, identical for every caller, no request parameters —
     # trains/runs XGBoost fresh each call, so duplicate concurrent hits are
-    # even more expensive than the read-only descriptive endpoints.
-    return await _singleflight.coalesce("cluster_forecast", lambda: asyncio.to_thread(_fetch_and_process))
+    # even more expensive than the read-only descriptive endpoints. Longer
+    # cache TTL than the others (5 min, not 90s): retraining a model is
+    # meaningfully more expensive than a warehouse read, and cluster
+    # transition predictions don't need to be as fresh as raw financials.
+    return await _ttl_cache.cached("cluster_forecast", 300, lambda: asyncio.to_thread(_fetch_and_process))

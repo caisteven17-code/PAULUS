@@ -14,7 +14,7 @@ from typing import Any, Callable
 import numpy as np
 import pandas as pd
 
-from app.services import _aws_financials, _singleflight, analytics_db
+from app.services import _aws_financials, _ttl_cache, analytics_db
 from app.services._institution_pool import run_parallel
 from app.services._stl import run_stl
 from app.services.data_definitions import (
@@ -543,18 +543,20 @@ async def get_financial_trend(
     vicariates: list[str] | None = None,
     institution_ids: list[str] | None = None,
 ) -> dict[str, Any]:
-    # Coalesce concurrent identical requests (e.g. several browser tabs/
+    # Coalesce simultaneous identical requests (e.g. several browser tabs/
     # components independently fetching the same diocese-wide "All Years,
-    # All Parishes" trend at once) into a single in-flight computation —
-    # observed live as 3 simultaneous copies of this exact query each
+    # All Parishes" trend at once) into one computation, and cache the
+    # result briefly so requests moments apart (not simultaneous) also skip
+    # RDS — observed live as 3 simultaneous copies of this exact query each
     # holding a warehouse connection for 39s+, collectively starving the
     # read pool for every other request.
     key = (
         f"financial_trend:{entity_type}:{institution_id}:{year}:{timeframe}:"
         f"{sorted(vicariates) if vicariates else None}:{sorted(institution_ids) if institution_ids else None}"
     )
-    return await _singleflight.coalesce(
+    return await _ttl_cache.cached(
         key,
+        _ttl_cache.DEFAULT_TTL_SECONDS,
         lambda: _get_financial_trend_uncached(
             institution_id, entity_type, year, timeframe, vicariates, institution_ids
         ),
