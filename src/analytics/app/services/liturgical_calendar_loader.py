@@ -343,7 +343,7 @@ async def run_approval_sync_forever(stop_event) -> None:
             logger.exception("Liturgical approval synchronization failed")
             from app.services import analytics_db
 
-            analytics_db.discard_pool()
+            analytics_db.discard_etl_pool()
         try:
             await asyncio.wait_for(stop_event.wait(), timeout=LITURGICAL_APPROVAL_POLL_SECONDS)
         except TimeoutError:
