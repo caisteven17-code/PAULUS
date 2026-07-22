@@ -7,7 +7,7 @@ from typing import Optional
 import pandas as pd
 
 from app.models.schemas import AnomalyResult, HealthDimensions, HealthScoreResponse
-from app.services import _aws_financials, analytics_db
+from app.services import _aws_financials, _singleflight, analytics_db
 from app.services.data_definitions import (
     _SCHEMA_MAP,
     MONTH_ORDER,
@@ -408,6 +408,23 @@ async def get_health_scores_batch(
     group's records in a single query turns 90+ round trips into one per
     source (AWS for parishes, one Supabase query per entity type for the
     rest)."""
+    # Same duplicate-concurrent-request risk as financial-trend/parish-cluster
+    # (see _singleflight.py) — e.g. multiple tabs on the same filter state all
+    # requesting the identical entity set at once. Key on a canonical
+    # (sorted) representation of the request so distinct scopes never share
+    # a cache entry.
+    key_entities = ",".join(
+        sorted(f"{e['institution_id']}:{e['entity_type']}:{e.get('entity_class')}" for e in entities)
+    )
+    key = f"health_scores_batch:{year}:{timeframe}:{key_entities}"
+    return await _singleflight.coalesce(key, lambda: _get_health_scores_batch_uncached(entities, year, timeframe))
+
+
+async def _get_health_scores_batch_uncached(
+    entities: list[dict],
+    year: Optional[int] = None,
+    timeframe: Optional[str] = None,
+) -> list[HealthScoreResponse]:
     by_type: dict[str, list[dict]] = {}
     for e in entities:
         by_type.setdefault(e["entity_type"], []).append(e)

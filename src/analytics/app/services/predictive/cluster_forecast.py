@@ -12,7 +12,7 @@ from typing import Any
 import numpy as np
 import pandas as pd
 
-from app.services import _aws_financials, _parish_quadrant
+from app.services import _aws_financials, _parish_quadrant, _singleflight
 from app.services._institution_pool import run_parallel
 from app.services.data_definitions import (
     PARISH_EXPENSES,
@@ -189,4 +189,7 @@ def _fetch_and_process() -> dict[str, Any]:
 
 
 async def get_cluster_forecast() -> dict[str, Any]:
-    return await asyncio.to_thread(_fetch_and_process)
+    # Diocese-wide, identical for every caller, no request parameters —
+    # trains/runs XGBoost fresh each call, so duplicate concurrent hits are
+    # even more expensive than the read-only descriptive endpoints.
+    return await _singleflight.coalesce("cluster_forecast", lambda: asyncio.to_thread(_fetch_and_process))
