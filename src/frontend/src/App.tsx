@@ -249,7 +249,10 @@ export default function App() {
   const mainScrollRef = useRef<HTMLElement>(null);
   const { permissions, user, loading: permissionsLoading } = usePermissions();
   const [timeframe, setTimeframe] = useState<Timeframe>('6m');
-  const [year, setYear] = useState<number>(2026);
+  // null means "All Years" — the default, unscoped view. Write/simulation
+  // contexts that need a concrete year (submissions, Digital Twin) fall back
+  // to the real current calendar year rather than accepting null.
+  const [year, setYear] = useState<number | null>(null);
   const [digitalTwinSession, setDigitalTwinSession] = useState<DigitalTwinSession | null>(null);
   const [digitalTwinActiveTab, setDigitalTwinActiveTab] = useState('parish-dashboard');
   const [dtSandboxState, setDtSandboxState] = useState<SandboxState | null>(null);
@@ -262,7 +265,10 @@ export default function App() {
   const currentMonthName = MONTHS[new Date().getMonth()];
   const [dtMonth, setDtMonth] = useState<string>(currentMonthName);
   const [dtPendingMonth, setDtPendingMonth] = useState<string>(currentMonthName);
-  const [dtPendingYear, setDtPendingYear] = useState<number>(year);
+  // A simulation always runs against one concrete year — "All Years" isn't a
+  // valid Digital Twin scope — so seed from the real current year whenever
+  // the dashboard filter is unscoped.
+  const [dtPendingYear, setDtPendingYear] = useState<number>(year ?? new Date().getFullYear());
 
   useEffect(() => {
     const roleDefaultTab: Record<Role, string> = {
@@ -913,7 +919,10 @@ export default function App() {
               year={year}
               onYearChange={(y) => {
                 setYear(y);
-                setDtPendingYear(y);
+                // A running simulation is always anchored to one concrete
+                // year — leave dtPendingYear untouched if the dashboard
+                // filter switches to "All Years" mid-session.
+                if (y !== null) setDtPendingYear(y);
               }}
               onLogout={requestLogout}
             />
@@ -971,7 +980,7 @@ export default function App() {
 
               {/* Active period badge */}
               <span className="ml-auto shrink-0 rounded-full border border-amber-300 bg-white px-2.5 py-0.5 text-[11px] font-bold text-amber-800">
-                {dtMonth} {year} • Read-only view
+                {dtMonth} {dtPendingYear} • Read-only view
               </span>
             </div>
 

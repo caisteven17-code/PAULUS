@@ -26,11 +26,7 @@ export class AnalyticsController {
     if (!entities.length) {
       return Res.status(HttpStatus.BAD_REQUEST).json({ error: 'entities array is required.' });
     }
-    const scores = await Promise.all(
-      entities.map((e) =>
-        this.analyticsService.calculateHealthScore(e.entityId, e.entityType, e.entityClass, body.year, body.timeframe),
-      ),
-    );
+    const scores = await this.analyticsService.calculateHealthScoresBatch(entities, body.year, body.timeframe);
     return Res.status(HttpStatus.OK).json(scores);
   }
 

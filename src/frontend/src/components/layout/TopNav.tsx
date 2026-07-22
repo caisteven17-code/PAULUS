@@ -14,7 +14,8 @@ const TIMEFRAME_LABELS: Record<Timeframe, string> = {
   all: 'All Time',
 };
 
-const YEAR_OPTIONS = [2026, 2025, 2024, 2023, 2022] as const;
+// null = "All Years" — always listed first, and the default selection.
+const YEAR_OPTIONS: (number | null)[] = [null, 2026, 2025, 2024, 2023, 2022, 2021];
 
 interface TopNavProps {
   onNavigate?: (page: string) => void;
@@ -22,8 +23,8 @@ interface TopNavProps {
   currentPage?: string;
   timeframe?: Timeframe;
   onTimeframeChange?: (timeframe: Timeframe) => void;
-  year?: number;
-  onYearChange?: (year: number) => void;
+  year?: number | null;
+  onYearChange?: (year: number | null) => void;
   onLogout?: () => void;
 }
 
@@ -33,7 +34,7 @@ export function TopNav({
   currentPage = 'home',
   timeframe = '6m',
   onTimeframeChange,
-  year = 2026,
+  year = null,
   onYearChange,
   onLogout,
 }: TopNavProps) {
@@ -134,7 +135,7 @@ export function TopNav({
                 onClick={() => setIsYearOpen(!isYearOpen)}
                 className="flex h-10 min-w-[100px] items-center justify-center gap-3 rounded-full border border-white/10 bg-white/5 px-4 text-sm font-black text-white hover:bg-white/10 transition-colors"
               >
-                <span>{year}</span>
+                <span>{year === null ? 'All Years' : year}</span>
                 <ChevronDown
                   className={`w-4 h-4 text-white/35 transition-transform ${isYearOpen ? 'rotate-180' : ''}`}
                 />
@@ -144,14 +145,16 @@ export function TopNav({
                 <div className="absolute right-0 mt-2 w-32 bg-white rounded-2xl shadow-xl border border-gray-100 py-2 z-[60] animate-in fade-in zoom-in duration-200">
                   {YEAR_OPTIONS.map((y) => (
                     <button
-                      key={y}
+                      key={y ?? 'all'}
                       onClick={() => {
                         onYearChange?.(y);
                         setIsYearOpen(false);
                       }}
                       className="w-full px-4 py-2.5 text-left text-sm font-medium hover:bg-gray-50 flex items-center justify-between transition-colors"
                     >
-                      <span className={year === y ? 'text-gold-600 font-bold' : 'text-gray-600'}>{y}</span>
+                      <span className={year === y ? 'text-gold-600 font-bold' : 'text-gray-600'}>
+                        {y === null ? 'All Years' : y}
+                      </span>
                       {year === y && <Check className="w-4 h-4 text-gold-600" />}
                     </button>
                   ))}
@@ -275,7 +278,7 @@ export function TopNav({
                 onClick={() => setIsYearOpen(!isYearOpen)}
                 className="flex items-center gap-2 bg-white/5 text-white px-4 py-2 rounded-xl text-xs font-bold hover:bg-white/10 transition-colors border border-white/10"
               >
-                <span>{year}</span>
+                <span>{year === null ? 'All Years' : year}</span>
                 <ChevronDown
                   className={`w-4 h-4 text-white/40 transition-transform ${isYearOpen ? 'rotate-180' : ''}`}
                 />
@@ -285,14 +288,16 @@ export function TopNav({
                 <div className="absolute right-0 mt-2 w-32 bg-white rounded-2xl shadow-xl border border-gray-100 py-2 z-[60] animate-in fade-in zoom-in duration-200">
                   {YEAR_OPTIONS.map((y) => (
                     <button
-                      key={y}
+                      key={y ?? 'all'}
                       onClick={() => {
                         onYearChange?.(y);
                         setIsYearOpen(false);
                       }}
                       className="w-full px-4 py-2.5 text-left text-sm font-medium hover:bg-gray-50 flex items-center justify-between transition-colors"
                     >
-                      <span className={year === y ? 'text-gold-600 font-bold' : 'text-gray-700'}>{y}</span>
+                      <span className={year === y ? 'text-gold-600 font-bold' : 'text-gray-700'}>
+                        {y === null ? 'All Years' : y}
+                      </span>
                       {year === y && <Check className="w-4 h-4 text-gold-600" />}
                     </button>
                   ))}

@@ -81,6 +81,7 @@ Browser → apiClient (src/lib/api-client.ts)
 - A Supabase MCP server is available in this environment for inspecting the live project (`list_tables`, `execute_sql`, `apply_migration`, etc.) — prefer `list_tables`/`get_advisors` before schema changes.
 
 ## Conventions
-- Financial health scoring (analytics) is currently driven by a hardcoded `INSTITUTION_DATA` map keyed by entity name in `src/backend/src/services/analytics.service.ts` — it is mock data, not computed from `financial_records` yet.
+- Financial health scoring (`src/backend/src/services/analytics.service.ts`) delegates to the Python analytics service (`ANALYTICS_PYTHON_URL`) and falls back to a formula computed from real `financial_records`; a static default score is used only for entities with zero records.
+- The Python analytics service reads the AWS RDS warehouse (`ANALYTICS_DB_URL`, `parish_analytics`/`parish_silver` schemas) as the primary source for parish descriptive analytics, falling back to Supabase when the env var is unset or the warehouse is unreachable (`analytics_db.enabled()` gate).
 - Entity types are consistently the string union `'parish' | 'school' | 'seminary'` across frontend and backend; keep new code aligned to it.
 - Shared types live in `src/frontend/src/types.ts` and `src/backend/src/types.ts` (kept in parallel, not shared via a package).

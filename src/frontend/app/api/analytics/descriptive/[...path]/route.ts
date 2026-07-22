@@ -6,3 +6,8 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ path
   const { path } = await params;
   return proxyToBackend(req, { path: `/analytics/descriptive/${path.join('/')}` });
 }
+
+export async function POST(req: NextRequest, { params }: { params: Promise<{ path: string[] }> }) {
+  const { path } = await params;
+  return proxyToBackend(req, { path: `/analytics/descriptive/${path.join('/')}` });
+}

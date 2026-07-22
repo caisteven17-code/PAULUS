@@ -28,9 +28,8 @@ _PIPELINE_NAME = "parish_bronze"
 
 
 def _raise_legacy_mirror_retired() -> None:
-    raise RuntimeError(
-        "The AWS operational-mirror loader is retired. Use direct Supabase-to-Silver synchronization."
-    )
+    raise RuntimeError("The AWS operational-mirror loader is retired. Use direct Supabase-to-Silver synchronization.")
+
 
 _FINANCIAL_AMOUNT_COLUMNS = (
     "sacraments_total",

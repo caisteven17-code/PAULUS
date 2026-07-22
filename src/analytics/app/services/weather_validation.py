@@ -15,7 +15,6 @@ This replaces the naive per-record API call approach (1,080+ calls) with
 
 from __future__ import annotations
 
-import calendar
 import json
 import logging
 import time
@@ -28,8 +27,8 @@ logger = logging.getLogger(__name__)
 
 # ── Tolerances ────────────────────────────────────────────────────────────────
 
-TEMP_MAE_THRESHOLD = 2.0        # °C
-RAIN_RELMAE_THRESHOLD = 0.30    # 30% relative MAE
+TEMP_MAE_THRESHOLD = 2.0  # °C
+RAIN_RELMAE_THRESHOLD = 0.30  # 30% relative MAE
 
 # ── Meteostat (temperature reference) ─────────────────────────────────────────
 # Uses Ninoy Aquino International Airport (WMO 98429) — nearest station to
@@ -46,9 +45,11 @@ def build_meteostat_cache(start: date, end: date) -> dict[tuple[int, int], float
     Returns {(year, month): temp_avg_c}.
     """
     try:
-        from meteostat import Station, monthly as meteostat_monthly
-        from datetime import datetime as dt_class
         import math
+        from datetime import datetime as dt_class
+
+        from meteostat import Station
+        from meteostat import monthly as meteostat_monthly
     except ImportError:
         logger.warning("meteostat not installed -- run: pip install meteostat")
         return {}
@@ -87,7 +88,7 @@ def build_meteostat_cache(start: date, end: date) -> dict[tuple[int, int], float
 # ── CHIRPS via ClimateSERV ────────────────────────────────────────────────────
 
 CLIMATESERV_BASE = "https://climateserv.servirglobal.net/api"
-CHIRPS_DATATYPE = 0     # CHIRPS precipitation
+CHIRPS_DATATYPE = 0  # CHIRPS precipitation
 CHIRPS_INTERVALTYPE = 1  # monthly
 CHIRPS_OPERATIONTYPE = 5  # average over geometry
 
@@ -162,6 +163,7 @@ def _chirps_retrieve_range(request_id: str, max_wait: int = 120) -> dict[tuple[i
                     if (yr is None or mo is None) and item.get("date"):
                         try:
                             from datetime import datetime as dt_class
+
                             dt = dt_class.strptime(item["date"], "%m/%d/%Y")
                             yr, mo = dt.year, dt.month
                         except ValueError:
@@ -169,8 +171,8 @@ def _chirps_retrieve_range(request_id: str, max_wait: int = 120) -> dict[tuple[i
                     if yr is None or mo is None or raw_val is None:
                         continue
                     try:
-                        monthly_totals[(int(yr), int(mo))] = (
-                            monthly_totals.get((int(yr), int(mo)), 0.0) + float(raw_val)
+                        monthly_totals[(int(yr), int(mo))] = monthly_totals.get((int(yr), int(mo)), 0.0) + float(
+                            raw_val
                         )
                     except (TypeError, ValueError):
                         continue
@@ -292,7 +294,7 @@ def validate_month(
             if rel_diff > RAIN_RELMAE_THRESHOLD:
                 mismatches.append(
                     f"Rainfall mismatch: NASA POWER AG {nasa_power_rainfall}mm vs CHIRPS {chirps_rain}mm "
-                    f"(relative diff {rel_diff*100:.1f}%, threshold {RAIN_RELMAE_THRESHOLD*100:.0f}%)."
+                    f"(relative diff {rel_diff * 100:.1f}%, threshold {RAIN_RELMAE_THRESHOLD * 100:.0f}%)."
                 )
 
     # ── Result ────────────────────────────────────────────────────────────────

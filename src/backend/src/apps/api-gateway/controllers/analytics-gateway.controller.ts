@@ -116,6 +116,12 @@ export class AnalyticsGatewayController {
     return proxyToPython(req, res, subPath, 'GET');
   }
 
+  @Post('descriptive/*')
+  async descriptivePost(@Req() req: Request, @Res({ passthrough: true }) res: Response) {
+    const subPath = req.path.replace(/^\/api\/analytics/, '/analytics');
+    return proxyToPython(req, res, subPath, 'POST');
+  }
+
   @Get('diagnostic/*')
   async diagnosticWildcardGet(@Req() req: Request, @Res({ passthrough: true }) res: Response) {
     const subPath = req.path.replace(/^\/api\/analytics/, '/analytics');

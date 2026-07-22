@@ -13,6 +13,7 @@ from typing import Any
 import numpy as np
 import pandas as pd
 
+from app.services import _aws_financials
 from app.services.data_definitions import _SCHEMA_MAP, build_date_index
 from app.services.predictive._champion import (
     markov_forecast,
@@ -105,8 +106,12 @@ def _state_of(series: np.ndarray, window: int = 3) -> str:
     return "improving" if slope > 0 else "declining"
 
 
-def _fetch_and_process(institution_id: str, periods: int) -> dict[str, Any]:
-    ts = datetime.now(timezone.utc).isoformat()
+def _fetch_series(institution_id: str) -> pd.DataFrame | None:
+    """Monthly df with date/total_receipts. Tries the AWS warehouse (parish
+    only) before probing each Supabase schema for the institution."""
+    aws_df = _aws_financials.parish_monthly_df(institution_id)
+    if aws_df is not None and len(aws_df) >= 6:
+        return aws_df
 
     schema = None
     receipt_cols: list[str] = []
@@ -122,24 +127,8 @@ def _fetch_and_process(institution_id: str, periods: int) -> dict[str, Any]:
             schema, receipt_cols, _, _ = _SCHEMA_MAP[etype]
             break
 
-    insufficient = {
-        "data_sufficient": False,
-        "institution_id": institution_id,
-        "continuous_forecast": [],
-        "state_prediction": "stable",
-        "transition_probabilities": {},
-        "champion": {
-            "champion_model": "N/A",
-            "metrics": {},
-            "all_candidates": {},
-            "wape": 1.0,
-            "needs_retraining": True,
-        },
-        "timestamp": ts,
-    }
-
     if schema is None:
-        return insufficient
+        return None
 
     all_cols = ["institution_id", "month", "year"] + receipt_cols
     seen: set[str] = set()
@@ -158,19 +147,40 @@ def _fetch_and_process(institution_id: str, periods: int) -> dict[str, Any]:
         .order("year")
         .execute()
     )
-
     if not res.data or len(res.data) < 6:
-        return insufficient
+        return None
 
     df = pd.DataFrame(res.data)
     df = build_date_index(df)
-
     for col in receipt_cols:
         if col not in df.columns:
             df[col] = 0.0
         df[col] = pd.to_numeric(df[col], errors="coerce").fillna(0.0)
-
     df["total_receipts"] = df[receipt_cols].sum(axis=1)
+    return df
+
+
+def _fetch_and_process(institution_id: str, periods: int) -> dict[str, Any]:
+    ts = datetime.now(timezone.utc).isoformat()
+
+    df = _fetch_series(institution_id)
+    if df is None:
+        return {
+            "data_sufficient": False,
+            "institution_id": institution_id,
+            "continuous_forecast": [],
+            "state_prediction": "stable",
+            "transition_probabilities": {},
+            "champion": {
+                "champion_model": "N/A",
+                "metrics": {},
+                "all_candidates": {},
+                "wape": 1.0,
+                "needs_retraining": True,
+            },
+            "timestamp": ts,
+        }
+
     series = df["total_receipts"].values.astype(float)
 
     train, holdout = train_test_split_ts(series)

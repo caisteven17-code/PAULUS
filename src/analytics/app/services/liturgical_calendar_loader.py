@@ -149,20 +149,17 @@ def _upsert_authoritative_calendar(rows: list[dict[str, Any]]) -> int:
            OR id = ANY(%s::uuid[])
         """,
         (dates, sources, source_ids),
+        pool=analytics_db.get_etl_pool(),
     )
     existing_by_id = {row["id"]: row["id"] for row in existing}
-    existing_by_key = {
-        (row["date"], row["source_name"]): row["id"] for row in existing
-    }
+    existing_by_key = {(row["date"], row["source_name"]): row["id"] for row in existing}
 
     payloads: list[dict[str, Any]] = []
     for row in rows:
         source_id = str(row.get("id")) if row.get("id") else None
         payload = _db_payload(row)
         payload["id"] = (
-            existing_by_id.get(source_id)
-            or existing_by_key.get((payload["date"], payload["source_name"]))
-            or source_id
+            existing_by_id.get(source_id) or existing_by_key.get((payload["date"], payload["source_name"])) or source_id
         )
         payloads.append(payload)
 
@@ -172,9 +169,10 @@ def _upsert_authoritative_calendar(rows: list[dict[str, Any]]) -> int:
             "liturgical_calendar",
             payloads[offset : offset + _LITURGICAL_CHUNK],
             "id",
+            pool=analytics_db.get_etl_pool(),
         )
     analytics_db.execute(
-        "SELECT * FROM parish_analytics.refresh_liturgical_calendar_analytics()"
+        "SELECT * FROM parish_analytics.refresh_liturgical_calendar_analytics()", pool=analytics_db.get_etl_pool()
     )
     return len(payloads)
 
@@ -193,9 +191,7 @@ def _upsert_batch(
     if authoritative_approval:
         return _upsert_authoritative_calendar(rows)
 
-    canonical_in_supabase = (
-        LITURGICAL_CANONICAL_SOURCE == "supabase" and not authoritative_approval
-    )
+    canonical_in_supabase = LITURGICAL_CANONICAL_SOURCE == "supabase" and not authoritative_approval
     if canonical_in_supabase:
         published = _publish_review_candidates(rows)
         logger.info("Published %d liturgical candidates to Supabase for review", published)
@@ -204,7 +200,7 @@ def _upsert_batch(
     sources = list({row["source_name"] for row in rows})
     source_ids = [row["id"] for row in rows if authoritative_approval and row.get("id")]
 
-    with analytics_db.get_pool().connection() as conn:
+    with analytics_db.get_etl_pool().connection() as conn:
         with conn.cursor(row_factory=dict_row) as cur:
             cur.execute(
                 """
@@ -230,15 +226,11 @@ def _upsert_batch(
                 key = (payload["date"], payload["source_name"])
                 source_id = str(row.get("id")) if row.get("id") else None
                 existing = (
-                    existing_by_id.get(source_id) if authoritative_approval and source_id
-                    else existing_by_key.get(key)
+                    existing_by_id.get(source_id) if authoritative_approval and source_id else existing_by_key.get(key)
                 )
                 if existing:
                     record_id, existing_status = existing
-                    if (
-                        existing_status in {"approved", "approved_with_revisions"}
-                        and not authoritative_approval
-                    ):
+                    if existing_status in {"approved", "approved_with_revisions"} and not authoritative_approval:
                         action = "skip_approved"
                         skipped += 1
                     else:
@@ -271,9 +263,7 @@ def _upsert_batch(
             promotions: list[tuple[str, str]] = []
             for payload in inserts:
                 columns = list(payload)
-                statement = sql.SQL(
-                    "INSERT INTO reference.liturgical_calendar ({}) VALUES ({}) RETURNING id"
-                ).format(
+                statement = sql.SQL("INSERT INTO reference.liturgical_calendar ({}) VALUES ({}) RETURNING id").format(
                     sql.SQL(", ").join(sql.Identifier(column) for column in columns),
                     sql.SQL(", ").join(sql.Placeholder() * len(columns)),
                 )
@@ -286,9 +276,7 @@ def _upsert_batch(
             for record_id, payload in updates:
                 columns = list(payload)
                 statement = sql.SQL("UPDATE reference.liturgical_calendar SET {} WHERE id = %s").format(
-                    sql.SQL(", ").join(
-                        sql.SQL("{} = %s").format(sql.Identifier(column)) for column in columns
-                    )
+                    sql.SQL(", ").join(sql.SQL("{} = %s").format(sql.Identifier(column)) for column in columns)
                 )
                 cur.execute(statement, [*[_adapt(payload[column]) for column in columns], record_id])
                 staging_id = staging_id_map.get((payload["date"], payload["source_name"]))
@@ -306,7 +294,9 @@ def _upsert_batch(
                 )
         conn.commit()
 
-    analytics_db.execute("SELECT * FROM parish_analytics.refresh_liturgical_calendar_analytics()")
+    analytics_db.execute(
+        "SELECT * FROM parish_analytics.refresh_liturgical_calendar_analytics()", pool=analytics_db.get_etl_pool()
+    )
 
     if inserts:
         logger.info("Inserted %d liturgical calendar rows", len(inserts))
@@ -352,9 +342,7 @@ async def run_approval_sync_forever(stop_event) -> None:
         except Exception:
             logger.exception("Liturgical approval synchronization failed")
         try:
-            await asyncio.wait_for(
-                stop_event.wait(), timeout=LITURGICAL_APPROVAL_POLL_SECONDS
-            )
+            await asyncio.wait_for(stop_event.wait(), timeout=LITURGICAL_APPROVAL_POLL_SECONDS)
         except TimeoutError:
             pass
 

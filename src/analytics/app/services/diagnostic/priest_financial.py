@@ -13,6 +13,7 @@ from typing import Any
 import numpy as np
 import pandas as pd
 
+from app.services import _aws_financials
 from app.services.data_definitions import (
     _SCHEMA_MAP,
     build_date_index,
@@ -87,10 +88,11 @@ def _rule_based_narrative(stats: dict[str, Any]) -> str:
 # ── Core processing ───────────────────────────────────────────────────────────
 
 
-def _fetch_and_process(institution_id: str) -> dict[str, Any]:
-    ts = datetime.now(timezone.utc).isoformat()
+def _fetch_series(institution_id: str) -> pd.DataFrame | None:
+    aws_df = _aws_financials.parish_monthly_df(institution_id)
+    if aws_df is not None and len(aws_df) >= 6:
+        return aws_df
 
-    # Detect entity type
     schema = None
     receipt_cols: list[str] = []
     expense_cols: list[str] = []
@@ -107,16 +109,7 @@ def _fetch_and_process(institution_id: str) -> dict[str, Any]:
             break
 
     if schema is None:
-        return {
-            "data_sufficient": False,
-            "institution_id": institution_id,
-            "root_cause_indicator": "N/A",
-            "gauge_score": 0.0,
-            "association_score": 0.0,
-            "shap_values": {},
-            "narrative": "Insufficient data.",
-            "timestamp": ts,
-        }
+        return None
 
     all_cols = ["institution_id", "month", "year"] + receipt_cols + expense_cols
     seen: set[str] = set()
@@ -135,8 +128,25 @@ def _fetch_and_process(institution_id: str) -> dict[str, Any]:
         .order("year")
         .execute()
     )
-
     if not res.data or len(res.data) < 6:
+        return None
+
+    df = pd.DataFrame(res.data)
+    df = build_date_index(df)
+    for col in receipt_cols + expense_cols:
+        if col not in df.columns:
+            df[col] = 0.0
+        df[col] = pd.to_numeric(df[col], errors="coerce").fillna(0.0)
+    df["total_receipts"] = df[receipt_cols].sum(axis=1)
+    df["total_expenses"] = df[expense_cols].sum(axis=1)
+    return df
+
+
+def _fetch_and_process(institution_id: str) -> dict[str, Any]:
+    ts = datetime.now(timezone.utc).isoformat()
+
+    df = _fetch_series(institution_id)
+    if df is None:
         return {
             "data_sufficient": False,
             "institution_id": institution_id,
@@ -147,17 +157,6 @@ def _fetch_and_process(institution_id: str) -> dict[str, Any]:
             "narrative": "Insufficient data for diagnostic analysis.",
             "timestamp": ts,
         }
-
-    df = pd.DataFrame(res.data)
-    df = build_date_index(df)
-
-    for col in receipt_cols + expense_cols:
-        if col not in df.columns:
-            df[col] = 0.0
-        df[col] = pd.to_numeric(df[col], errors="coerce").fillna(0.0)
-
-    df["total_receipts"] = df[receipt_cols].sum(axis=1)
-    df["total_expenses"] = df[expense_cols].sum(axis=1)
 
     # Engineer features: lag1, lag2, month_sin, month_cos, time_index
     df["lag1"] = df["total_receipts"].shift(1).fillna(method="bfill")

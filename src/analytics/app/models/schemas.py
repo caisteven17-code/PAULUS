@@ -35,6 +35,22 @@ class HealthScoreResponse(BaseModel):
     timestamp: str
 
 
+class FinancialTrendBatchRequest(BaseModel):
+    institution_ids: List[str]
+
+
+class HealthScoreBatchEntity(BaseModel):
+    institution_id: str
+    entity_type: str
+    entity_class: Optional[str] = None
+
+
+class HealthScoreBatchRequest(BaseModel):
+    entities: List[HealthScoreBatchEntity]
+    year: Optional[int] = None
+    timeframe: Optional[str] = None
+
+
 class AnomalyResult(BaseModel):
     entity_id: str
     target_month: Optional[str] = None

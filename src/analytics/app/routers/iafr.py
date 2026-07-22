@@ -11,7 +11,7 @@ from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 
 from app.services import iafr_cleaner, iafr_sandbox
-from app.services.supabase_client import get_table, get_supabase
+from app.services.supabase_client import get_supabase, get_table
 
 router = APIRouter(tags=["iafr"])
 
@@ -91,11 +91,7 @@ async def clean_submission_test(body: TestCleanSubmissionRequest):
         raise HTTPException(status_code=400, detail="The sandbox cleaner only processes file test runs.")
 
     institution = (
-        get_table("diocese", "institutions")
-        .select("id,name")
-        .eq("id", run["institution_id"])
-        .single()
-        .execute()
+        get_table("diocese", "institutions").select("id,name").eq("id", run["institution_id"]).single().execute()
     )
     institution_name = institution.data["name"] if institution.data else None
 
@@ -147,9 +143,9 @@ async def clean_submission_test(body: TestCleanSubmissionRequest):
     _set_test_stage(body.runId, "mapping", 6, "completed", f"Mapped {len(entries)} canonical entries.", 75)
 
     _set_test_stage(body.runId, "loading", 7, "running", "Writing to parishes_submission_test.", 80)
-    commit_response = get_supabase().schema("operations").rpc(
-        "commit_parish_submission_test_run", {"p_run_id": body.runId}
-    ).execute()
+    commit_response = (
+        get_supabase().schema("operations").rpc("commit_parish_submission_test_run", {"p_run_id": body.runId}).execute()
+    )
     if not commit_response.data:
         _set_test_stage(body.runId, "loading", 7, "failed", "The production-shaped test insert failed.", 80)
         return {
@@ -194,7 +190,12 @@ async def clean_submission_test(body: TestCleanSubmissionRequest):
 
     _set_test_stage(body.runId, "completed", 9, "completed", "Sandbox file submission completed.", 100)
     get_table("operations", "parish_submission_test_runs").update(
-        {"status": "completed", "current_stage": "completed", "progress_percent": 100, "completed_at": datetime.now(timezone.utc).isoformat()}
+        {
+            "status": "completed",
+            "current_stage": "completed",
+            "progress_percent": 100,
+            "completed_at": datetime.now(timezone.utc).isoformat(),
+        }
     ).eq("id", body.runId).execute()
     return {
         "runId": body.runId,
@@ -306,7 +307,9 @@ def _prior_ending_balance(institution_id: str, month: str, year: int) -> float |
     return None
 
 
-def _upsert_financial_record(institution_id: str, submission_batch_id: str, month: str, year: int, beginning_balance: float) -> str:
+def _upsert_financial_record(
+    institution_id: str, submission_batch_id: str, month: str, year: int, beginning_balance: float
+) -> str:
     existing = (
         get_table("parishes", "financial_records")
         .select("id")
@@ -359,7 +362,9 @@ def _upsert_financial_record(institution_id: str, submission_batch_id: str, mont
 
 
 def _replace_line_items(financial_record_id: str, line_items: list[dict[str, Any]]) -> None:
-    account_titles = get_table("parishes", "iafr_account_titles").select("id, account_code").eq("is_active", True).execute()
+    account_titles = (
+        get_table("parishes", "iafr_account_titles").select("id, account_code").eq("is_active", True).execute()
+    )
     code_to_id = {row["account_code"]: row["id"] for row in (account_titles.data or [])}
 
     get_table("parishes", "iafr_line_items").delete().eq("financial_record_id", financial_record_id).execute()
@@ -380,7 +385,8 @@ def _replace_line_items(financial_record_id: str, line_items: list[dict[str, Any
             "source_label": item.get("source_label"),
         }
         for item in line_items
-        if item["section_code"] != "A"  # Section A (granular arancel breakdowns) are memo-only, not stored as line items
+        if item["section_code"]
+        != "A"  # Section A (granular arancel breakdowns) are memo-only, not stored as line items
     ]
     get_table("parishes", "iafr_line_items").insert(payload).execute()
 

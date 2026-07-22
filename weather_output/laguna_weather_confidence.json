@@ -1,45 +1,45 @@
 {
-  "overall_mean_cohens_kappa": 0.3979,
+  "overall_mean_cohens_kappa": 0.3602,
   "overall_mean_cohens_kappa_strength": "Fair",
-  "overall_mean_lins_ccc": 0.6335,
+  "overall_mean_lins_ccc": 0.6187,
   "rainfall": {
-    "total_rows": 3650,
-    "cohens_kappa": 0.409,
+    "total_rows": 4044,
+    "cohens_kappa": 0.5074,
     "cohens_kappa_strength": "Moderate",
-    "lins_ccc": 0.5311
+    "lins_ccc": 0.4789
   },
   "severe_weather": {
-    "total_rows": 3650,
-    "cohens_kappa": 0.3989,
+    "total_rows": 4044,
+    "cohens_kappa": 0.2599,
     "cohens_kappa_strength": "Fair",
     "lins_ccc": null,
     "lins_ccc_note": "N/A \u2014 weathercode is nominal, not continuous."
   },
   "severe_weather_rain_based": {
     "note": "Additional signal, not a replacement for severe_weather above \u2014 classifies from rainfall intensity (6 sources, 5 independent lineage groups) instead of each model's own weathercode (3 sources, 1 lineage group). Captures rain-driven severe weather only; a high-wind/low-rain event would show as no_severe here even if severe_weather (weathercode) correctly flags it.",
-    "total_rows": 3650,
-    "cohens_kappa": 0.2508,
+    "total_rows": 4044,
+    "cohens_kappa": 0.3492,
     "cohens_kappa_strength": "Fair",
     "lins_ccc": null,
     "lins_ccc_note": "N/A \u2014 this is a categorical classification (5-tier), not the raw mm value."
   },
   "temperature": {
-    "total_rows": 3650,
+    "total_rows": 4044,
     "note": "Validation bins raw temp_c; classification uses Rothfusz heat index.",
-    "cohens_kappa": 0.5009,
+    "cohens_kappa": 0.4327,
     "cohens_kappa_strength": "Moderate",
-    "lins_ccc": 0.7734
+    "lins_ccc": 0.7507
   },
   "humidity": {
-    "total_rows": 3650,
-    "cohens_kappa": 0.308,
+    "total_rows": 4044,
+    "cohens_kappa": 0.3049,
     "cohens_kappa_strength": "Fair",
-    "lins_ccc": 0.5706
+    "lins_ccc": 0.6314
   },
   "wind": {
-    "total_rows": 3650,
-    "cohens_kappa": 0.3729,
+    "total_rows": 4044,
+    "cohens_kappa": 0.2962,
     "cohens_kappa_strength": "Fair",
-    "lins_ccc": 0.6589
+    "lins_ccc": 0.6136
   }
 }

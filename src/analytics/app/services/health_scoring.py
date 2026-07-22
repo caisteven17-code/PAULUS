@@ -7,11 +7,11 @@ from typing import Optional
 import pandas as pd
 
 from app.models.schemas import AnomalyResult, HealthDimensions, HealthScoreResponse
+from app.services import _aws_financials, analytics_db
 from app.services.data_definitions import (
     _SCHEMA_MAP,
     MONTH_ORDER,
 )
-from app.services import analytics_db
 from app.services.supabase_client import get_supabase, get_table
 
 # ── Helpers ──────────────────────────────────────────────────────────────────
@@ -68,6 +68,28 @@ def _score_from_records(
     entity_type: str,
     timeframe: str | None = None,
 ) -> HealthScoreResponse | None:
+    """Supabase path: df has the raw per-category columns, summed here."""
+    if df.empty:
+        return None
+
+    df = df.copy()
+    for col in receipt_cols + expense_cols:
+        if col not in df.columns:
+            df[col] = 0.0
+        df[col] = pd.to_numeric(df[col], errors="coerce").fillna(0.0)
+    df["total_receipts"] = df[receipt_cols].sum(axis=1)
+    df["total_expenses"] = df[expense_cols].sum(axis=1)
+    return _score_from_totals(df, entity_type, timeframe)
+
+
+def _score_from_totals(
+    df: pd.DataFrame,
+    entity_type: str,
+    timeframe: str | None = None,
+) -> HealthScoreResponse | None:
+    """AWS path (and the tail end of the Supabase path): df already carries
+    total_receipts/total_expenses per month — only the pre-aggregation step
+    differs between sources, everything downstream is identical."""
     if df.empty:
         return None
 
@@ -88,13 +110,6 @@ def _score_from_records(
     if len(df) < 2:
         return None
 
-    for col in receipt_cols + expense_cols:
-        if col not in df.columns:
-            df[col] = 0.0
-        df[col] = pd.to_numeric(df[col], errors="coerce").fillna(0.0)
-
-    df["total_receipts"] = df[receipt_cols].sum(axis=1)
-    df["total_expenses"] = df[expense_cols].sum(axis=1)
     avg_receipts = df["total_receipts"].mean()
     avg_expenses = df["total_expenses"].mean()
 
@@ -166,6 +181,19 @@ def _default_score(entity_id: str, entity_type: str) -> HealthScoreResponse:
     )
 
 
+# ── AWS warehouse fetch (parish only — same source financial_trend.py uses)──
+
+
+# Supabase's parishes.financial_records exists for legacy/demo compatibility
+# but its per-category receipt/expense columns are never populated by the
+# real ingestion pipeline (verified empty across all 92 parishes) — the real
+# monthly totals live in the AWS warehouse, fetched via the shared
+# _aws_financials.parish_monthly_totals helper (also used by
+# financial_trend.py's decline-monitor batch).
+def _fetch_aws_totals(institution_ids: list[str], year: Optional[int] = None) -> pd.DataFrame:
+    return _aws_financials.parish_monthly_totals(institution_ids, year)
+
+
 # ── Snapshot write-back ───────────────────────────────────────────────────────
 
 _DIM_MAP = {
@@ -202,9 +230,7 @@ def _write_snapshot(institution_id: str, entity_type: str, score: HealthScoreRes
             # fallback copy in Supabase.
             import logging
 
-            logging.getLogger(__name__).warning(
-                "Health snapshot deferred because ANALYTICS_DB_URL is unavailable"
-            )
+            logging.getLogger(__name__).warning("Health snapshot deferred because ANALYTICS_DB_URL is unavailable")
             return
         _write_snapshot_aws(institution_id, entity_type, inst_name, score)
 
@@ -276,6 +302,21 @@ def _write_snapshot_aws(institution_id: str, entity_type: str, inst_name: str, s
         )
 
 
+# Snapshot writes are pure best-effort history bookkeeping (every failure is
+# already swallowed inside _write_snapshot) — they don't need to be on the
+# response's critical path. Scheduling them as background tasks, instead of
+# awaiting the blocking Supabase/AWS calls inline, keeps the event loop free
+# to service other concurrent requests. Kept in a module-level set so the
+# tasks aren't garbage-collected before they finish.
+_snapshot_tasks: set[asyncio.Task] = set()
+
+
+def _schedule_snapshot_write(institution_id: str, entity_type: str, score: HealthScoreResponse) -> None:
+    task = asyncio.create_task(asyncio.to_thread(_write_snapshot, institution_id, entity_type, score))
+    _snapshot_tasks.add(task)
+    task.add_done_callback(_snapshot_tasks.discard)
+
+
 # ── Public API ────────────────────────────────────────────────────────────────
 
 
@@ -289,6 +330,21 @@ async def get_health_score(
     if entity_type not in _SCHEMA_MAP:
         raise ValueError(f"Unknown entity type: {entity_type}")
 
+    if entity_type == "parish" and analytics_db.enabled():
+        df = await asyncio.to_thread(_fetch_aws_totals, [institution_id], year)
+        # AWS is authoritative for parishes — it's the only source that
+        # distinguishes "no records yet for this year" from "nothing to
+        # score." Falling back to Supabase here would silently recompute
+        # from its always-empty placeholder columns instead of admitting
+        # that.
+        score = _score_from_totals(df, entity_type, timeframe) if not df.empty else None
+        if score is None:
+            return _default_score(institution_id, entity_type)
+        score.entity_class = entity_class
+        if year is None and (timeframe is None or timeframe == "all"):
+            _schedule_snapshot_write(institution_id, entity_type, score)
+        return score
+
     schema, receipt_cols, expense_cols, consumable_col = _SCHEMA_MAP[entity_type]
 
     all_cols = ["institution_id", "month", "year"] + receipt_cols + expense_cols
@@ -300,21 +356,30 @@ async def get_health_score(
             select_cols.append(c)
             seen.add(c)
 
-    query = (
-        get_table(schema, "financial_records")
-        .select(", ".join(select_cols))
-        .eq("institution_id", institution_id)
-        .eq("is_current_version", True)
-        .is_("deleted_at", "null")
-    )
-    if year:
-        query = query.eq("year", year)
-    result = query.order("year").execute()
+    def _fetch_records() -> list[dict]:
+        query = (
+            get_table(schema, "financial_records")
+            .select(", ".join(select_cols))
+            .eq("institution_id", institution_id)
+            .eq("is_current_version", True)
+            .is_("deleted_at", "null")
+        )
+        if year:
+            query = query.eq("year", year)
+        return query.order("year").execute().data
 
-    if not result.data:
+    # supabase-py's Client is synchronous (blocking httpx under the hood).
+    # Calling .execute() directly here would block the whole asyncio event
+    # loop for the request's round-trip — harmless for one request, but the
+    # health-scores batch fires dozens of these concurrently, and a blocked
+    # event loop can't service any other request (including the descriptive
+    # dashboard's own queries) until each one finishes in turn.
+    records = await asyncio.to_thread(_fetch_records)
+
+    if not records:
         return _default_score(institution_id, entity_type)
 
-    df = pd.DataFrame(result.data)
+    df = pd.DataFrame(records)
     score = _score_from_records(df, receipt_cols, expense_cols, consumable_col, entity_type, timeframe)
     if score is None:
         return _default_score(institution_id, entity_type)
@@ -325,8 +390,103 @@ async def get_health_score(
     # score is a what-if slice for the dashboard, not a new data point for
     # the historical snapshot trend.
     if year is None and (timeframe is None or timeframe == "all"):
-        _write_snapshot(institution_id, entity_type, score)
+        _schedule_snapshot_write(institution_id, entity_type, score)
     return score
+
+
+async def get_health_scores_batch(
+    entities: list[dict],
+    year: Optional[int] = None,
+    timeframe: Optional[str] = None,
+) -> list[HealthScoreResponse]:
+    """Batched variant of get_health_score for dashboards scoring every
+    institution at once. get_health_score does one round trip per
+    institution; firing 90+ of those concurrently doesn't actually run
+    concurrently in any way that helps — each round trip still costs its own
+    network latency, and with enough of them in flight at once, the slowest
+    stragglers land well past the gateway's request timeout. Fetching each
+    group's records in a single query turns 90+ round trips into one per
+    source (AWS for parishes, one Supabase query per entity type for the
+    rest)."""
+    by_type: dict[str, list[dict]] = {}
+    for e in entities:
+        by_type.setdefault(e["entity_type"], []).append(e)
+
+    # Parishes: AWS is authoritative (see get_health_score) — one query for
+    # every requested parish instead of one per institution.
+    aws_totals_by_institution: dict[str, pd.DataFrame] = {}
+    parish_group = by_type.pop("parish", None)
+    if parish_group and analytics_db.enabled():
+        ids = [e["institution_id"] for e in parish_group]
+        df = await asyncio.to_thread(_fetch_aws_totals, ids, year)
+        if not df.empty:
+            for institution_id, group_df in df.groupby("institution_id"):
+                aws_totals_by_institution[institution_id] = group_df
+    elif parish_group:
+        by_type["parish"] = parish_group  # AWS unavailable — Supabase fallback below
+
+    def _fetch_group(entity_type: str, ids: list[str]) -> list[dict]:
+        schema, receipt_cols, expense_cols, _ = _SCHEMA_MAP[entity_type]
+        all_cols = ["institution_id", "month", "year"] + receipt_cols + expense_cols
+        seen: set[str] = set()
+        select_cols: list[str] = []
+        for c in all_cols:
+            if c not in seen:
+                select_cols.append(c)
+                seen.add(c)
+        query = (
+            get_table(schema, "financial_records")
+            .select(", ".join(select_cols))
+            .in_("institution_id", ids)
+            .eq("is_current_version", True)
+            .is_("deleted_at", "null")
+        )
+        if year:
+            query = query.eq("year", year)
+        return query.order("year").execute().data or []
+
+    records_by_institution: dict[str, list[dict]] = {}
+    for entity_type, group in by_type.items():
+        if entity_type not in _SCHEMA_MAP:
+            continue
+        ids = [e["institution_id"] for e in group]
+        rows = await asyncio.to_thread(_fetch_group, entity_type, ids)
+        for row in rows:
+            records_by_institution.setdefault(row["institution_id"], []).append(row)
+
+    results: list[HealthScoreResponse] = []
+    for e in entities:
+        institution_id = e["institution_id"]
+        entity_type = e["entity_type"]
+        if entity_type not in _SCHEMA_MAP:
+            results.append(_default_score(institution_id, entity_type))
+            continue
+
+        if entity_type == "parish" and institution_id in aws_totals_by_institution:
+            score = _score_from_totals(aws_totals_by_institution[institution_id], entity_type, timeframe)
+        elif entity_type == "parish" and analytics_db.enabled():
+            # Requested but had no AWS rows at all — genuinely nothing to
+            # score, not a reason to fall back to Supabase's empty columns.
+            score = None
+        else:
+            rows = records_by_institution.get(institution_id, [])
+            if not rows:
+                results.append(_default_score(institution_id, entity_type))
+                continue
+            _, receipt_cols, expense_cols, consumable_col = _SCHEMA_MAP[entity_type]
+            df = pd.DataFrame(rows)
+            score = _score_from_records(df, receipt_cols, expense_cols, consumable_col, entity_type, timeframe)
+
+        if score is None:
+            results.append(_default_score(institution_id, entity_type))
+            continue
+
+        score.entity_class = e.get("entity_class")
+        if year is None and (timeframe is None or timeframe == "all"):
+            _schedule_snapshot_write(institution_id, entity_type, score)
+        results.append(score)
+
+    return results
 
 
 async def get_anomaly(institution_id: str, month: str) -> AnomalyResult:

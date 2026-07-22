@@ -471,7 +471,9 @@ def _localized_title(value: Any) -> Optional[str]:
     return _clean_spaces(value)
 
 
-def load_source_truth_year(year: int, source_dir: Path = DEFAULT_SOURCE_DIR) -> tuple[list[dict[str, Any]], dict[str, Any]]:
+def load_source_truth_year(
+    year: int, source_dir: Path = DEFAULT_SOURCE_DIR
+) -> tuple[list[dict[str, Any]], dict[str, Any]]:
     """Read one source-of-truth JSON file and normalize its days[] records."""
     path = source_dir / f"{year}.json"
     if not path.exists():
@@ -608,7 +610,9 @@ def _overall_validation(gcatholic_status: str, romcal_status: str) -> str:
     return "mismatched_all"
 
 
-def _best_match_result(source: dict[str, Any], validators: list[dict[str, Any]]) -> tuple[dict[str, Any], Optional[dict[str, Any]]]:
+def _best_match_result(
+    source: dict[str, Any], validators: list[dict[str, Any]]
+) -> tuple[dict[str, Any], Optional[dict[str, Any]]]:
     if not validators:
         return {"status": "missing", "method": "missing", "similarity": None, "possible_match": False}, None
 
@@ -622,7 +626,12 @@ def _best_match_result(source: dict[str, Any], validators: list[dict[str, Any]])
             best_result = result
             best_validator = validator
 
-    return best_result or {"status": "mismatched", "method": "mismatched", "similarity": 0.0, "possible_match": False}, best_validator
+    return best_result or {
+        "status": "mismatched",
+        "method": "mismatched",
+        "similarity": 0.0,
+        "possible_match": False,
+    }, best_validator
 
 
 def _review_note(validation_status: str) -> str:
@@ -657,12 +666,7 @@ def _validation_reason(
             litcal_part = f"; LitCal fallback: {litcal_name} ({litcal_status} by {litcal_method})"
         else:
             litcal_part = f"; LitCal fallback: {litcal_status}"
-    return (
-        f"Source of truth: {source_name}; "
-        f"GCatholic: {gcatholic_part}; "
-        f"Romcal: {romcal_part}"
-        f"{litcal_part}."
-    )
+    return f"Source of truth: {source_name}; GCatholic: {gcatholic_part}; Romcal: {romcal_part}{litcal_part}."
 
 
 def _apply_validator_results(
@@ -1134,7 +1138,8 @@ def collect(
             year_matched = [
                 row
                 for row in source_rows
-                if row["validation_status"] in {
+                if row["validation_status"]
+                in {
                     "matched_both",
                     "matched_gcatholic_only",
                     "matched_romcal_only",
@@ -1259,8 +1264,7 @@ if __name__ == "__main__":
         source_dir=Path(args.source_dir),
     )
     print(
-        f"Collected {len(result['clean']['records'])} matched rows and "
-        f"{len(result['review']['records'])} review rows."
+        f"Collected {len(result['clean']['records'])} matched rows and {len(result['review']['records'])} review rows."
     )
 
     if args.load:

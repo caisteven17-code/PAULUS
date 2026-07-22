@@ -12,6 +12,7 @@ from typing import Any
 import numpy as np
 import pandas as pd
 
+from app.services import _aws_financials
 from app.services.data_definitions import _SCHEMA_MAP, build_date_index, safe_div
 from app.services.supabase_client import get_table
 
@@ -87,13 +88,10 @@ def _decision_quality(simulated: list[dict], baseline: np.ndarray) -> dict[str, 
     }
 
 
-def _fetch_and_run(
-    institution_id: str,
-    assignment_duration_months: int,
-    collection_impact_pct: float,
-    periods: int,
-) -> dict[str, Any]:
-    ts = datetime.now(timezone.utc).isoformat()
+def _fetch_baseline(institution_id: str) -> np.ndarray:
+    aws_df = _aws_financials.parish_monthly_df(institution_id)
+    if aws_df is not None and not aws_df.empty:
+        return aws_df["total_receipts"].values.astype(float)
 
     schema = None
     receipt_cols: list[str] = []
@@ -110,38 +108,47 @@ def _fetch_and_run(
             break
 
     if schema is None:
-        baseline = np.array([1000.0] * 12)
-    else:
-        all_cols = ["institution_id", "month", "year"] + receipt_cols
-        seen: set[str] = set()
-        select_cols: list[str] = []
-        for c in all_cols:
-            if c not in seen:
-                select_cols.append(c)
-                seen.add(c)
+        raise ValueError(f"No financial records found for institution {institution_id}")
 
-        res = (
-            get_table(schema, "financial_records")
-            .select(", ".join(select_cols))
-            .eq("institution_id", institution_id)
-            .eq("is_current_version", True)
-            .is_("deleted_at", "null")
-            .order("year")
-            .execute()
-        )
+    all_cols = ["institution_id", "month", "year"] + receipt_cols
+    seen: set[str] = set()
+    select_cols: list[str] = []
+    for c in all_cols:
+        if c not in seen:
+            select_cols.append(c)
+            seen.add(c)
 
-        if not res.data:
-            baseline = np.array([1000.0] * 12)
-        else:
-            df = pd.DataFrame(res.data)
-            df = build_date_index(df)
-            for col in receipt_cols:
-                if col not in df.columns:
-                    df[col] = 0.0
-                df[col] = pd.to_numeric(df[col], errors="coerce").fillna(0.0)
-            df["total_receipts"] = df[receipt_cols].sum(axis=1)
-            baseline = df["total_receipts"].values.astype(float)
+    res = (
+        get_table(schema, "financial_records")
+        .select(", ".join(select_cols))
+        .eq("institution_id", institution_id)
+        .eq("is_current_version", True)
+        .is_("deleted_at", "null")
+        .order("year")
+        .execute()
+    )
+    if not res.data:
+        raise ValueError(f"No financial records found for institution {institution_id}")
 
+    df = pd.DataFrame(res.data)
+    df = build_date_index(df)
+    for col in receipt_cols:
+        if col not in df.columns:
+            df[col] = 0.0
+        df[col] = pd.to_numeric(df[col], errors="coerce").fillna(0.0)
+    df["total_receipts"] = df[receipt_cols].sum(axis=1)
+    return df["total_receipts"].values.astype(float)
+
+
+def _fetch_and_run(
+    institution_id: str,
+    assignment_duration_months: int,
+    collection_impact_pct: float,
+    periods: int,
+) -> dict[str, Any]:
+    ts = datetime.now(timezone.utc).isoformat()
+
+    baseline = _fetch_baseline(institution_id)
     simulated = _run_scenario(baseline, assignment_duration_months, collection_impact_pct, periods)
     sensitivity = _sensitivity_analysis(baseline, assignment_duration_months, collection_impact_pct, periods)
     dq = _decision_quality(simulated, baseline)

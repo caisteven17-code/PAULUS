@@ -13,6 +13,7 @@ from typing import Any
 import numpy as np
 import pandas as pd
 
+from app.services import _aws_financials
 from app.services.data_definitions import _SCHEMA_MAP, build_date_index
 from app.services.predictive._champion import (
     markov_forecast,
@@ -180,10 +181,15 @@ def _generate_forecast(
         return yhat, yhat - std_val, yhat + std_val
 
 
-def _fetch_and_process(institution_id: str, entity_type: str, periods: int) -> dict[str, Any]:
-    ts = datetime.now(timezone.utc).isoformat()
-    schema, receipt_cols, expense_cols, _ = _SCHEMA_MAP[entity_type]
+def _fetch_series(institution_id: str, entity_type: str) -> pd.DataFrame | None:
+    """Monthly df with date/total_receipts/total_expenses — AWS warehouse first
+    for parishes, Supabase otherwise. None when fewer than 6 months exist."""
+    if entity_type == "parish":
+        df = _aws_financials.parish_monthly_df(institution_id)
+        if df is not None and len(df) >= 6:
+            return df
 
+    schema, receipt_cols, expense_cols, _ = _SCHEMA_MAP[entity_type]
     all_cols = ["institution_id", "month", "year"] + receipt_cols + expense_cols
     seen: set[str] = set()
     select_cols: list[str] = []
@@ -201,37 +207,41 @@ def _fetch_and_process(institution_id: str, entity_type: str, periods: int) -> d
         .order("year")
         .execute()
     )
-
-    insufficient = {
-        "data_sufficient": False,
-        "entity_id": institution_id,
-        "entity_type": entity_type,
-        "forecast_receipts": [],
-        "forecast_expenses": [],
-        "champion": {
-            "champion_model": "N/A",
-            "metrics": {},
-            "all_candidates": {},
-            "wape": 1.0,
-            "needs_retraining": True,
-        },
-        "signal": "stable",
-        "timestamp": ts,
-    }
-
     if not res.data or len(res.data) < 6:
-        return insufficient
+        return None
 
     df = pd.DataFrame(res.data)
     df = build_date_index(df)
-
     for col in receipt_cols + expense_cols:
         if col not in df.columns:
             df[col] = 0.0
         df[col] = pd.to_numeric(df[col], errors="coerce").fillna(0.0)
-
     df["total_receipts"] = df[receipt_cols].sum(axis=1)
     df["total_expenses"] = df[expense_cols].sum(axis=1)
+    return df
+
+
+def _fetch_and_process(institution_id: str, entity_type: str, periods: int) -> dict[str, Any]:
+    ts = datetime.now(timezone.utc).isoformat()
+
+    df = _fetch_series(institution_id, entity_type)
+    if df is None:
+        return {
+            "data_sufficient": False,
+            "entity_id": institution_id,
+            "entity_type": entity_type,
+            "forecast_receipts": [],
+            "forecast_expenses": [],
+            "champion": {
+                "champion_model": "N/A",
+                "metrics": {},
+                "all_candidates": {},
+                "wape": 1.0,
+                "needs_retraining": True,
+            },
+            "signal": "stable",
+            "timestamp": ts,
+        }
 
     r_series = df["total_receipts"].values.astype(float)
     e_series = df["total_expenses"].values.astype(float)

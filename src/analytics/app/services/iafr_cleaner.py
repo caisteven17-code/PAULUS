@@ -24,12 +24,33 @@ FORMULA_ERROR_VALUES = {"#N/A", "#REF!", "#DIV/0!", "#VALUE!", "#NAME?", "#NULL!
 KNOWN_TEMPLATE_TITLE = "2026 INTEGRATED ARANCEL & FINANCIAL REPORT (IAFR) FORM"
 
 MONTH_NAMES = [
-    "Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec",
+    "Jan",
+    "Feb",
+    "Mar",
+    "Apr",
+    "May",
+    "Jun",
+    "Jul",
+    "Aug",
+    "Sep",
+    "Oct",
+    "Nov",
+    "Dec",
 ]
 MONTH_NAME_TO_NUM = {name: i + 1 for i, name in enumerate(MONTH_NAMES)}
 FULL_MONTH_TO_NUM = {
-    "january": 1, "february": 2, "march": 3, "april": 4, "may": 5, "june": 6,
-    "july": 7, "august": 8, "september": 9, "october": 10, "november": 11, "december": 12,
+    "january": 1,
+    "february": 2,
+    "march": 3,
+    "april": 4,
+    "may": 5,
+    "june": 6,
+    "july": 7,
+    "august": 8,
+    "september": 9,
+    "october": 10,
+    "november": 11,
+    "december": 12,
 }
 
 
@@ -78,7 +99,12 @@ FIELD_MAP: dict[str, FieldSpec] = {
     ),
     "mass_intentions_unclaimed": FieldSpec(
         "Total Unclaimed Mass Intentions (treated as Other Parish Fund Receipts)",
-        "D", "O", "B.01.02", "memo", "B", "B.01",
+        "D",
+        "O",
+        "B.01.02",
+        "memo",
+        "B",
+        "B.01",
     ),
     # B.1 Mass Collections
     "mass_coll_weekday": FieldSpec("-   Weekday Collections", "E", "M", "C.01", "receipt", "C", "B.1"),
@@ -100,9 +126,7 @@ FIELD_MAP: dict[str, FieldSpec] = {
     "receipts_interest_income": FieldSpec(
         "-  Interest Income from Bank Accounts", "E", "M", "D.04", "receipt", "D", "B.3"
     ),
-    "receipts_subsidy_from_diocese": FieldSpec(
-        "-  Subsidy from the Diocese", "E", "M", "D.05", "receipt", "D", "B.3"
-    ),
+    "receipts_subsidy_from_diocese": FieldSpec("-  Subsidy from the Diocese", "E", "M", "D.05", "receipt", "D", "B.3"),
     "receipts_special_collections": FieldSpec(
         "-  Special Collections (KINDLY ENCODE AMOUNT, see F.3)", "E", "M", "D.06", "receipt", "D", "B.3"
     ),
@@ -140,12 +164,8 @@ FIELD_MAP: dict[str, FieldSpec] = {
     "other_pastoral_total": FieldSpec("Other Pastoral Expenses", "C", "O", "E.03", "expense", "E", "C.3"),
     # D.1 Salaries, Wages, Benefits
     "salary_employees": FieldSpec("-  Salaries & Wages - Employees", "G", "M", None, "memo", "E", "D.1"),
-    "salary_remuneration_clergy": FieldSpec(
-        "-  Remuneration-Priests/Deacons/Nuns", "G", "M", None, "memo", "E", "D.1"
-    ),
-    "salary_other_compensation": FieldSpec(
-        "-  Other Compensations/Allowances", "G", "M", None, "memo", "E", "D.1"
-    ),
+    "salary_remuneration_clergy": FieldSpec("-  Remuneration-Priests/Deacons/Nuns", "G", "M", None, "memo", "E", "D.1"),
+    "salary_other_compensation": FieldSpec("-  Other Compensations/Allowances", "G", "M", None, "memo", "E", "D.1"),
     "salary_13th_month": FieldSpec("-  13th Month & Bonuses", "G", "M", None, "memo", "E", "D.1"),
     "salary_total": FieldSpec("Salaries,Wages, Benefits", "C", "O", "E.04", "expense", "E", "D.1"),
     # D.2 Government Contributions — no form subtotal, each contributes to E.05 directly
@@ -220,9 +240,7 @@ FIELD_MAP: dict[str, FieldSpec] = {
     ),
     "remit_5pct_tax": FieldSpec("-  5% Tax Collections (Diocese Share)", "G", "M", "F.01", "remittance", "F", "F.1"),
     # F.2 Bishop's Fund Share — breakdown is memo, form subtotal is the F.02 line item
-    "bishop_share_confirmation": FieldSpec(
-        "-  Confirmation (Bishop's Share)", "G", "M", None, "memo", "F", "F.2"
-    ),
+    "bishop_share_confirmation": FieldSpec("-  Confirmation (Bishop's Share)", "G", "M", None, "memo", "F", "F.2"),
     "bishop_share_confirmation_minister": FieldSpec(
         "-  Confirmation (Minister-Bishop)", "G", "M", None, "memo", "F", "F.2"
     ),
@@ -276,20 +294,39 @@ STANDALONE_FIELDS: dict[str, FieldSpec] = {
         "CONSTRUCTION FUND (NET RECEIPTS)", "G", "P", None, "memo", "E", "", kind="reconciliation"
     ),
     "beginning_balance": FieldSpec(
-        "Add: Beginning Balance (Previous Month's Ending Balance)", "G", "P", None, "balance", "A", "", kind="reconciliation"
+        "Add: Beginning Balance (Previous Month's Ending Balance)",
+        "G",
+        "P",
+        None,
+        "balance",
+        "A",
+        "",
+        kind="reconciliation",
     ),
     "ending_balance_before_remit": FieldSpec(
-        "ENDING CASH BALANCE FOR THE MONTH (before remittance)", "G", "P", None, "balance", "E", "", kind="reconciliation"
+        "ENDING CASH BALANCE FOR THE MONTH (before remittance)",
+        "G",
+        "P",
+        None,
+        "balance",
+        "E",
+        "",
+        kind="reconciliation",
     ),
     "ending_balance_after_remit": FieldSpec(
-        "ENDING CASH BALANCE FOR THE MONTH (after remittance)", "G", "P", None, "balance", "F", "", kind="reconciliation"
+        "ENDING CASH BALANCE FOR THE MONTH (after remittance)",
+        "G",
+        "P",
+        None,
+        "balance",
+        "F",
+        "",
+        kind="reconciliation",
     ),
     "personal_contrib_cbcp_pension": FieldSpec(
         "CBCP Pension (1k)", "O", "Q", None, "personal_contribution", "F", "F.3"
     ),
-    "personal_contrib_phf": FieldSpec(
-        "PHF (2,500, inc. tithes)", "O", "Q", None, "personal_contribution", "F", "F.3"
-    ),
+    "personal_contrib_phf": FieldSpec("PHF (2,500, inc. tithes)", "O", "Q", None, "personal_contribution", "F", "F.3"),
     "personal_contrib_monthly_clergy_assembly": FieldSpec(
         "Monthly Clergy Assembly", "O", "Q", None, "personal_contribution", "F", "F.3"
     ),
@@ -705,8 +742,15 @@ def build_reconciliation_checks(extracted: dict[str, Any], line_items: list[dict
     )
 
     sacrament_keys = [
-        "baptism_infant", "baptism_adult", "wedding_with_mass", "wedding_without_mass",
-        "funeral_mass", "funeral_blessings", "certificates", "marriage_banns", "permits",
+        "baptism_infant",
+        "baptism_adult",
+        "wedding_with_mass",
+        "wedding_without_mass",
+        "funeral_mass",
+        "funeral_blessings",
+        "certificates",
+        "marriage_banns",
+        "permits",
     ]
     add_check(
         "SACRAMENTS_GRANULAR_RECONCILIATION",
@@ -767,11 +811,19 @@ def validate(extracted: dict[str, Any], expected_parish_name: str | None = None)
 
     parish_name = (extracted.get("parish_name") or "").strip()
     fields = extracted.get("fields", {})
-    money_fields = {k: v for k, v in fields.items() if FIELD_MAP.get(k, STANDALONE_FIELDS.get(k)) and (FIELD_MAP.get(k) or STANDALONE_FIELDS.get(k)).kind == "money"}
+    money_fields = {
+        k: v
+        for k, v in fields.items()
+        if FIELD_MAP.get(k, STANDALONE_FIELDS.get(k)) and (FIELD_MAP.get(k) or STANDALONE_FIELDS.get(k)).kind == "money"
+    }
     all_zero = all(v == 0 for v in money_fields.values()) if money_fields else True
 
     if not parish_name and all_zero:
-        add("missing_required", "blocker", "Uploaded file is empty or unreadable — no parish name and no financial data found.")
+        add(
+            "missing_required",
+            "blocker",
+            "Uploaded file is empty or unreadable — no parish name and no financial data found.",
+        )
         return errors
 
     if not parish_name:
@@ -785,7 +837,8 @@ def validate(extracted: dict[str, Any], expected_parish_name: str | None = None)
         normalized_actual = parish_name.strip().lower()
         if normalized_expected not in normalized_actual and normalized_actual not in normalized_expected:
             add(
-                "out_of_range", "warning",
+                "out_of_range",
+                "warning",
                 f"Parish name on the form ('{parish_name}') does not match the submitting institution ('{expected_parish_name}').",
                 field_name="parish_name",
             )
@@ -802,12 +855,18 @@ def validate(extracted: dict[str, Any], expected_parish_name: str | None = None)
         if spec.kind != "money" or spec.item_type not in negative_check_types:
             continue
         if fields.get(key, 0.0) < 0:
-            add("out_of_range", "warning", f"'{spec.label}' is negative, which is unusual for this field.", field_name=key)
+            add(
+                "out_of_range",
+                "warning",
+                f"'{spec.label}' is negative, which is unusual for this field.",
+                field_name=key,
+            )
 
     version_mismatch = extracted.get("template_version_mismatch")
     if version_mismatch:
         add(
-            "out_of_range", "warning",
+            "out_of_range",
+            "warning",
             f"Unrecognized template version/title ('{version_mismatch}') — totals were not verified against the known 2026 layout.",
         )
 
@@ -959,4 +1018,3 @@ def _process_csv(file_bytes: bytes, target_month: int, target_year: int):
             return extracted, row_month, row_year
 
     return None, None, None
-

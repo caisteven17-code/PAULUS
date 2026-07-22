@@ -52,16 +52,16 @@ DEFAULT_OUT_DIR = Path(__file__).resolve().parents[4] / "weather_output"
 
 # ── Tolerances ────────────────────────────────────────────────────────────────
 
-TEMP_MAE_THRESHOLD = 2.0   # °C      — MAE above this fails temperature validation
+TEMP_MAE_THRESHOLD = 2.0  # °C      — MAE above this fails temperature validation
 RAIN_RELMAE_THRESHOLD = 0.30  # 30%  — relative MAE above this fails rainfall validation
-WIND_MAE_THRESHOLD = 1.5   # m/s     — MAE above this fails wind speed validation
+WIND_MAE_THRESHOLD = 1.5  # m/s     — MAE above this fails wind speed validation
 HUMID_MAE_THRESHOLD = 10.0  # %RH   — MAE above this fails humidity validation
 
 # Per-record flag threshold (2× the MAE threshold) — individual months flagged
 # in the report even when overall MAE passes, so analysts can inspect outliers.
-TEMP_FLAG_DELTA = TEMP_MAE_THRESHOLD * 2    # °C
+TEMP_FLAG_DELTA = TEMP_MAE_THRESHOLD * 2  # °C
 RAIN_FLAG_RELDELTA = RAIN_RELMAE_THRESHOLD * 2  # relative
-WIND_FLAG_DELTA = WIND_MAE_THRESHOLD * 2    # m/s
+WIND_FLAG_DELTA = WIND_MAE_THRESHOLD * 2  # m/s
 HUMID_FLAG_DELTA = HUMID_MAE_THRESHOLD * 2  # %RH
 
 # ── NOAA GSOD ─────────────────────────────────────────────────────────────────
@@ -153,7 +153,11 @@ def fetch_gsod_monthly(station_id: str, start: date, end: date) -> list[dict]:
                 # Re-use temp_c from the same record if available, otherwise skip.
                 if r.get("TEMP") is not None:
                     temp_c = (float(r["TEMP"]) - 32) * 5 / 9
-                    rh = 100 * math.exp(17.625 * dewp_c / (243.04 + dewp_c)) / math.exp(17.625 * temp_c / (243.04 + temp_c))
+                    rh = (
+                        100
+                        * math.exp(17.625 * dewp_c / (243.04 + dewp_c))
+                        / math.exp(17.625 * temp_c / (243.04 + temp_c))
+                    )
                     monthly[key]["dewps"].append(max(0.0, min(100.0, rh)))
         except (TypeError, ValueError):
             pass
@@ -362,7 +366,9 @@ def validate(
     # Average across all stations for each month
     gsod_ref: dict[tuple[int, int], float] = {k: round(sum(v) / len(v), 2) for k, v in gsod_temp_by_month.items()}
     gsod_wind_ref: dict[tuple[int, int], float] = {k: round(sum(v) / len(v), 3) for k, v in gsod_wind_by_month.items()}
-    gsod_humid_ref: dict[tuple[int, int], float] = {k: round(sum(v) / len(v), 2) for k, v in gsod_humid_by_month.items()}
+    gsod_humid_ref: dict[tuple[int, int], float] = {
+        k: round(sum(v) / len(v), 2) for k, v in gsod_humid_by_month.items()
+    }
 
     # ── Step 2: Fetch CHIRPS reference rainfall ───────────────────────────────
     logger.info("Fetching CHIRPS reference rainfall (%s → %s)...", start, end)

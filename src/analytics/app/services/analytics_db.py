@@ -17,6 +17,8 @@ from app.config import ANALYTICS_DB_URL, WAREHOUSE_DB_STATEMENT_TIMEOUT_SECONDS
 
 _pool: ConnectionPool | None = None
 _pool_lock = RLock()
+_etl_pool: ConnectionPool | None = None
+_etl_pool_lock = RLock()
 
 
 def enabled() -> bool:
@@ -39,9 +41,17 @@ def get_pool() -> ConnectionPool:
         # would stack up and, if any one of them stalled, block the entire
         # single-worker service from accepting *any* request for 30-90s.
         # min_size keeps warm connections ready; connect_timeout caps how
-        # long a bad connection attempt can block the pool; RDS allows 81
-        # connections total (16 in use at last check), so max_size=8 leaves
-        # plenty of headroom for other services sharing the instance.
+        # long a bad connection attempt can block the pool. A real dashboard
+        # page load fires several endpoints at once (financial-trend,
+        # seasonality, projects, health-scores) and each of those internally
+        # opens its own pool checkout (some via a ThreadPoolExecutor of 2-3
+        # sub-queries) — under that concurrency, max_size=8 measurably
+        # queued requests and pushed a few past the NestJS gateway's 20s
+        # timeout, observed as "Python analytics batch call failed" fallback
+        # log lines. RDS allows 81 connections total (~35 in use at peak
+        # observed load across all services sharing the instance), so
+        # max_size=20 gives real concurrency headroom without approaching
+        # that ceiling.
         # check + max_idle: long-running callers (e.g. weather_collector.py,
         # which spends 30-40+ min fetching external APIs before ever
         # touching this pool) would get handed a connection RDS had already
@@ -52,7 +62,7 @@ def get_pool() -> ConnectionPool:
         _pool = ConnectionPool(
             ANALYTICS_DB_URL,
             min_size=2,
-            max_size=8,
+            max_size=20,
             timeout=30,
             max_idle=120,
             kwargs={
@@ -65,11 +75,55 @@ def get_pool() -> ConnectionPool:
     return _pool
 
 
+# Separate, deliberately small pool for ETL/sync writers (parish_gold_loader,
+# institution_dimension_sync, and similar warehouse_control.etl_runs-tracked
+# jobs) — kept fully independent of the read-serving pool above. A slow or
+# stuck ETL write (observed once holding a connection for 15+ minutes before
+# its owning process was killed) used to compete for the *same* max_size=20
+# budget every dashboard request also draws from; one heavy writer could
+# leave live user-facing requests queued for the pool's own 30s timeout,
+# which is indistinguishable from the whole service being down. A hard
+# max_size=4 here means ETL work can never starve the read pool, regardless
+# of how long any single ETL query runs.
+def get_etl_pool() -> ConnectionPool:
+    global _etl_pool
+    if _etl_pool is not None:
+        return _etl_pool
+    with _etl_pool_lock:
+        if _etl_pool is not None:
+            return _etl_pool
+        if not ANALYTICS_DB_URL:
+            raise RuntimeError("ANALYTICS_DB_URL must be set in .env")
+        _etl_pool = ConnectionPool(
+            ANALYTICS_DB_URL,
+            min_size=0,
+            max_size=4,
+            timeout=30,
+            max_idle=120,
+            kwargs={
+                "connect_timeout": 10,
+                "options": f"-c statement_timeout={WAREHOUSE_DB_STATEMENT_TIMEOUT_SECONDS * 1000}",
+            },
+            check=ConnectionPool.check_connection,
+            open=True,
+        )
+    return _etl_pool
+
+
 def close_pool() -> None:
     global _pool
     with _pool_lock:
         stale_pool = _pool
         _pool = None
+    if stale_pool is not None:
+        stale_pool.close(timeout=5)
+
+
+def close_etl_pool() -> None:
+    global _etl_pool
+    with _etl_pool_lock:
+        stale_pool = _etl_pool
+        _etl_pool = None
     if stale_pool is not None:
         stale_pool.close(timeout=5)
 
@@ -84,19 +138,58 @@ def discard_pool() -> None:
         pass
 
 
+def discard_etl_pool() -> None:
+    """ETL-pool counterpart of discard_pool() — a connection recovery in an
+    ETL worker must never tear down the read-serving pool live dashboard
+    requests depend on."""
+    try:
+        close_etl_pool()
+    except Exception:
+        pass
+
+
+def reap_stale_etl_runs() -> int:
+    """Mark any warehouse_control.etl_runs row still 'running' as 'failed'.
+
+    Call once at process startup. A pipeline run cannot span a process
+    restart — anything still 'running' when a fresh process boots is
+    guaranteed orphaned (its owning process was killed/crashed/redeployed
+    before it could record a real outcome), never an actually-in-progress
+    job. Without this, orphaned rows accumulate indefinitely and the
+    etl_runs history stops reflecting reality. Returns the number of rows
+    reaped.
+    """
+    with get_etl_pool().connection() as conn:
+        with conn.cursor() as cur:
+            cur.execute(
+                """
+                UPDATE warehouse_control.etl_runs
+                SET status = 'failed',
+                    finished_at = now(),
+                    error_summary = 'Orphaned at startup: owning process exited before recording a real outcome.'
+                WHERE status = 'running'
+                """
+            )
+            count = cur.rowcount
+        conn.commit()
+    return count
+
+
 def _adapt(value):
     return Jsonb(value) if isinstance(value, (dict, list)) else value
 
 
-def execute(sql: str, params: dict | list | tuple | None = None) -> None:
-    with get_pool().connection() as conn:
+def execute(sql: str, params: dict | list | tuple | None = None, pool: ConnectionPool | None = None) -> None:
+    with (pool or get_pool()).connection() as conn:
         with conn.cursor() as cur:
             cur.execute(sql, params)
         conn.commit()
 
 
-def execute_returning_one(sql: str, params: dict | list | tuple | None = None) -> dict | None:
-    with get_pool().connection() as conn:
+def execute_returning_one(
+    sql: str, params: dict | list | tuple | None = None, pool: ConnectionPool | None = None
+) -> dict | None:
+    with (pool or get_pool()).connection() as conn:
         with conn.cursor(row_factory=dict_row) as cur:
             cur.execute(sql, params)
             row = cur.fetchone()
@@ -104,8 +197,8 @@ def execute_returning_one(sql: str, params: dict | list | tuple | None = None) -
     return row
 
 
-def fetch_query(sql: str, params: dict | list | tuple | None = None) -> list[dict]:
-    with get_pool().connection() as conn:
+def fetch_query(sql: str, params: dict | list | tuple | None = None, pool: ConnectionPool | None = None) -> list[dict]:
+    with (pool or get_pool()).connection() as conn:
         with conn.cursor(row_factory=dict_row) as cur:
             cur.execute(sql, params)
             return cur.fetchall()
@@ -121,7 +214,13 @@ def fetch_all(schema: str, table: str, columns: str = "*", order_by: str | None 
             return cur.fetchall()
 
 
-def upsert_rows(schema: str, table: str, rows: list[dict], conflict_cols: list[str] | str) -> int:
+def upsert_rows(
+    schema: str,
+    table: str,
+    rows: list[dict],
+    conflict_cols: list[str] | str,
+    pool: ConnectionPool | None = None,
+) -> int:
     """INSERT ... ON CONFLICT (conflict_cols) DO UPDATE. Every row must share the
     same set of keys (all call sites in this codebase already build batches this way).
     """
@@ -143,7 +242,7 @@ def upsert_rows(schema: str, table: str, rows: list[dict], conflict_cols: list[s
         f'INSERT INTO "{schema}"."{table}" ({col_list}) VALUES {values_sql} '
         f"ON CONFLICT ({conflict_list}) DO UPDATE SET {update_list}"
     )
-    execute(sql, params)
+    execute(sql, params, pool=pool)
     return len(rows)
 
 
@@ -156,7 +255,14 @@ def fetch_one(schema: str, table: str, where: dict, columns: str = "*") -> dict 
             return cur.fetchone()
 
 
-def upsert_row(schema: str, table: str, row: dict, conflict_cols: list[str] | str, returning: str | None = None):
+def upsert_row(
+    schema: str,
+    table: str,
+    row: dict,
+    conflict_cols: list[str] | str,
+    returning: str | None = None,
+    pool: ConnectionPool | None = None,
+):
     """Single-row INSERT ... ON CONFLICT DO UPDATE. With `returning`, always
     yields that column's value whether the row was inserted or already existed
     — the "find or create, give me the key" pattern used by dimension tables.
@@ -181,7 +287,7 @@ def upsert_row(schema: str, table: str, row: dict, conflict_cols: list[str] | st
     if returning:
         sql += f' RETURNING "{returning}"'
 
-    with get_pool().connection() as conn:
+    with (pool or get_pool()).connection() as conn:
         with conn.cursor() as cur:
             cur.execute(sql, params)
             result = cur.fetchone() if returning else None

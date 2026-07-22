@@ -47,19 +47,11 @@ WAREHOUSE_INSTITUTION_SYNC_ENABLED: bool = os.getenv("WAREHOUSE_INSTITUTION_SYNC
 WAREHOUSE_INSTITUTION_POLL_SECONDS: int = max(10, int(os.getenv("WAREHOUSE_INSTITUTION_POLL_SECONDS", "60")))
 
 # Direct Supabase -> AWS Silver/Gold for school and seminary finance.
-WAREHOUSE_EDUCATION_SYNC_ENABLED: bool = os.getenv(
-    "WAREHOUSE_EDUCATION_SYNC_ENABLED", "false"
-).lower() == "true"
-WAREHOUSE_EDUCATION_POLL_SECONDS: int = max(
-    30, int(os.getenv("WAREHOUSE_EDUCATION_POLL_SECONDS", "60"))
-)
+WAREHOUSE_EDUCATION_SYNC_ENABLED: bool = os.getenv("WAREHOUSE_EDUCATION_SYNC_ENABLED", "false").lower() == "true"
+WAREHOUSE_EDUCATION_POLL_SECONDS: int = max(30, int(os.getenv("WAREHOUSE_EDUCATION_POLL_SECONDS", "60")))
 
 # Human-reviewed liturgical calendar records are operational master data in
 # Supabase. AWS retains collection staging and an approved analytical copy.
 LITURGICAL_CANONICAL_SOURCE: str = os.getenv("LITURGICAL_CANONICAL_SOURCE", "supabase").lower()
-LITURGICAL_APPROVAL_SYNC_ENABLED: bool = os.getenv(
-    "LITURGICAL_APPROVAL_SYNC_ENABLED", "false"
-).lower() == "true"
-LITURGICAL_APPROVAL_POLL_SECONDS: int = max(
-    30, int(os.getenv("LITURGICAL_APPROVAL_POLL_SECONDS", "300"))
-)
+LITURGICAL_APPROVAL_SYNC_ENABLED: bool = os.getenv("LITURGICAL_APPROVAL_SYNC_ENABLED", "false").lower() == "true"
+LITURGICAL_APPROVAL_POLL_SECONDS: int = max(30, int(os.getenv("LITURGICAL_APPROVAL_POLL_SECONDS", "300")))

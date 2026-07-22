@@ -13,7 +13,6 @@ from typing import Any
 
 from app.services import analytics_db
 
-
 _WEATHER_TABLES = {
     "weather_observations",
     "weather_rainfall_daily",
@@ -77,20 +76,15 @@ class AwsWeatherQuery:
         return self
 
     def execute(self) -> WeatherResponse:
-        select_sql = ", ".join(
-            "*" if column == "*" else f'"{column}"' for column in self.columns
-        )
+        select_sql = ", ".join("*" if column == "*" else f'"{column}"' for column in self.columns)
         statement = f'SELECT {select_sql} FROM reference."{self.table}"'
         params: list[Any] = []
         if self.filters:
-            statement += " WHERE " + " AND ".join(
-                f'"{column}" {operator} %s' for column, operator, _ in self.filters
-            )
+            statement += " WHERE " + " AND ".join(f'"{column}" {operator} %s' for column, operator, _ in self.filters)
             params.extend(value for _, _, value in self.filters)
         if self.order_columns:
             statement += " ORDER BY " + ", ".join(
-                f'"{column}" {"DESC" if desc else "ASC"}'
-                for column, desc in self.order_columns
+                f'"{column}" {"DESC" if desc else "ASC"}' for column, desc in self.order_columns
             )
         if self.limit is not None:
             statement += " LIMIT %s OFFSET %s"
@@ -110,4 +104,3 @@ def fetch_all(table: str, columns: list[str] | tuple[str, ...] | str = "*") -> l
 
 
 atexit.register(analytics_db.close_pool)
-

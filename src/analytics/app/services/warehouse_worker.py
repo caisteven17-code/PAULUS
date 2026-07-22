@@ -82,14 +82,17 @@ def _rpc(name: str, params: dict[str, Any]) -> Any:
 
 
 def _claim_outbox_events() -> list[dict[str, Any]]:
-    return _rpc(
-        "claim_analytics_sync_events",
-        {
-            "p_worker_id": _worker_id,
-            "p_limit": WAREHOUSE_OUTBOX_BATCH_SIZE,
-            "p_lease_seconds": WAREHOUSE_OUTBOX_LEASE_SECONDS,
-        },
-    ) or []
+    return (
+        _rpc(
+            "claim_analytics_sync_events",
+            {
+                "p_worker_id": _worker_id,
+                "p_limit": WAREHOUSE_OUTBOX_BATCH_SIZE,
+                "p_lease_seconds": WAREHOUSE_OUTBOX_LEASE_SECONDS,
+            },
+        )
+        or []
+    )
 
 
 def _complete_outbox_event(event: dict[str, Any]) -> bool:
@@ -142,7 +145,7 @@ def _run_outbox_once() -> dict[str, int]:
             logger.exception("Durable analytics delivery failed for %s", event["source_record_id"])
             if aws_error is None:
                 aws_error = exc
-                analytics_db.discard_pool()
+                analytics_db.discard_etl_pool()
                 _worker_state["connection_recoveries"] += 1
             if _fail_outbox_event(event, exc):
                 result["rescheduled"] += 1
@@ -163,6 +166,7 @@ def _get_pipeline_watermark(pipeline_name: str) -> dict[str, Any] | None:
           AND source_table = 'financial_records'
         """,
         (pipeline_name,),
+        pool=analytics_db.get_etl_pool(),
     )
     return rows[0] if rows else None
 
@@ -179,6 +183,7 @@ def _set_pipeline_watermark(pipeline_name: str, updated_at: str | datetime, reco
             updated_at = now()
         """,
         (pipeline_name, updated_at, record_id),
+        pool=analytics_db.get_etl_pool(),
     )
 
 
@@ -192,6 +197,7 @@ def _touch_pipeline_watermark(pipeline_name: str) -> None:
           AND source_table = 'financial_records'
         """,
         (pipeline_name,),
+        pool=analytics_db.get_etl_pool(),
     )
 
 
@@ -228,7 +234,8 @@ def initialize_global_watermark() -> bool:
         WHERE backfill_name = 'parish_finance_direct_v1' AND status = 'succeeded'
         ORDER BY source_updated_at DESC, source_record_id DESC
         LIMIT 1
-        """
+        """,
+        pool=analytics_db.get_etl_pool(),
     )
     if rows:
         _set_pipeline_watermark(_GLOBAL_PIPELINE_NAME, rows[0]["source_updated_at"], rows[0]["id"])
@@ -272,6 +279,7 @@ def _candidate_grains(source_record_id: str) -> list[tuple[int, int]]:
           AND date_key IS NOT NULL
         """,
         (source_record_id,),
+        pool=analytics_db.get_etl_pool(),
     )
     return [(int(row["parish_key"]), int(row["date_key"])) for row in rows]
 
@@ -326,8 +334,11 @@ def _cleanup_if_due() -> dict[str, int] | None:
 
 def _run_global_once() -> dict[str, Any]:
     results: dict[str, Any] = {
-        "initialized": [], "synced": [], "failed": [],
-        "retries": _process_due_retries(), "cleanup": _cleanup_if_due(),
+        "initialized": [],
+        "synced": [],
+        "failed": [],
+        "retries": _process_due_retries(),
+        "cleanup": _cleanup_if_due(),
     }
     if initialize_global_watermark():
         results["initialized"].append(_GLOBAL_PIPELINE_NAME)
@@ -383,16 +394,21 @@ def run_once(institution_ids: list[str] | None = None) -> dict[str, Any]:
         outbox = _run_outbox_once()
         # Drain retries created by the former AWS-watermark worker. New events
         # are retained and retried in Supabase instead.
-        retries = _process_due_retries() if outbox["rescheduled"] == 0 else {
-            "claimed": 0, "succeeded": 0, "rescheduled": 0, "dead_letter": 0
-        }
+        retries = (
+            _process_due_retries()
+            if outbox["rescheduled"] == 0
+            else {"claimed": 0, "succeeded": 0, "rescheduled": 0, "dead_letter": 0}
+        )
         return {"outbox": outbox, "retries": retries, "cleanup": _cleanup_if_due()}
     if institution_ids is None and WAREHOUSE_SYNC_ALL_PARISHES:
         return _run_global_once()
     allowlist = institution_ids if institution_ids is not None else WAREHOUSE_PILOT_INSTITUTION_IDS
     results: dict[str, Any] = {
-        "initialized": [], "synced": [], "failed": [],
-        "retries": _process_due_retries(), "cleanup": _cleanup_if_due(),
+        "initialized": [],
+        "synced": [],
+        "failed": [],
+        "retries": _process_due_retries(),
+        "cleanup": _cleanup_if_due(),
     }
     for institution_id in allowlist:
         if initialize_watermark(institution_id):
@@ -434,7 +450,7 @@ async def run_forever(stop_event: asyncio.Event) -> None:
             _worker_state["last_error_type"] = type(exc).__name__
             _worker_state["consecutive_failures"] += 1
             _worker_state["connection_recoveries"] += 1
-            analytics_db.discard_pool()
+            analytics_db.discard_etl_pool()
             _mark_heartbeat("recovering")
         try:
             await asyncio.wait_for(stop_event.wait(), timeout=WAREHOUSE_PILOT_POLL_SECONDS)
@@ -459,7 +475,7 @@ def main() -> None:
             result = run_once()
         print(result)
     finally:
-        analytics_db.close_pool()
+        analytics_db.close_etl_pool()
 
 
 if __name__ == "__main__":

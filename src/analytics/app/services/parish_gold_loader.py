@@ -56,6 +56,7 @@ def _start_run(
             mode,
             Jsonb(scope),
         ),
+        pool=analytics_db.get_etl_pool(),
     )
     if not row:
         raise RuntimeError("Could not create Phase 5E ETL run")
@@ -63,7 +64,7 @@ def _start_run(
 
 
 def _record_results(run_id: str, checks: list[Check]) -> None:
-    with analytics_db.get_pool().connection() as conn:
+    with analytics_db.get_etl_pool().connection() as conn:
         with conn.cursor() as cur:
             for check in checks:
                 cur.execute(
@@ -123,6 +124,7 @@ def _finish_run(
             error_summary,
             run_id,
         ),
+        pool=analytics_db.get_etl_pool(),
     )
 
 
@@ -137,6 +139,7 @@ def _record_failure(run_id: str, message: str) -> None:
                 'GOLD_LOAD_ROLLBACK', %s)
         """,
         (run_id, message[:2000]),
+        pool=analytics_db.get_etl_pool(),
     )
 
 
@@ -450,7 +453,7 @@ def load(mode: str, institution_ids: list[str] | None = None) -> dict[str, Any]:
     candidate_count = monthly_loaded = breakdown_loaded = 0
     checks: list[Check] = []
     try:
-        with analytics_db.get_pool().connection() as conn:
+        with analytics_db.get_etl_pool().connection() as conn:
             with conn.transaction():
                 with conn.cursor(row_factory=dict_row) as cur:
                     candidate_count = _create_scope(cur, institution_ids)
@@ -459,18 +462,13 @@ def load(mode: str, institution_ids: list[str] | None = None) -> dict[str, Any]:
                     checks = _preflight(cur)
                     failures = [check for check in checks if check.status == "failed"]
                     if failures:
-                        raise RuntimeError(
-                            "Gold preflight failed: " + ", ".join(check.name for check in failures)
-                        )
+                        raise RuntimeError("Gold preflight failed: " + ", ".join(check.name for check in failures))
                     monthly_loaded = _load_monthly(cur)
                     breakdown_loaded = _load_breakdowns(cur)
                     checks.extend(_reconcile(cur, candidate_count))
                     failures = [check for check in checks if check.status == "failed"]
                     if failures:
-                        raise RuntimeError(
-                            "Gold reconciliation failed: "
-                            + ", ".join(check.name for check in failures)
-                        )
+                        raise RuntimeError("Gold reconciliation failed: " + ", ".join(check.name for check in failures))
         _record_results(run_id, checks)
         _finish_run(
             run_id,
@@ -517,7 +515,7 @@ def refresh_incremental(record_id: str, grains: list[tuple[int, int]]) -> dict[s
         if not normalized_grains:
             checks.append(Check.exact("incremental_affected_grain_count", 0, 0))
         else:
-            with analytics_db.get_pool().connection() as conn:
+            with analytics_db.get_etl_pool().connection() as conn:
                 with conn.transaction():
                     with conn.cursor(row_factory=dict_row) as cur:
                         candidate_count = _create_grain_scope(cur, normalized_grains)
@@ -525,8 +523,7 @@ def refresh_incremental(record_id: str, grains: list[tuple[int, int]]) -> dict[s
                         failures = [check for check in checks if check.status == "failed"]
                         if failures:
                             raise RuntimeError(
-                                "Gold incremental preflight failed: "
-                                + ", ".join(check.name for check in failures)
+                                "Gold incremental preflight failed: " + ", ".join(check.name for check in failures)
                             )
                         _delete_refresh_grains(cur)
                         monthly_loaded = _load_monthly(cur)
@@ -535,8 +532,7 @@ def refresh_incremental(record_id: str, grains: list[tuple[int, int]]) -> dict[s
                         failures = [check for check in checks if check.status == "failed"]
                         if failures:
                             raise RuntimeError(
-                                "Gold incremental reconciliation failed: "
-                                + ", ".join(check.name for check in failures)
+                                "Gold incremental reconciliation failed: " + ", ".join(check.name for check in failures)
                             )
         _record_results(run_id, checks)
         _finish_run(
@@ -579,7 +575,7 @@ def main() -> None:
     try:
         print(load(args.mode, args.institution_ids))
     finally:
-        analytics_db.close_pool()
+        analytics_db.close_etl_pool()
 
 
 if __name__ == "__main__":

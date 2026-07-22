@@ -89,6 +89,24 @@ export class AnalyticsService {
     return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value);
   }
 
+  private mapPythonScore(python: any): FinancialHealthScore {
+    return {
+      entityId: python.entity_id,
+      entityType: python.entity_type,
+      entityClass: python.entity_class,
+      compositeScore: python.composite_score,
+      dimensions: python.dimensions,
+      trend: python.trend,
+      percentageChange: python.percentage_change,
+      analysis: python.analysis,
+      recommendations: python.recommendations,
+      periodStartYear: python.period_start_year,
+      periodEndYear: python.period_end_year,
+      dataSufficient: python.data_sufficient,
+      timestamp: python.timestamp,
+    } as FinancialHealthScore;
+  }
+
   async calculateHealthScore(
     entityId: string,
     entityType: 'parish' | 'seminary' | 'school',
@@ -107,24 +125,69 @@ export class AnalyticsService {
     const python = this.isUuid(entityId)
       ? await this.callPython(`/analytics/health/${entityType}/${entityId}${query ? `?${query}` : ''}`)
       : null;
-    if (python) {
-      return {
-        entityId: python.entity_id,
-        entityType: python.entity_type,
-        entityClass: python.entity_class,
-        compositeScore: python.composite_score,
-        dimensions: python.dimensions,
-        trend: python.trend,
-        percentageChange: python.percentage_change,
-        analysis: python.analysis,
-        recommendations: python.recommendations,
-        periodStartYear: python.period_start_year,
-        periodEndYear: python.period_end_year,
-        dataSufficient: python.data_sufficient,
-        timestamp: python.timestamp,
-      } as FinancialHealthScore;
+    if (python) return this.mapPythonScore(python);
+
+    return this.calculateHealthScoreFallback(entityId, entityType, entityClass, year, timeframe);
+  }
+
+  // Dashboards score every institution at once. Calling calculateHealthScore
+  // per entity means one Python HTTP round trip per institution — each has
+  // its own real network latency, so 90+ of them in flight together doesn't
+  // parallelize away the cost, and the slowest stragglers land past the
+  // gateway's timeout. A single batched call lets Python fetch every
+  // institution's records in one Supabase query per entity type instead of
+  // one query per institution.
+  async calculateHealthScoresBatch(
+    entities: { entityId: string; entityType: 'parish' | 'seminary' | 'school'; entityClass?: EntityClass }[],
+    year?: number,
+    timeframe?: '6m' | '12m' | 'all',
+  ): Promise<FinancialHealthScore[]> {
+    const pythonEntities = entities.filter((e) => this.isUuid(e.entityId));
+    const pythonResults = new Map<string, any>();
+
+    if (pythonEntities.length > 0 && Date.now() >= this.pythonRetryAfter) {
+      try {
+        const res = await fetch(`${PYTHON_ANALYTICS_URL}/analytics/health-scores`, {
+          method: 'POST',
+          headers: { 'content-type': 'application/json' },
+          signal: AbortSignal.timeout(20_000),
+          body: JSON.stringify({
+            entities: pythonEntities.map((e) => ({
+              institution_id: e.entityId,
+              entity_type: e.entityType,
+              entity_class: e.entityClass,
+            })),
+            year,
+            timeframe,
+          }),
+        });
+        if (res.ok) {
+          const data = (await res.json()) as any[];
+          data.forEach((python, i) => pythonResults.set(pythonEntities[i].entityId, python));
+          this.pythonRetryAfter = 0;
+        }
+      } catch {
+        this.pythonRetryAfter = Date.now() + 10_000;
+        this.logger.log('Python analytics batch call failed; using NestJS fallback for this batch');
+      }
     }
 
+    return Promise.all(
+      entities.map((e) => {
+        const python = pythonResults.get(e.entityId);
+        if (python) return this.mapPythonScore(python);
+        return this.calculateHealthScoreFallback(e.entityId, e.entityType, e.entityClass, year, timeframe);
+      }),
+    );
+  }
+
+  private async calculateHealthScoreFallback(
+    entityId: string,
+    entityType: 'parish' | 'seminary' | 'school',
+    entityClass?: EntityClass,
+    year?: number,
+    timeframe?: '6m' | '12m' | 'all',
+  ): Promise<FinancialHealthScore> {
     let records = await this.financialService.getRecords(entityId, entityType, entityClass);
     if (year) records = records.filter((r) => r.year === year);
     const window = timeframe === '6m' ? 6 : timeframe === '12m' ? 12 : undefined;

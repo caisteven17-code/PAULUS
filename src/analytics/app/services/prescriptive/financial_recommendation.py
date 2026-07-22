@@ -11,6 +11,7 @@ from typing import Any
 
 import pandas as pd
 
+from app.services import _aws_financials
 from app.services.data_definitions import _SCHEMA_MAP, build_date_index, safe_div
 from app.services.supabase_client import get_table
 
@@ -79,10 +80,17 @@ def _solve_lp(avg_receipts: float, category_avgs: dict[str, float]) -> dict[str,
         }
 
 
-def _fetch_and_process(institution_id: str, entity_type: str) -> dict[str, Any]:
-    ts = datetime.now(timezone.utc).isoformat()
-    schema, receipt_cols, expense_cols, _ = _SCHEMA_MAP[entity_type]
+def _fetch_receipts_and_categories(institution_id: str, entity_type: str) -> tuple[float, dict[str, float]] | None:
+    """(avg total receipts, {expense category: avg}) — AWS warehouse first for
+    parishes (Section-D categories), Supabase otherwise. None when < 3 months."""
+    if entity_type == "parish":
+        df = _aws_financials.parish_monthly_df(institution_id)
+        if df is not None and len(df) >= 3:
+            avg_receipts = float(df["total_receipts"].mean())
+            category_avgs = {col: float(df[col].mean()) for col in _aws_financials.EXPENSE_CATEGORY_COLS}
+            return avg_receipts, category_avgs
 
+    schema, receipt_cols, expense_cols, _ = _SCHEMA_MAP[entity_type]
     all_cols = ["institution_id", "month", "year"] + receipt_cols + expense_cols
     seen: set[str] = set()
     select_cols: list[str] = []
@@ -100,8 +108,26 @@ def _fetch_and_process(institution_id: str, entity_type: str) -> dict[str, Any]:
         .order("year")
         .execute()
     )
-
     if not res.data or len(res.data) < 3:
+        return None
+
+    df = pd.DataFrame(res.data)
+    df = build_date_index(df)
+    for col in receipt_cols + expense_cols:
+        if col not in df.columns:
+            df[col] = 0.0
+        df[col] = pd.to_numeric(df[col], errors="coerce").fillna(0.0)
+
+    avg_receipts = float(df[receipt_cols].sum(axis=1).mean())
+    category_avgs = {col: float(df[col].mean()) for col in expense_cols if col in df.columns}
+    return avg_receipts, category_avgs
+
+
+def _fetch_and_process(institution_id: str, entity_type: str) -> dict[str, Any]:
+    ts = datetime.now(timezone.utc).isoformat()
+
+    fetched = _fetch_receipts_and_categories(institution_id, entity_type)
+    if fetched is None:
         return {
             "data_sufficient": False,
             "entity_id": institution_id,
@@ -111,17 +137,7 @@ def _fetch_and_process(institution_id: str, entity_type: str) -> dict[str, Any]:
             "disbursement_saved_pct": 0.0,
             "timestamp": ts,
         }
-
-    df = pd.DataFrame(res.data)
-    df = build_date_index(df)
-
-    for col in receipt_cols + expense_cols:
-        if col not in df.columns:
-            df[col] = 0.0
-        df[col] = pd.to_numeric(df[col], errors="coerce").fillna(0.0)
-
-    avg_receipts = float(df[receipt_cols].sum(axis=1).mean())
-    category_avgs = {col: float(df[col].mean()) for col in expense_cols if col in df.columns}
+    avg_receipts, category_avgs = fetched
 
     result = _solve_lp(avg_receipts, category_avgs)
 

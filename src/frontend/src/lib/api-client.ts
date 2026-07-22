@@ -279,7 +279,7 @@ export const apiClient = {
     entityId: string,
     entityType: 'parish' | 'seminary' | 'school',
     entityClass?: EntityClass,
-    year?: number,
+    year?: number | null,
     timeframe?: '6m' | '12m' | 'all',
   ): Promise<FinancialHealthScore> {
     return get('/api/analytics/health', {
@@ -296,10 +296,16 @@ export const apiClient = {
   // single global selection applied to every entity in the batch.
   async calculateHealthScores(
     entities: { entityId: string; entityType: 'parish' | 'seminary' | 'school'; entityClass?: EntityClass }[],
-    year?: number,
+    year?: number | null,
     timeframe?: '6m' | '12m' | 'all',
   ): Promise<FinancialHealthScore[]> {
-    return post('/api/analytics/health', { entities, year, timeframe });
+    // JSON.stringify keeps an explicit null (unlike undefined, which it drops),
+    // so year=null ("All Years") must be normalized here — otherwise the
+    // backend would receive a literal `"year": null` instead of an omitted
+    // key, unlike every other year-scoped call in this file which already
+    // goes through a GET query string (where null and undefined are already
+    // equivalent).
+    return post('/api/analytics/health', { entities, year: year ?? undefined, timeframe });
   },
 
   async getDiagnostic(entityId: string, month: string): Promise<DiagnosticResult> {
@@ -313,7 +319,7 @@ export const apiClient = {
     entityType: string,
     institutionId: string,
     params?: {
-      year?: number;
+      year?: number | null;
       timeframe?: '6m' | '12m' | 'all';
       vicariates?: string[];
       institutionIds?: string[];
@@ -326,6 +332,47 @@ export const apiClient = {
       institution_ids: params?.institutionIds?.length ? params.institutionIds.join(',') : undefined,
     }),
 
+  // Decline-monitor batch: recent months + decline/anomaly flags for N
+  // institutions in one request. Deliberately takes no year — the monitor
+  // always reflects each parish's true latest trend regardless of the Year
+  // filter (see the Python endpoint's docstring).
+  getFinancialTrendBatch: (
+    institutionIds: string[],
+  ): Promise<{
+    data_sufficient: boolean;
+    results: Record<
+      string,
+      {
+        monthly_series: { period: string; total_receipts: number; total_expenses: number }[];
+        decline_detected: boolean;
+        latest_z_score: number;
+        recent_anomaly: boolean;
+      }
+    >;
+    timestamp: string;
+  }> => post('/api/analytics/descriptive/financial-trend-batch', { institution_ids: institutionIds }),
+
+  // IAFR account-level drill-down: no codes → sections A-F; sectionCode →
+  // that section's subsections; sectionCode + subsectionCode → individual
+  // accounts. Backed by the AWS breakdown fact table.
+  getFinancialBreakdown: (
+    institutionId: string,
+    params?: {
+      year?: number | null;
+      sectionCode?: string;
+      subsectionCode?: string;
+      vicariates?: string[];
+      institutionIds?: string[];
+    },
+  ) =>
+    get(`/api/analytics/descriptive/financial-breakdown/${institutionId}`, {
+      year: params?.year ? String(params.year) : undefined,
+      section_code: params?.sectionCode,
+      subsection_code: params?.subsectionCode,
+      vicariates: params?.vicariates?.length ? params.vicariates.join(',') : undefined,
+      institution_ids: params?.institutionIds?.length ? params.institutionIds.join(',') : undefined,
+    }),
+
   getPastoralAssignment: (institutionId: string) =>
     get(`/api/analytics/descriptive/pastoral-assignment/${institutionId}`),
 
@@ -334,7 +381,7 @@ export const apiClient = {
   getSeasonalityTrend: (
     entityType: string,
     institutionId: string,
-    params?: { year?: number; timeframe?: '6m' | '12m' | 'all' },
+    params?: { year?: number | null; timeframe?: '6m' | '12m' | 'all' },
   ) =>
     get(`/api/analytics/descriptive/seasonality/${entityType}/${institutionId}`, {
       year: params?.year ? String(params.year) : undefined,

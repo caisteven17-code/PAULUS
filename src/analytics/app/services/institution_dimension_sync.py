@@ -48,11 +48,16 @@ def _watermark() -> dict[str, Any]:
           AND source_table = %s
         """,
         (PIPELINE_NAME, SOURCE_SCHEMA, SOURCE_TABLE),
+        pool=analytics_db.get_etl_pool(),
     )
-    return rows[0] if rows else {
-        "last_source_updated_at": EPOCH,
-        "last_source_id": ZERO_UUID,
-    }
+    return (
+        rows[0]
+        if rows
+        else {
+            "last_source_updated_at": EPOCH,
+            "last_source_id": ZERO_UUID,
+        }
+    )
 
 
 def _set_watermark(updated_at: str | datetime, source_id: str) -> None:
@@ -68,6 +73,7 @@ def _set_watermark(updated_at: str | datetime, source_id: str) -> None:
             updated_at = now()
         """,
         (PIPELINE_NAME, SOURCE_SCHEMA, SOURCE_TABLE, updated_at, source_id),
+        pool=analytics_db.get_etl_pool(),
     )
 
 
@@ -88,10 +94,7 @@ def _fetch_changes(watermark: dict[str, Any]) -> list[dict[str, Any]]:
             .execute()
         )
         batch = response.data or []
-        rows.extend(
-            row for row in batch
-            if (_timestamp_text(row.get("updated_at")), str(row["id"])) > last_pair
-        )
+        rows.extend(row for row in batch if (_timestamp_text(row.get("updated_at")), str(row["id"])) > last_pair)
         if len(batch) < PAGE_SIZE:
             break
         offset += PAGE_SIZE
@@ -130,6 +133,7 @@ def _start_run() -> str:
         RETURNING run_id
         """,
         (PIPELINE_NAME,),
+        pool=analytics_db.get_etl_pool(),
     )
     if not row:
         raise RuntimeError("Failed to create institution-dimension ETL run")
@@ -150,6 +154,7 @@ def _finish_run(run_id: str, status: str, extracted: int, loaded: int, error: st
         WHERE run_id = %s
         """,
         (status, extracted, loaded, 1 if error else 0, loaded, error, run_id),
+        pool=analytics_db.get_etl_pool(),
     )
 
 
@@ -161,6 +166,7 @@ def _record_failure(run_id: str, source_id: str | None, exc: Exception) -> None:
         VALUES (%s, %s, %s, %s, %s, %s)
         """,
         (run_id, SOURCE_SCHEMA, SOURCE_TABLE, source_id, type(exc).__name__, str(exc)),
+        pool=analytics_db.get_etl_pool(),
     )
 
 
@@ -172,6 +178,7 @@ def _record_reconciliation(run_id: str, passed: bool) -> None:
         VALUES (%s, 'institution_dimension_upsert', %s, '{"values_exposed":false}'::jsonb)
         """,
         (run_id, "passed" if passed else "failed"),
+        pool=analytics_db.get_etl_pool(),
     )
 
 
@@ -189,6 +196,7 @@ def run_once() -> dict[str, Any]:
                 "dim_institutions",
                 _dimension_row(source),
                 "institution_id",
+                pool=analytics_db.get_etl_pool(),
             )
             loaded += 1
             _set_watermark(source["updated_at"], current_id)
@@ -225,9 +233,8 @@ def main() -> None:
     try:
         print(run_once())
     finally:
-        analytics_db.close_pool()
+        analytics_db.close_etl_pool()
 
 
 if __name__ == "__main__":
     main()
-

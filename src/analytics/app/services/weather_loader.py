@@ -79,13 +79,14 @@ def _execute_with_retry(query):
         except httpx.TransportError as exc:
             if attempt == _RETRY_MAX_ATTEMPTS - 1:
                 raise
-            delay = (
-                min(_RETRY_BASE_DELAY_S * (2 ** attempt), _RETRY_MAX_DELAY_S)
-                + random.uniform(0, _RETRY_BASE_DELAY_S)
-            )
+            delay = min(_RETRY_BASE_DELAY_S * (2**attempt), _RETRY_MAX_DELAY_S) + random.uniform(0, _RETRY_BASE_DELAY_S)
             logger.warning(
                 "Supabase request failed (%s: %s) — retrying in %.1fs (attempt %d/%d)",
-                type(exc).__name__, exc, delay, attempt + 1, _RETRY_MAX_ATTEMPTS,
+                type(exc).__name__,
+                exc,
+                delay,
+                attempt + 1,
+                _RETRY_MAX_ATTEMPTS,
             )
             time.sleep(delay)
 
@@ -220,7 +221,7 @@ def load_from_file(path: Path) -> int:
 
     validate_month = None
     try:
-        from app.services.weather_validation import validate_month, build_meteostat_cache, build_chirps_cache
+        from app.services.weather_validation import build_chirps_cache, build_meteostat_cache, validate_month
     except ImportError:
         logger.warning("weather_validation module not available — skipping validation")
 
@@ -239,7 +240,8 @@ def load_from_file(path: Path) -> int:
     chirps_caches: dict[str, dict] = {}
     if validate_month:
         nasa_munis = [
-            m for m in data.get("municipalities", [])
+            m
+            for m in data.get("municipalities", [])
             if m.get("champion_source") == "nasa_power_ag"
             and m.get("latitude") is not None
             and m.get("longitude") is not None
@@ -438,10 +440,7 @@ def _upsert_daily_table(table: str, rows: list[dict]) -> int:
             table,
             ", ".join(unsupported),
         )
-    rows = [
-        {column: value for column, value in row.items() if column in available}
-        for row in rows
-    ]
+    rows = [{column: value for column, value in row.items() if column in available} for row in rows]
 
     total = 0
     for i in range(0, len(rows), _DAILY_UPSERT_CHUNK):
@@ -526,10 +525,7 @@ def upsert_monthly_confidence(
         )
     }
     if not confidence_columns.issubset(available):
-        logger.info(
-            "Skipping optional Cohen/Lin confidence fields; AWS uses the "
-            "monthly Fleiss metric schema"
-        )
+        logger.info("Skipping optional Cohen/Lin confidence fields; AWS uses the monthly Fleiss metric schema")
         return 0
 
     from app.services.weather_daily_classifier import compute_confidence_scores
@@ -546,38 +542,38 @@ def upsert_monthly_confidence(
         ym = r["date"][:7] + "-01"
         temp_by_key[(r["municipality"], ym)].append(r)
 
-    for r in (daily_wind_rows or []):
+    for r in daily_wind_rows or []:
         ym = r["date"][:7] + "-01"
         wind_by_key[(r["municipality"], ym)].append(r)
 
     all_keys = set(rain_by_key.keys()) | set(temp_by_key.keys()) | set(wind_by_key.keys())
     upsert_rows = []
 
-    for (municipality, ym) in all_keys:
+    for municipality, ym in all_keys:
         rain_rows = rain_by_key.get((municipality, ym), [])
         temp_rows = temp_by_key.get((municipality, ym), [])
         wind_rows = wind_by_key.get((municipality, ym), [])
         confidence = compute_confidence_scores(rain_rows, temp_rows, wind_rows)
-        upsert_rows.append({
-            "year_month":          ym,
-            "municipality":        municipality,
-            "rain_cohens_kappa":   confidence["rainfall"]["cohens_kappa"],
-            "rain_lins_ccc":       confidence["rainfall"]["lins_ccc"],
-            "severe_cohens_kappa": confidence["severe_weather"]["cohens_kappa"],
-            "temp_cohens_kappa":   confidence["temperature"]["cohens_kappa"],
-            "temp_lins_ccc":       confidence["temperature"]["lins_ccc"],
-            "humidity_cohens_kappa": confidence["humidity"]["cohens_kappa"],
-            "humidity_lins_ccc":   confidence["humidity"]["lins_ccc"],
-            "wind_cohens_kappa":   confidence["wind"]["cohens_kappa"],
-            "wind_lins_ccc":       confidence["wind"]["lins_ccc"],
-        })
+        upsert_rows.append(
+            {
+                "year_month": ym,
+                "municipality": municipality,
+                "rain_cohens_kappa": confidence["rainfall"]["cohens_kappa"],
+                "rain_lins_ccc": confidence["rainfall"]["lins_ccc"],
+                "severe_cohens_kappa": confidence["severe_weather"]["cohens_kappa"],
+                "temp_cohens_kappa": confidence["temperature"]["cohens_kappa"],
+                "temp_lins_ccc": confidence["temperature"]["lins_ccc"],
+                "humidity_cohens_kappa": confidence["humidity"]["cohens_kappa"],
+                "humidity_lins_ccc": confidence["humidity"]["lins_ccc"],
+                "wind_cohens_kappa": confidence["wind"]["cohens_kappa"],
+                "wind_lins_ccc": confidence["wind"]["lins_ccc"],
+            }
+        )
 
     if not upsert_rows:
         return 0
 
-    analytics_db.upsert_rows(
-        "reference", "weather_monthly_summary", upsert_rows, "year_month,municipality"
-    )
+    analytics_db.upsert_rows("reference", "weather_monthly_summary", upsert_rows, "year_month,municipality")
 
     logger.info("Cohen's Kappa + Lin's CCC upserted for %d municipality-months", len(upsert_rows))
     return len(upsert_rows)

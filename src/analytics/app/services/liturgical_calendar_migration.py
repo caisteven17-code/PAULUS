@@ -199,16 +199,12 @@ def _upsert(cur, spec: TableSpec, rows: list[dict[str, Any]]) -> None:
         if column != "id"
     ]
     compared_columns = [column for column in spec.columns if column != "id"]
-    current_values = sql.SQL(", ").join(
-        sql.Identifier(spec.table, column) for column in compared_columns
-    )
+    current_values = sql.SQL(", ").join(sql.Identifier(spec.table, column) for column in compared_columns)
     incoming_values = sql.SQL(", ").join(
         sql.SQL("EXCLUDED.{}").format(sql.Identifier(column)) for column in compared_columns
     )
     statement = sql.SQL(
-        "INSERT INTO {}.{} ({}) VALUES ({}) "
-        "ON CONFLICT ({}) DO UPDATE SET {} "
-        "WHERE ({}) IS DISTINCT FROM ({})"
+        "INSERT INTO {}.{} ({}) VALUES ({}) ON CONFLICT ({}) DO UPDATE SET {} WHERE ({}) IS DISTINCT FROM ({})"
     ).format(
         sql.Identifier(spec.schema),
         sql.Identifier(spec.table),

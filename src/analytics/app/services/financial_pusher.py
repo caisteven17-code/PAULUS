@@ -76,10 +76,7 @@ class SourceColumn:
 
 def _source_column_key(parts: list[str], occurrence: int) -> str:
     text = " > ".join(part.strip() for part in parts if part and part.strip())
-    text = "".join(
-        char for char in unicodedata.normalize("NFKD", text.lower())
-        if not unicodedata.combining(char)
-    )
+    text = "".join(char for char in unicodedata.normalize("NFKD", text.lower()) if not unicodedata.combining(char))
     text = re.sub(r"[^a-z0-9]+", " ", text)
     base = re.sub(r"\s+", " ", text).strip() or "column"
     return base if occurrence == 1 else f"{base} #{occurrence}"
@@ -87,10 +84,7 @@ def _source_column_key(parts: list[str], occurrence: int) -> str:
 
 def normalize_name(value: str | None) -> str:
     text = (value or "").lower()
-    text = "".join(
-        char for char in unicodedata.normalize("NFKD", text)
-        if not unicodedata.combining(char)
-    )
+    text = "".join(char for char in unicodedata.normalize("NFKD", text) if not unicodedata.combining(char))
     text = re.sub(r"\bsto\b\.?", "santo", text)
     text = re.sub(r"\bsta\b\.?", "santa", text)
     text = re.sub(r"\bsts\b\.?", "saint", text)
@@ -182,12 +176,12 @@ def _month_year_from_sheet(sheet_name: str) -> tuple[int, int] | None:
 def _header_grid(ws, max_header_row: int = 6) -> list[list[Any]]:
     grid = [[ws.cell(row=r, column=c).value for c in range(1, ws.max_column + 1)] for r in range(1, max_header_row + 1)]
     for merged in ws.merged_cells.ranges:
-      if merged.min_row > max_header_row:
-          continue
-      value = ws.cell(merged.min_row, merged.min_col).value
-      for r in range(merged.min_row, min(merged.max_row, max_header_row) + 1):
-          for c in range(merged.min_col, merged.max_col + 1):
-              grid[r - 1][c - 1] = value
+        if merged.min_row > max_header_row:
+            continue
+        value = ws.cell(merged.min_row, merged.min_col).value
+        for r in range(merged.min_row, min(merged.max_row, max_header_row) + 1):
+            for c in range(merged.min_col, merged.max_col + 1):
+                grid[r - 1][c - 1] = value
     return grid
 
 
@@ -215,9 +209,27 @@ def _is_financial_value_column(parts: list[str]) -> bool:
     if joined.endswith(" rate") and "tax rate" not in joined and "prescribed rate" not in joined:
         return False
     include_terms = [
-        "amount", "collection", "collections", "donation", "donations", "income", "subsidy",
-        "receipts", "expenses", "borrowings", "balance", "stipend", "share", "bill", "wages",
-        "contributions", "compensations", "allowances", "labor", "materials", "net receipts",
+        "amount",
+        "collection",
+        "collections",
+        "donation",
+        "donations",
+        "income",
+        "subsidy",
+        "receipts",
+        "expenses",
+        "borrowings",
+        "balance",
+        "stipend",
+        "share",
+        "bill",
+        "wages",
+        "contributions",
+        "compensations",
+        "allowances",
+        "labor",
+        "materials",
+        "net receipts",
     ]
     return "tax rate" in joined or any(term in joined for term in include_terms)
 
@@ -297,15 +309,42 @@ def _suggest_mapping(
             False,
         )
     if section == "sacraments" and parts and parts[-1].lower() == "rate":
-        return None, None, "sacrament_diocese_share_rate", 0.9, "needs_review", "Sacrament diocese-share rate; saved as memo/checking detail, not posted as money.", "memo", False
+        return (
+            None,
+            None,
+            "sacrament_diocese_share_rate",
+            0.9,
+            "needs_review",
+            "Sacrament diocese-share rate; saved as memo/checking detail, not posted as money.",
+            "memo",
+            False,
+        )
     if sacrament_code and ("rate amount" in text or "prescribed rate" in text):
-        account, field, confidence, status, rule = sacrament_code, "sacrament_prescribed_rate", 0.9, "needs_review", "memo"
+        account, field, confidence, status, rule = (
+            sacrament_code,
+            "sacrament_prescribed_rate",
+            0.9,
+            "needs_review",
+            "memo",
+        )
         reason = f"Prescribed rate for {sacrament_name}; saved as memo/checking detail, not posted as money."
     elif sacrament_code and "gratis" in text and ("quantity" in text or "chargeable" not in text):
-        account, field, confidence, status, rule = sacrament_code, "sacrament_gratis_quantity", 0.9, "needs_review", "memo"
+        account, field, confidence, status, rule = (
+            sacrament_code,
+            "sacrament_gratis_quantity",
+            0.9,
+            "needs_review",
+            "memo",
+        )
         reason = f"Gratis quantity for {sacrament_name}; saved as count detail, not posted as money."
     elif sacrament_code and "chargeable" in text and "quantity" in text:
-        account, field, confidence, status, rule = sacrament_code, "sacrament_chargeable_quantity", 0.9, "needs_review", "memo"
+        account, field, confidence, status, rule = (
+            sacrament_code,
+            "sacrament_chargeable_quantity",
+            0.9,
+            "needs_review",
+            "memo",
+        )
         reason = f"Chargeable quantity for {sacrament_name}; saved as count detail, not posted as money."
     elif "quantity" in text:
         return None, None, None, 1.0, "ignored", "Non-amount helper column.", "ignore", False
@@ -356,7 +395,9 @@ def _suggest_mapping(
     elif "philhealth" in text or "phic" in text:
         account, confidence = "D.2.03", 0.98
         reason = "Government contribution column."
-    elif any(k in text for k in ["salaries", "wages", "remuneration", "compensations", "allowances", "13th month", "bonuses"]):
+    elif any(
+        k in text for k in ["salaries", "wages", "remuneration", "compensations", "allowances", "13th month", "bonuses"]
+    ):
         if "salaries" in text or "wages" in text:
             account = "D.1.01"
         elif "remuneration" in text:
@@ -399,7 +440,26 @@ def _suggest_mapping(
     elif "other pastoral" in text:
         account, confidence = "C.3.02", 0.9
         reason = "Other pastoral expense column."
-    elif "construction" not in section and any(k in text for k in ["food", "groceries", "meetings", "gasoline", "transportation", "office", "security", "liturgical", "real properties", "repairs", "charitable", "subscriptions", "hospital", "medicine", "other expenses"]):
+    elif "construction" not in section and any(
+        k in text
+        for k in [
+            "food",
+            "groceries",
+            "meetings",
+            "gasoline",
+            "transportation",
+            "office",
+            "security",
+            "liturgical",
+            "real properties",
+            "repairs",
+            "charitable",
+            "subscriptions",
+            "hospital",
+            "medicine",
+            "other expenses",
+        ]
+    ):
         if "food" in text or "groceries" in text:
             account = "D.5.01"
         elif "meetings" in text:
@@ -461,7 +521,19 @@ def _suggest_mapping(
     elif "saturday anticipated" in text:
         account, confidence = "B.1.03", 0.98
         reason = "Saturday anticipated mass collection."
-    elif any(k in text for k in ["rentals", "mortuary", "columbary", "kandilaan", "donation boxes", "envelopes", "parking", "other sources"]):
+    elif any(
+        k in text
+        for k in [
+            "rentals",
+            "mortuary",
+            "columbary",
+            "kandilaan",
+            "donation boxes",
+            "envelopes",
+            "parking",
+            "other sources",
+        ]
+    ):
         if "rentals" in text:
             account = "B.2.01"
         elif "mortuary" in text or "columbary" in text:
@@ -496,7 +568,9 @@ def _suggest_mapping(
     elif "other receipts" in text and "construction" not in section:
         account, confidence = "B.3.07", 0.92
         reason = "Other receipt column."
-    elif "remittances" in section and any(k in text for k in ["diocese share", "diocese fund", "pension fund", "progressive tax", "5% tax collections"]):
+    elif "remittances" in section and any(
+        k in text for k in ["diocese share", "diocese fund", "pension fund", "progressive tax", "5% tax collections"]
+    ):
         if "sacraments" in text:
             account = "F.1.01"
         elif "diocese fund" in text:
@@ -546,7 +620,13 @@ def _suggest_mapping(
         account, confidence = "F.3.01", 0.88
         status = "needs_review"
         reason = "Standalone Other Collections is treated as special collection remittance; review because the source header is sparse."
-    elif "confirmation" in text and "bishop" not in text and "diocese" not in text and "pension" not in text and "minister" not in text:
+    elif (
+        "confirmation" in text
+        and "bishop" not in text
+        and "diocese" not in text
+        and "pension" not in text
+        and "minister" not in text
+    ):
         account, confidence = "A.2.01", 0.96
         reason = "Confirmation receipt column."
     elif "total charge over" in text or "total over/above" in text:
@@ -779,7 +859,12 @@ def _match_institution(
             candidates = exact[variant]
             status = "matched" if len(candidates) == 1 else "suggested"
             candidate = candidates[0]
-            return {"institution_id": candidate["id"], "status": status, "confidence": 1.0, "match_name": candidate.get("name")}
+            return {
+                "institution_id": candidate["id"],
+                "status": status,
+                "confidence": 1.0,
+                "match_name": candidate.get("name"),
+            }
 
     best = None
     best_score = 0.0
@@ -796,9 +881,24 @@ def _match_institution(
             second_score = score
     if best and best_score >= 0.86:
         if best_score - second_score < 0.03:
-            return {"institution_id": best["id"], "status": "suggested", "confidence": round(best_score, 2), "match_name": best.get("name")}
-        return {"institution_id": best["id"], "status": "suggested", "confidence": round(best_score, 2), "match_name": best.get("name")}
-    return {"institution_id": None, "status": "unmatched", "confidence": round(best_score, 2), "match_name": best.get("name") if best else None}
+            return {
+                "institution_id": best["id"],
+                "status": "suggested",
+                "confidence": round(best_score, 2),
+                "match_name": best.get("name"),
+            }
+        return {
+            "institution_id": best["id"],
+            "status": "suggested",
+            "confidence": round(best_score, 2),
+            "match_name": best.get("name"),
+        }
+    return {
+        "institution_id": None,
+        "status": "unmatched",
+        "confidence": round(best_score, 2),
+        "match_name": best.get("name") if best else None,
+    }
 
 
 def _is_parish_data_row(code: Any, parish_name: Any) -> tuple[bool, str | None, str]:
@@ -977,7 +1077,13 @@ def _parse_workbook(file_name: str, file_bytes: bytes) -> dict[str, Any]:
                     }
                 )
 
-            validation_status = "blocked" if any(i["severity"] in ("blocker", "error") for i in row_issues) else "warning" if row_issues else "ready"
+            validation_status = (
+                "blocked"
+                if any(i["severity"] in ("blocker", "error") for i in row_issues)
+                else "warning"
+                if row_issues
+                else "ready"
+            )
             for issue in row_issues:
                 issues_by_type[issue["type"]] += 1
 
@@ -1131,7 +1237,9 @@ def list_accounts() -> list[dict[str, Any]]:
     if rows:
         return sorted(rows.values(), key=lambda r: r.get("account_code") or "")
     names, _ = _get_account_lookup()
-    return [{"account_code": code, "account_name": name, "section_code": code[0]} for code, name in sorted(names.items())]
+    return [
+        {"account_code": code, "account_name": name, "section_code": code[0]} for code, name in sorted(names.items())
+    ]
 
 
 def create_canonical_account(payload: dict[str, Any]) -> dict[str, Any]:
@@ -1192,10 +1300,7 @@ def update_canonical_account(payload: dict[str, Any]) -> dict[str, Any]:
     if not account_id:
         raise ValueError("Canonical account id is required.")
     result = (
-        get_table("parishes", "iafr_account_titles")
-        .update(_account_payload(payload))
-        .eq("id", account_id)
-        .execute()
+        get_table("parishes", "iafr_account_titles").update(_account_payload(payload)).eq("id", account_id).execute()
     )
     if not result.data:
         raise ValueError("Canonical account was not found.")
@@ -1232,7 +1337,9 @@ def _get_existing_record(institution_id: str, year: int, month_label: str) -> st
     return data["id"] if data else None
 
 
-def _ensure_record(institution_id: str, batch_id: str, year: int, month: int, import_mode: str) -> tuple[str | None, str]:
+def _ensure_record(
+    institution_id: str, batch_id: str, year: int, month: int, import_mode: str
+) -> tuple[str | None, str]:
     month_label = MONTH_TO_SHORT[month]
     existing_id = _get_existing_record(institution_id, year, month_label)
     now = datetime.now(timezone.utc).isoformat()
@@ -1407,12 +1514,7 @@ def _upsert_parish_alias(
         or []
     )
     if existing:
-        result = (
-            get_table("operations", "parish_import_aliases")
-            .update(payload)
-            .eq("id", existing[0]["id"])
-            .execute()
-        )
+        result = get_table("operations", "parish_import_aliases").update(payload).eq("id", existing[0]["id"]).execute()
         return (getattr(result, "data", None) or [payload])[0]
     result = get_table("operations", "parish_import_aliases").insert(payload).execute()
     return (getattr(result, "data", None) or [payload])[0]
@@ -1478,11 +1580,7 @@ def save_parish_match(payload: dict[str, Any]) -> dict[str, Any]:
 
     updated_rows = 0
     for row in rows:
-        issues = [
-            issue
-            for issue in (row.get("issues") or [])
-            if issue.get("type") != "unmatched_parish"
-        ]
+        issues = [issue for issue in (row.get("issues") or []) if issue.get("type") != "unmatched_parish"]
         validation_status = _row_status_after_issues(issues)
         get_table("operations", "financial_push_rows").update(
             {
@@ -1668,7 +1766,9 @@ def commit_batch(
         if len(approved) != 1:
             raise ValueError("Single-column patch mode requires exactly one mapped source column.")
     reviewed_parishes = {
-        (normalize_source_code(mapping.get("sourceCode")), normalize_name(mapping.get("sourceName"))): mapping.get("institutionId")
+        (normalize_source_code(mapping.get("sourceCode")), normalize_name(mapping.get("sourceName"))): mapping.get(
+            "institutionId"
+        )
         for mapping in parish_mappings or []
         if mapping.get("institutionId") and mapping.get("sourceName")
     }
@@ -1705,7 +1805,9 @@ def commit_batch(
                 ).eq("id", row["id"]).execute()
         if row["validation_status"] != "ready" or not row.get("institution_id"):
             blocked += 1
-            get_table("operations", "financial_push_rows").update({"validation_status": "blocked"}).eq("id", row["id"]).execute()
+            get_table("operations", "financial_push_rows").update({"validation_status": "blocked"}).eq(
+                "id", row["id"]
+            ).execute()
             continue
         if import_mode == "patch_selected":
             record_id = _get_existing_record(
@@ -1718,7 +1820,9 @@ def commit_batch(
             )
         if not record_id:
             skipped += 1
-            get_table("operations", "financial_push_rows").update({"validation_status": "skipped"}).eq("id", row["id"]).execute()
+            get_table("operations", "financial_push_rows").update({"validation_status": "skipped"}).eq(
+                "id", row["id"]
+            ).execute()
             continue
 
         items = []
@@ -1780,7 +1884,9 @@ def commit_batch(
                     continue
                 if existing:
                     update_payload = {key: value for key, value in item.items() if key != "financial_record_id"}
-                    get_table("parishes", "iafr_line_items").update(update_payload).eq("id", existing[0]["id"]).execute()
+                    get_table("parishes", "iafr_line_items").update(update_payload).eq(
+                        "id", existing[0]["id"]
+                    ).execute()
                     if len(existing) > 1:
                         get_table("parishes", "iafr_line_items").delete().in_(
                             "id", [entry["id"] for entry in existing[1:]]

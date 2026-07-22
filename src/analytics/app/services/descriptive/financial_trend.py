@@ -14,8 +14,9 @@ from typing import Any, Callable
 import numpy as np
 import pandas as pd
 
-from app.services import analytics_db
+from app.services import _aws_financials, _singleflight, analytics_db
 from app.services._institution_pool import run_parallel
+from app.services._stl import run_stl
 from app.services.data_definitions import (
     _SCHEMA_MAP,
     build_date_index,
@@ -33,23 +34,7 @@ ALL_INSTITUTIONS = "all"
 
 def _run_stl(series: pd.Series) -> tuple[pd.Series, pd.Series, pd.Series]:
     """Run STL decomposition; return (trend, seasonal, residual)."""
-    from statsmodels.tsa.seasonal import STL
-
-    n = len(series)
-    # STL requires at least 2 full seasonal cycles; fallback to linear trend
-    if n < 24:
-        trend = series.rolling(window=max(1, n // 3), center=True, min_periods=1).mean()
-        seasonal = pd.Series(0.0, index=series.index)
-        residual = series - trend
-        return trend, seasonal, residual
-
-    stl = STL(series, period=12, robust=True)
-    result = stl.fit()
-    return (
-        pd.Series(result.trend, index=series.index),
-        pd.Series(result.seasonal, index=series.index),
-        pd.Series(result.resid, index=series.index),
-    )
+    return run_stl(series)
 
 
 def _isolation_forest_flags(values: np.ndarray) -> list[bool]:
@@ -246,26 +231,37 @@ def _fetch_and_process(institution_id: str, entity_type: str) -> dict[str, Any]:
 # other_receipts ≈ total_collections, ~99.5% match):
 #   - collections_mass: Section B.1 (weekday/Sunday/Saturday mass collections)
 #   - sacraments: parish's actual retained share (NOT the gross prescribed/
-#     arancel amount — that overstates by the diocese/bishop's-fund portion)
+#     arancel amount — that overstates by the diocese/bishop's-fund portion).
+#     sacraments_parish_share and sacraments_over_above are its two exact
+#     addends (see the 050_parish_gold_candidates.sql formula), carried
+#     alongside the combined total so the frontend can show a real,
+#     reconciling 2-line breakdown instead of an itemized-by-account one —
+#     a per-sacrament (Baptism/Wedding/Funeral/...) breakdown isn't possible
+#     because sacraments_parish_share is a single flat-rate multiplication of
+#     the aggregate gross prescribed total, not tracked per sacrament type.
 #   - other_receipts: Section B.3 (donations, interest, subsidy, special/
 #     second collections, charge over/above, misc receipts)
 #   - other_collections: Section B.2 (rentals, mortuary, kandilaan, donation
-#     boxes, envelopes, parking), net of a 5% deduction that applied 2023-2025
+#     boxes, envelopes, parking), already net of the year-dependent deduction
+#     baked into the gold fact table's collection_other column
 _AWS_CATEGORY_COLS = [
     "collections_mass",
     "sacraments",
+    "sacraments_parish_share",
+    "sacraments_over_above",
     "other_receipts",
     "other_collections",
     "expenses_parish",
     "expenses_pastoral",
 ]
 
-# Sourced from the v2 candidates view rather than the gold fact table: it
-# carries institution_id directly (no dim_institutions join needed for scope)
-# and already has collections_other_95 / collections_other_receipts, which
-# the promoted gold table doesn't yet include. Verified fast (unmaterialized
-# view, but a full 5,232-row scan takes ~50ms) and reconciles against
-# total_collections, so it's safe to read live.
+# Sourced from the v2 candidates view rather than the gold fact table for most
+# columns: it carries institution_id directly (no dim_institutions join
+# needed for scope). collection_other is the exception — it lives only on
+# the gold fact table (parish_analytics.fact_parish_monthly_financials), so
+# that's joined in on (parish_key, date_key) for just that one column.
+# Verified fast (unmaterialized view, but a full 5,232-row scan takes ~50ms)
+# and reconciles against total_collections, so it's safe to read live.
 _AWS_TREND_SQL_TEMPLATE = """
     SELECT f.date_key,
            SUM(COALESCE(f.total_collections, 0))::float8 AS total_receipts,
@@ -273,14 +269,16 @@ _AWS_TREND_SQL_TEMPLATE = """
            SUM(COALESCE(f.collections_mass, 0))::float8 AS collections_mass,
            SUM(COALESCE(f.sacraments_parish_share, 0)
              + COALESCE(f.sacraments_over_above_confirmation_incl, 0))::float8 AS sacraments,
+           SUM(COALESCE(f.sacraments_parish_share, 0))::float8 AS sacraments_parish_share,
+           SUM(COALESCE(f.sacraments_over_above_confirmation_incl, 0))::float8 AS sacraments_over_above,
            SUM(COALESCE(f.collections_other_receipts, 0))::float8 AS other_receipts,
-           SUM(COALESCE(f.collections_other_95, 0)
-             * (1 - CASE WHEN f.reporting_year BETWEEN 2023 AND 2025 THEN 0.05 ELSE 0 END))::float8
-             AS other_collections,
+           SUM(COALESCE(gold.collection_other, 0))::float8 AS other_collections,
            SUM(COALESCE(f.expenses_parish, 0))::float8 AS expenses_parish,
            SUM(COALESCE(f.expenses_pastoral_mass_stipend, 0))::float8 AS expenses_pastoral
     FROM parish_analytics.vw_parish_monthly_financial_candidates_v2 f
     JOIN parish_analytics.dim_parishes dp ON dp.parish_key = f.parish_key
+    JOIN parish_analytics.fact_parish_monthly_financials gold
+      ON gold.parish_key = f.parish_key AND gold.date_key = f.date_key
     {where_sql}
     GROUP BY f.date_key
     ORDER BY f.date_key
@@ -374,8 +372,7 @@ def _fetch_and_process_aws_parish(
             period_params: list[Any] = [year * 100, (year + 1) * 100]
         else:
             period_sql = (
-                "AND f.date_key > (SELECT MAX(date_key) - 100 "
-                "FROM parish_analytics.fact_parish_monthly_financials)"
+                "AND f.date_key > (SELECT MAX(date_key) - 100 FROM parish_analytics.fact_parish_monthly_financials)"
             )
             period_params = []
 
@@ -517,7 +514,11 @@ def _fetch_and_process_supabase_all() -> dict[str, Any]:
         )
     result["vicariate_totals"] = sorted(
         (
-            {"vicariate": v, "total_receipts": round(t["total_receipts"], 2), "total_expenses": round(t["total_expenses"], 2)}
+            {
+                "vicariate": v,
+                "total_receipts": round(t["total_receipts"], 2),
+                "total_expenses": round(t["total_expenses"], 2),
+            }
             for v, t in vicariate_totals.items()
         ),
         key=lambda x: -x["total_receipts"],
@@ -541,6 +542,32 @@ async def get_financial_trend(
     timeframe: str | None = None,
     vicariates: list[str] | None = None,
     institution_ids: list[str] | None = None,
+) -> dict[str, Any]:
+    # Coalesce concurrent identical requests (e.g. several browser tabs/
+    # components independently fetching the same diocese-wide "All Years,
+    # All Parishes" trend at once) into a single in-flight computation —
+    # observed live as 3 simultaneous copies of this exact query each
+    # holding a warehouse connection for 39s+, collectively starving the
+    # read pool for every other request.
+    key = (
+        f"financial_trend:{entity_type}:{institution_id}:{year}:{timeframe}:"
+        f"{sorted(vicariates) if vicariates else None}:{sorted(institution_ids) if institution_ids else None}"
+    )
+    return await _singleflight.coalesce(
+        key,
+        lambda: _get_financial_trend_uncached(
+            institution_id, entity_type, year, timeframe, vicariates, institution_ids
+        ),
+    )
+
+
+async def _get_financial_trend_uncached(
+    institution_id: str,
+    entity_type: str,
+    year: int | None,
+    timeframe: str | None,
+    vicariates: list[str] | None,
+    institution_ids: list[str] | None,
 ) -> dict[str, Any]:
     if entity_type not in _SCHEMA_MAP:
         raise ValueError(f"Unknown entity type: {entity_type}")
@@ -570,3 +597,219 @@ async def get_financial_trend(
     else:
         result = await asyncio.to_thread(_fetch_and_process, institution_id, entity_type)
     return _apply_timeframe(result, timeframe)
+
+
+# ── IAFR account-level breakdown (drill-down) ────────────────────────────────
+# fact_parish_financial_breakdowns is one row per parish-month-account, joined
+# to dim_iafr_account — the diocese's actual IAFR report structure (sections
+# A-F → subsections → individual accounts). This powers the dashboard's
+# Parish → Section → Subsection → Account drill-down.
+
+# Fixed IAFR section names (dim_iafr_account has no section-name column; the
+# codes are stable — they mirror the printed IAFR form).
+_IAFR_SECTION_NAMES = {
+    "A": "Pastoral Fund Receipts",
+    "B": "Parish Fund Receipts",
+    "C": "Pastoral Fund Expenses",
+    "D": "Parish Operating Expenses",
+    "E": "Construction",
+    "F": "Remittances",
+}
+
+# Every drill level returns a receipts/expenses split rather than one blind
+# SUM: section E genuinely mixes both directions (construction receipts AND
+# expenses), so a single total there would be misleading. account_type 'memo'
+# (the Tax Rate pseudo-account, B.1.04) is a rate, not a peso amount — always
+# excluded so it can never render as a bar next to real currency figures.
+_AWS_BREAKDOWN_SQL = """
+    SELECT {group_key} AS key,
+           {group_label} AS label,
+           SUM(f.amount) FILTER (WHERE a.account_type IN ('receipt', 'personal_contribution'))::float8
+             AS receipts,
+           SUM(f.amount) FILTER (WHERE a.account_type IN ('expense', 'remittance'))::float8
+             AS expenses,
+           MIN(a.account_code) AS sort_code
+    FROM parish_analytics.fact_parish_financial_breakdowns f
+    JOIN parish_analytics.dim_parishes dp ON dp.parish_key = f.parish_key
+    JOIN shared_analytics.dim_institutions di ON di.institution_key = dp.institution_key
+    JOIN parish_analytics.dim_iafr_account a ON a.iafr_account_key = f.iafr_account_key
+    WHERE a.account_type != 'memo'
+      {scope_where}
+      {extra_where}
+    GROUP BY 1, 2
+    ORDER BY sort_code
+"""
+
+
+def _fetch_breakdown(
+    institution_id: str,
+    year: int | None,
+    section_code: str | None,
+    subsection_code: str | None,
+    vicariates: list[str] | None = None,
+    institution_ids: list[str] | None = None,
+) -> dict[str, Any]:
+    ts = datetime.now(timezone.utc).isoformat()
+
+    # Same scope convention as _fetch_and_process_aws_parish: a single parish,
+    # a vicariate/district/class subset, or the whole diocese — lets the
+    # Collections Breakdown legend's hover-preview (aggregate scope) reuse
+    # this same endpoint the parish-level drill-down uses.
+    scope_all = institution_id == ALL_INSTITUTIONS
+    scope: list[str] = []
+    params: list[Any] = []
+    if not scope_all:
+        scope.append("AND di.institution_id = %s")
+        params.append(institution_id)
+    elif institution_ids:
+        scope.append("AND di.institution_id = ANY(%s)")
+        params.append(institution_ids)
+    elif vicariates:
+        scope.append("AND dp.vicariate = ANY(%s)")
+        params.append(vicariates)
+
+    where: list[str] = []
+    if year:
+        where.append("AND f.date_key >= %s AND f.date_key < %s")
+        params.extend([year * 100, (year + 1) * 100])
+    if section_code:
+        where.append("AND a.section_code = %s")
+        params.append(section_code)
+    if subsection_code:
+        where.append("AND a.subsection_code = %s")
+        params.append(subsection_code)
+
+    if section_code and subsection_code:
+        level = "account"
+        group_key, group_label = "a.account_code", "a.account_name"
+    elif section_code:
+        level = "subsection"
+        group_key, group_label = "a.subsection_code", "a.subsection_code"
+    else:
+        level = "section"
+        group_key, group_label = "a.section_code", "a.section_code"
+
+    rows = analytics_db.fetch_query(
+        _AWS_BREAKDOWN_SQL.format(
+            group_key=group_key, group_label=group_label, scope_where=" ".join(scope), extra_where=" ".join(where)
+        ),
+        params,
+    )
+
+    items = []
+    for r in rows:
+        receipts = round(float(r["receipts"] or 0), 2)
+        expenses = round(float(r["expenses"] or 0), 2)
+        if level == "section":
+            label = _IAFR_SECTION_NAMES.get(r["key"], r["key"])
+        elif level == "subsection":
+            label = str(r["label"]).replace("_", " ").title()
+        else:
+            label = r["label"]
+        items.append(
+            {
+                "key": r["key"],
+                "label": label,
+                "receipts": receipts,
+                "expenses": expenses,
+                "total": round(receipts + expenses, 2),
+            }
+        )
+
+    return {
+        "data_sufficient": len(items) > 0,
+        "entity_id": institution_id,
+        "level": level,
+        "section_code": section_code,
+        "subsection_code": subsection_code,
+        "items": items,
+        "timestamp": ts,
+    }
+
+
+# ── Decline-monitor batch ────────────────────────────────────────────────────
+# One warehouse round trip for N parishes (shared _aws_financials fetch, same
+# technique as health_scoring's batch). Deliberately never scoped by year: a
+# decline *monitor* reflects each parish's true latest trend, not one
+# truncated to whichever Year filter happens to be selected — so no year
+# parameter is even exposed. Light analysis only (no STL/IsolationForest):
+# decline_detected needs just the last-3-month slope, and a plain z-score of
+# the latest month flags recent anomalies — running the full decomposition 92×
+# for a 4-column table would be waste.
+
+
+def _fetch_and_process_batch(institution_ids: list[str]) -> dict[str, Any]:
+    ts = datetime.now(timezone.utc).isoformat()
+    df = _aws_financials.parish_monthly_totals(institution_ids)
+
+    results: dict[str, Any] = {}
+    if not df.empty:
+        for iid, g in df.groupby("institution_id"):
+            g = g.sort_values("date_key")
+            receipts = g["total_receipts"].astype(float).values
+            n = len(receipts)
+            if n < 3:
+                continue
+
+            # Same decline rule as _analyze: negative slope across the last 3 months
+            slope = float(np.polyfit(range(3), receipts[-3:], 1)[0])
+
+            mean_r = float(np.mean(receipts))
+            std_r = float(np.std(receipts, ddof=0)) or 1.0
+            latest_z = round((float(receipts[-1]) - mean_r) / std_r, 4)
+
+            tail = g.tail(6)
+            results[str(iid)] = {
+                "monthly_series": [
+                    {
+                        "period": f"{int(r.date_key) // 100}-{int(r.date_key) % 100:02d}",
+                        "total_receipts": round(float(r.total_receipts), 2),
+                        "total_expenses": round(float(r.total_expenses), 2),
+                    }
+                    for r in tail.itertuples()
+                ],
+                "decline_detected": bool(slope < 0),
+                "latest_z_score": latest_z,
+                "recent_anomaly": bool(abs(latest_z) >= 2),
+            }
+
+    return {
+        "data_sufficient": len(results) > 0,
+        "results": results,
+        "timestamp": ts,
+    }
+
+
+async def get_financial_trend_batch(institution_ids: list[str]) -> dict[str, Any]:
+    if not analytics_db.enabled() or not institution_ids:
+        return {
+            "data_sufficient": False,
+            "results": {},
+            "timestamp": datetime.now(timezone.utc).isoformat(),
+        }
+    return await asyncio.to_thread(_fetch_and_process_batch, institution_ids)
+
+
+async def get_financial_breakdown(
+    institution_id: str,
+    year: int | None = None,
+    section_code: str | None = None,
+    subsection_code: str | None = None,
+    vicariates: list[str] | None = None,
+    institution_ids: list[str] | None = None,
+) -> dict[str, Any]:
+    if not analytics_db.enabled():
+        # The IAFR account-level fact table only exists in the warehouse —
+        # there is no Supabase equivalent to fall back to.
+        return {
+            "data_sufficient": False,
+            "entity_id": institution_id,
+            "level": "section",
+            "section_code": section_code,
+            "subsection_code": subsection_code,
+            "items": [],
+            "timestamp": datetime.now(timezone.utc).isoformat(),
+        }
+    return await asyncio.to_thread(
+        _fetch_breakdown, institution_id, year, section_code, subsection_code, vicariates, institution_ids
+    )

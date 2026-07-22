@@ -1,5 +1,7 @@
 import asyncio
+import logging
 import os
+from concurrent.futures import ThreadPoolExecutor
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
@@ -36,6 +38,7 @@ except Exception as exc:
     OPTIONAL_ROUTERS_ERROR = exc
 
 app = FastAPI(title="Diocese Analytics API", version="2.0.0")
+logger = logging.getLogger(__name__)
 
 origins = os.getenv("FRONTEND_URL", "http://localhost:3000").split(",")
 origins += ["http://127.0.0.1:3000", "http://localhost:4000", "http://127.0.0.1:4000"]
@@ -69,8 +72,45 @@ if OPTIONAL_ROUTERS_ERROR is None:
 
 
 @app.on_event("startup")
+async def _size_default_executor():
+    # Every descriptive/health-scoring service in this app wraps its blocking
+    # Supabase/AWS calls in asyncio.to_thread, which borrows the loop's
+    # default executor — Python's default there is only ~8-12 workers on
+    # typical hardware. That's fine for one request, but the health-scores
+    # batch fires dozens of these concurrently (one per institution), so most
+    # of them queue behind the small pool instead of actually running,
+    # pushing per-request latency well past the gateway's 10s timeout. These
+    # are I/O-bound waits (network round trips), not CPU-bound work, so a much
+    # larger thread count than the CPU core count is the standard fix.
+    asyncio.get_running_loop().set_default_executor(ThreadPoolExecutor(max_workers=64))
+
+
+@app.on_event("startup")
+async def _reap_stale_etl_runs():
+    # Any warehouse_control.etl_runs row still 'running' at this point was
+    # orphaned by a previous process instance dying mid-run (killed, crashed,
+    # redeployed) before it could record a real outcome — a run can never
+    # legitimately span a process restart. Left alone, these accumulate
+    # indefinitely and make the ETL history unreliable. Runs regardless of
+    # whether the sync workers below are enabled, since orphaned rows can
+    # predate the current .env configuration.
+    if analytics_db.enabled():
+        try:
+            reaped = await asyncio.to_thread(analytics_db.reap_stale_etl_runs)
+            if reaped:
+                logger.warning("Reaped %d orphaned warehouse_control.etl_runs row(s)", reaped)
+        except Exception:
+            logger.exception("Failed to reap stale etl_runs rows at startup")
+
+
+@app.on_event("startup")
 async def _start_warehouse_worker():
-    global _warehouse_worker_stop, _warehouse_worker_task, _institution_worker_task, _liturgical_worker_task, _education_worker_task
+    global \
+        _warehouse_worker_stop, \
+        _warehouse_worker_task, \
+        _institution_worker_task, \
+        _liturgical_worker_task, \
+        _education_worker_task
     if (
         not WAREHOUSE_PILOT_SYNC_ENABLED
         and not WAREHOUSE_INSTITUTION_SYNC_ENABLED
@@ -86,17 +126,13 @@ async def _start_warehouse_worker():
     if WAREHOUSE_PILOT_SYNC_ENABLED:
         _warehouse_worker_task = asyncio.create_task(warehouse_worker.run_forever(_warehouse_worker_stop))
     if WAREHOUSE_INSTITUTION_SYNC_ENABLED:
-        _institution_worker_task = asyncio.create_task(
-            institution_dimension_sync.run_forever(_warehouse_worker_stop)
-        )
+        _institution_worker_task = asyncio.create_task(institution_dimension_sync.run_forever(_warehouse_worker_stop))
     if LITURGICAL_APPROVAL_SYNC_ENABLED:
         _liturgical_worker_task = asyncio.create_task(
             liturgical_calendar_loader.run_approval_sync_forever(_warehouse_worker_stop)
         )
     if WAREHOUSE_EDUCATION_SYNC_ENABLED:
-        _education_worker_task = asyncio.create_task(
-            education_financial_sync.run_forever(_warehouse_worker_stop)
-        )
+        _education_worker_task = asyncio.create_task(education_financial_sync.run_forever(_warehouse_worker_stop))
 
 
 @app.on_event("shutdown")
@@ -124,6 +160,7 @@ async def _shutdown_analytics_db():
         except TimeoutError:
             _education_worker_task.cancel()
     analytics_db.close_pool()
+    analytics_db.close_etl_pool()
 
 
 @app.get("/analytics/dependency-warning")
@@ -147,17 +184,11 @@ async def warehouse_pilot_status():
         "gold_incremental_enabled": WAREHOUSE_GOLD_INCREMENTAL_ENABLED,
         "institution_sync_enabled": WAREHOUSE_INSTITUTION_SYNC_ENABLED,
         "institution_poll_seconds": WAREHOUSE_INSTITUTION_POLL_SECONDS,
-        "institution_worker_running": (
-            _institution_worker_task is not None and not _institution_worker_task.done()
-        ),
+        "institution_worker_running": (_institution_worker_task is not None and not _institution_worker_task.done()),
         "liturgical_approval_sync_enabled": LITURGICAL_APPROVAL_SYNC_ENABLED,
         "liturgical_approval_poll_seconds": LITURGICAL_APPROVAL_POLL_SECONDS,
-        "liturgical_worker_running": (
-            _liturgical_worker_task is not None and not _liturgical_worker_task.done()
-        ),
+        "liturgical_worker_running": (_liturgical_worker_task is not None and not _liturgical_worker_task.done()),
         "education_sync_enabled": WAREHOUSE_EDUCATION_SYNC_ENABLED,
         "education_poll_seconds": WAREHOUSE_EDUCATION_POLL_SECONDS,
-        "education_worker_running": (
-            _education_worker_task is not None and not _education_worker_task.done()
-        ),
+        "education_worker_running": (_education_worker_task is not None and not _education_worker_task.done()),
     }

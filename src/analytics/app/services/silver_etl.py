@@ -86,8 +86,7 @@ def _resolve_institution_keys(institution_ids: list[str]) -> dict[str, int]:
     missing_count = len(set(unique_ids) - set(resolved))
     if missing_count:
         raise InstitutionDimensionMissingError(
-            f"{missing_count} institution dimension mapping(s) missing; "
-            "run the institution synchronizer and retry"
+            f"{missing_count} institution dimension mapping(s) missing; run the institution synchronizer and retry"
         )
     return resolved
 
@@ -251,9 +250,7 @@ def _build_line_rows(
     return rows
 
 
-def _build_record_row(
-    record: dict[str, Any], line_rows: list[dict], run_id: str, institution_key: int
-) -> dict:
+def _build_record_row(record: dict[str, Any], line_rows: list[dict], run_id: str, institution_key: int) -> dict:
     flags = []
     if record.get("submission_batch_id") is None:
         flags.append("MISSING_SUBMISSION_BATCH")
@@ -414,7 +411,8 @@ def run_silver_record(record_id: str) -> dict[str, Any]:
         record, lines, accounts = _fetch_source(record_id)
         institution_key = (
             _resolve_institution_keys([str(record["institution_id"])])[str(record["institution_id"])]
-            if record else None
+            if record
+            else None
         )
         active = bool(record and record.get("is_current_version") and record.get("deleted_at") is None)
         if not active:

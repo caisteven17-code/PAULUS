@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-06-28T15:29:42.573213Z",
+  "generated_at": "2026-07-22T13:44:24.325490Z",
   "global_ranking": [
     {
       "source": "nasa_power_sb",
@@ -11,152 +11,11 @@
     },
     {
       "source": "open_meteo",
-      "avg_composite": 66.52
+      "avg_composite": 65.98
     }
   ],
   "per_municipality": [
     {
-      "municipality": "Pakil",
-      "source": "nasa_power_sb",
-      "is_champion": true,
-      "coverage": 100.0,
-      "plausibility": 100.0,
-      "consistency": 100.0,
-      "composite": 100.0,
-      "record_count": 730,
-      "rainfall_mismatch_count": 0,
-      "rainfall_mismatches": []
-    },
-    {
-      "municipality": "Pakil",
-      "source": "nasa_power_ag",
-      "is_champion": false,
-      "coverage": 100.0,
-      "plausibility": 100.0,
-      "consistency": 100.0,
-      "composite": 100.0,
-      "record_count": 730,
-      "rainfall_mismatch_count": 0,
-      "rainfall_mismatches": []
-    },
-    {
-      "municipality": "Pakil",
-      "source": "open_meteo",
-      "is_champion": false,
-      "coverage": 100.0,
-      "plausibility": 100.0,
-      "consistency": 17.95,
-      "composite": 67.18,
-      "record_count": 730,
-      "rainfall_mismatch_count": 421,
-      "rainfall_mismatches": [
-        "2021-01-01: 5.5mm vs median 19.1mm",
-        "2021-01-02: 33.8mm vs median 11.6mm",
-        "2021-01-06: 0.6mm vs median 2.3mm",
-        "2021-01-08: 6.0mm vs median 3.7mm",
-        "2021-01-12: 0.0mm vs median 0.2mm",
-        "2021-01-14: 0.6mm vs median 5.4mm",
-        "2021-01-15: 0.4mm vs median 6.4mm",
-        "2021-01-16: 0.0mm vs median 0.5mm",
-        "2021-01-19: 21.2mm vs median 12.4mm",
-        "2021-01-20: 23.3mm vs median 55.4mm"
-      ]
-    },
-    {
-      "municipality": "Pangil",
-      "source": "nasa_power_sb",
-      "is_champion": true,
-      "coverage": 100.0,
-      "plausibility": 100.0,
-      "consistency": 100.0,
-      "composite": 100.0,
-      "record_count": 730,
-      "rainfall_mismatch_count": 0,
-      "rainfall_mismatches": []
-    },
-    {
-      "municipality": "Pangil",
-      "source": "nasa_power_ag",
-      "is_champion": false,
-      "coverage": 100.0,
-      "plausibility": 100.0,
-      "consistency": 100.0,
-      "composite": 100.0,
-      "record_count": 730,
-      "rainfall_mismatch_count": 0,
-      "rainfall_mismatches": []
-    },
-    {
-      "municipality": "Pangil",
-      "source": "open_meteo",
-      "is_champion": false,
-      "coverage": 100.0,
-      "plausibility": 100.0,
-      "consistency": 17.95,
-      "composite": 67.18,
-      "record_count": 730,
-      "rainfall_mismatch_count": 421,
-      "rainfall_mismatches": [
-        "2021-01-01: 5.5mm vs median 19.1mm",
-        "2021-01-02: 33.8mm vs median 11.6mm",
-        "2021-01-06: 0.6mm vs median 2.3mm",
-        "2021-01-08: 6.0mm vs median 3.7mm",
-        "2021-01-12: 0.0mm vs median 0.2mm",
-        "2021-01-14: 0.6mm vs median 5.4mm",
-        "2021-01-15: 0.4mm vs median 6.4mm",
-        "2021-01-16: 0.0mm vs median 0.5mm",
-        "2021-01-19: 21.2mm vs median 12.4mm",
-        "2021-01-20: 23.3mm vs median 55.4mm"
-      ]
-    },
-    {
-      "municipality": "Siniloan",
-      "source": "open_meteo",
-      "is_champion": false,
-      "coverage": 100.0,
-      "plausibility": 100.0,
-      "consistency": 15.21,
-      "composite": 66.08,
-      "record_count": 730,
-      "rainfall_mismatch_count": 455,
-      "rainfall_mismatches": [
-        "2021-01-01: 2.5mm vs median 19.1mm",
-        "2021-01-02: 18.8mm vs median 11.6mm",
-        "2021-01-06: 0.5mm vs median 2.3mm",
-        "2021-01-10: 2.0mm vs median 5.8mm",
-        "2021-01-12: 0.0mm vs median 0.2mm",
-        "2021-01-13: 0.4mm vs median 2.0mm",
-        "2021-01-14: 0.1mm vs median 5.4mm",
-        "2021-01-15: 0.0mm vs median 6.4mm",
-        "2021-01-20: 22.8mm vs median 55.4mm",
-        "2021-01-22: 1.5mm vs median 6.4mm"
-      ]
-    },
-    {
-      "municipality": "Siniloan",
-      "source": "nasa_power_sb",
-      "is_champion": true,
-      "coverage": 100.0,
-      "plausibility": 100.0,
-      "consistency": 100.0,
-      "composite": 100.0,
-      "record_count": 730,
-      "rainfall_mismatch_count": 0,
-      "rainfall_mismatches": []
-    },
-    {
-      "municipality": "Siniloan",
-      "source": "nasa_power_ag",
-      "is_champion": false,
-      "coverage": 100.0,
-      "plausibility": 100.0,
-      "consistency": 100.0,
-      "composite": 100.0,
-      "record_count": 730,
-      "rainfall_mismatch_count": 0,
-      "rainfall_mismatches": []
-    },
-    {
       "municipality": "Famy",
       "source": "nasa_power_sb",
       "is_champion": true,
@@ -164,7 +23,7 @@
       "plausibility": 100.0,
       "consistency": 100.0,
       "composite": 100.0,
-      "record_count": 730,
+      "record_count": 2022,
       "rainfall_mismatch_count": 0,
       "rainfall_mismatches": []
     },
@@ -176,7 +35,7 @@
       "plausibility": 100.0,
       "consistency": 100.0,
       "composite": 100.0,
-      "record_count": 730,
+      "record_count": 2022,
       "rainfall_mismatch_count": 0,
       "rainfall_mismatches": []
     },
@@ -186,10 +45,10 @@
       "is_champion": false,
       "coverage": 100.0,
       "plausibility": 100.0,
-      "consistency": 15.21,
-      "composite": 66.08,
-      "record_count": 730,
-      "rainfall_mismatch_count": 455,
+      "consistency": 14.94,
+      "composite": 65.98,
+      "record_count": 2022,
+      "rainfall_mismatch_count": 1286,
       "rainfall_mismatches": [
         "2021-01-01: 2.5mm vs median 19.1mm",
         "2021-01-02: 18.8mm vs median 11.6mm",
@@ -211,7 +70,7 @@
       "plausibility": 100.0,
       "consistency": 100.0,
       "composite": 100.0,
-      "record_count": 730,
+      "record_count": 2022,
       "rainfall_mismatch_count": 0,
       "rainfall_mismatches": []
     },
@@ -223,7 +82,7 @@
       "plausibility": 100.0,
       "consistency": 100.0,
       "composite": 100.0,
-      "record_count": 730,
+      "record_count": 2022,
       "rainfall_mismatch_count": 0,
       "rainfall_mismatches": []
     },
@@ -233,10 +92,10 @@
       "is_champion": false,
       "coverage": 100.0,
       "plausibility": 100.0,
-      "consistency": 15.21,
-      "composite": 66.08,
-      "record_count": 730,
-      "rainfall_mismatch_count": 455,
+      "consistency": 14.94,
+      "composite": 65.98,
+      "record_count": 2022,
+      "rainfall_mismatch_count": 1286,
       "rainfall_mismatches": [
         "2021-01-01: 2.5mm vs median 19.1mm",
         "2021-01-02: 18.8mm vs median 11.6mm",

@@ -292,9 +292,7 @@ def process_batch(
     run_id = _start_run(record_ids, backfill_name)
     _mark_running(record_ids, run_id, backfill_name)
     try:
-        institution_keys = _resolve_institution_keys(
-            [str(record["institution_id"]) for record in records]
-        )
+        institution_keys = _resolve_institution_keys([str(record["institution_id"]) for record in records])
         source_lines = fetch_source_lines(record_ids)
         lines_by_record: dict[str, list[dict]] = defaultdict(list)
         for line in source_lines:

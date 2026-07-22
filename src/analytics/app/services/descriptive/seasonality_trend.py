@@ -14,6 +14,7 @@ import numpy as np
 import pandas as pd
 
 from app.services import analytics_db
+from app.services._stl import run_stl_residuals
 from app.services.data_definitions import (
     _SCHEMA_MAP,
     MONTH_ORDER,
@@ -37,16 +38,7 @@ _LITURGICAL_EVENTS = {
 
 
 def _run_stl_residuals(series: pd.Series) -> pd.Series:
-    from statsmodels.tsa.seasonal import STL
-
-    n = len(series)
-    if n < 24:
-        rolling = series.rolling(window=max(1, n // 3), center=True, min_periods=1).mean()
-        return series - rolling
-
-    stl = STL(series, period=12, robust=True)
-    result = stl.fit()
-    return pd.Series(result.resid, index=series.index)
+    return run_stl_residuals(series)
 
 
 def _isolation_flags(residuals: np.ndarray) -> list[bool]:

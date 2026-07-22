@@ -13,6 +13,7 @@ from typing import Any
 import numpy as np
 import pandas as pd
 
+from app.services import _aws_financials
 from app.services.data_definitions import (
     _SCHEMA_MAP,
     build_date_index,
@@ -81,42 +82,49 @@ def _fetch_and_process(institution_id: str) -> dict[str, Any]:
             "timestamp": ts,
         }
 
-    all_cols = ["institution_id", "month", "year"] + receipt_cols + expense_cols
-    seen: set[str] = set()
-    select_cols: list[str] = []
-    for c in all_cols:
-        if c not in seen:
-            select_cols.append(c)
-            seen.add(c)
+    # AWS is authoritative for parishes — Supabase's financial_records numeric
+    # columns are never populated by the real ingestion pipeline, so reading
+    # them would produce assignment-period stats that are always ~zero
+    # regardless of the priest or period involved.
+    df: pd.DataFrame | None = _aws_financials.parish_monthly_df(institution_id) if schema == "parishes" else None
 
-    fin_res = (
-        get_table(schema, "financial_records")
-        .select(", ".join(select_cols))
-        .eq("institution_id", institution_id)
-        .eq("is_current_version", True)
-        .is_("deleted_at", "null")
-        .order("year")
-        .execute()
-    )
+    if df is None or len(df) < 3:
+        all_cols = ["institution_id", "month", "year"] + receipt_cols + expense_cols
+        seen: set[str] = set()
+        select_cols: list[str] = []
+        for c in all_cols:
+            if c not in seen:
+                select_cols.append(c)
+                seen.add(c)
 
-    if not fin_res.data or len(fin_res.data) < 3:
-        return {
-            "data_sufficient": False,
-            "institution_id": institution_id,
-            "assignment_periods": [],
-            "performance_analysis": {},
-            "timestamp": ts,
-        }
+        fin_res = (
+            get_table(schema, "financial_records")
+            .select(", ".join(select_cols))
+            .eq("institution_id", institution_id)
+            .eq("is_current_version", True)
+            .is_("deleted_at", "null")
+            .order("year")
+            .execute()
+        )
 
-    df = pd.DataFrame(fin_res.data)
-    df = build_date_index(df)
+        if not fin_res.data or len(fin_res.data) < 3:
+            return {
+                "data_sufficient": False,
+                "institution_id": institution_id,
+                "assignment_periods": [],
+                "performance_analysis": {},
+                "timestamp": ts,
+            }
 
-    for col in receipt_cols + expense_cols:
-        if col not in df.columns:
-            df[col] = 0.0
-        df[col] = pd.to_numeric(df[col], errors="coerce").fillna(0.0)
+        df = pd.DataFrame(fin_res.data)
+        df = build_date_index(df)
 
-    df["total_receipts"] = df[receipt_cols].sum(axis=1)
+        for col in receipt_cols + expense_cols:
+            if col not in df.columns:
+                df[col] = 0.0
+            df[col] = pd.to_numeric(df[col], errors="coerce").fillna(0.0)
+
+        df["total_receipts"] = df[receipt_cols].sum(axis=1)
 
     # ── Build period segments ─────────────────────────────────────────────────
     period_stats: list[dict] = []

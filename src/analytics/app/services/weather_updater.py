@@ -413,9 +413,7 @@ def update(
             run_id, "success", len(results), records_loaded + daily_rows_loaded, error_detail=legacy_error
         )
     except Exception as exc:
-        _update_run_record(
-            run_id, "failed", len(results), records_loaded + daily_rows_loaded, error_detail=str(exc)
-        )
+        _update_run_record(run_id, "failed", len(results), records_loaded + daily_rows_loaded, error_detail=str(exc))
         raise
 
     return {
@@ -470,6 +468,5 @@ if __name__ == "__main__":
     if args.load:
         print(f"Loaded {result['records_loaded']} records into reference.weather_observations")
         print(
-            f"Loaded {result['daily_rows_loaded']} rows into the split daily weather tables "
-            f"(monthly summary rebuilt)"
+            f"Loaded {result['daily_rows_loaded']} rows into the split daily weather tables (monthly summary rebuilt)"
         )

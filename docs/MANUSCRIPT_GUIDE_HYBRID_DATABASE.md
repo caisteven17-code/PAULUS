@@ -193,6 +193,88 @@ narrative.
   and only IDs are used) — confirm this against the actual ETL implementation once built, and
   update this section accordingly.
 
+## 8. Financial Health Score — citation basis and defense (for Methodology / Related Literature chapter)
+
+The composite score (`health_scoring.py`) blends five weighted dimensions: liquidity (25%),
+sustainability/operating margin (25%), efficiency (20%), stability (15%), and reporting
+compliance (15%). Each dimension is grounded in cited literature; the specific weights and
+scaling constants are not — be precise about which is which in the manuscript.
+
+**Citation mapping — use this table in Methodology or Related Literature:**
+
+| Dimension / decision | Supporting source |
+|---|---|
+| Using a composite index at all (not one ratio) | Bunting, "Dimensions and indicators of non-profit financial condition" (100+ ratios exist in the literature, no single agreed measure); Zietlow, "A Financial Health Index for Achieving Nonprofit Financial Sustainability" (direct precedent for combining liquidity/solvency/flexibility into one index) |
+| Liquidity (25%) | Nonprofit Finance Fund, "Top Indicators of Nonprofit Financial Health" (liquidity as a critical measure of ability to withstand risk); "A Methodology for Measuring the Financial Sustainability of Non-Profit Organizations" (lists liquidity explicitly among weighted indicators) |
+| Sustainability / operating margin (25%) | Tuckman & Chang's nonprofit financial vulnerability model (operating margin is one of the model's core variables, discussed in *Voluntas*/Cambridge); Lewis Center, "9 Questions to Assess Your Church's Financial Health" ("long-term sustainability") |
+| Efficiency (20%) | The Methodology paper above (lists efficiency explicitly, alongside liquidity/profitability/solvency) |
+| Stability (15%) | General volatility-as-risk-proxy technique, standard in financial/time-series analysis (coefficient of variation on monthly revenue, MoM growth) |
+| Reporting compliance (15%) | **USCCB Diocesan Financial Management Guide** (finance councils, budgets, financial statements, and pastor accountability as parish financial management requirements); **Code of Canon Law, Book V, Canons 1284 and 1287** (organized books, annual reports, and accountability for ecclesiastical goods are a canonical requirement, not a data-quality convenience) |
+
+**What this table does and does not establish — state this explicitly in the defense:** the
+citations justify *which five categories* belong in a Catholic parish financial health score and
+*why*. They do not specify the arithmetic. Nobody in the cited literature weights liquidity at
+25% or scales operating margin by ×200 — those are tuned parameters, and per the 2026-07-13
+Change Log entry above, that revision date is what should be cited for the formula itself, not
+any of the sources in this table. If a panel member asks "why 25% and not 30%?", the honest
+answer is design judgment tuned against the diocese's real data, not a research finding — say so
+directly rather than reaching for a citation that isn't there.
+
+**Reporting compliance is the model's most original contribution.** It is the one dimension with
+no equivalent in the generic nonprofit financial-health literature (Tuckman & Chang, Zietlow,
+Bunting) — it exists because Catholic canon law imposes a specific recordkeeping and reporting
+obligation the secular models have no reason to include. This is worth stating explicitly as a
+context-specific extension of the general framework, not just a fifth generic ratio.
+
+**Known, named limitation: no reserve/net-asset dimension.** Tuckman & Chang and the Lewis Center
+both include reserve/equity strength as a distinct dimension of nonprofit financial health.
+Checked directly against both data sources on 2026-07-22: Supabase's `parishes.financial_records`
+has the right-shaped columns (`beginning_balance`, `ending_balance_after_remit`) but they are
+unpopulated (zero) for all 92 parishes; the AWS warehouse's closest field,
+`pastoral_parish_fund_total_net_receipts_deficit`, is a monthly net-flow figure, not an
+accumulated balance. A reserve dimension is not addable today because the underlying data does
+not exist yet, not because it was overlooked. State this as: *"per Tuckman & Chang and the Lewis
+Center, reserve/net-asset strength is a recognized dimension of nonprofit financial health; it
+was excluded here because the diocese's reporting pipeline does not yet capture balance-sheet
+data, only income-and-expense flows. Incorporating it is identified as future work contingent on
+that data becoming available."* This reads as more rigorous than silently omitting the
+dimension — it shows the gap was identified, understood, and explicitly deferred for a named
+reason.
+
+## 9. Parish Cluster Analysis — citation basis and design evolution (for Methodology chapter)
+
+The rule-based parish clustering (`descriptive/parish_cluster.py`, and its forecasting
+counterpart `predictive/cluster_forecast.py`) assigns every parish to one of four clusters
+(A/B/C/D) using a 2x2 quadrant: **stability** (seasonally-adjusted collection volatility) ×
+**net margin** (positive/negative), with both axis thresholds set by a dynamic median-split
+computed diocese-wide (recomputed against the full 92-parish set regardless of which filter is
+active in the UI, so "high" and "low" mean the same thing no matter what scope a user is
+viewing).
+
+**Design evolution — state this explicitly, don't let a panel discover it:** the original
+prototype (`src/analytics/model_lab/model_rule_based_segmentation.py`) documents a different
+A/B/C/D quadrant — collection volume × net margin, with no stability component. The
+implementation described here deliberately diverges from that prototype because the client
+specified clustering should reflect parish *stability*, which the original design does not
+capture at all (a parish could have high, wildly volatile collections and still land in the same
+cluster as a parish with high, steady collections). Frame this as a client-directed refinement of
+an early prototype, not an inconsistency — the quadrant *structure* (four clusters from two binary
+dimensions) is preserved; one axis was replaced to match the actual requirement.
+
+**Citation basis — three layers, cite each for what it actually supports:**
+
+| What needs justifying | Source | What it supports |
+|---|---|---|
+| Why stability matters as a nonprofit/church financial health dimension at all | Tuckman & Chang's nonprofit financial vulnerability model; Lewis Center, "9 Questions to Assess Your Church's Financial Health" ("recurring income") | Same citations already used in §8 — stability/predictability of revenue is a recognized dimension of nonprofit financial condition, not something invented for this system. |
+| Why stability is measured from the STL *residual*, not raw variance | Cleveland, Cleveland, McRae & Terpenning (1990), "STL: A Seasonal-Trend Decomposition Procedure Based on Loess," *Journal of Official Statistics*; Hyndman & Athanasopoulos, "Forecasting: Principles and Practice" | Raw month-to-month variance would flag every parish as "volatile" purely from predictable liturgical-calendar swings (Christmas, Holy Week) that this system's own seasonality analysis already confirms are large and universal. STL decomposition — already used elsewhere in this codebase for anomaly detection — separates trend and seasonal pattern from the *remainder*, so only genuinely unexplained volatility counts against a parish's stability score. This is standard time-series methodology, not a bespoke technique. |
+| Why pairing a volatility axis with a margin axis into one quadrant is a sound structure | Markowitz (1952), "Portfolio Selection," *Journal of Finance* | The foundational risk-return framework: classify entities simultaneously by a performance measure (margin ≈ return) and a volatility measure (stability ≈ inverse of risk). Not nonprofit-specific — cite it for the *structural* choice of a 2-axis quadrant, adapted here from investment portfolios to parishes. |
+
+**What remains yours to defend as design, not literature:** the median-split mechanism and the
+STL-residual approach are both citable methodology; the *specific* threshold values that result
+from running median-split against this diocese's actual data, and the exact quadrant boundaries,
+are empirical outputs of your data, not a claim from any of the sources above — same distinction
+as the Health Score's weights in §8.
+
 ---
 
 ## Change Log
@@ -267,3 +349,24 @@ this feeds the manuscript's development narrative, not a full commit history.)*
   line-item update that preserved the amount while recording complete OLD/NEW JSONB through
   the secure audit view. The automatic transition run passed 39 bronze comparison checks and
   four direct-silver checks, advanced the source watermark, and left zero open failures.
+- **2026-07-22** — Added §8: citation basis for the Financial Health Score's five dimensions,
+  mapping each to specific nonprofit/church financial-health literature (Bunting, Zietlow,
+  Nonprofit Finance Fund, the NPO financial sustainability methodology paper, Tuckman & Chang,
+  the Lewis Center, USCCB's Diocesan Financial Management Guide, and Canon Law 1284/1287).
+  Documented the reasoning for why the specific weights/scaling remain engineering judgment
+  (cite the 2026-07-13 revision for those, not this literature). Checked both Supabase and the
+  AWS warehouse directly for reserve/net-asset data to support a possible sixth dimension:
+  confirmed neither has usable data yet (Supabase's balance columns exist but are unpopulated;
+  AWS only has a monthly net-flow figure, not an accumulated balance) — logged as a named,
+  data-availability-driven limitation rather than an oversight.
+- **2026-07-22** — Added §9: documented that the parish cluster design (`descriptive/parish_cluster.py`,
+  `predictive/cluster_forecast.py`) will move to an A/B/C/D quadrant of stability (seasonally-adjusted,
+  STL-residual-based volatility) × net margin, replacing both the original prototype's
+  collection-level × margin design (`model_rule_based_segmentation.py`, no stability component) and
+  today's live deficit/growth/variance rule cascade — driven by an explicit client requirement that
+  clustering reflect parish stability, which neither prior version captured cleanly. Logged the
+  three-layer citation basis (Tuckman & Chang/Lewis Center for why stability matters; Cleveland et
+  al. 1990 and Hyndman & Athanasopoulos for deseasonalizing via STL residual before measuring
+  volatility; Markowitz 1952 for the risk-return quadrant structure itself) and flagged the
+  design-evolution reasoning to state explicitly in the manuscript rather than leave for a panel to
+  discover.

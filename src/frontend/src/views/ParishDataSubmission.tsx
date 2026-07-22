@@ -47,7 +47,7 @@ interface ParishDataSubmissionProps {
   parishName?: string;
   vicariate?: string;
   parishClass?: string;
-  year?: number;
+  year?: number | null;
   onBack?: () => void;
   onImport?: (records: FinancialRecord[]) => void;
 }
@@ -100,11 +100,17 @@ export function ParishDataSubmission({
   parishName = 'San Isidro Labrador Parish',
   vicariate = 'Holy Family Vicariate',
   parishClass = 'Class B',
-  year = 2026,
+  year: rawYear,
   onBack,
   onImport,
 }: ParishDataSubmissionProps) {
   const { permissions } = usePermissions();
+  // A submission is always for one concrete reporting year — "All Years" (the
+  // dashboard filter's default) isn't a valid submission target — so fall
+  // back to the real current calendar year whenever the global filter is
+  // unscoped, rather than passing null/undefined into deadline math or the
+  // records this form saves.
+  const year = rawYear ?? new Date().getFullYear();
   const institutionType = useMemo(() => resolveInstitutionType(parishClass), [parishClass]);
   const heading = institutionHeadingMap[institutionType];
   const template = submissionTemplates[institutionType];

@@ -12,6 +12,7 @@ from typing import Any
 import numpy as np
 import pandas as pd
 
+from app.services import _aws_financials
 from app.services.data_definitions import _SCHEMA_MAP, build_date_index, safe_div
 from app.services.supabase_client import get_table
 
@@ -99,6 +100,15 @@ def _sensitivity_analysis(
 
 
 def _fetch_baseline(institution_id: str, entity_type: str) -> tuple[np.ndarray, np.ndarray, float]:
+    if entity_type == "parish":
+        aws_df = _aws_financials.parish_monthly_df(institution_id)
+        if aws_df is not None and not aws_df.empty:
+            return (
+                aws_df["total_receipts"].values.astype(float),
+                aws_df["total_expenses"].values.astype(float),
+                0.0,  # consumable_avg is accepted for signature compat but unused by _compute_health_score
+            )
+
     schema, receipt_cols, expense_cols, consumable_col = _SCHEMA_MAP[entity_type]
 
     all_cols = ["institution_id", "month", "year"] + receipt_cols + expense_cols
@@ -120,7 +130,7 @@ def _fetch_baseline(institution_id: str, entity_type: str) -> tuple[np.ndarray, 
     )
 
     if not res.data:
-        return np.array([1000.0]), np.array([900.0]), 200.0
+        raise ValueError("No financial records found for this institution")
 
     df = pd.DataFrame(res.data)
     df = build_date_index(df)
@@ -215,6 +225,13 @@ _HEALTH_WINDOW = 6  # trailing months used per-period for the health score
 
 def _fetch_monthly_history(institution_id: str, entity_type: str) -> pd.DataFrame:
     """Per-month history with totals, date-sorted. Empty DataFrame if no records."""
+    if entity_type == "parish":
+        aws_df = _aws_financials.parish_monthly_df(institution_id)
+        if aws_df is not None and not aws_df.empty:
+            aws_df = aws_df.copy()
+            aws_df["consumable"] = 0.0  # unused by _compute_health_score; kept for column-shape parity
+            return aws_df
+
     schema, receipt_cols, expense_cols, consumable_col = _SCHEMA_MAP[entity_type]
 
     all_cols = ["institution_id", "month", "year"] + receipt_cols + expense_cols
@@ -249,9 +266,7 @@ def _fetch_monthly_history(institution_id: str, entity_type: str) -> pd.DataFram
     df["total_receipts"] = df[receipt_cols].sum(axis=1)
     df["total_expenses"] = df[expense_cols].sum(axis=1)
     df["consumable"] = (
-        pd.to_numeric(df[consumable_col], errors="coerce").fillna(0.0)
-        if consumable_col in df.columns
-        else 0.0
+        pd.to_numeric(df[consumable_col], errors="coerce").fillna(0.0) if consumable_col in df.columns else 0.0
     )
     return df
 
@@ -307,9 +322,7 @@ def _run_replay(
     matches = df.index[df["date"] == start_date]
     if len(matches) == 0:
         available = [d.strftime("%Y-%m") for d in df["date"].tolist()]
-        raise ValueError(
-            f"No record for {start_date.strftime('%Y-%m')}. Available periods: {', '.join(available)}"
-        )
+        raise ValueError(f"No record for {start_date.strftime('%Y-%m')}. Available periods: {', '.join(available)}")
     start_idx = int(matches[0])
 
     actual_r = df["total_receipts"].values.astype(float)
@@ -341,12 +354,8 @@ def _run_replay(
         "counterfactual_trajectory": cf_traj,
         "divergence": {
             "periods_compared": len(actual_traj),
-            "cumulative_net_delta": round(
-                cf_traj[-1]["cumulative_net"] - actual_traj[-1]["cumulative_net"], 2
-            ),
-            "final_health_delta": round(
-                cf_traj[-1]["health_score"] - actual_traj[-1]["health_score"], 2
-            ),
+            "cumulative_net_delta": round(cf_traj[-1]["cumulative_net"] - actual_traj[-1]["cumulative_net"], 2),
+            "final_health_delta": round(cf_traj[-1]["health_score"] - actual_traj[-1]["health_score"], 2),
         },
         "timestamp": ts,
     }

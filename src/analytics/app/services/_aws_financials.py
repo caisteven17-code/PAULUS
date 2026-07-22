@@ -49,13 +49,14 @@ _ONE_PARISH_SQL = f"""
 
 _ALL_PARISHES_SQL = """
     SELECT di.institution_id,
+           di.institution_name,
            f.date_key,
            SUM(COALESCE(f.total_collections, 0))::float8 AS total_receipts,
            SUM(COALESCE(f.total_expenses, 0))::float8 AS total_expenses
     FROM parish_analytics.fact_parish_monthly_financials f
     JOIN parish_analytics.dim_parishes dp ON dp.parish_key = f.parish_key
     JOIN shared_analytics.dim_institutions di ON di.institution_key = dp.institution_key
-    GROUP BY di.institution_id, f.date_key
+    GROUP BY di.institution_id, di.institution_name, f.date_key
     ORDER BY di.institution_id, f.date_key
 """
 
@@ -83,9 +84,54 @@ def parish_monthly_df(institution_id: str) -> pd.DataFrame | None:
     return _finalize(pd.DataFrame(rows))
 
 
+# Multi-institution monthly totals from the v2 candidates view (institution_id
+# is a raw column there — no dim_institutions join needed). Hoisted out of
+# health_scoring.py so its batch endpoint and financial_trend.py's
+# decline-monitor batch share one fetch instead of near-duplicate SQL.
+_MANY_PARISHES_TOTALS_SQL = """
+    SELECT f.institution_id,
+           f.date_key,
+           SUM(COALESCE(f.total_collections, 0))::float8 AS total_receipts,
+           SUM(COALESCE(f.total_expenses, 0))::float8 AS total_expenses
+    FROM parish_analytics.vw_parish_monthly_financial_candidates_v2 f
+    {where_sql}
+    GROUP BY f.institution_id, f.date_key
+    ORDER BY f.institution_id, f.date_key
+"""
+
+
+def parish_monthly_totals(institution_ids: list[str], year: int | None = None) -> pd.DataFrame:
+    """Monthly totals for N institutions in one round trip. Returns a df with
+    institution_id (str), date_key, total_receipts, total_expenses, year,
+    month (Jan-style name) — empty df when nothing matches."""
+    where: list[str] = []
+    params: list = []
+    if len(institution_ids) == 1:
+        where.append("f.institution_id = %s")
+        params.append(institution_ids[0])
+    else:
+        where.append("f.institution_id = ANY(%s)")
+        params.append(institution_ids)
+    if year:
+        where.append("f.date_key >= %s AND f.date_key < %s")
+        params.extend([year * 100, (year + 1) * 100])
+
+    rows = analytics_db.fetch_query(_MANY_PARISHES_TOTALS_SQL.format(where_sql="WHERE " + " AND ".join(where)), params)
+    if not rows:
+        return pd.DataFrame()
+
+    df = pd.DataFrame(rows)
+    df["institution_id"] = df["institution_id"].astype(str)
+    df["year"] = df["date_key"] // 100
+    df["month"] = (df["date_key"] % 100 - 1).map(lambda i: MONTH_ORDER[i])
+    return df
+
+
 def all_parish_monthly_dfs() -> list[tuple[str, pd.DataFrame]] | None:
     """(institution_id, monthly df) for every parish in the warehouse, one
-    round trip. None → caller falls back to per-parish Supabase reads."""
+    round trip. Each df keeps an `institution_name` column so callers that
+    display names (parish clustering) don't need a second lookup. None →
+    caller falls back to per-parish Supabase reads."""
     if not analytics_db.enabled():
         return None
     try:
@@ -96,4 +142,4 @@ def all_parish_monthly_dfs() -> list[tuple[str, pd.DataFrame]] | None:
     if not rows:
         return None
     df = pd.DataFrame(rows)
-    return [(iid, _finalize(g.drop(columns=["institution_id"]))) for iid, g in df.groupby("institution_id")]
+    return [(str(iid), _finalize(g.drop(columns=["institution_id"]))) for iid, g in df.groupby("institution_id")]

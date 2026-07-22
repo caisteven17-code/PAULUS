@@ -2,7 +2,7 @@ from typing import Literal, Optional
 
 from fastapi import APIRouter, HTTPException, Query
 
-from app.models.schemas import AnomalyResult, HealthScoreResponse
+from app.models.schemas import AnomalyResult, HealthScoreBatchRequest, HealthScoreResponse
 from app.services import health_scoring
 
 router = APIRouter(tags=["analytics"])
@@ -24,6 +24,15 @@ async def compute_health_score(
         raise HTTPException(status_code=400, detail=str(exc))
     except Exception as exc:
         raise HTTPException(status_code=500, detail=f"Analytics error: {exc}")
+
+
+@router.post("/health-scores", response_model=list[HealthScoreResponse])
+async def compute_health_scores_batch(body: HealthScoreBatchRequest):
+    try:
+        entities = [e.model_dump() for e in body.entities]
+        return await health_scoring.get_health_scores_batch(entities, body.year, body.timeframe)
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=f"Batch analytics error: {exc}")
 
 
 @router.get("/anomaly/{institution_id}", response_model=AnomalyResult)

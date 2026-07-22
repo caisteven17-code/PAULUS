@@ -12,6 +12,7 @@ from typing import Any
 import numpy as np
 import pandas as pd
 
+from app.services import _aws_financials
 from app.services._institution_pool import run_parallel
 from app.services.data_definitions import (
     PARISH_EXPENSES,
@@ -98,87 +99,104 @@ def _solve_milp(parishes: list[dict], budget: float, upgrade_cost_per_parish: fl
         return selected
 
 
+def _features_from_totals(iid: str, r: np.ndarray, e: np.ndarray) -> dict[str, Any]:
+    n = len(r)
+    avg = float(np.mean(r))
+    var = float(np.var(r, ddof=0))
+    cv = safe_div(float(np.sqrt(var)), avg)
+
+    if n >= 12:
+        cy = float(np.sum(r[-12:]))
+        py = float(np.sum(r[-24:-12])) if n >= 24 else float(np.sum(r[: max(1, n - 12)]))
+        growth = safe_div(cy - py, py or 1)
+    elif n >= 2:
+        growth = safe_div(r[-1] - r[0], abs(r[0]) or 1)
+    else:
+        growth = 0.0
+
+    deficit = int(np.sum(e > r))
+    deficit_rate = safe_div(deficit, n)
+    cluster = _rule_cluster(avg, growth, deficit_rate, cv)
+    target = _upgrade_cluster(cluster)
+
+    return {
+        "institution_id": iid,
+        "avg_collection": round(avg, 2),
+        "cluster_label": cluster,
+        "target_cluster": target,
+        "growth_rate": round(growth, 4),
+        "deficit_rate": round(deficit_rate, 4),
+    }
+
+
 def _fetch_and_process(budget: float = 500000.0, upgrade_cost: float = 50000.0) -> dict[str, Any]:
     ts = datetime.now(timezone.utc).isoformat()
 
-    inst_res = (
-        get_table("diocese", "institutions").select("id, institution_type").eq("institution_type", "parish").execute()
-    )
-    institutions = inst_res.data or []
-
-    if not institutions:
-        return {
-            "data_sufficient": False,
-            "recommended_upgrades": [],
-            "actionability_rate": 0.0,
-            "budget_allocation": {},
-            "timestamp": ts,
-        }
-
-    all_cols = ["institution_id", "month", "year"] + PARISH_RECEIPTS + PARISH_EXPENSES
-    seen: set[str] = set()
-    select_cols: list[str] = []
-    for c in all_cols:
-        if c not in seen:
-            select_cols.append(c)
-            seen.add(c)
-
-    def _worker(inst: dict) -> dict | None:
-        iid = inst["id"]
-        res = (
-            get_table("parishes", "financial_records")
-            .select(", ".join(select_cols))
-            .eq("institution_id", iid)
-            .eq("is_current_version", True)
-            .is_("deleted_at", "null")
-            .order("year")
+    aws_series = _aws_financials.all_parish_monthly_dfs()
+    if aws_series is not None:
+        parishes = [
+            _features_from_totals(
+                iid, df["total_receipts"].values.astype(float), df["total_expenses"].values.astype(float)
+            )
+            for iid, df in aws_series
+            if len(df) >= 3
+        ]
+    else:
+        inst_res = (
+            get_table("diocese", "institutions")
+            .select("id, institution_type")
+            .eq("institution_type", "parish")
             .execute()
         )
-        if not res.data or len(res.data) < 3:
-            return None
+        institutions = inst_res.data or []
 
-        df = pd.DataFrame(res.data)
-        df = build_date_index(df)
+        if not institutions:
+            return {
+                "data_sufficient": False,
+                "recommended_upgrades": [],
+                "actionability_rate": 0.0,
+                "budget_allocation": {},
+                "timestamp": ts,
+            }
 
-        for col in PARISH_RECEIPTS + PARISH_EXPENSES:
-            if col not in df.columns:
-                df[col] = 0.0
-            df[col] = pd.to_numeric(df[col], errors="coerce").fillna(0.0)
+        all_cols = ["institution_id", "month", "year"] + PARISH_RECEIPTS + PARISH_EXPENSES
+        seen: set[str] = set()
+        select_cols: list[str] = []
+        for c in all_cols:
+            if c not in seen:
+                select_cols.append(c)
+                seen.add(c)
 
-        df["total_receipts"] = df[PARISH_RECEIPTS].sum(axis=1)
-        df["total_expenses"] = df[PARISH_EXPENSES].sum(axis=1)
+        def _worker(inst: dict) -> dict | None:
+            iid = inst["id"]
+            res = (
+                get_table("parishes", "financial_records")
+                .select(", ".join(select_cols))
+                .eq("institution_id", iid)
+                .eq("is_current_version", True)
+                .is_("deleted_at", "null")
+                .order("year")
+                .execute()
+            )
+            if not res.data or len(res.data) < 3:
+                return None
 
-        r = df["total_receipts"].values.astype(float)
-        e = df["total_expenses"].values.astype(float)
-        n = len(r)
-        avg = float(np.mean(r))
-        var = float(np.var(r, ddof=0))
-        cv = safe_div(float(np.sqrt(var)), avg)
+            df = pd.DataFrame(res.data)
+            df = build_date_index(df)
 
-        if n >= 12:
-            cy = float(np.sum(r[-12:]))
-            py = float(np.sum(r[-24:-12])) if n >= 24 else float(np.sum(r[: max(1, n - 12)]))
-            growth = safe_div(cy - py, py or 1)
-        elif n >= 2:
-            growth = safe_div(r[-1] - r[0], abs(r[0]) or 1)
-        else:
-            growth = 0.0
+            for col in PARISH_RECEIPTS + PARISH_EXPENSES:
+                if col not in df.columns:
+                    df[col] = 0.0
+                df[col] = pd.to_numeric(df[col], errors="coerce").fillna(0.0)
 
-        deficit = int(np.sum(e > r))
-        deficit_rate = safe_div(deficit, n)
-        cluster = _rule_cluster(avg, growth, deficit_rate, cv)
-        target = _upgrade_cluster(cluster)
+            df["total_receipts"] = df[PARISH_RECEIPTS].sum(axis=1)
+            df["total_expenses"] = df[PARISH_EXPENSES].sum(axis=1)
 
-        return {
-            "institution_id": iid,
-            "avg_collection": round(avg, 2),
-            "cluster_label": cluster,
-            "target_cluster": target,
-            "growth_rate": round(growth, 4),
-            "deficit_rate": round(deficit_rate, 4),
-        }
+            return _features_from_totals(
+                iid, df["total_receipts"].values.astype(float), df["total_expenses"].values.astype(float)
+            )
 
-    parishes = run_parallel(_worker, institutions)
+        parishes = run_parallel(_worker, institutions)
 
     if not parishes:
         return {

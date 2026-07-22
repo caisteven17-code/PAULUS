@@ -59,9 +59,9 @@ interface PriestDashboardProps {
   entityClass?: string;
   isEmbedded?: boolean;
   timeframe?: '3m' | '6m' | '12m';
-  year?: number;
+  year?: number | null;
   onNavigate?: (page: string) => void;
-  onYearChange?: (year: number) => void;
+  onYearChange?: (year: number | null) => void;
   onLogout?: () => void;
 }
 
@@ -392,7 +392,7 @@ export function PriestDashboard({
   entityClass,
   isEmbedded = false,
   timeframe = '6m',
-  year = 2026,
+  year = null,
   onNavigate,
   onYearChange,
   onLogout,
@@ -1611,12 +1611,16 @@ export function PriestDashboard({
 
   const handleImportRecords = async (importedRecords: FinancialRecord[]) => {
     try {
-      // Add entityId and entityType to records
+      // Add entityId and entityType to records. A saved record always needs
+      // one concrete year — "All Years" (the dashboard filter's default)
+      // isn't a valid value to stamp a real financial record with — so fall
+      // back to the actual current calendar year when the global filter is
+      // unscoped.
       const recordsWithEntity = importedRecords.map((record) => ({
         ...record,
         entityId: entityInfo.name.toLowerCase().replace(/\s+/g, '_'),
         entityType: mappedType as 'parish' | 'school' | 'seminary',
-        year: year,
+        year: year ?? new Date().getFullYear(),
       }));
 
       // Save to dataService

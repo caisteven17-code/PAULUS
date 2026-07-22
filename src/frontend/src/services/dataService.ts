@@ -71,7 +71,7 @@ export const dataService = {
 
   async calculateHealthScores(
     entities: { entityId: string; entityType: 'parish' | 'seminary' | 'school'; entityClass?: EntityClass }[],
-    year?: number,
+    year?: number | null,
     timeframe?: '6m' | '12m' | 'all',
   ): Promise<FinancialHealthScore[]> {
     return apiClient.calculateHealthScores(entities, year, timeframe);

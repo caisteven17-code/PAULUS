@@ -584,9 +584,7 @@ def _load_approved_source_rows_from_db(
     )
 
     if not approved_rows:
-        raise RuntimeError(
-            "No approved liturgical calendar rows found in the database for engine training."
-        )
+        raise RuntimeError("No approved liturgical calendar rows found in the database for engine training.")
 
     by_date: dict[str, dict[str, Any]] = {}
     for record in approved_rows:
@@ -642,7 +640,9 @@ def _build_year_anchors(year: int) -> YearAnchors:
     santo_nino = _third_sunday_of_january(year)
     ordinary_first_start = baptism + timedelta(days=1)
     ordinary_first_sunday = _next_sunday(ordinary_first_start)
-    ordinary_first_last_week = _ordinary_first_part_week_number(ash - timedelta(days=1), ordinary_first_start, ordinary_first_sunday)
+    ordinary_first_last_week = _ordinary_first_part_week_number(
+        ash - timedelta(days=1), ordinary_first_start, ordinary_first_sunday
+    )
     ordinary_second_start = pentecost + timedelta(days=1)
     ordinary_second_first_sunday = _next_sunday(ordinary_second_start)
     ordinary_second_start_week = 34 - ((first_advent - ordinary_second_start).days // 7)
@@ -834,7 +834,7 @@ def _baseline_celebration(dt: date, anchors: YearAnchors, season: str) -> dict[s
             title = f"{ORDINAL_WORDS[week]} Sunday of Easter"
             return _celebration(key, title, "Sunday of Easter")
         second_easter_sunday = anchors.easter_sunday + timedelta(days=7)
-        week = 2 + (( _previous_sunday(dt) - second_easter_sunday).days // 7)
+        week = 2 + ((_previous_sunday(dt) - second_easter_sunday).days // 7)
         key = f"{_weekday_slug(dt)}-of-the-{ORDINAL_PREFIXES[week]}-week-of-easter-{dt.isoformat()}"
         title = f"{WEEKDAY_NAMES[dt.weekday()]} of the {ORDINAL_WORDS[week]} Week of Easter"
         return _celebration(key, title, "Weekday / feria")
@@ -1328,7 +1328,9 @@ def main() -> int:
             return 0
         args.year = today.year + 1
         if _year_exists_in_db(args.year) and not args.force:
-            print(f"Skipped preload: {args.year} already exists in reference.liturgical_calendar for {ENGINE_SOURCE_NAME}.")
+            print(
+                f"Skipped preload: {args.year} already exists in reference.liturgical_calendar for {ENGINE_SOURCE_NAME}."
+            )
             return 0
 
     generated_years: list[int] = []

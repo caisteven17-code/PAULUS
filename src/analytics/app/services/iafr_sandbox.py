@@ -4,7 +4,6 @@ from __future__ import annotations
 
 from typing import Any
 
-
 CANONICAL_FIELD_MAP: dict[str, tuple[str, str, str]] = {
     "mass_intentions_claimed": ("A.3.02", "A", "mass_intentions"),
     "mass_intentions_unclaimed": ("A.3.03", "A", "mass_intentions"),

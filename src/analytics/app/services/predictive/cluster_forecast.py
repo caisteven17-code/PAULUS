@@ -12,114 +12,98 @@ from typing import Any
 import numpy as np
 import pandas as pd
 
+from app.services import _aws_financials, _parish_quadrant
 from app.services._institution_pool import run_parallel
 from app.services.data_definitions import (
     PARISH_EXPENSES,
     PARISH_RECEIPTS,
     build_date_index,
-    safe_div,
 )
 from app.services.supabase_client import get_table
 
-_CLUSTER_LABELS = ["High-Performing", "Growing", "Stable", "At-Risk"]
+# A/B/C/D — shared Stability × Net Margin quadrant. Transitions forecast here
+# only make sense if "current cluster" is the exact definition
+# descriptive/parish_cluster.py assigns, hence the shared module.
+_CLUSTER_LABELS = _parish_quadrant.CLUSTER_LABELS
 _LABEL_TO_IDX = {lbl: i for i, lbl in enumerate(_CLUSTER_LABELS)}
 _IDX_TO_LABEL = {i: lbl for i, lbl in enumerate(_CLUSTER_LABELS)}
 
 
-def _rule_cluster(avg: float, growth: float, deficit_rate: float, cv: float) -> int:
-    if deficit_rate > 0.4 or growth < -0.05:
-        return 3  # At-Risk
-    if growth >= 0.05:
-        return 1  # Growing
-    if cv < 0.3:
-        return 0  # High-Performing
-    return 2  # Stable
-
-
 def _extract_features(df: pd.DataFrame) -> dict[str, float]:
-    for col in PARISH_RECEIPTS + PARISH_EXPENSES:
-        if col not in df.columns:
-            df[col] = 0.0
-        df[col] = pd.to_numeric(df[col], errors="coerce").fillna(0.0)
-
-    df["total_receipts"] = df[PARISH_RECEIPTS].sum(axis=1)
-    df["total_expenses"] = df[PARISH_EXPENSES].sum(axis=1)
+    if "total_receipts" not in df.columns or "total_expenses" not in df.columns:
+        # Supabase path: totals aren't precomputed, derive them from raw columns.
+        for col in PARISH_RECEIPTS + PARISH_EXPENSES:
+            if col not in df.columns:
+                df[col] = 0.0
+            df[col] = pd.to_numeric(df[col], errors="coerce").fillna(0.0)
+        df["total_receipts"] = df[PARISH_RECEIPTS].sum(axis=1)
+        df["total_expenses"] = df[PARISH_EXPENSES].sum(axis=1)
 
     r = df["total_receipts"].values.astype(float)
     e = df["total_expenses"].values.astype(float)
-    n = len(r)
-
-    avg = float(np.mean(r))
-    var = float(np.var(r, ddof=0))
-    cv = safe_div(float(np.sqrt(var)), avg)
-
-    if n >= 12:
-        cy = float(np.sum(r[-12:]))
-        py = float(np.sum(r[-24:-12])) if n >= 24 else float(np.sum(r[: max(1, n - 12)]))
-        growth = safe_div(cy - py, py or 1)
-    elif n >= 2:
-        growth = safe_div(r[-1] - r[0], abs(r[0]) or 1)
-    else:
-        growth = 0.0
-
-    deficit = int(np.sum(e > r))
-    deficit_rate = safe_div(deficit, n)
-
-    return {
-        "avg_collection": avg,
-        "variance": var,
-        "cv": cv,
-        "growth_rate": growth,
-        "deficit_rate": deficit_rate,
-        "cluster_idx": _rule_cluster(avg, growth, deficit_rate, cv),
-    }
+    # cluster_idx is assigned in a second pass — the stable/volatile cutoff is
+    # a diocese-wide median, unknowable per-parish in isolation.
+    return _parish_quadrant.compute_features(r, e)
 
 
 def _fetch_and_process() -> dict[str, Any]:
     ts = datetime.now(timezone.utc).isoformat()
 
-    inst_res = (
-        get_table("diocese", "institutions").select("id, institution_type").eq("institution_type", "parish").execute()
-    )
-    institutions = inst_res.data or []
-
-    if not institutions:
-        return {
-            "data_sufficient": False,
-            "parish_predictions": [],
-            "transition_matrix": {},
-            "movement_summary": {lbl: 0 for lbl in _CLUSTER_LABELS},
-            "timestamp": ts,
-        }
-
-    all_cols = ["institution_id", "month", "year"] + PARISH_RECEIPTS + PARISH_EXPENSES
-    seen: set[str] = set()
-    select_cols: list[str] = []
-    for c in all_cols:
-        if c not in seen:
-            select_cols.append(c)
-            seen.add(c)
-
-    def _worker(inst: dict) -> dict | None:
-        iid = inst["id"]
-        res = (
-            get_table("parishes", "financial_records")
-            .select(", ".join(select_cols))
-            .eq("institution_id", iid)
-            .eq("is_current_version", True)
-            .is_("deleted_at", "null")
-            .order("year")
+    aws_series = _aws_financials.all_parish_monthly_dfs()
+    if aws_series is not None:
+        rows = []
+        for iid, df in aws_series:
+            if len(df) < 6:
+                continue
+            feats = _extract_features(df)
+            feats["institution_id"] = iid
+            rows.append(feats)
+    else:
+        inst_res = (
+            get_table("diocese", "institutions")
+            .select("id, institution_type")
+            .eq("institution_type", "parish")
             .execute()
         )
-        if not res.data or len(res.data) < 6:
-            return None
-        df = pd.DataFrame(res.data)
-        df = build_date_index(df)
-        feats = _extract_features(df)
-        feats["institution_id"] = iid
-        return feats
+        institutions = inst_res.data or []
 
-    rows = run_parallel(_worker, institutions)
+        if not institutions:
+            return {
+                "data_sufficient": False,
+                "parish_predictions": [],
+                "transition_matrix": {},
+                "movement_summary": {lbl: 0 for lbl in _CLUSTER_LABELS},
+                "timestamp": ts,
+            }
+
+        all_cols = ["institution_id", "month", "year"] + PARISH_RECEIPTS + PARISH_EXPENSES
+        seen: set[str] = set()
+        select_cols: list[str] = []
+        for c in all_cols:
+            if c not in seen:
+                select_cols.append(c)
+                seen.add(c)
+
+        def _worker(inst: dict) -> dict | None:
+            iid = inst["id"]
+            res = (
+                get_table("parishes", "financial_records")
+                .select(", ".join(select_cols))
+                .eq("institution_id", iid)
+                .eq("is_current_version", True)
+                .is_("deleted_at", "null")
+                .order("year")
+                .execute()
+            )
+            if not res.data or len(res.data) < 6:
+                return None
+            df = pd.DataFrame(res.data)
+            df = build_date_index(df)
+            feats = _extract_features(df)
+            feats["institution_id"] = iid
+            return feats
+
+        rows = run_parallel(_worker, institutions)
 
     if len(rows) < 4:
         return {
@@ -130,7 +114,16 @@ def _fetch_and_process() -> dict[str, Any]:
             "timestamp": ts,
         }
 
-    feature_names = ["avg_collection", "variance", "cv", "growth_rate", "deficit_rate"]
+    # Second pass: diocese-wide median volatility split, then assign every
+    # parish its current A/B/C/D quadrant label — identical definition to
+    # descriptive/parish_cluster.py by construction (shared module).
+    threshold = _parish_quadrant.stability_threshold(rows)
+    for r_ in rows:
+        r_["cluster_idx"] = _LABEL_TO_IDX[
+            _parish_quadrant.classify(r_["volatility_index"], r_["net_margin"], threshold)
+        ]
+
+    feature_names = ["avg_monthly_collection", "volatility_index", "net_margin"]
     X = np.array([[r[f] for f in feature_names] for r in rows])
     y = np.array([r["cluster_idx"] for r in rows])
 
@@ -173,8 +166,8 @@ def _fetch_and_process() -> dict[str, Any]:
     movement_summary = {lbl: 0 for lbl in _CLUSTER_LABELS}
     parish_predictions = []
     for i, r in enumerate(rows):
-        current_label = _IDX_TO_LABEL.get(int(r["cluster_idx"]), "Stable")
-        predicted_label = _IDX_TO_LABEL.get(int(predicted_clusters[i]), "Stable")
+        current_label = _IDX_TO_LABEL.get(int(r["cluster_idx"]), _CLUSTER_LABELS[0])
+        predicted_label = _IDX_TO_LABEL.get(int(predicted_clusters[i]), _CLUSTER_LABELS[0])
         movement_summary[predicted_label] = movement_summary.get(predicted_label, 0) + 1
         proba = predicted_proba[i] if isinstance(predicted_proba[i], list) else [0.25] * 4
         parish_predictions.append(
