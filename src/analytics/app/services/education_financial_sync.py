@@ -320,6 +320,7 @@ async def run_forever(stop_event) -> None:
                 await asyncio.to_thread(run_once, entity_type)
             except Exception:
                 logger.exception("%s financial synchronization failed", entity_type)
+                analytics_db.discard_pool()
         try:
             await asyncio.wait_for(stop_event.wait(), timeout=WAREHOUSE_EDUCATION_POLL_SECONDS)
         except TimeoutError:

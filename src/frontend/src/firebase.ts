@@ -28,6 +28,9 @@ export interface AuthUser {
   entityName?: string;
   entityType?: string;
   entityId?: string;
+  assignmentStatus?: 'assigned' | 'unassigned';
+  hasParishAccess?: boolean;
+  accountStatus?: 'active' | 'archived';
   displayName?: string;
   name?: string;
   status?: string;
@@ -47,6 +50,19 @@ export interface AuthUser {
 
 type AuthStateCallback = (user: AuthUser | null) => void;
 type Unsubscriber = () => void;
+
+const areSameAuthUsers = (a: AuthUser | null, b: AuthUser | null) => {
+  if (a === b) return true;
+  if (!a || !b) return false;
+  return (
+    (a.id || a.uid || a.email || '') === (b.id || b.uid || b.email || '') &&
+    a.role === b.role &&
+    a.entityId === b.entityId &&
+    a.entityName === b.entityName &&
+    a.assignmentStatus === b.assignmentStatus &&
+    a.avatarUrl === b.avatarUrl
+  );
+};
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -82,6 +98,17 @@ function mapSupabaseUser(supabaseUser: any): AuthUser {
   };
 }
 
+async function canonicalSession(accessToken: string, fallback: AuthUser): Promise<AuthUser> {
+  try {
+    const response = await fetch('/api/auth', { headers: { Authorization: `Bearer ${accessToken}` } });
+    if (!response.ok) return fallback;
+    const body = await response.json();
+    return body?.user ? { ...fallback, ...body.user } : fallback;
+  } catch {
+    return fallback;
+  }
+}
+
 const STORAGE_KEY = 'currentUser';
 
 // ─── Mock DB (kept for Settings → User Management which still uses localStorage) ──
@@ -108,9 +135,11 @@ export const auth = {
       .getSession()
       .then(({ data }) => {
         if (data.session?.user) {
-          const user = mapSupabaseUser(data.session.user);
-          localStorage.setItem(STORAGE_KEY, JSON.stringify(user));
-          callback(user);
+          const fallback = mapSupabaseUser(data.session.user);
+          canonicalSession(data.session.access_token, fallback).then((user) => {
+            localStorage.setItem(STORAGE_KEY, JSON.stringify(user));
+            callback(user);
+          });
           return;
         }
         // ── 2. Fall back to localStorage demo session ─────────────────────────
@@ -128,9 +157,11 @@ export const auth = {
       data: { subscription },
     } = supabaseBrowser.auth.onAuthStateChange((_event, session) => {
       if (session?.user) {
-        const user = mapSupabaseUser(session.user);
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(user));
-        callback(user);
+        const fallback = mapSupabaseUser(session.user);
+        canonicalSession(session.access_token, fallback).then((user) => {
+          localStorage.setItem(STORAGE_KEY, JSON.stringify(user));
+          callback(user);
+        });
       } else if (_event === 'SIGNED_OUT') {
         localStorage.removeItem(STORAGE_KEY);
         callback(null);
@@ -164,7 +195,7 @@ export function useAuth() {
 
   useEffect(() => {
     const unsubscribe = auth.onAuthStateChanged((authUser) => {
-      setUser(authUser);
+      setUser((previous) => (areSameAuthUsers(previous, authUser) ? previous : authUser));
       setLoading(false);
     });
     return () => unsubscribe?.();

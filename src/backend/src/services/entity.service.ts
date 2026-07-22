@@ -556,7 +556,7 @@ export class EntityService {
       this.supabaseService.admin
         .schema('diocese')
         .from('profiles')
-        .select('id, full_name, is_active')
+        .select('id, external_auth_id, full_name, email, institution_id, is_active')
         .eq('role_id', 'parish_priest')
         .eq('is_active', true)
         .is('deleted_at', null)
@@ -587,9 +587,12 @@ export class EntityService {
     const assignments = assignmentsResult.data ?? [];
     const priestNames = new Map(priests.map((priest: any) => [priest.id, priest.full_name || 'Unnamed priest']));
     const parishNames = new Map(parishes.map((parish: any) => [parish.id, parish.name]));
+    // Active clergy assignments are authoritative. Profile/Auth institution
+    // fields are snapshots only and must never recreate an assignment.
+    const assignmentRows = assignments;
 
     return {
-      priests: priests.map((priest: any) => ({ id: priest.id, name: priest.full_name || 'Unnamed priest' })),
+      priests: priests.map((priest: any) => ({ id: priest.id, externalAuthId: priest.external_auth_id, name: priest.full_name || 'Unnamed priest' })),
       parishes: parishes.map((parish: any) => ({
         id: parish.id,
         name: parish.name,
@@ -597,7 +600,7 @@ export class EntityService {
         district: parish.district,
         vicariate: parish.vicariate,
       })),
-      assignments: assignments.map((assignment: any) => ({
+      assignments: assignmentRows.map((assignment: any) => ({
         id: assignment.id,
         priestId: assignment.priest_id,
         priestName: priestNames.get(assignment.priest_id) || 'Unknown priest',

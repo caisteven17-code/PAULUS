@@ -50,7 +50,7 @@ export function Login({ onLogin, onPusher }: LoginProps) {
         const meta = sbData.session.user.user_metadata ?? {};
         const role = (meta.role as AppRole) ?? 'bishop';
         const accessRole = normalizeAccessRole(meta.role || 'parish_priest');
-        const currentUser: AuthUser = {
+        let currentUser: AuthUser = {
           uid: sbData.session.user.id, email: sbData.session.user.email ?? '',
           displayName: meta.displayName ?? meta.display_name ?? sbData.session.user.email?.split('@')[0] ?? '',
           role, accessRole, roleId: accessRole, roleLabel: getAccessRoleLabel(accessRole),
@@ -58,6 +58,15 @@ export function Login({ onLogin, onPusher }: LoginProps) {
           entityType: meta.entityType ?? meta.entity_type ?? '',
           entityId: meta.entityId ?? meta.entity_id ?? '', status: 'active',
         };
+        try {
+          const sessionResponse = await fetch('/api/auth', {
+            headers: { Authorization: `Bearer ${sbData.session.access_token}` },
+          });
+          const sessionBody = await sessionResponse.json();
+          if (sessionResponse.ok && sessionBody?.user) currentUser = { ...currentUser, ...sessionBody.user };
+        } catch {
+          // Offline/demo fallback keeps the Auth metadata-based user above.
+        }
         localStorage.setItem('currentUser', JSON.stringify(currentUser));
         const { data: aalData } = await supabaseBrowser.auth.mfa.getAuthenticatorAssuranceLevel();
         if (aalData?.nextLevel === 'aal2' && aalData.currentLevel !== 'aal2') {

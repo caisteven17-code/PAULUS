@@ -9,6 +9,17 @@ body {
   font-family: 'Inter', ui-sans-serif, system-ui, sans-serif;
 }
 
+html,
+body {
+  min-height: 100%;
+}
+
+body,
+#root,
+#__next {
+  background-color: #f5f5f5;
+}
+
 /* Custom Scrollbar Utilities */
 .scrollbar-hide {
   -ms-overflow-style: none; /* IE and Edge */

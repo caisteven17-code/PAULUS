@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo, useEffect, useCallback } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import ReactECharts from 'echarts-for-react';
 import { InlineLoader } from '../components/ui/LoadingScreen';
@@ -526,6 +526,10 @@ const FILTER_TABS: { id: LogCategory; label: string }[] = [
   { id: 'system', label: 'System' },
 ];
 
+const AUDIT_FETCH_LIMIT = 300;
+const INITIAL_VISIBLE_LOGS = 120;
+const VISIBLE_LOG_INCREMENT = 120;
+
 function groupByDate(logs: AuditEntry[]) {
   const groups: Record<string, AuditEntry[]> = {};
   for (const log of logs) {
@@ -661,14 +665,6 @@ function metaEntries(metadata?: Record<string, any>): { label: string; value: st
 }
 
 // ── Actor avatar (initials now, profile photo later) ──────────
-const AVATAR_COLORS = ['#1a472a', '#D4AF37', '#3B82F6', '#7C3AED', '#0EA5E9', '#F43F5E', '#14B8A6', '#FB923C', '#6366F1'];
-
-function colorFor(name: string): string {
-  let h = 0;
-  for (let i = 0; i < name.length; i++) h = (h * 31 + name.charCodeAt(i)) >>> 0;
-  return AVATAR_COLORS[h % AVATAR_COLORS.length];
-}
-
 function Avatar({ name, photoUrl, system }: { name: string; photoUrl?: string; system?: boolean }) {
   if (system) {
     return (
@@ -683,8 +679,7 @@ function Avatar({ name, photoUrl, system }: { name: string; photoUrl?: string; s
   }
   return (
     <div
-      className="w-9 h-9 rounded-full flex items-center justify-center shrink-0 text-white text-xs font-black"
-      style={{ backgroundColor: colorFor(name) }}
+      className="w-9 h-9 rounded-full flex items-center justify-center shrink-0 bg-black text-gold-400 text-xs font-black ring-1 ring-gold-500/35"
     >
       {getInitials(name)}
     </div>
@@ -767,8 +762,9 @@ export function AuditLog() {
   const [showAnalytics, setShowAnalytics] = useState(false);
   const [showFilters, setShowFilters] = useState(false);
   const [selectedLog, setSelectedLog] = useState<AuditEntry | null>(null);
+  const [visibleLogCount, setVisibleLogCount] = useState(INITIAL_VISIBLE_LOGS);
 
-  const fetchLogs = () => {
+  const fetchLogs = useCallback((signal?: AbortSignal) => {
     setIsLoading(true);
     const params = new URLSearchParams();
     if (activeFilter !== 'all') params.set('category', activeFilter);
@@ -777,26 +773,34 @@ export function AuditLog() {
     if (institutionName) params.set('institutionName', institutionName);
     if (dateFrom) params.set('dateFrom', `${dateFrom}T${timeFrom || '00:00'}`);
     if (dateTo) params.set('dateTo', `${dateTo}T${timeTo || '23:59:59'}`);
-    params.set('limit', '1000');
+    params.set('limit', String(AUDIT_FETCH_LIMIT));
 
     const query = params.toString();
-    fetch(`/api/audit-log${query ? `?${query}` : ''}`, { credentials: 'include' })
+    fetch(`/api/audit-log${query ? `?${query}` : ''}`, { credentials: 'include', signal })
       .then((res) => (res.ok ? res.json() : []))
       .then((data: AuditEntry[]) => {
         setLogs(Array.isArray(data) ? data : []);
       })
-      .catch(() => setLogs([]))
-      .finally(() => setIsLoading(false));
-  };
+      .catch((error) => {
+        if (error?.name !== 'AbortError') setLogs([]);
+      })
+      .finally(() => {
+        if (!signal?.aborted) setIsLoading(false);
+      });
+  }, [activeFilter, institutionType, institutionId, institutionName, dateFrom, timeFrom, dateTo, timeTo]);
 
-  useEffect(() => { fetchLogs(); }, []);
   useEffect(() => {
     fetch('/api/entities', { credentials: 'include' })
       .then((res) => (res.ok ? res.json() : null))
       .then((data) => setInstitutions(normalizeInstitutions(data)))
       .catch(() => setInstitutions([]));
   }, []);
-  useEffect(() => { fetchLogs(); }, [activeFilter, institutionType, institutionId, institutionName, dateFrom, timeFrom, dateTo, timeTo]);
+  useEffect(() => {
+    setVisibleLogCount(INITIAL_VISIBLE_LOGS);
+    const controller = new AbortController();
+    fetchLogs(controller.signal);
+    return () => controller.abort();
+  }, [fetchLogs]);
 
   const loadInstitutionsForType = (type: Exclude<InstitutionTypeFilter, 'all' | 'diocese'>) => {
     fetch(`/api/entities?type=${type}`, { credentials: 'include' })
@@ -887,8 +891,14 @@ export function AuditLog() {
     });
   }, [logs, search, activeFilter, institutionType, institutionId, institutionName, dateFrom, timeFrom, dateTo, timeTo]);
 
-  const grouped = useMemo(() => groupByDate(filtered), [filtered]);
+  useEffect(() => {
+    setVisibleLogCount(INITIAL_VISIBLE_LOGS);
+  }, [search]);
+
+  const visibleLogs = useMemo(() => filtered.slice(0, visibleLogCount), [filtered, visibleLogCount]);
+  const grouped = useMemo(() => groupByDate(visibleLogs), [visibleLogs]);
   const dateKeys = Object.keys(grouped);
+  const hasMoreVisibleLogs = visibleLogs.length < filtered.length;
 
   const stats = useMemo(
     () => ({
@@ -1088,7 +1098,7 @@ export function AuditLog() {
           </button>
 
           <button
-            onClick={fetchLogs}
+            onClick={() => fetchLogs()}
             disabled={isLoading}
             className="shrink-0 flex items-center gap-2 px-4 py-2 bg-white text-gray-600 text-[11px] font-black uppercase tracking-widest rounded-xl border border-gray-200 hover:border-gray-400 transition-colors disabled:opacity-50"
           >
@@ -1470,13 +1480,8 @@ export function AuditLog() {
           </div>
         ) : (
           <div className="space-y-10">
-            {dateKeys.map((date, di) => (
-              <motion.div
-                key={date}
-                initial={{ opacity: 0, y: 16 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: di * 0.05 }}
-              >
+            {dateKeys.map((date) => (
+              <section key={date}>
                 <div className="flex items-center gap-4 mb-6">
                   <div className="w-2 h-2 rounded-full bg-gold-500 shrink-0" />
                   <p className="text-[11px] font-black text-gray-400 uppercase tracking-[0.3em]">{date}</p>
@@ -1487,17 +1492,11 @@ export function AuditLog() {
                 </div>
 
                 <div className="relative pl-6 border-l-2 border-gray-100 space-y-1">
-                  {grouped[date].map((log, li) => {
+                  {grouped[date].map((log) => {
                     const sev = SEVERITY_CONFIG[log.severity];
                     const cat = CATEGORY_CONFIG[log.category] ?? CATEGORY_CONFIG['system'];
                     return (
-                      <motion.div
-                        key={log.id}
-                        initial={{ opacity: 0, x: -8 }}
-                        animate={{ opacity: 1, x: 0 }}
-                        transition={{ delay: di * 0.04 + li * 0.03 }}
-                        className="relative group"
-                      >
+                      <div key={log.id} className="relative group">
                         <div
                           className={`absolute -left-[1.85rem] top-4 w-3.5 h-3.5 rounded-full ring-2 ring-offset-2 ring-offset-[#FDFCFB] ${sev.ring} flex items-center justify-center`}
                         >
@@ -1552,19 +1551,30 @@ export function AuditLog() {
                             <ChevronRight className="w-4 h-4 text-gray-300 group-hover:text-gold-500 transition-colors" />
                           </div>
                         </div>
-                      </motion.div>
+                      </div>
                     );
                   })}
                 </div>
-              </motion.div>
+              </section>
             ))}
+          </div>
+        )}
+
+        {!isLoading && hasMoreVisibleLogs && (
+          <div className="mt-8 flex justify-center">
+            <button
+              onClick={() => setVisibleLogCount((count) => count + VISIBLE_LOG_INCREMENT)}
+              className="rounded-xl border border-gray-200 bg-white px-5 py-2.5 text-[11px] font-black uppercase tracking-widest text-gray-600 shadow-sm transition-colors hover:border-church-green hover:text-church-green"
+            >
+              Load more logs
+            </button>
           </div>
         )}
 
         <div className="mt-12 flex items-center gap-4">
           <div className="flex-1 h-px bg-gray-100" />
           <p className="text-[10px] font-black text-gray-300 uppercase tracking-[0.3em] whitespace-nowrap">
-            {filtered.length} of {logs.length} events &nbsp;·&nbsp; 90-day retention
+            {visibleLogs.length} shown of {filtered.length} matched events &nbsp;·&nbsp; {logs.length} loaded
           </p>
           <div className="flex-1 h-px bg-gray-100" />
         </div>

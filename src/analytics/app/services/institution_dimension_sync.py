@@ -211,6 +211,7 @@ async def run_forever(stop_event: asyncio.Event) -> None:
             await asyncio.to_thread(run_once)
         except Exception:
             logger.exception("Institution dimension poll failed; watermark was not advanced past the failure")
+            analytics_db.discard_pool()
         try:
             await asyncio.wait_for(stop_event.wait(), timeout=WAREHOUSE_INSTITUTION_POLL_SECONDS)
         except TimeoutError:
@@ -230,4 +231,3 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
-

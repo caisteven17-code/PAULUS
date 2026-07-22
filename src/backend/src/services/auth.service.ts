@@ -437,6 +437,64 @@ export class AppAuthService {
     };
   }
 
+  private async withCanonicalParishAssignment(user: AuthUser, externalAuthId: string): Promise<AuthUser> {
+    const roleId = String(user.roleId ?? user.accessRole ?? user.role ?? '');
+    if (roleId !== 'parish_priest') {
+      return { ...user, accountStatus: user.status === 'archived' ? 'archived' : 'active' };
+    }
+
+    const { data: profile, error: profileError } = await this.supabaseService.admin
+      .schema('diocese')
+      .from('profiles')
+      .select('id,full_name,email,role_id,is_active,external_auth_id')
+      .eq('external_auth_id', externalAuthId)
+      .is('deleted_at', null)
+      .maybeSingle();
+    if (profileError) throw profileError;
+
+    let assignment: any = null;
+    if (profile?.id) {
+      const { data, error } = await this.supabaseService.admin
+        .schema('clergy')
+        .from('priest_assignments')
+        .select('institution_id')
+        .eq('priest_id', profile.id)
+        .eq('assignment_role', 'parish_priest')
+        .eq('is_active', true)
+        .is('deleted_at', null)
+        .maybeSingle();
+      if (error) throw error;
+      assignment = data;
+    }
+
+    let institutionName: string | undefined;
+    if (assignment?.institution_id) {
+      const { data, error } = await this.supabaseService.admin
+        .schema('diocese')
+        .from('institutions')
+        .select('name')
+        .eq('id', assignment.institution_id)
+        .maybeSingle();
+      if (error) throw error;
+      institutionName = data?.name;
+    }
+
+    const assigned = Boolean(assignment?.institution_id);
+    return {
+      ...user,
+      displayName: profile?.full_name || user.displayName,
+      role: 'parish_priest',
+      accessRole: 'parish_priest',
+      roleId: 'parish_priest',
+      entityType: 'parish',
+      entityId: assigned ? assignment.institution_id : undefined,
+      entityName: assigned ? institutionName : undefined,
+      assignmentStatus: assigned ? 'assigned' : 'unassigned',
+      hasParishAccess: assigned,
+      accountStatus: profile?.is_active === false || user.status === 'archived' ? 'archived' : 'active',
+    };
+  }
+
   async login(email: string, password: string): Promise<{ token: string; user: AuthUser } | null> {
     const { data, error } = await this.supabaseService.supabaseBrowser.auth.signInWithPassword({
       email,
@@ -457,7 +515,7 @@ export class AppAuthService {
   async getSession(token: string): Promise<AuthUser | null> {
     const { data, error } = await this.supabaseService.supabaseServer.auth.getUser(token);
     if (error || !data.user) return null;
-    return this.mapSupabaseUser(data.user);
+    return this.withCanonicalParishAssignment(this.mapSupabaseUser(data.user), data.user.id);
   }
 
   async listUsers() {
@@ -472,30 +530,62 @@ export class AppAuthService {
     const avatarByAuthId = new Map<string, string>();
     const birthdayByAuthId = new Map<string, string>();
     const onboardedByAuthId = new Map<string, boolean>();
+    const profileByAuthId = new Map<string, any>();
     const { data: profiles } = await this.supabaseService.admin
       .schema('diocese')
       .from('profiles')
-      .select('external_auth_id, avatar_url, birthday, onboarding_completed');
+      .select('id, external_auth_id, full_name, email, role_id, institution_id, is_active, avatar_url, birthday, onboarding_completed');
     for (const p of profiles ?? []) {
       if (!p.external_auth_id) continue;
+      profileByAuthId.set(p.external_auth_id, p);
       if (p.avatar_url) avatarByAuthId.set(p.external_auth_id, p.avatar_url);
       if (p.birthday) birthdayByAuthId.set(p.external_auth_id, p.birthday);
       if (p.onboarding_completed === true) onboardedByAuthId.set(p.external_auth_id, true);
     }
 
+    const priestProfileIds = (profiles ?? []).filter((p: any) => p.role_id === 'parish_priest').map((p: any) => p.id);
+    const assignmentByPriest = new Map<string, any>();
+    if (priestProfileIds.length) {
+      const { data: assignments, error: assignmentError } = await this.supabaseService.admin
+        .schema('clergy')
+        .from('priest_assignments')
+        .select('priest_id,institution_id')
+        .in('priest_id', priestProfileIds)
+        .eq('assignment_role', 'parish_priest')
+        .eq('is_active', true)
+        .is('deleted_at', null);
+      if (assignmentError) throw assignmentError;
+      for (const assignment of assignments ?? []) assignmentByPriest.set(assignment.priest_id, assignment);
+    }
+    const institutionIds = Array.from(new Set(Array.from(assignmentByPriest.values()).map((a) => a.institution_id)));
+    const institutionNameById = new Map<string, string>();
+    if (institutionIds.length) {
+      const { data: institutions, error: institutionError } = await this.supabaseService.admin
+        .schema('diocese').from('institutions').select('id,name').in('id', institutionIds);
+      if (institutionError) throw institutionError;
+      for (const institution of institutions ?? []) institutionNameById.set(institution.id, institution.name);
+    }
+
     return (data.users ?? []).map((u) => {
       const meta = u.user_metadata ?? {};
+      const profile = profileByAuthId.get(u.id);
+      const isParishPriest = (profile?.role_id ?? meta.role) === 'parish_priest';
+      const assignment = isParishPriest ? assignmentByPriest.get(profile?.id) : null;
+      const assigned = Boolean(assignment?.institution_id);
       const onboardingCompleted =
         onboardedByAuthId.get(u.id) === true || meta.onboardingCompleted === true || meta.onboarding_completed === true;
       return {
         id: u.id,
         email: u.email ?? '',
-        displayName: (meta.displayName ?? meta.display_name ?? u.email ?? '') as string,
-        role: (meta.role ?? 'parish_priest') as string,
-        roleId: (meta.role ?? 'parish_priest') as string,
-        entityName: (meta.entityName ?? meta.entity_name ?? '') as string,
+        displayName: (profile?.full_name ?? meta.displayName ?? meta.display_name ?? u.email ?? '') as string,
+        role: (profile?.role_id ?? meta.role ?? 'parish_priest') as string,
+        roleId: (profile?.role_id ?? meta.role ?? 'parish_priest') as string,
+        entityName: isParishPriest ? (assigned ? institutionNameById.get(assignment.institution_id) ?? '' : '') : (meta.entityName ?? meta.entity_name ?? '') as string,
         entityType: (meta.entityType ?? meta.entity_type ?? 'parish') as string,
-        entityId: (meta.entityId ?? meta.entity_id ?? '') as string,
+        entityId: isParishPriest ? (assignment?.institution_id ?? '') : (meta.entityId ?? meta.entity_id ?? '') as string,
+        assignmentStatus: isParishPriest ? (assigned ? 'assigned' : 'unassigned') : undefined,
+        hasParishAccess: isParishPriest ? assigned : undefined,
+        accountStatus: u.banned_until || profile?.is_active === false ? 'archived' : 'active',
         avatarUrl: avatarByAuthId.get(u.id) ?? meta.avatarUrl ?? meta.avatar_url ?? null,
         birthday: birthdayByAuthId.get(u.id) ?? meta.birthday ?? meta.birth_date ?? null,
         onboardingCompleted,
@@ -581,6 +671,16 @@ export class AppAuthService {
 
   async deleteUser(id: string, action: 'archive' | 'restore') {
     if (action === 'archive') {
+      const { data: profile, error: profileError } = await this.supabaseService.admin
+        .schema('diocese').from('profiles').select('id,role_id').eq('external_auth_id', id).maybeSingle();
+      if (profileError) throw profileError;
+      if (profile?.role_id === 'parish_priest') {
+        const { data: assignment, error: assignmentError } = await this.supabaseService.admin
+          .schema('clergy').from('priest_assignments').select('id').eq('priest_id', profile.id)
+          .eq('is_active', true).is('deleted_at', null).limit(1).maybeSingle();
+        if (assignmentError) throw assignmentError;
+        if (assignment) throw new Error('ACTIVE_PARISH_ASSIGNMENT');
+      }
       const { data, error } = await this.supabaseService.supabaseServer.auth.admin.updateUserById(id, {
         user_metadata: { status: 'archived' },
         ban_duration: '876600h', // ~100 years

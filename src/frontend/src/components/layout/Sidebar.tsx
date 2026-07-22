@@ -11,6 +11,8 @@ import {
   ChevronDown,
   User,
   Bell,
+  PanelLeftClose,
+  PanelLeftOpen,
   FileText,
   BarChart3,
   Heart,
@@ -39,6 +41,8 @@ interface SidebarProps {
   role: string;
   timeframe?: Timeframe;
   onTimeframeChange?: (timeframe: Timeframe) => void;
+  isOpen?: boolean;
+  onToggle?: () => void;
 }
 
 /** Timeframe display labels (moved to module level to avoid recreation on each render) */
@@ -48,7 +52,15 @@ const TIMEFRAME_LABELS: Record<Timeframe, string> = {
   all: 'All Time',
 } as const;
 
-export function Sidebar({ activeTab = '', onNavigate, role, timeframe = '6m', onTimeframeChange }: SidebarProps) {
+export function Sidebar({
+  activeTab = '',
+  onNavigate,
+  role,
+  timeframe = '6m',
+  onTimeframeChange,
+  isOpen = true,
+  onToggle,
+}: SidebarProps) {
   const [showTimeframeDropdown, setShowTimeframeDropdown] = React.useState(false);
   const [showParishDropdown, setShowParishDropdown] = React.useState(activeTab.startsWith('parish'));
   const [showPriestDropdown, setShowPriestDropdown] = React.useState(activeTab.startsWith('priest'));
@@ -152,7 +164,30 @@ export function Sidebar({ activeTab = '', onNavigate, role, timeframe = '6m', on
   ];
 
   return (
-    <aside className="hidden md:flex flex-col w-64 bg-black text-white h-screen sticky top-0 left-0 z-40 shadow-2xl border-r border-white/5">
+    <>
+      <button
+        type="button"
+        onClick={onToggle}
+        aria-label={isOpen ? 'Hide sidebar' : 'Show sidebar'}
+        title={isOpen ? 'Hide sidebar' : 'Show sidebar'}
+        className={`hidden md:inline-flex fixed top-5 z-50 h-9 w-9 items-center justify-center rounded-full border border-white/10 bg-black text-gold-400 shadow-xl shadow-black/20 transition-[left,background-color,color] duration-300 hover:bg-white hover:text-black ${
+          isOpen ? 'left-[238px]' : 'left-4'
+        }`}
+      >
+        {isOpen ? <PanelLeftClose className="h-4 w-4" /> : <PanelLeftOpen className="h-4 w-4" />}
+      </button>
+
+      <div
+        className={`hidden md:block h-screen sticky top-0 left-0 z-40 shrink-0 overflow-visible transition-[width] duration-300 ease-out ${
+          isOpen ? 'w-64' : 'w-0'
+        }`}
+      >
+        <aside
+          className={`flex flex-col w-64 bg-black text-white h-screen shadow-2xl border-r border-white/5 transition-transform duration-300 ease-out ${
+            isOpen ? 'translate-x-0' : '-translate-x-full'
+          }`}
+          aria-hidden={!isOpen}
+        >
       {/* Logo Section */}
       <div className="p-6 mb-4">
         <div className="flex items-center gap-3">
@@ -740,6 +775,8 @@ export function Sidebar({ activeTab = '', onNavigate, role, timeframe = '6m', on
       </nav>
 
       <div className="p-4 border-t border-white/5" />
-    </aside>
+        </aside>
+      </div>
+    </>
   );
 }
