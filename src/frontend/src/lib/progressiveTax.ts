@@ -1,4 +1,4 @@
-export type ProgressiveTaxSchemeStatus = 'draft' | 'published';
+export type ProgressiveTaxSchemeStatus = 'draft' | 'published' | 'superseded';
 
 export interface ProgressiveTaxBracket {
   id: string;

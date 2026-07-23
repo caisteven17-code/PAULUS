@@ -11,6 +11,7 @@ import {
   FilePlus2,
   Loader2,
   LockKeyhole,
+  Pencil,
   Plus,
   RefreshCw,
   Save,
@@ -20,7 +21,7 @@ import {
 import { getApiRequestHeaders } from '../../lib/api-client';
 import { calculateProgressiveTax } from '../../lib/progressiveTax';
 
-type SchemeStatus = 'draft' | 'published';
+type SchemeStatus = 'draft' | 'published' | 'superseded';
 
 interface TaxBracket {
   id?: string;
@@ -55,7 +56,7 @@ interface DraftEditor {
   brackets: EditableBracket[];
 }
 
-type EditorMode = 'existing' | 'create' | 'clone';
+type EditorMode = 'existing' | 'create' | 'clone' | 'revision';
 
 const API_PATH = '/api/admin/taxation-schemes';
 const CENTAVO = 0.01;
@@ -137,7 +138,7 @@ const normalizeScheme = (raw: any): TaxScheme => {
     effectiveFrom: String(
       raw?.effectiveFrom ?? raw?.effective_from ?? raw?.effectiveMonth ?? raw?.effective_month ?? '',
     ),
-    status: raw?.status === 'published' ? 'published' : 'draft',
+    status: raw?.status === 'published' ? 'published' : raw?.status === 'superseded' ? 'superseded' : 'draft',
     publishedAt: raw?.publishedAt ?? raw?.published_at ?? null,
     createdAt: raw?.createdAt ?? raw?.created_at ?? null,
     brackets: Array.isArray(bracketSource)
@@ -153,7 +154,8 @@ const normalizeSchemes = (body: any): TaxScheme[] => {
     .map(normalizeScheme)
     .filter((scheme) => scheme.id)
     .sort((a, b) => {
-      if (a.status !== b.status) return a.status === 'draft' ? -1 : 1;
+      const statusOrder: Record<SchemeStatus, number> = { draft: 0, published: 1, superseded: 2 };
+      if (a.status !== b.status) return statusOrder[a.status] - statusOrder[b.status];
       return b.effectiveFrom.localeCompare(a.effectiveFrom) || b.version - a.version;
     });
 };
@@ -197,7 +199,12 @@ async function apiRequest<T>(path: string, init: RequestInit = {}): Promise<T> {
   return body as T;
 }
 
-function editorValidation(editor: DraftEditor, schemes: TaxScheme[], selectedSchemeId?: string) {
+function editorValidation(
+  editor: DraftEditor,
+  schemes: TaxScheme[],
+  selectedSchemeId?: string,
+  allowPublishedConflict = false,
+) {
   const errors: string[] = [];
   if (!editor.name.trim()) errors.push('Scheme name is required.');
   if (!/^\d{4}-\d{2}$/.test(editor.effectiveFrom)) {
@@ -206,10 +213,12 @@ function editorValidation(editor: DraftEditor, schemes: TaxScheme[], selectedSch
   if (editor.effectiveMode === 'year' && !editor.effectiveFrom.endsWith('-01')) {
     errors.push('Whole-year schemes must begin in January.');
   }
+  const periodConflicts = schemes.filter(
+    (scheme) => scheme.id !== selectedSchemeId && monthValue(scheme.effectiveFrom) === editor.effectiveFrom,
+  );
   if (
-    schemes.some(
-      (scheme) => scheme.id !== selectedSchemeId && monthValue(scheme.effectiveFrom) === editor.effectiveFrom,
-    )
+    periodConflicts.length > 0 &&
+    !(allowPublishedConflict && periodConflicts.every((scheme) => scheme.status === 'published'))
   ) {
     errors.push(
       editor.effectiveMode === 'year'
@@ -249,7 +258,12 @@ export function TaxationSchemeControl() {
 
   const selectedScheme = schemes.find((scheme) => scheme.id === selectedId) ?? null;
   const validationErrors = editor
-    ? editorValidation(editor, schemes, editorMode === 'existing' ? selectedScheme?.id : undefined)
+    ? editorValidation(
+        editor,
+        schemes,
+        editorMode === 'existing' ? selectedScheme?.id : undefined,
+        editorMode === 'revision' || selectedScheme?.status === 'draft',
+      )
     : [];
 
   const loadSchemes = React.useCallback(async (preferredId?: string) => {
@@ -352,6 +366,20 @@ export function TaxationSchemeControl() {
     setError('');
   };
 
+  const startRevision = () => {
+    if (!selectedScheme || selectedScheme.status !== 'published') return;
+    const revision = editorFromScheme(selectedScheme);
+    setCloneSourceId(selectedScheme.id);
+    setSelectedId('');
+    setEditorMode('revision');
+    setEditor({
+      ...revision,
+      name: selectedScheme.name,
+      brackets: revision.brackets.map((bracket, index) => ({ ...bracket, id: `revision-${index}` })),
+    });
+    setError('');
+  };
+
   const selectScheme = (scheme: TaxScheme) => {
     setEditorMode('existing');
     setCloneSourceId('');
@@ -389,12 +417,13 @@ export function TaxationSchemeControl() {
       let body: any;
       if (editorMode === 'create') {
         body = await apiRequest<any>(API_PATH, { method: 'POST', body: JSON.stringify(payload) });
-      } else if (editorMode === 'clone') {
+      } else if (editorMode === 'clone' || editorMode === 'revision') {
         body = await apiRequest<any>(`${API_PATH}/${encodeURIComponent(cloneSourceId)}/clone`, {
           method: 'POST',
           body: JSON.stringify({
             name: payload.name,
             effectiveMonth: payload.effectiveMonth,
+            mode: editorMode,
           }),
         });
         const clonedId = String(body?.scheme?.id ?? body?.id ?? '');
@@ -585,7 +614,9 @@ export function TaxationSchemeControl() {
                         className={`inline-flex shrink-0 items-center gap-1 rounded px-2 py-1 text-[10px] font-bold uppercase ${
                           scheme.status === 'published'
                             ? 'bg-emerald-100 text-emerald-700'
-                            : 'bg-slate-100 text-slate-600'
+                            : scheme.status === 'superseded'
+                              ? 'bg-slate-200 text-slate-500'
+                              : 'bg-amber-100 text-amber-700'
                         }`}
                       >
                         {scheme.status === 'published' && <Check className="h-3 w-3" />}
@@ -616,7 +647,7 @@ export function TaxationSchemeControl() {
                     <input
                       type="text"
                       value={editor.name}
-                      disabled={selectedScheme?.status === 'published'}
+                      disabled={Boolean(selectedScheme && selectedScheme.status !== 'draft')}
                       onChange={(event) => setEditor({ ...editor, name: event.target.value })}
                       className="h-11 w-full rounded-lg border border-slate-200 bg-white px-3 text-sm font-semibold text-slate-900 outline-none focus:border-amber-500 disabled:bg-slate-50 disabled:text-slate-500"
                     />
@@ -633,7 +664,7 @@ export function TaxationSchemeControl() {
                           <button
                             key={option.value}
                             type="button"
-                            disabled={selectedScheme?.status === 'published'}
+                            disabled={Boolean(selectedScheme && selectedScheme.status !== 'draft')}
                             aria-pressed={active}
                             onClick={() => {
                               setError('');
@@ -667,7 +698,7 @@ export function TaxationSchemeControl() {
                         max="2100"
                         step="1"
                         value={editor.effectiveFrom.slice(0, 4)}
-                        disabled={selectedScheme?.status === 'published'}
+                        disabled={Boolean(selectedScheme && selectedScheme.status !== 'draft')}
                         onChange={(event) => {
                           setError('');
                           setEditor({ ...editor, effectiveFrom: `${event.target.value}-01` });
@@ -678,7 +709,7 @@ export function TaxationSchemeControl() {
                       <input
                         type="month"
                         value={editor.effectiveFrom}
-                        disabled={selectedScheme?.status === 'published'}
+                        disabled={Boolean(selectedScheme && selectedScheme.status !== 'draft')}
                         onChange={(event) => {
                           setError('');
                           setEditor({ ...editor, effectiveFrom: event.target.value });
@@ -689,6 +720,17 @@ export function TaxationSchemeControl() {
                   </label>
                 </div>
                 <div className="flex flex-wrap gap-2">
+                  {selectedScheme?.status === 'published' && (
+                    <button
+                      type="button"
+                      onClick={startRevision}
+                      disabled={Boolean(busyAction)}
+                      className="inline-flex items-center gap-2 rounded-lg bg-amber-500 px-3 py-2.5 text-sm font-bold text-slate-950 hover:bg-amber-400 disabled:opacity-50"
+                    >
+                      <Pencil className="h-4 w-4" />
+                      Edit Scheme
+                    </button>
+                  )}
                   {selectedScheme && (
                     <button
                       type="button"
@@ -714,10 +756,12 @@ export function TaxationSchemeControl() {
                 </div>
               </div>
 
-              {selectedScheme?.status === 'published' && (
+              {selectedScheme && selectedScheme.status !== 'draft' && (
                 <div className="flex items-center gap-2 border-y border-slate-200 py-3 text-sm font-semibold text-slate-600">
                   <LockKeyhole className="h-4 w-4 text-slate-400" />
-                  Published version - Read only
+                  {selectedScheme.status === 'published'
+                    ? 'Published version - Use Edit Scheme to create a revision'
+                    : 'Superseded version - Read only'}
                 </div>
               )}
 
@@ -734,7 +778,7 @@ export function TaxationSchemeControl() {
                   </thead>
                   <tbody className="divide-y divide-slate-100">
                     {editor.brackets.map((bracket, index) => {
-                      const locked = selectedScheme?.status === 'published';
+                      const locked = Boolean(selectedScheme && selectedScheme.status !== 'draft');
                       return (
                         <tr key={bracket.id}>
                           <td className="px-4 py-3 font-bold text-slate-400">{index + 1}</td>
@@ -794,7 +838,7 @@ export function TaxationSchemeControl() {
                     })}
                   </tbody>
                 </table>
-                {selectedScheme?.status !== 'published' && (
+                {(!selectedScheme || selectedScheme.status === 'draft') && (
                   <div className="border-t border-slate-200 bg-slate-50 px-4 py-3">
                     <button
                       type="button"
@@ -808,7 +852,7 @@ export function TaxationSchemeControl() {
                 )}
               </div>
 
-              {validationErrors.length > 0 && selectedScheme?.status !== 'published' && (
+              {validationErrors.length > 0 && (!selectedScheme || selectedScheme.status === 'draft') && (
                 <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3">
                   {validationErrors.map((message) => (
                     <p key={message} className="text-xs font-semibold text-amber-800">
@@ -851,7 +895,7 @@ export function TaxationSchemeControl() {
                   </div>
                 </div>
 
-                {selectedScheme?.status !== 'published' && (
+                {(!selectedScheme || selectedScheme.status === 'draft') && (
                   <div className="flex flex-wrap justify-end gap-2">
                     <button
                       type="button"

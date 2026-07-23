@@ -2,6 +2,7 @@ export const dynamic = 'force-dynamic';
 
 import { NextRequest } from 'next/server';
 import {
+  ensureTaxationPeriodAvailable,
   getTaxationScheme,
   requireTaxationCaller,
   taxationAdmin,
@@ -14,15 +15,28 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ sch
   try {
     const caller = await requireTaxationCaller(req, 'manage_entities');
     const { schemeId } = await params;
-    const body = (await req.json()) as { name?: string; effectiveMonth?: string };
-    if (!/^\d{4}-\d{2}-01$/.test(body.effectiveMonth ?? '')) {
+    const body = (await req.json()) as {
+      name?: string;
+      effectiveMonth?: string;
+      mode?: 'clone' | 'revision';
+    };
+    const sourceScheme = await getTaxationScheme(schemeId);
+    if (!sourceScheme) throw new TaxationApiError('The source taxation scheme was not found.', 404);
+
+    const isRevision = body.mode === 'revision';
+    if (isRevision && sourceScheme.status !== 'published') {
+      throw new TaxationApiError('Only the currently published scheme can be revised.', 400);
+    }
+    const effectiveMonth = isRevision ? sourceScheme.effectiveFrom : body.effectiveMonth;
+    if (!/^\d{4}-\d{2}-01$/.test(effectiveMonth ?? '')) {
       throw new TaxationApiError('A first-of-month effective date is required.', 400);
     }
+    if (!isRevision) await ensureTaxationPeriodAvailable(effectiveMonth as string);
 
     const { data: newSchemeId, error } = await taxationAdmin.schema('diocese').rpc('clone_progressive_tax_scheme', {
       p_source_scheme_id: schemeId,
       p_name: body.name?.trim() || null,
-      p_effective_month: body.effectiveMonth,
+      p_effective_month: effectiveMonth,
       p_actor_id: caller.profileId,
     });
     if (error || !newSchemeId) {

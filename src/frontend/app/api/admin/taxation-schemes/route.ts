@@ -2,6 +2,7 @@ export const dynamic = 'force-dynamic';
 
 import { NextRequest } from 'next/server';
 import {
+  ensureTaxationPeriodAvailable,
   getTaxationScheme,
   listTaxationSchemes,
   requireTaxationCaller,
@@ -41,7 +42,7 @@ function validateDraftBody(body: DraftBody) {
   });
   return {
     name: body.name.trim(),
-    effectiveMonth: body.effectiveMonth,
+    effectiveMonth: body.effectiveMonth as string,
     brackets,
   };
 }
@@ -59,6 +60,7 @@ export async function POST(req: NextRequest) {
   try {
     const caller = await requireTaxationCaller(req, 'manage_entities');
     const draft = validateDraftBody((await req.json()) as DraftBody);
+    await ensureTaxationPeriodAvailable(draft.effectiveMonth);
     const { data: schemeId, error } = await taxationAdmin.schema('diocese').rpc('save_progressive_tax_draft', {
       p_scheme_id: null,
       p_name: draft.name,

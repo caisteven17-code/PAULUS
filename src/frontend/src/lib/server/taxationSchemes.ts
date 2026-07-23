@@ -8,7 +8,7 @@ type SchemeRow = {
   version: number;
   name: string;
   effective_month: string;
-  status: 'draft' | 'published';
+  status: 'draft' | 'published' | 'superseded';
   created_by: string | null;
   published_by: string | null;
   published_at: string | null;
@@ -30,7 +30,7 @@ export type TaxationSchemeDto = {
   version: number;
   name: string;
   effectiveFrom: string;
-  status: 'draft' | 'published';
+  status: 'draft' | 'published' | 'superseded';
   createdBy: string | null;
   publishedBy: string | null;
   publishedAt: string | null;
@@ -204,6 +204,23 @@ export async function getEffectiveTaxationScheme(
   return (await attachBrackets([data as SchemeRow]))[0] ?? null;
 }
 
+export async function ensureTaxationPeriodAvailable(effectiveMonth: string) {
+  const { data, error } = await supabaseServer
+    .schema('diocese')
+    .from('progressive_tax_schemes')
+    .select('id')
+    .eq('effective_month', effectiveMonth)
+    .in('status', ['draft', 'published'])
+    .limit(1);
+  if (error) throw new TaxationApiError(error.message, 500);
+  if ((data ?? []).length > 0) {
+    throw new TaxationApiError(
+      'A taxation scheme already exists for that effective year or month. Edit the published scheme or choose another effective period.',
+      409,
+    );
+  }
+}
+
 export function taxationErrorResponse(error: unknown) {
   if (error instanceof TaxationApiError) {
     return Response.json({ error: error.message }, { status: error.status });
@@ -219,10 +236,11 @@ export function throwTaxationMutationError(
 ): never {
   if (
     error?.code === '23505' ||
-    error?.message?.includes('progressive_tax_schemes_effective_month_key')
+    error?.message?.includes('progressive_tax_schemes_effective_month_key') ||
+    error?.message?.includes('uq_progressive_tax_schemes')
   ) {
     throw new TaxationApiError(
-      'A taxation scheme already exists for that effective year or month. Choose another effective period.',
+      'A taxation scheme already exists for that effective year or month. Edit the published scheme or choose another effective period.',
       409,
     );
   }
