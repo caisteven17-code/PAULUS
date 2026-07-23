@@ -30,7 +30,7 @@ function validateDraftBody(body: DraftBody) {
   let minimumAmount = 1;
   const brackets = body.brackets.map((bracket, index) => {
     const maximumAmount = Number(bracket.maximumAmount);
-    const rate = Number(bracket.rate);
+    const rate = Math.round((Number(bracket.rate) + Number.EPSILON) * 10000) / 10000;
     if (!Number.isFinite(maximumAmount) || maximumAmount < minimumAmount) {
       throw new TaxationApiError(`Bracket ${index + 1} must end at or above ${minimumAmount.toFixed(2)}.`, 400);
     }

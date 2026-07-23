@@ -89,6 +89,12 @@ const asNumber = (value: unknown, fallback = 0) => {
 };
 
 const roundMoney = (value: number) => Math.round((value + Number.EPSILON) * 100) / 100;
+const roundPercent = (value: number) => Math.round((value + Number.EPSILON) * 100) / 100;
+
+const percentText = (value: number) => {
+  const rounded = roundPercent(value);
+  return Number.isFinite(rounded) ? String(rounded) : '';
+};
 
 const monthValue = (value?: string | null) => {
   if (!value) return '';
@@ -168,7 +174,7 @@ const editorFromScheme = (scheme: TaxScheme): DraftEditor => ({
   brackets: scheme.brackets.map((bracket, index) => ({
     id: bracket.id || `bracket-${index}`,
     maximumAmount: bracket.maximumAmount.toFixed(2),
-    ratePercent: (bracket.rate * 100).toString(),
+    ratePercent: percentText(bracket.rate * 100),
   })),
 });
 
@@ -180,7 +186,7 @@ const initialEditor = (year = currentYear()): DraftEditor => ({
   brackets: INITIAL_BRACKETS.map((bracket, index) => ({
     id: `new-bracket-${index}`,
     maximumAmount: bracket.maximumAmount.toFixed(2),
-    ratePercent: (bracket.rate * 100).toString(),
+    ratePercent: percentText(bracket.rate * 100),
   })),
 });
 
@@ -392,11 +398,12 @@ export function TaxationSchemeControl() {
     let minimum = roundMoney(value.firstMinimum);
     const brackets = value.brackets.map((bracket, index) => {
       const maximum = roundMoney(Number(bracket.maximumAmount));
+      const ratePercent = roundPercent(Number(bracket.ratePercent));
       const result = {
         ordinal: index + 1,
         minimumAmount: minimum,
         maximumAmount: maximum,
-        rate: Number(bracket.ratePercent) / 100,
+        rate: ratePercent / 100,
       };
       minimum = roundMoney(maximum + CENTAVO);
       return result;
@@ -810,9 +817,13 @@ export function TaxationSchemeControl() {
                                 min="0.01"
                                 max="100"
                                 step="0.01"
+                                inputMode="decimal"
                                 value={bracket.ratePercent}
                                 disabled={locked}
                                 onChange={(event) => updateBracket(index, 'ratePercent', event.target.value)}
+                                onBlur={(event) =>
+                                  updateBracket(index, 'ratePercent', percentText(Number(event.target.value)))
+                                }
                                 className="h-10 w-full rounded-lg border border-slate-200 bg-white px-3 pr-8 text-right font-semibold text-slate-900 outline-none focus:border-amber-500 disabled:bg-slate-50 disabled:text-slate-500"
                               />
                               <span className="absolute right-3 top-1/2 -translate-y-1/2 font-bold text-slate-400">
