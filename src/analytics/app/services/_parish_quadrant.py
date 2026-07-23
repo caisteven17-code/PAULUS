@@ -52,25 +52,36 @@ CLUSTER_DESCRIPTIONS = {
 }
 
 
-def compute_features(receipts: np.ndarray, expenses: np.ndarray) -> dict[str, Any]:
+def compute_features(
+    receipts: np.ndarray, expenses: np.ndarray, subsidy: np.ndarray | None = None
+) -> dict[str, Any]:
     """Per-parish quadrant inputs from chronological monthly series.
 
     volatility_index: std of the seasonally-adjusted (STL residual) receipts
     series, divided by average receipts — scale-free, so a ₱50M/mo parish and
-    a ₱500k/mo parish are judged on relative, not absolute, swings.
-    net_margin: mean of monthly (receipts - expenses) / receipts — averaging
-    monthly margins rather than one lump ratio so a single huge month can't
-    mask a chronically negative operating position.
+    a ₱500k/mo parish are judged on relative, not absolute, swings. Computed
+    from the full receipts series (subsidy included) — this measures the
+    overall receipts pattern, not organic self-sufficiency.
+    net_margin: mean of monthly (organic_receipts - expenses) / organic_receipts,
+    where organic_receipts = receipts - subsidy — averaging monthly margins
+    rather than one lump ratio so a single huge month can't mask a
+    chronically negative operating position. Diocese subsidy (account
+    B.3.03) is excluded here so a subsidized parish's margin reflects
+    whether its OWN collections cover its OWN expenses, not whether the
+    subsidy happens to cover the gap — otherwise a parish that only breaks
+    even because of the subsidy reads as "healthy" instead of "supported."
     """
     receipts = np.asarray(receipts, dtype=float)
     expenses = np.asarray(expenses, dtype=float)
+    subsidy = np.asarray(subsidy, dtype=float) if subsidy is not None else np.zeros_like(receipts)
     avg_receipts = float(np.mean(receipts)) if len(receipts) else 0.0
 
     residuals = run_stl_residuals(pd.Series(receipts, index=pd.RangeIndex(len(receipts))))
     residual_std = float(np.std(residuals.values, ddof=0))
     volatility_index = safe_div(residual_std, avg_receipts or 1)
 
-    monthly_margins = [safe_div(r - e, r) for r, e in zip(receipts, expenses) if r > 0]
+    organic_receipts = receipts - subsidy
+    monthly_margins = [safe_div(r - e, r) for r, e in zip(organic_receipts, expenses) if r > 0]
     net_margin = float(np.mean(monthly_margins)) if monthly_margins else (0.0 if avg_receipts > 0 else -1.0)
 
     return {

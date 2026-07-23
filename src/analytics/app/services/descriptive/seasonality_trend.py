@@ -177,7 +177,10 @@ _AWS_SEASONALITY_SQL = """
            SUM(COALESCE(f.liturgical_simbang_gabi_days_count, 0))::float8 AS simbang_gabi_days_count,
            SUM(COALESCE(f.liturgical_lent_days_count, 0))::float8 AS lent_days_count,
            SUM(COALESCE(f.liturgical_easter_days_count, 0))::float8 AS easter_days_count,
-           SUM(COALESCE(f.liturgical_ordinary_time_days_count, 0))::float8 AS ordinary_time_days_count
+           SUM(COALESCE(f.liturgical_ordinary_time_days_count, 0))::float8 AS ordinary_time_days_count,
+           SUM(COALESCE(f.liturgical_advent_days_count, 0))::float8 AS advent_days_count,
+           SUM(COALESCE(f.liturgical_feasts_count, 0))::float8 AS feasts_count,
+           SUM(COALESCE(f.liturgical_memorials_count, 0))::float8 AS memorials_count
     FROM parish_analytics.vw_parish_monthly_financials_liturgical f
     JOIN parish_analytics.dim_parishes dp ON dp.parish_key = f.parish_key
     JOIN shared_analytics.dim_institutions di ON di.institution_key = dp.institution_key
@@ -186,15 +189,25 @@ _AWS_SEASONALITY_SQL = """
     ORDER BY f.date_key
 """
 
+# "season" events are mutually exclusive — every month falls into exactly one
+# (sourced from the view's liturgical_season-derived day counts). "day_type"
+# events are rank/day-of-week flags that can occur *within* any season above
+# (e.g. December is both "Christmas" season and, for its last 9 days,
+# "Simbang Gabi") — the two groups measure different axes of the same
+# months, not competing totals, so the frontend must not present them as one
+# flat ranked list (that would look like double-counting).
 _AWS_EVENT_DEFINITIONS = [
-    ("Christmas", ["christmas_days_count"]),
-    ("Simbang Gabi", ["simbang_gabi_days_count"]),
-    ("Holy Week", ["holy_week_days_count"]),
-    ("Lent", ["lent_days_count"]),
-    ("Easter", ["easter_days_count"]),
-    ("Major Celebrations", ["major_celebration_days_count", "solemnities_count"]),
-    ("Sundays", ["sundays_count"]),
-    ("Ordinary Time", ["ordinary_time_days_count"]),
+    ("Christmas", ["christmas_days_count"], "season"),
+    ("Advent", ["advent_days_count"], "season"),
+    ("Lent", ["lent_days_count"], "season"),
+    ("Easter", ["easter_days_count"], "season"),
+    ("Ordinary Time", ["ordinary_time_days_count"], "season"),
+    ("Simbang Gabi", ["simbang_gabi_days_count"], "day_type"),
+    ("Holy Week", ["holy_week_days_count"], "day_type"),
+    ("Major Celebrations", ["major_celebration_days_count", "solemnities_count"], "day_type"),
+    ("Feasts", ["feasts_count"], "day_type"),
+    ("Memorials", ["memorials_count"], "day_type"),
+    ("Sundays", ["sundays_count"], "day_type"),
 ]
 
 
@@ -244,7 +257,7 @@ def _fetch_and_process_aws_parish(institution_id: str, year: int | None) -> dict
     ]
 
     event_averages = []
-    for event_name, cols in _AWS_EVENT_DEFINITIONS:
+    for event_name, cols, event_group in _AWS_EVENT_DEFINITIONS:
         mask = pd.Series(False, index=df.index)
         for col in cols:
             if col in df.columns:
@@ -256,6 +269,7 @@ def _fetch_and_process_aws_parish(institution_id: str, year: int | None) -> dict
         event_averages.append(
             {
                 "event_name": event_name,
+                "event_group": event_group,
                 "avg_collection": round(avg_c, 2),
                 "vs_baseline_pct": round(safe_div(avg_c - baseline, baseline) * 100, 2),
             }

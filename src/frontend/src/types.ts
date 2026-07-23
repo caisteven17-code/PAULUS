@@ -44,6 +44,41 @@ export interface FinancialRecord {
   entityClass?: EntityClass;
 }
 
+export interface IAFRAccountLine {
+  code: string;
+  name: string;
+  receipts: number;
+  expenses: number;
+  total: number;
+}
+
+export interface IAFRSubsectionBreakdown {
+  code: string;
+  name: string;
+  accounts: IAFRAccountLine[];
+  receipts: number;
+  expenses: number;
+  total: number;
+}
+
+export interface IAFRSectionBreakdown {
+  code: string;
+  name: string;
+  subsections: IAFRSubsectionBreakdown[];
+  receipts: number;
+  expenses: number;
+  total: number;
+}
+
+export interface IAFRBreakdownReport {
+  data_sufficient: boolean;
+  entity_id: string;
+  year: number | null;
+  sections: IAFRSectionBreakdown[];
+  grand_total: { receipts: number; expenses: number; total: number };
+  timestamp: string;
+}
+
 export interface Parish {
   id: string;
   name: string;

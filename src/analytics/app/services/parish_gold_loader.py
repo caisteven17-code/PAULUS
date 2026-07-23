@@ -20,6 +20,24 @@ _PIPELINE_NAME = "parish_gold_phase_5e"
 _FORMULA_VERSION = "parish_monthly_v4"
 _DEFAULT_PILOT_INSTITUTION_ID = "aec32176-c296-4928-880f-180985f9a376"
 
+# Postgres advisory lock, shared by every load()/refresh_incremental() call —
+# from this process, a teammate's separate machine, or a scheduled job. Only
+# one of these expensive gold_load_scope computations may run at a time,
+# database-wide; a second overlapping invocation skips instead of piling on
+# a duplicate 30s+ query. Transaction-scoped (pg_try_advisory_xact_lock), so
+# it releases automatically at commit/rollback — it can never be left stuck
+# even if the owning process is killed outright, unlike a manual lock/unlock
+# pair. Observed live: 3 concurrent copies of this exact query, each held
+# for 30-90+ seconds, exhausting the warehouse read pool for every other
+# request while they ran.
+_GOLD_LOAD_LOCK_KEY = 8234509127
+
+
+class _LoadAlreadyRunning(Exception):
+    """Raised internally when the advisory lock is already held elsewhere —
+    caught separately from real failures so a skipped run is recorded as
+    'skipped', not 'failed'."""
+
 
 @dataclass(frozen=True)
 class Check:
@@ -456,6 +474,9 @@ def load(mode: str, institution_ids: list[str] | None = None) -> dict[str, Any]:
         with analytics_db.get_etl_pool().connection() as conn:
             with conn.transaction():
                 with conn.cursor(row_factory=dict_row) as cur:
+                    cur.execute("SELECT pg_try_advisory_xact_lock(%s) AS locked", (_GOLD_LOAD_LOCK_KEY,))
+                    if not cur.fetchone()["locked"]:
+                        raise _LoadAlreadyRunning()
                     candidate_count = _create_scope(cur, institution_ids)
                     if candidate_count == 0:
                         raise RuntimeError("Approved Gold load scope contains no candidates")
@@ -486,6 +507,13 @@ def load(mode: str, institution_ids: list[str] | None = None) -> dict[str, Any]:
             "breakdown_facts_loaded": breakdown_loaded,
             "checks": [check.__dict__ for check in checks],
         }
+    except _LoadAlreadyRunning:
+        # Not a failure — status must be one of the DB's allowed values
+        # (running/succeeded/partial/failed; there's no 'skipped'), and
+        # nothing here actually went wrong, so 'succeeded' with zero counts
+        # plus an explanatory error_summary is the most honest fit.
+        _finish_run(run_id, status="succeeded", error_summary="Skipped: another gold load was already running.")
+        return {"run_id": run_id, "mode": mode, "status": "skipped", "reason": "another gold load already running"}
     except Exception as exc:
         message = str(exc)
         _record_failure(run_id, message)
@@ -518,6 +546,9 @@ def refresh_incremental(record_id: str, grains: list[tuple[int, int]]) -> dict[s
             with analytics_db.get_etl_pool().connection() as conn:
                 with conn.transaction():
                     with conn.cursor(row_factory=dict_row) as cur:
+                        cur.execute("SELECT pg_try_advisory_xact_lock(%s) AS locked", (_GOLD_LOAD_LOCK_KEY,))
+                        if not cur.fetchone()["locked"]:
+                            raise _LoadAlreadyRunning()
                         candidate_count = _create_grain_scope(cur, normalized_grains)
                         checks = _preflight(cur)
                         failures = [check for check in checks if check.status == "failed"]
@@ -551,6 +582,14 @@ def refresh_incremental(record_id: str, grains: list[tuple[int, int]]) -> dict[s
             "monthly_facts_loaded": monthly_loaded,
             "breakdown_facts_loaded": breakdown_loaded,
             "checks": [check.__dict__ for check in checks],
+        }
+    except _LoadAlreadyRunning:
+        _finish_run(run_id, status="succeeded", error_summary="Skipped: another gold load was already running.")
+        return {
+            "run_id": run_id,
+            "mode": "incremental",
+            "status": "skipped",
+            "reason": "another gold load already running",
         }
     except Exception as exc:
         message = str(exc)

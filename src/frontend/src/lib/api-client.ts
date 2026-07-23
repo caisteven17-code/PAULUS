@@ -14,6 +14,7 @@ import type {
   Project,
   Donation,
   ProjectExpense,
+  IAFRBreakdownReport,
 } from '../types';
 import { auth } from '../firebase';
 import { supabaseBrowser } from './supabase';
@@ -369,6 +370,23 @@ export const apiClient = {
       year: params?.year ? String(params.year) : undefined,
       section_code: params?.sectionCode,
       subsection_code: params?.subsectionCode,
+      vicariates: params?.vicariates?.length ? params.vicariates.join(',') : undefined,
+      institution_ids: params?.institutionIds?.length ? params.institutionIds.join(',') : undefined,
+    }),
+
+  // Full IAFR report tree (all sections/subsections/accounts, with
+  // subtotals) in one round trip — the report-table counterpart of
+  // getFinancialBreakdown, which only returns one drill level at a time.
+  getFinancialBreakdownReport: (
+    institutionId: string,
+    params?: {
+      year?: number | null;
+      vicariates?: string[];
+      institutionIds?: string[];
+    },
+  ): Promise<IAFRBreakdownReport> =>
+    get(`/api/analytics/descriptive/financial-breakdown-report/${institutionId}`, {
+      year: params?.year ? String(params.year) : undefined,
       vicariates: params?.vicariates?.length ? params.vicariates.join(',') : undefined,
       institution_ids: params?.institutionIds?.length ? params.institutionIds.join(',') : undefined,
     }),

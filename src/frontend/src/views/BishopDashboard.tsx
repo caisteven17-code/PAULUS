@@ -54,6 +54,7 @@ import { motion, AnimatePresence } from 'motion/react';
 import { formatCurrency, formatNumber } from '../lib/format';
 import SeminaryAnalyticsDashboard from '../components/analytics/SeminaryAnalyticsDashboard';
 import { DataImportExport } from '../components/projects/DataImportExport';
+import { IAFRBreakdownReport } from '../components/financial/IAFRBreakdownReport';
 
 const topTierParishesData = [
   { rank: 1, name: 'St. John Paul II Parish', location: 'SAN PABLO', class: 'Class A' },
@@ -1468,6 +1469,11 @@ export function BishopDashboard({
   }, [entityType, realEntities]);
 
   const [sortConfig, setSortConfig] = useState<{ key: string; direction: 'asc' | 'desc' } | null>(null);
+  // Trend Monitor direction filter — defaults to showing every entity (the
+  // "general monitor" framing) rather than pre-filtering to decliners, so
+  // the table isn't empty on load whenever nothing happens to be declining.
+  const [trendDirectionFilter, setTrendDirectionFilter] = useState<'down' | 'up' | 'all'>('all');
+  const [showFullEventBreakdown, setShowFullEventBreakdown] = useState(false);
   const [districtFilter, setDistrictFilter] = useState('All Districts');
   const [vicariateFilter, setVicariateFilter] = useState('All Vicariates');
   const [classFilter, setClassFilter] = useState('All Classes');
@@ -1476,13 +1482,12 @@ export function BishopDashboard({
   const [contributionView, setContributionView] = useState<'entity' | 'vicariate'>('vicariate');
   const [selectedVicariate, setSelectedVicariate] = useState<string | null>(null);
   const [selectedBarVicariate, setSelectedBarVicariate] = useState<string | null>(null);
-  // Deep drill-down (Parishes only): Vicariate → Parish → IAFR Section →
-  // Subsection → individual Account, backed by the AWS breakdown fact table.
-  // Levels below Parish are fetched on demand via getFinancialBreakdown.
+  // Drill-down (Parishes only): Vicariate → Parish. Selecting a parish shows
+  // its full IAFR report (IAFRBreakdownReport) instead of drilling further
+  // into the chart — the report already shows every Section → Subsection →
+  // Account with subtotals at once, so a level-at-a-time chart below Parish
+  // would just duplicate the same numbers in a second projection.
   const [drillParish, setDrillParish] = useState<{ id: string; name: string } | null>(null);
-  const [drillSection, setDrillSection] = useState<{ code: string; label: string } | null>(null);
-  const [drillSubsection, setDrillSubsection] = useState<{ code: string; label: string } | null>(null);
-  const [drillBreakdown, setDrillBreakdown] = useState<any | null>(null);
   const [isDrillLoading, setIsDrillLoading] = useState(false);
   // Collections/Disbursement Breakdown legend hover preview (Item 8) —
   // separate from the drill-down state above. hoveredLegendKey drives a
@@ -1634,9 +1639,12 @@ export function BishopDashboard({
       setIsDescriptiveLoading(false);
       return;
     }
+    // No `year` here — the getFinancialTrend call below is always full,
+    // unscoped history (see its own comment), so caching it per-year would
+    // just cause a redundant re-fetch of identical data on every Year
+    // filter change instead of reusing what's already cached.
     const requestKey = JSON.stringify({
       institutionId,
-      year,
       vicariates: vicariates ? [...vicariates].sort() : [],
       institutionIds: institutionIds ? [...institutionIds].sort() : [],
     });
@@ -1659,8 +1667,8 @@ export function BishopDashboard({
           'parish',
           institutionId,
           institutionIds
-            ? { year, timeframe: 'all', institutionIds }
-            : { year, timeframe: 'all', vicariates },
+            ? { timeframe: 'all', institutionIds }
+            : { timeframe: 'all', vicariates },
         )
         .then((res: any) => {
           if (cancelled) return;
@@ -1888,20 +1896,9 @@ export function BishopDashboard({
   }, [currentEntities, districtFilter, vicariateFilter, classFilter, entityFilter, entityType]);
 
   const barChartData = useMemo(() => {
-    // Drill levels below Parish come from the IAFR breakdown endpoint —
-    // single source, receipts/expenses split per row (section E genuinely
-    // mixes both directions, so a lone total would mislead).
-    if (entityType === 'Parishes' && drillParish) {
-      const items = drillBreakdown?.items ?? [];
-      return items.map((item: any) => ({
-        name: item.label,
-        key: item.key,
-        collections: Number(item.receipts ?? 0),
-        disbursements: Number(item.expenses ?? 0),
-        isBreakdown: true,
-      }));
-    }
-
+    // Only Vicariate → Parish levels feed this chart now — once a parish is
+    // selected (drillParish), the full IAFR report table replaces the chart
+    // entirely, so there's no "below Parish" level for this to compute.
     if (entityType === 'Parishes' && apiParishFinancialTrend) {
       const rows = selectedBarVicariate
         ? apiParishFinancialTrend.parish_totals
@@ -1966,7 +1963,7 @@ export function BishopDashboard({
         isVicariate: true,
       }))
       .sort((a, b) => b.collections - a.collections);
-  }, [filteredEntities, selectedBarVicariate, entityType, apiParishFinancialTrend, drillParish, drillBreakdown]);
+  }, [filteredEntities, selectedBarVicariate, entityType, apiParishFinancialTrend]);
 
   // Adaptive value scaling for the entity/drill bar chart: vicariate totals
   // are tens of millions, but a deep account-level drill can be a few
@@ -1989,41 +1986,7 @@ export function BishopDashboard({
   useEffect(() => {
     setSelectedBarVicariate(null);
     setDrillParish(null);
-    setDrillSection(null);
-    setDrillSubsection(null);
-    setDrillBreakdown(null);
   }, [entityType]);
-
-  // Fetch the IAFR breakdown for the current drill level. Respects the Year
-  // filter (same convention as the rest of the descriptive tier): "All
-  // Years" aggregates the parish's full history.
-  useEffect(() => {
-    if (entityType !== 'Parishes' || !drillParish) {
-      setDrillBreakdown(null);
-      return;
-    }
-    let cancelled = false;
-    setIsDrillLoading(true);
-    apiClient
-      .getFinancialBreakdown(drillParish.id, {
-        year,
-        sectionCode: drillSection?.code,
-        subsectionCode: drillSubsection?.code,
-      })
-      .then((res: any) => {
-        if (cancelled) return;
-        setDrillBreakdown(res?.data_sufficient !== false && Array.isArray(res?.items) ? res : null);
-      })
-      .catch(() => {
-        if (!cancelled) setDrillBreakdown(null);
-      })
-      .finally(() => {
-        if (!cancelled) setIsDrillLoading(false);
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [entityType, drillParish, drillSection, drillSubsection, year]);
 
   // Reset the legend hover/pin cache whenever the underlying scope changes so
   // a stale preview or pinned value from a different Vicariate/Class/parish
@@ -2109,6 +2072,14 @@ export function BishopDashboard({
             )}
           </li>
         </ul>
+        {showValues && (
+          <div className="flex items-center justify-between gap-3 text-[11px] font-bold border-t border-gray-100 mt-2 pt-2">
+            <span className="text-church-black">Total</span>
+            <span className="text-church-green whitespace-nowrap">
+              {formatCurrency(sacramentsBreakdownTotals.parishShare + sacramentsBreakdownTotals.overAbove)}
+            </span>
+          </div>
+        )}
         {showValues ? (
           <p className="text-[10px] text-gray-400 leading-snug mt-2">
             Parish Share is net of the diocese/bishop&apos;s-fund share; not broken down further by sacrament type
@@ -2151,6 +2122,14 @@ export function BishopDashboard({
               </li>
             ))}
           </ul>
+        )}
+        {showValues && Array.isArray(data?.items) && data.items.length > 0 && (
+          <div className="flex items-center justify-between gap-3 text-[11px] font-bold border-t border-gray-100 mt-2 pt-2">
+            <span className="text-church-black">Total</span>
+            <span className="text-church-green whitespace-nowrap">
+              {formatCurrency(data.items.reduce((sum: number, item: any) => sum + (item[amountField] ?? 0), 0))}
+            </span>
+          </div>
         )}
         {Array.isArray(data?.items) && data.items.length > 0 && !showValues && (
           <p className="text-[10px] text-gray-400 mt-2">Click to see amounts.</p>
@@ -2234,6 +2213,24 @@ export function BishopDashboard({
     return [...events]
       .sort((a: any, b: any) => Number(b.vs_baseline_pct ?? 0) - Number(a.vs_baseline_pct ?? 0))
       .slice(0, 3);
+  }, [apiParishSeasonality]);
+
+  // Full liturgical event breakdown (all 11, not just the top-3 headline
+  // above), split into the two classification axes the backend tags each
+  // event with: "season" (mutually exclusive — every month is exactly one)
+  // vs. "day_type" (rank/day-of-week flags that can co-occur with any
+  // season, e.g. Simbang Gabi falls within the Christmas/Advent season).
+  // Showing them ungrouped would look like double-counting the same months.
+  const parishSeasonalityGrouped = useMemo(() => {
+    const events = apiParishSeasonality?.event_averages;
+    if (!Array.isArray(events) || events.length === 0) return { seasons: [], dayTypes: [] };
+    const sorted = [...events].sort(
+      (a: any, b: any) => Number(b.vs_baseline_pct ?? 0) - Number(a.vs_baseline_pct ?? 0),
+    );
+    return {
+      seasons: sorted.filter((e: any) => e.event_group === 'season'),
+      dayTypes: sorted.filter((e: any) => e.event_group !== 'season'),
+    };
   }, [apiParishSeasonality]);
 
   // Latest-month figures for the 3 top KPI tiles, read from the same
@@ -2436,7 +2433,8 @@ export function BishopDashboard({
           entityType === 'Seminaries' || vicariateFilter === 'All Vicariates' || p.vicariate === vicariateFilter;
         const cMatch = classFilter === 'All Classes' || p.class === classFilter;
         const pMatch = entityFilter === 'All Entities' || p.name === entityFilter;
-        return dMatch && vMatch && cMatch && pMatch;
+        const tMatch = trendDirectionFilter === 'all' || p.type === trendDirectionFilter;
+        return dMatch && vMatch && cMatch && pMatch && tMatch;
       });
     if (sortConfig) {
       data.sort((a: any, b: any) => {
@@ -2446,7 +2444,16 @@ export function BishopDashboard({
       });
     }
     return data;
-  }, [liveDeclineData, districtFilter, vicariateFilter, classFilter, entityFilter, sortConfig, entityType]);
+  }, [
+    liveDeclineData,
+    districtFilter,
+    vicariateFilter,
+    classFilter,
+    entityFilter,
+    trendDirectionFilter,
+    sortConfig,
+    entityType,
+  ]);
 
   const handleSort = (key: string) => {
     setSortConfig((prev) =>
@@ -3981,22 +3988,16 @@ export function BishopDashboard({
                               <button
                                 onClick={() => {
                                   // Pop one level, deepest first — not clear-to-root.
-                                  if (drillSubsection) setDrillSubsection(null);
-                                  else if (drillSection) setDrillSection(null);
-                                  else if (drillParish) setDrillParish(null);
+                                  if (drillParish) setDrillParish(null);
                                   else setSelectedBarVicariate(null);
                                 }}
                                 className="p-2 hover:bg-gray-100 rounded-full transition-colors"
                                 title={
-                                  drillSubsection
-                                    ? 'Back to Subsections'
-                                    : drillSection
-                                      ? 'Back to Sections'
-                                      : drillParish
-                                        ? 'Back to Parishes'
-                                        : entityType === 'Diocesan Schools'
-                                          ? 'Back to Clusters'
-                                          : 'Back to Vicariates'
+                                  drillParish
+                                    ? 'Back to Parishes'
+                                    : entityType === 'Diocesan Schools'
+                                      ? 'Back to Clusters'
+                                      : 'Back to Vicariates'
                                 }
                               >
                                 <svg
@@ -4016,63 +4017,53 @@ export function BishopDashboard({
                             <div>
                               <div className="flex items-center gap-2">
                                 <h3 className="text-3xl font-extrabold text-gray-900 uppercase tracking-tight">
-                                  {drillSubsection
-                                    ? `${drillParish?.name} — ${drillSubsection.label}`
-                                    : drillSection
-                                      ? `${drillParish?.name} — ${drillSection.label}`
-                                      : drillParish
-                                        ? `IAFR Breakdown for ${drillParish.name}`
-                                        : selectedBarVicariate
-                                          ? `COLLECTIONS / RECEIPTS & DISBURSEMENTS IN ${selectedBarVicariate}`
-                                          : `COLLECTIONS / RECEIPTS & DISBURSEMENTS BY ${entityType === 'Parishes' ? 'VICARIATE' : entityType === 'Seminaries' ? 'SEMINARY' : 'CLUSTER'}`}
+                                  {drillParish
+                                    ? `IAFR Report for ${drillParish.name}`
+                                    : selectedBarVicariate
+                                      ? `COLLECTIONS / RECEIPTS & DISBURSEMENTS IN ${entityType === 'Diocesan Schools' ? 'CLUSTER' : 'VICARIATE'} OF ${selectedBarVicariate}`
+                                      : `COLLECTIONS / RECEIPTS & DISBURSEMENTS BY ${entityType === 'Parishes' ? 'VICARIATE' : entityType === 'Seminaries' ? 'SEMINARY' : 'CLUSTER'}`}
                                 </h3>
-                                {entityType === 'Parishes' && (
+                                {entityType === 'Parishes' && !drillParish && (
                                   <ChartHelpToggle>
-                                    Click a bar to drill deeper: Vicariate → Parish → IAFR Section → Subsection →
-                                    individual Account. Each level shows that level&apos;s Receipts/Disbursements
-                                    split, sourced from the diocese&apos;s own IAFR report structure — the same
-                                    sections (A–F) used in the printed financial report. Use the back arrow to go up
-                                    one level at a time.
+                                    Click a bar to drill deeper: Vicariate → Parish. Selecting a parish shows its full
+                                    IAFR report — every Section, Subsection, and Account with subtotals, sourced from
+                                    the diocese&apos;s own IAFR report structure, matching the printed financial
+                                    report. Use the back arrow to go up one level at a time.
                                   </ChartHelpToggle>
                                 )}
                               </div>
                               {(selectedBarVicariate || drillParish) && (
                                 <p className="text-sm text-gray-500 font-medium mt-1">
-                                  {drillSubsection
-                                    ? 'Individual IAFR accounts'
-                                    : drillSection
-                                      ? 'Subsections — click a bar to see individual accounts'
-                                      : drillParish
-                                        ? 'IAFR sections — click a bar to drill deeper'
-                                        : entityType === 'Parishes'
-                                          ? 'Detailed Parish Breakdown — click a parish for its IAFR breakdown'
-                                          : 'Detailed Breakdown'}
+                                  {drillParish
+                                    ? 'Full IAFR report below — every section, subsection, and account with subtotals'
+                                    : entityType === 'Parishes'
+                                      ? 'Detailed Parish Breakdown — click a parish for its IAFR report'
+                                      : 'Detailed Breakdown'}
                                 </p>
                               )}
                             </div>
                           </div>
-                          <div className="flex items-center gap-4">
-                            <select
-                              value={collectionsDisbursementsFilter}
-                              onChange={(e) => setCollectionsDisbursementsFilter(e.target.value as any)}
-                              className="bg-gray-100 border-none text-[10px] font-bold text-church-green rounded-lg px-3 py-2 outline-none cursor-pointer hover:bg-gray-200 transition-colors"
-                            >
-                              <option value="all">ALL CATEGORIES</option>
-                              <option value="collections">COLLECTIONS</option>
-                              <option value="disbursements">DISBURSEMENTS</option>
-                            </select>
-                          </div>
+                          {!drillParish && (
+                            <div className="flex items-center gap-4">
+                              <select
+                                value={collectionsDisbursementsFilter}
+                                onChange={(e) => setCollectionsDisbursementsFilter(e.target.value as any)}
+                                className="bg-gray-100 border-none text-[10px] font-bold text-church-green rounded-lg px-3 py-2 outline-none cursor-pointer hover:bg-gray-200 transition-colors"
+                              >
+                                <option value="all">ALL CATEGORIES</option>
+                                <option value="collections">COLLECTIONS</option>
+                                <option value="disbursements">DISBURSEMENTS</option>
+                              </select>
+                            </div>
+                          )}
                         </CardHeader>
                         <CardContent className="mt-4 px-8 pb-4">
-                          {entityType === 'Parishes' && barChartData.length === 0 && !drillParish && (
+                          {!drillParish && (
+                            <>
+                          {entityType === 'Parishes' && barChartData.length === 0 && (
                             <p className="text-sm text-gray-400 text-center py-8">
                               Per-vicariate breakdown isn't available once already scoped to a specific Vicariate,
                               District, or Class — reset those filters to "All" to see this chart.
-                            </p>
-                          )}
-                          {entityType === 'Parishes' && drillParish && !isDrillLoading && barChartData.length === 0 && (
-                            <p className="text-sm text-gray-400 text-center py-8">
-                              No IAFR breakdown records for this selection in the chosen period.
                             </p>
                           )}
                           <div className="relative h-[400px] w-full mt-4">
@@ -4182,15 +4173,7 @@ export function BishopDashboard({
                                 click: (params: any) => {
                                   const item: any = barChartData[params.dataIndex];
                                   if (!item || entityType === 'Seminaries') return;
-                                  if (drillSubsection) return; // account level — deepest
-                                  if (drillSection) {
-                                    setDrillSubsection({ code: item.key, label: item.name });
-                                    return;
-                                  }
-                                  if (drillParish) {
-                                    setDrillSection({ code: item.key, label: item.name });
-                                    return;
-                                  }
+                                  if (drillParish) return; // parish level — chart hidden, no deeper level here
                                   if (selectedBarVicariate) {
                                     // Parish bar → IAFR breakdown (needs the parish UUID;
                                     // Diocesan Schools has no AWS breakdown data)
@@ -4208,21 +4191,15 @@ export function BishopDashboard({
                           </div>
                           {/* Axis label above the legend — same order as every other chart */}
                           <div className="text-center mt-2 text-[11px] font-bold text-gray-400 uppercase tracking-[0.4em]">
-                            {drillSubsection
-                              ? 'Account'
-                              : drillSection
-                                ? 'Subsection'
-                                : drillParish
-                                  ? 'IAFR Section'
-                                  : selectedBarVicariate
-                                    ? entityType === 'Diocesan Schools'
-                                      ? 'School'
-                                      : 'Parish'
-                                    : entityType === 'Parishes'
-                                      ? 'Vicariate'
-                                      : entityType === 'Seminaries'
-                                        ? 'Seminary'
-                                        : 'Cluster'}
+                            {selectedBarVicariate
+                              ? entityType === 'Diocesan Schools'
+                                ? 'School'
+                                : 'Parish'
+                              : entityType === 'Parishes'
+                                ? 'Vicariate'
+                                : entityType === 'Seminaries'
+                                  ? 'Seminary'
+                                  : 'Cluster'}
                           </div>
                           <div className="flex items-center gap-6 justify-center mt-4">
                             <div
@@ -4258,6 +4235,17 @@ export function BishopDashboard({
                                 renderVicariateCategoryPopover('disbursements')}
                             </div>
                           </div>
+                            </>
+                          )}
+
+                          {entityType === 'Parishes' && drillParish && (
+                            <IAFRBreakdownReport
+                              hideHeader
+                              institutionId={drillParish.id}
+                              institutionName={drillParish.name}
+                              year={year}
+                            />
+                          )}
                         </CardContent>
                       </Card>
                     )}
@@ -4297,12 +4285,13 @@ export function BishopDashboard({
                           onTouchEnd={handleTrendTouchEnd}
                         >
                           {renderChartLoadingOverlay()}
-                          {renderSixMonthPager()}
                           <div className="w-6 flex-shrink-0 flex items-center justify-center h-full">
                             <span className="text-[10px] font-bold text-gray-400 uppercase tracking-[0.2em] -rotate-90 whitespace-nowrap">
                               Amount (Millions)
                             </span>
                           </div>
+                          <div className="relative flex-1 h-full">
+                          {renderSixMonthPager()}
                           <ReactECharts
                             option={{
                               color: ['#6366f1', '#8b5cf6', '#06b6d4', '#10b981', '#f59e0b', '#ef4444'],
@@ -4415,6 +4404,7 @@ export function BishopDashboard({
                             }}
                             style={{ height: '100%', width: '100%' }}
                           />
+                          </div>
                         </div>
                         <div className="relative text-center mt-2 text-[10px] font-bold text-gray-400 uppercase tracking-[0.3em]">
                           Month
@@ -4529,12 +4519,13 @@ export function BishopDashboard({
                             onTouchEnd={handleTrendTouchEnd}
                           >
                             {renderChartLoadingOverlay()}
-                            {renderSixMonthPager()}
                             <div className="w-6 flex-shrink-0 flex items-center justify-center h-full">
                               <span className="text-[10px] font-bold text-gray-400 uppercase tracking-[0.2em] -rotate-90 whitespace-nowrap">
                                 Amount (Millions)
                               </span>
                             </div>
+                            <div className="relative flex-1 h-full">
+                            {renderSixMonthPager()}
                             <ReactECharts
                               option={{
                                 color: ['#6366f1', '#8b5cf6', '#06b6d4', '#10b981', '#f59e0b', '#ef4444'],
@@ -4605,6 +4596,7 @@ export function BishopDashboard({
                               }}
                               style={{ height: '100%', width: '100%' }}
                             />
+                            </div>
                           </div>
                           <div className="relative text-center mt-2 text-[10px] font-bold text-gray-400 uppercase tracking-[0.3em]">
                             Month
@@ -4725,16 +4717,31 @@ export function BishopDashboard({
                   </>
                 )}
 
-                {/* Row 2: Monthly Collections Decline Monitor */}
+                {/* Row 2: Monthly Collections Trend Monitor */}
                 <Card className="border-none shadow-sm">
-                  <CardHeader>
-                    <div className="flex items-center gap-2">
-                      <AlertTriangle className="w-6 h-6 text-orange-500" />
-                      <h3 className="text-2xl font-bold text-church-green">Monthly Collections Decline Monitor</h3>
+                  <CardHeader className="flex flex-row items-start justify-between gap-4 space-y-0">
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <AlertTriangle className="w-6 h-6 text-orange-500" />
+                        <h3 className="text-2xl font-bold text-church-green">Monthly Collections Trend Monitor</h3>
+                      </div>
+                      <p className="text-sm text-gray-400 mt-1">
+                        {trendDirectionFilter === 'down'
+                          ? 'Flags entities with continuously decreasing collections over the past 4 months.'
+                          : trendDirectionFilter === 'up'
+                            ? 'Flags entities with continuously increasing collections over the past 4 months.'
+                            : "Tracks every entity's collections trend over the past 4 months."}
+                      </p>
                     </div>
-                    <p className="text-sm text-gray-400 mt-1">
-                      Flags entities with continuously decreasing collections over the past 4 months.
-                    </p>
+                    <select
+                      value={trendDirectionFilter}
+                      onChange={(e) => setTrendDirectionFilter(e.target.value as 'down' | 'up' | 'all')}
+                      className="bg-gray-100 border-none text-[10px] font-bold text-church-green rounded-lg px-3 py-2 outline-none cursor-pointer hover:bg-gray-200 transition-colors flex-shrink-0"
+                    >
+                      <option value="all">ALL TRENDS</option>
+                      <option value="down">DECLINING</option>
+                      <option value="up">INCREASING</option>
+                    </select>
                   </CardHeader>
                   <CardContent className="mt-4">
                     <div className="overflow-x-auto max-h-[350px] overflow-y-auto scrollbar-thin scrollbar-thumb-gray-200 scrollbar-track-transparent">
@@ -4837,7 +4844,13 @@ export function BishopDashboard({
                           {filteredDeclineData.length === 0 ? (
                             <tr>
                               <td colSpan={7} className="px-4 py-8 text-center text-gray-400 text-sm">
-                                Awaiting monthly submission data.
+                                {liveDeclineData.length === 0
+                                  ? 'Awaiting monthly submission data.'
+                                  : trendDirectionFilter === 'down'
+                                    ? 'No entities are currently declining.'
+                                    : trendDirectionFilter === 'up'
+                                      ? 'No entities are currently increasing.'
+                                      : 'No entities match the current filters.'}
                               </td>
                             </tr>
                           ) : (
@@ -4873,8 +4886,11 @@ export function BishopDashboard({
                     <div className="mt-6 p-4 border border-gray-200 rounded-xl bg-gray-50/50">
                       <p className="text-sm font-bold text-church-black/80">Interpretation:</p>
                       <p className="text-sm text-gray-400 mt-1">
-                        Entities with a sustained decline may require pastoral outreach, targeted fundraising or expense
-                        controls to prevent deficit months.
+                        {trendDirectionFilter === 'up'
+                          ? 'Entities with sustained growth may indicate pastoral or fundraising initiatives worth replicating elsewhere.'
+                          : trendDirectionFilter === 'all'
+                            ? 'Green entities are trending up, orange entities are trending down — sustained declines may require pastoral outreach, targeted fundraising, or expense controls to prevent deficit months.'
+                            : 'Entities with a sustained decline may require pastoral outreach, targeted fundraising or expense controls to prevent deficit months.'}
                       </p>
                     </div>
                   </CardContent>
@@ -5135,6 +5151,67 @@ export function BishopDashboard({
                         </>
                       )}
                     </div>
+
+                    {entityType !== 'Seminaries' &&
+                      (parishSeasonalityGrouped.seasons.length > 0 || parishSeasonalityGrouped.dayTypes.length > 0) && (
+                        <div className="mt-6 border-t border-white/10 pt-4">
+                          <button
+                            type="button"
+                            onClick={() => setShowFullEventBreakdown((v) => !v)}
+                            className="text-[10px] font-bold text-gold-500 uppercase tracking-widest hover:text-gold-400 transition-colors"
+                          >
+                            {showFullEventBreakdown ? 'Hide full liturgical breakdown ▲' : 'See full liturgical breakdown ▼'}
+                          </button>
+                          {showFullEventBreakdown && (
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mt-4">
+                              <div>
+                                <p className="text-[10px] font-black text-gray-500 uppercase tracking-[0.2em] mb-2">
+                                  Liturgical Seasons
+                                </p>
+                                <ul className="space-y-1.5">
+                                  {parishSeasonalityGrouped.seasons.map((event: any, index: number) => {
+                                    const pct = Number(event.vs_baseline_pct ?? 0);
+                                    return (
+                                      <li
+                                        key={`season-${event.event_name}-${index}`}
+                                        className="flex items-center justify-between gap-3 text-[12px] text-white/70"
+                                      >
+                                        <span>{event.event_name}</span>
+                                        <span className="font-bold text-gold-400 whitespace-nowrap">
+                                          {pct >= 0 ? '+' : ''}
+                                          {pct.toFixed(0)}%
+                                        </span>
+                                      </li>
+                                    );
+                                  })}
+                                </ul>
+                              </div>
+                              <div>
+                                <p className="text-[10px] font-black text-gray-500 uppercase tracking-[0.2em] mb-2">
+                                  Notable Day Types
+                                </p>
+                                <ul className="space-y-1.5">
+                                  {parishSeasonalityGrouped.dayTypes.map((event: any, index: number) => {
+                                    const pct = Number(event.vs_baseline_pct ?? 0);
+                                    return (
+                                      <li
+                                        key={`daytype-${event.event_name}-${index}`}
+                                        className="flex items-center justify-between gap-3 text-[12px] text-white/70"
+                                      >
+                                        <span>{event.event_name}</span>
+                                        <span className="font-bold text-gold-400 whitespace-nowrap">
+                                          {pct >= 0 ? '+' : ''}
+                                          {pct.toFixed(0)}%
+                                        </span>
+                                      </li>
+                                    );
+                                  })}
+                                </ul>
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      )}
                   </CardContent>
                 </Card>
 
@@ -5163,7 +5240,7 @@ export function BishopDashboard({
                     let pieData: { name: string; value: number; color: string }[];
                     let listRows: { name: string; subtitle: string; label: string; color: string }[];
                     let total: number;
-                    let clusterKpis: { purity: number; coverage: number } | null = null;
+                    let clusterKpis: { coverage: number } | null = null;
 
                     if (realCluster) {
                       pieData = Object.entries(CLUSTER_COLORS)
@@ -5189,7 +5266,6 @@ export function BishopDashboard({
                       }));
                       total = realCluster.parishes.length;
                       clusterKpis = {
-                        purity: Math.round((realCluster.kpis?.cluster_purity ?? 0) * 100),
                         coverage: Math.round((realCluster.kpis?.rule_coverage_rate ?? 0) * 100),
                       };
                     } else {
@@ -5230,10 +5306,11 @@ export function BishopDashboard({
                                   scaled by its own average — so a small and a large parish are compared fairly) is
                                   split at the diocese-wide median into Stable vs. Volatile. Net Margin above/below
                                   zero splits Surplus vs. Deficit. That gives 4 quadrants — A (stable + surplus), B
-                                  (stable + deficit), C (volatile + surplus), D (volatile + deficit). Cluster Purity
-                                  is the share of parishes whose stored label matches what re-deriving it from their
-                                  own features would produce (a self-consistency check); Rule Coverage is the share
-                                  of parishes with enough history to be classified at all.
+                                  (stable + deficit), C (volatile + surplus), D (volatile + deficit). Net Margin
+                                  excludes diocese subsidy — a subsidized parish's margin reflects whether its own
+                                  collections cover its own expenses, not whether the subsidy happens to cover the
+                                  gap. Rule Coverage is the share of parishes with enough history to be classified at
+                                  all.
                                 </ChartHelpToggle>
                               </div>
                               <p className="text-xs text-gray-500 mt-2 leading-relaxed max-w-sm">
@@ -5243,9 +5320,6 @@ export function BishopDashboard({
                               </p>
                               {clusterKpis && (
                                 <div className="flex gap-4 mt-3">
-                                  <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">
-                                    Cluster Purity: <span className="text-[#D4AF37]">{clusterKpis.purity}%</span>
-                                  </span>
                                   <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">
                                     Rule Coverage: <span className="text-[#D4AF37]">{clusterKpis.coverage}%</span>
                                   </span>

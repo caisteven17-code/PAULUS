@@ -47,16 +47,31 @@ _ONE_PARISH_SQL = f"""
     ORDER BY f.date_key
 """
 
+    # subsidy: account B.3.03 "Subsidy from Diocese" pulled from the
+    # account-level breakdown fact table — the monthly fact table's
+    # total_collections already blends subsidy into the diocese-wide total,
+    # so this is the only way to isolate it per parish-month. Used by
+    # parish_cluster.py / cluster_forecast.py to exclude subsidy from
+    # net_margin (see _parish_quadrant.compute_features's docstring).
 _ALL_PARISHES_SQL = """
     SELECT di.institution_id,
            di.institution_name,
            f.date_key,
            SUM(COALESCE(f.total_collections, 0))::float8 AS total_receipts,
-           SUM(COALESCE(f.total_expenses, 0))::float8 AS total_expenses
+           SUM(COALESCE(f.total_expenses, 0))::float8 AS total_expenses,
+           COALESCE(subsidy.amount, 0)::float8 AS subsidy_receipts
     FROM parish_analytics.fact_parish_monthly_financials f
     JOIN parish_analytics.dim_parishes dp ON dp.parish_key = f.parish_key
     JOIN shared_analytics.dim_institutions di ON di.institution_key = dp.institution_key
-    GROUP BY di.institution_id, di.institution_name, f.date_key
+    LEFT JOIN (
+        SELECT dp2.institution_key, b.date_key, SUM(b.amount)::float8 AS amount
+        FROM parish_analytics.fact_parish_financial_breakdowns b
+        JOIN parish_analytics.dim_parishes dp2 ON dp2.parish_key = b.parish_key
+        JOIN parish_analytics.dim_iafr_account a ON a.iafr_account_key = b.iafr_account_key
+        WHERE a.account_code = 'B.3.03'
+        GROUP BY dp2.institution_key, b.date_key
+    ) subsidy ON subsidy.institution_key = di.institution_key AND subsidy.date_key = f.date_key
+    GROUP BY di.institution_id, di.institution_name, f.date_key, subsidy.amount
     ORDER BY di.institution_id, f.date_key
 """
 

@@ -40,6 +40,7 @@ import { auth } from '../firebase';
 import { FinancialHealthGauge } from '../components/ui/FinancialHealthGauge';
 import { HealthDimensionBar } from '../components/ui/HealthDimensionBar';
 import { DiagnosticCard } from '../components/ui/DiagnosticCard';
+import { IAFRBreakdownReport } from '../components/financial/IAFRBreakdownReport';
 import { StewardChatbot } from '../components/ui/StewardChatbot';
 import { InlineLoader } from '../components/ui/LoadingScreen';
 import { DashboardHeader } from '../components/layout/DashboardHeader';
@@ -2709,6 +2710,16 @@ export function PriestDashboard({
                 </div>
               </div>
             </div>
+
+            {mappedType === 'parish' && userEntityInfo.id && (
+              <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-200">
+                <IAFRBreakdownReport
+                  institutionId={userEntityInfo.id}
+                  institutionName={userEntityInfo.name}
+                  year={year ?? null}
+                />
+              </div>
+            )}
 
             {isPriestDashboardContext && (
               <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-200">

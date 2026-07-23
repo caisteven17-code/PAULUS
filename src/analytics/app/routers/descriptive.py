@@ -85,6 +85,29 @@ async def financial_breakdown(
         raise HTTPException(status_code=500, detail=f"Financial breakdown error: {exc}")
 
 
+@router.get("/financial-breakdown-report/{institution_id}")
+async def financial_breakdown_report(
+    institution_id: str,
+    year: int | None = None,
+    vicariates: str | None = None,
+    institution_ids: str | None = None,
+):
+    """Full IAFR report tree (all sections → subsections → accounts, with
+    subtotals) in one round trip — the report-table counterpart of
+    /financial-breakdown, which only returns one drill level at a time."""
+    try:
+        vicariate_list = [v for v in vicariates.split(",") if v] if vicariates else None
+        institution_id_list = [i for i in institution_ids.split(",") if i] if institution_ids else None
+        return await svc_ft.get_financial_breakdown_report(
+            institution_id,
+            year=year,
+            vicariates=vicariate_list,
+            institution_ids=institution_id_list,
+        )
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=f"Financial breakdown report error: {exc}")
+
+
 @router.get("/pastoral-assignment/{institution_id}")
 async def pastoral_assignment(institution_id: str):
     try:

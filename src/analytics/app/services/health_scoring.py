@@ -417,9 +417,10 @@ async def get_health_scores_batch(
         sorted(f"{e['institution_id']}:{e['entity_type']}:{e.get('entity_class')}" for e in entities)
     )
     key = f"health_scores_batch:{year}:{timeframe}:{key_entities}"
-    return await _ttl_cache.cached(
-        key, _ttl_cache.DEFAULT_TTL_SECONDS, lambda: _get_health_scores_batch_uncached(entities, year, timeframe)
-    )
+    # Same "All Years is the expensive, low-freshness-need shape" reasoning
+    # as financial_trend.py.
+    ttl = _ttl_cache.UNSCOPED_TTL_SECONDS if year is None else _ttl_cache.DEFAULT_TTL_SECONDS
+    return await _ttl_cache.cached(key, ttl, lambda: _get_health_scores_batch_uncached(entities, year, timeframe))
 
 
 async def _get_health_scores_batch_uncached(

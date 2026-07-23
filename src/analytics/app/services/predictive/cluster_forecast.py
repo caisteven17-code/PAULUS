@@ -38,12 +38,22 @@ def _extract_features(df: pd.DataFrame) -> dict[str, float]:
             df[col] = pd.to_numeric(df[col], errors="coerce").fillna(0.0)
         df["total_receipts"] = df[PARISH_RECEIPTS].sum(axis=1)
         df["total_expenses"] = df[PARISH_EXPENSES].sum(axis=1)
+        subsidy = df["subsidy_inflow"].values.astype(float) if "subsidy_inflow" in df.columns else None
+    else:
+        # AWS path (_aws_financials.all_parish_monthly_dfs()) — subsidy_receipts
+        # is a separate column sourced from the account-level breakdown fact
+        # table, since the monthly fact table blends subsidy into total_receipts.
+        subsidy = df["subsidy_receipts"].values.astype(float) if "subsidy_receipts" in df.columns else None
 
     r = df["total_receipts"].values.astype(float)
     e = df["total_expenses"].values.astype(float)
     # cluster_idx is assigned in a second pass — the stable/volatile cutoff is
-    # a diocese-wide median, unknowable per-parish in isolation.
-    return _parish_quadrant.compute_features(r, e)
+    # a diocese-wide median, unknowable per-parish in isolation. subsidy is
+    # excluded from net_margin only (not volatility_index) — must match
+    # parish_cluster.py's treatment exactly, or "current → predicted" cluster
+    # transitions here would be forecasting from a different net_margin
+    # definition than the one parish_cluster.py reports as "current."
+    return _parish_quadrant.compute_features(r, e, subsidy)
 
 
 def _fetch_and_process() -> dict[str, Any]:

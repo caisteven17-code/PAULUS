@@ -36,6 +36,7 @@ def _features_from_series(
     expenses: np.ndarray,
     institution_id: str,
     institution_name: str = "",
+    subsidy: np.ndarray | None = None,
 ) -> dict[str, Any]:
     """Quadrant inputs only — cluster_label is assigned in a second pass once
     the diocese-wide median volatility threshold is known (classification is
@@ -43,7 +44,7 @@ def _features_from_series(
     return {
         "institution_id": institution_id,
         "institution_name": institution_name,
-        **_parish_quadrant.compute_features(receipts, expenses),
+        **_parish_quadrant.compute_features(receipts, expenses, subsidy),
     }
 
 
@@ -67,24 +68,11 @@ def _parish_features(df: pd.DataFrame, institution_id: str, institution_name: st
 
     receipts = df["total_receipts"].values.astype(float)
     expenses = df["total_expenses"].values.astype(float)
-    return _features_from_series(receipts, expenses, institution_id, institution_name)
-
-
-def _compute_cluster_purity(parishes: list[dict], threshold: float) -> float:
-    """
-    Cluster purity proxy: fraction of parishes whose stored label matches a
-    re-derivation from their own features (always 1.0 for pure rule-based
-    assignment — kept as an explicit self-consistency check, same KPI the
-    original model_lab prototype reported).
-    """
-    if not parishes:
-        return 0.0
-    consistent = sum(
-        1
-        for p in parishes
-        if p["cluster_label"] == _parish_quadrant.classify(p["volatility_index"], p["net_margin"], threshold)
-    )
-    return round(safe_div(consistent, len(parishes)), 4)
+    # subsidy_inflow is already one of PARISH_RECEIPTS (summed into
+    # total_receipts above) — pulled out separately so net_margin can
+    # exclude it (see _parish_quadrant.compute_features's docstring).
+    subsidy = df["subsidy_inflow"].values.astype(float) if "subsidy_inflow" in df.columns else None
+    return _features_from_series(receipts, expenses, institution_id, institution_name, subsidy)
 
 
 def _fetch_and_process() -> dict[str, Any]:
@@ -104,7 +92,7 @@ def _fetch_and_process() -> dict[str, Any]:
             "data_sufficient": False,
             "cluster_counts": {c: 0 for c in _CLUSTERS},
             "parishes": [],
-            "kpis": {"cluster_purity": 0.0, "rule_coverage_rate": 0.0},
+            "kpis": {"rule_coverage_rate": 0.0},
             "timestamp": ts,
         }
 
@@ -141,7 +129,7 @@ def _fetch_and_process() -> dict[str, Any]:
             "data_sufficient": False,
             "cluster_counts": {c: 0 for c in _CLUSTERS},
             "parishes": [],
-            "kpis": {"cluster_purity": 0.0, "rule_coverage_rate": 0.0},
+            "kpis": {"rule_coverage_rate": 0.0},
             "timestamp": ts,
         }
 
@@ -153,7 +141,6 @@ def _fetch_and_process() -> dict[str, Any]:
 
     total_institutions = len(institutions)
     rule_coverage_rate = round(safe_div(len(parishes), total_institutions), 4)
-    purity = _compute_cluster_purity(parishes, threshold)
 
     return {
         "data_sufficient": True,
@@ -161,7 +148,6 @@ def _fetch_and_process() -> dict[str, Any]:
         "parishes": parishes,
         "stability_threshold": round(threshold, 4),
         "kpis": {
-            "cluster_purity": purity,
             "rule_coverage_rate": rule_coverage_rate,
         },
         "timestamp": ts,
@@ -188,6 +174,7 @@ def _fetch_and_process_aws() -> dict[str, Any]:
             df["total_expenses"].values.astype(float),
             iid,
             str(df["institution_name"].iloc[0] or "") if "institution_name" in df.columns else "",
+            df["subsidy_receipts"].values.astype(float) if "subsidy_receipts" in df.columns else None,
         )
         for iid, df in aws_series
         if len(df) >= 3
@@ -198,7 +185,7 @@ def _fetch_and_process_aws() -> dict[str, Any]:
             "data_sufficient": False,
             "cluster_counts": {c: 0 for c in _CLUSTERS},
             "parishes": [],
-            "kpis": {"cluster_purity": 0.0, "rule_coverage_rate": 0.0},
+            "kpis": {"rule_coverage_rate": 0.0},
             "timestamp": ts,
         }
 
@@ -217,7 +204,6 @@ def _fetch_and_process_aws() -> dict[str, Any]:
         "parishes": parishes,
         "stability_threshold": round(threshold, 4),
         "kpis": {
-            "cluster_purity": _compute_cluster_purity(parishes, threshold),
             "rule_coverage_rate": round(safe_div(len(parishes), max(total_institutions, len(parishes))), 4),
         },
         "timestamp": ts,
@@ -226,11 +212,18 @@ def _fetch_and_process_aws() -> dict[str, Any]:
 
 
 async def get_parish_cluster() -> dict[str, Any]:
-    # Diocese-wide, identical for every caller, no request parameters — the
-    # same duplicate-concurrent-request risk as financial-trend applies here
-    # too, plus a short cache so requests moments apart also skip RDS (see
-    # _ttl_cache.py).
-    return await _ttl_cache.cached("parish_cluster", _ttl_cache.DEFAULT_TTL_SECONDS, _get_parish_cluster_uncached)
+    # Diocese-wide, identical for every caller, no request parameters (this
+    # endpoint never scopes by year — it's always the "full history" shape),
+    # so it always gets the longer unscoped TTL, not the default one.
+    return await _ttl_cache.cached(
+        "parish_cluster",
+        _ttl_cache.UNSCOPED_TTL_SECONDS,
+        _get_parish_cluster_uncached,
+        # The Supabase fallback below is also empty for parishes, so an AWS
+        # read failing mid-contention and falling back looks identical to a
+        # genuine "no data" — don't freeze that into the cache for 5 minutes.
+        should_cache=lambda r: bool(r.get("data_sufficient")),
+    )
 
 
 async def _get_parish_cluster_uncached() -> dict[str, Any]:

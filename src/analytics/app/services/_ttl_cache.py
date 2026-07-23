@@ -28,10 +28,36 @@ from app.services import _singleflight
 # minute and a half rather than feeling stuck.
 DEFAULT_TTL_SECONDS = 90
 
+# For genuinely unbounded-by-year ("All Years") requests specifically — the
+# single most expensive query shape (zero date filtering, full history every
+# time). Full diocesan history barely changes minute to minute — new
+# submissions only ever affect the current period — so a much longer window
+# is safe here and meaningfully cuts how often the expensive computation
+# actually runs.
+UNSCOPED_TTL_SECONDS = 300
+
 _cache: dict[str, tuple[float, Any]] = {}
 
 
-async def cached(key: str, ttl_seconds: float, factory: Callable[[], Awaitable[Any]]) -> Any:
+async def cached(
+    key: str,
+    ttl_seconds: float,
+    factory: Callable[[], Awaitable[Any]],
+    should_cache: Callable[[Any], bool] = lambda _result: True,
+) -> Any:
+    """`should_cache` guards against freezing a transient failure into the
+    cache: several callers deliberately catch an AWS read failure and return
+    an honest "data_sufficient: false" result instead of raising (e.g. a
+    scoped financial-trend request during RDS contention) — that's a
+    perfectly good *response*, but it's the wrong thing to cache, since it
+    represents "the query didn't work this time," not a stable real answer.
+    Caching it anyway means everyone sees that same false "no data" for the
+    full TTL window even after the underlying data/contention issue clears.
+    Callers whose result shape distinguishes a real answer from a fallback
+    (via a `data_sufficient` flag, typically) should pass a predicate here;
+    the default caches unconditionally for callers where that risk doesn't
+    apply.
+    """
     entry = _cache.get(key)
     if entry is not None and time.monotonic() - entry[0] < ttl_seconds:
         return entry[1]
@@ -44,7 +70,8 @@ async def cached(key: str, ttl_seconds: float, factory: Callable[[], Awaitable[A
         if entry is not None and time.monotonic() - entry[0] < ttl_seconds:
             return entry[1]
         result = await factory()
-        _cache[key] = (time.monotonic(), result)
+        if should_cache(result):
+            _cache[key] = (time.monotonic(), result)
         return result
 
     return await _singleflight.coalesce(f"ttl_cache:{key}", _compute_and_store)

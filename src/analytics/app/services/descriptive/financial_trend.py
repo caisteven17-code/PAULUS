@@ -554,12 +554,24 @@ async def get_financial_trend(
         f"financial_trend:{entity_type}:{institution_id}:{year}:{timeframe}:"
         f"{sorted(vicariates) if vicariates else None}:{sorted(institution_ids) if institution_ids else None}"
     )
+    # "All Years" (year is None) is the single most expensive shape of this
+    # query — zero date filtering, full history every time — and the
+    # least likely to need fresh data, so it gets a much longer cache
+    # window than a specific-year request.
+    ttl = _ttl_cache.UNSCOPED_TTL_SECONDS if year is None else _ttl_cache.DEFAULT_TTL_SECONDS
     return await _ttl_cache.cached(
         key,
-        _ttl_cache.DEFAULT_TTL_SECONDS,
+        ttl,
         lambda: _get_financial_trend_uncached(
             institution_id, entity_type, year, timeframe, vicariates, institution_ids
         ),
+        # A scoped request (year/vicariates/institution_ids) can come back
+        # with data_sufficient=False as an honest "no data" answer *or* as
+        # the AWS-read-failed-so-fell-back-to-empty-Supabase path (e.g.
+        # during RDS contention) — the two look identical here, and only the
+        # first is a stable answer worth caching. Never freeze the second
+        # into the cache; the next request should always get a fresh try.
+        should_cache=lambda r: bool(r.get("data_sufficient")),
     )
 
 
@@ -815,3 +827,150 @@ async def get_financial_breakdown(
     return await asyncio.to_thread(
         _fetch_breakdown, institution_id, year, section_code, subsection_code, vicariates, institution_ids
     )
+
+
+# ── IAFR full-tree report (Section → Subsection → Account, with subtotals) ──
+# Same underlying fact table as _fetch_breakdown above, but grouped straight
+# at account grain in one query instead of one level at a time — a report
+# table needs the whole hierarchy (~113 accounts) at once, and building that
+# by calling the per-level endpoint repeatedly would mean ~1 + ~20 + ~113
+# round trips. account_code sort order already matches the printed form's
+# reading order (A.1.01 < A.1.02 < A.2.01 < B.1.01 < ...), so nesting by
+# dict-insertion-order below — never re-sorting subsection/account keys
+# alphabetically — is what keeps e.g. Section A's real order (Sacraments,
+# Confirmation, Mass Intentions) instead of an alphabetical scramble.
+_AWS_BREAKDOWN_REPORT_SQL = """
+    SELECT a.section_code,
+           a.subsection_code,
+           a.account_code,
+           a.account_name,
+           SUM(f.amount) FILTER (WHERE a.account_type IN ('receipt', 'personal_contribution'))::float8
+             AS receipts,
+           SUM(f.amount) FILTER (WHERE a.account_type IN ('expense', 'remittance'))::float8
+             AS expenses
+    FROM parish_analytics.fact_parish_financial_breakdowns f
+    JOIN parish_analytics.dim_parishes dp ON dp.parish_key = f.parish_key
+    JOIN shared_analytics.dim_institutions di ON di.institution_key = dp.institution_key
+    JOIN parish_analytics.dim_iafr_account a ON a.iafr_account_key = f.iafr_account_key
+    WHERE a.account_type != 'memo'
+      {scope_where}
+      {extra_where}
+    GROUP BY a.section_code, a.subsection_code, a.account_code, a.account_name
+    ORDER BY a.account_code
+"""
+
+
+def _fetch_breakdown_report(
+    institution_id: str,
+    year: int | None,
+    vicariates: list[str] | None = None,
+    institution_ids: list[str] | None = None,
+) -> dict[str, Any]:
+    ts = datetime.now(timezone.utc).isoformat()
+
+    # Same scope convention as _fetch_breakdown: a single parish, a
+    # vicariate/district/class subset, or the whole diocese.
+    scope_all = institution_id == ALL_INSTITUTIONS
+    scope: list[str] = []
+    params: list[Any] = []
+    if not scope_all:
+        scope.append("AND di.institution_id = %s")
+        params.append(institution_id)
+    elif institution_ids:
+        scope.append("AND di.institution_id = ANY(%s)")
+        params.append(institution_ids)
+    elif vicariates:
+        scope.append("AND dp.vicariate = ANY(%s)")
+        params.append(vicariates)
+
+    where: list[str] = []
+    if year:
+        where.append("AND f.date_key >= %s AND f.date_key < %s")
+        params.extend([year * 100, (year + 1) * 100])
+
+    rows = analytics_db.fetch_query(
+        _AWS_BREAKDOWN_REPORT_SQL.format(scope_where=" ".join(scope), extra_where=" ".join(where)),
+        params,
+    )
+
+    sections: dict[str, dict[str, Any]] = {}
+    for r in rows:
+        receipts = round(float(r["receipts"] or 0), 2)
+        expenses = round(float(r["expenses"] or 0), 2)
+
+        section = sections.setdefault(
+            r["section_code"],
+            {
+                "code": r["section_code"],
+                "name": _IAFR_SECTION_NAMES.get(r["section_code"], r["section_code"]),
+                "subsections": {},
+                "receipts": 0.0,
+                "expenses": 0.0,
+                "total": 0.0,
+            },
+        )
+        subsection = section["subsections"].setdefault(
+            r["subsection_code"],
+            {
+                "code": r["subsection_code"],
+                "name": str(r["subsection_code"]).replace("_", " ").title(),
+                "accounts": [],
+                "receipts": 0.0,
+                "expenses": 0.0,
+                "total": 0.0,
+            },
+        )
+        subsection["accounts"].append(
+            {
+                "code": r["account_code"],
+                "name": r["account_name"],
+                "receipts": receipts,
+                "expenses": expenses,
+                "total": round(receipts + expenses, 2),
+            }
+        )
+        subsection["receipts"] = round(subsection["receipts"] + receipts, 2)
+        subsection["expenses"] = round(subsection["expenses"] + expenses, 2)
+        subsection["total"] = round(subsection["receipts"] + subsection["expenses"], 2)
+
+    grand_total = {"receipts": 0.0, "expenses": 0.0, "total": 0.0}
+    section_list: list[dict[str, Any]] = []
+    for section in sections.values():
+        section["subsections"] = list(section["subsections"].values())
+        for subsection in section["subsections"]:
+            section["receipts"] = round(section["receipts"] + subsection["receipts"], 2)
+            section["expenses"] = round(section["expenses"] + subsection["expenses"], 2)
+        section["total"] = round(section["receipts"] + section["expenses"], 2)
+        section_list.append(section)
+        grand_total["receipts"] = round(grand_total["receipts"] + section["receipts"], 2)
+        grand_total["expenses"] = round(grand_total["expenses"] + section["expenses"], 2)
+    grand_total["total"] = round(grand_total["receipts"] + grand_total["expenses"], 2)
+
+    return {
+        "data_sufficient": len(section_list) > 0,
+        "entity_id": institution_id,
+        "year": year,
+        "sections": section_list,
+        "grand_total": grand_total,
+        "timestamp": ts,
+    }
+
+
+async def get_financial_breakdown_report(
+    institution_id: str,
+    year: int | None = None,
+    vicariates: list[str] | None = None,
+    institution_ids: list[str] | None = None,
+) -> dict[str, Any]:
+    if not analytics_db.enabled():
+        # Same as get_financial_breakdown — the account-level fact table only
+        # exists in the warehouse, no Supabase equivalent to fall back to.
+        return {
+            "data_sufficient": False,
+            "entity_id": institution_id,
+            "year": year,
+            "sections": [],
+            "grand_total": {"receipts": 0.0, "expenses": 0.0, "total": 0.0},
+            "timestamp": datetime.now(timezone.utc).isoformat(),
+        }
+    return await asyncio.to_thread(_fetch_breakdown_report, institution_id, year, vicariates, institution_ids)

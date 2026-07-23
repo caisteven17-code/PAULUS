@@ -261,10 +261,17 @@ export default function App() {
   const mainScrollRef = useRef<HTMLElement>(null);
   const { permissions, user, loading: permissionsLoading } = usePermissions();
   const [timeframe, setTimeframe] = useState<Timeframe>('6m');
-  // null means "All Years" — the default, unscoped view. Write/simulation
-  // contexts that need a concrete year (submissions, Digital Twin) fall back
-  // to the real current calendar year rather than accepting null.
-  const [year, setYear] = useState<number | null>(null);
+  // null means "All Years" — still selectable, but no longer the default.
+  // "All Years" is the single most expensive query in the analytics
+  // service (zero date filtering, full history every time); defaulting to
+  // it meant every fresh dashboard load fired that query automatically.
+  // Defaulting to the current calendar year instead means the expensive
+  // unscoped query only runs when a user deliberately asks for it. Write/
+  // simulation contexts that need a concrete year (submissions, Digital
+  // Twin) already fell back to the real current calendar year rather than
+  // accepting null, so this also makes the read-side default consistent
+  // with those.
+  const [year, setYear] = useState<number | null>(new Date().getFullYear());
   const [digitalTwinSession, setDigitalTwinSession] = useState<DigitalTwinSession | null>(null);
   const [digitalTwinActiveTab, setDigitalTwinActiveTab] = useState('parish-dashboard');
   const [dtSandboxState, setDtSandboxState] = useState<SandboxState | null>(null);
