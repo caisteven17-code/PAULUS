@@ -7,6 +7,7 @@ import {
   taxationAdmin,
   TaxationApiError,
   taxationErrorResponse,
+  throwTaxationMutationError,
 } from '../../../../../../src/lib/server/taxationSchemes';
 
 export async function POST(req: NextRequest, { params }: { params: Promise<{ schemeId: string }> }) {
@@ -24,7 +25,9 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ sch
       p_effective_month: body.effectiveMonth,
       p_actor_id: caller.profileId,
     });
-    if (error || !newSchemeId) throw new Error(error?.message ?? 'Could not clone the taxation scheme.');
+    if (error || !newSchemeId) {
+      throwTaxationMutationError(error, 'Could not clone the taxation scheme.');
+    }
     return Response.json({ scheme: await getTaxationScheme(newSchemeId as string) }, { status: 201 });
   } catch (error) {
     return taxationErrorResponse(error);

@@ -7,6 +7,7 @@ import {
   taxationAdmin,
   TaxationApiError,
   taxationErrorResponse,
+  throwTaxationMutationError,
 } from '../../../../../src/lib/server/taxationSchemes';
 
 type RouteContext = { params: Promise<{ schemeId: string }> };
@@ -54,7 +55,9 @@ export async function PATCH(req: NextRequest, { params }: RouteContext) {
       p_brackets: brackets,
       p_actor_id: caller.profileId,
     });
-    if (error || !data) throw new Error(error?.message ?? 'Could not update the taxation scheme draft.');
+    if (error || !data) {
+      throwTaxationMutationError(error, 'Could not update the taxation scheme draft.');
+    }
     return Response.json({ scheme: await getTaxationScheme(schemeId) });
   } catch (error) {
     return taxationErrorResponse(error);

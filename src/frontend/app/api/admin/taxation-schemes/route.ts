@@ -8,6 +8,7 @@ import {
   taxationAdmin,
   TaxationApiError,
   taxationErrorResponse,
+  throwTaxationMutationError,
 } from '../../../../src/lib/server/taxationSchemes';
 
 type DraftBody = {
@@ -65,7 +66,9 @@ export async function POST(req: NextRequest) {
       p_brackets: draft.brackets,
       p_actor_id: caller.profileId,
     });
-    if (error || !schemeId) throw new Error(error?.message ?? 'Could not create the taxation scheme draft.');
+    if (error || !schemeId) {
+      throwTaxationMutationError(error, 'Could not create the taxation scheme draft.');
+    }
     return Response.json({ scheme: await getTaxationScheme(schemeId as string) }, { status: 201 });
   } catch (error) {
     return taxationErrorResponse(error);

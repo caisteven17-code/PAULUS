@@ -213,4 +213,20 @@ export function taxationErrorResponse(error: unknown) {
   return Response.json({ error: message }, { status: 500 });
 }
 
+export function throwTaxationMutationError(
+  error: { code?: string | null; message?: string | null } | null,
+  fallback: string,
+): never {
+  if (
+    error?.code === '23505' ||
+    error?.message?.includes('progressive_tax_schemes_effective_month_key')
+  ) {
+    throw new TaxationApiError(
+      'A taxation scheme already exists for that effective year or month. Choose another effective period.',
+      409,
+    );
+  }
+  throw new TaxationApiError(error?.message ?? fallback, 500);
+}
+
 export { supabaseServer as taxationAdmin };

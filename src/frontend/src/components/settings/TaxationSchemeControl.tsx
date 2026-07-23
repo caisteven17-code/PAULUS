@@ -111,6 +111,15 @@ const displayEffectivePeriod = (scheme: TaxScheme) =>
     ? `Effective ${scheme.effectiveFrom.slice(0, 4)}`
     : `Effective ${displayMonth(scheme.effectiveFrom)}`;
 
+const nextAvailableAnnualYear = (schemes: TaxScheme[]) => {
+  const usedJanuaryDates = new Set(
+    schemes.map((scheme) => monthValue(scheme.effectiveFrom)).filter((value) => value.endsWith('-01')),
+  );
+  let year = Number(currentYear());
+  while (usedJanuaryDates.has(`${year}-01`)) year += 1;
+  return String(year);
+};
+
 const normalizeBracket = (raw: any, index: number): TaxBracket => ({
   id: raw?.id ? String(raw.id) : undefined,
   ordinal: asNumber(raw?.ordinal ?? raw?.position ?? raw?.sort_order ?? raw?.sortOrder, index + 1),
@@ -161,10 +170,10 @@ const editorFromScheme = (scheme: TaxScheme): DraftEditor => ({
   })),
 });
 
-const initialEditor = (): DraftEditor => ({
+const initialEditor = (year = currentYear()): DraftEditor => ({
   name: 'Progressive Taxation Scheme',
   effectiveMode: 'year',
-  effectiveFrom: `${currentYear()}-01`,
+  effectiveFrom: `${year}-01`,
   firstMinimum: 1,
   brackets: INITIAL_BRACKETS.map((bracket, index) => ({
     id: `new-bracket-${index}`,
@@ -188,7 +197,7 @@ async function apiRequest<T>(path: string, init: RequestInit = {}): Promise<T> {
   return body as T;
 }
 
-function editorValidation(editor: DraftEditor) {
+function editorValidation(editor: DraftEditor, schemes: TaxScheme[], selectedSchemeId?: string) {
   const errors: string[] = [];
   if (!editor.name.trim()) errors.push('Scheme name is required.');
   if (!/^\d{4}-\d{2}$/.test(editor.effectiveFrom)) {
@@ -196,6 +205,17 @@ function editorValidation(editor: DraftEditor) {
   }
   if (editor.effectiveMode === 'year' && !editor.effectiveFrom.endsWith('-01')) {
     errors.push('Whole-year schemes must begin in January.');
+  }
+  if (
+    schemes.some(
+      (scheme) => scheme.id !== selectedSchemeId && monthValue(scheme.effectiveFrom) === editor.effectiveFrom,
+    )
+  ) {
+    errors.push(
+      editor.effectiveMode === 'year'
+        ? `A taxation scheme is already effective for ${editor.effectiveFrom.slice(0, 4)}.`
+        : `A taxation scheme is already effective for ${displayMonth(editor.effectiveFrom)}.`,
+    );
   }
   if (editor.brackets.length === 0) errors.push('At least one bracket is required.');
 
@@ -228,7 +248,9 @@ export function TaxationSchemeControl() {
   const [confirmation, setConfirmation] = React.useState<'publish' | 'delete' | null>(null);
 
   const selectedScheme = schemes.find((scheme) => scheme.id === selectedId) ?? null;
-  const validationErrors = editor ? editorValidation(editor) : [];
+  const validationErrors = editor
+    ? editorValidation(editor, schemes, editorMode === 'existing' ? selectedScheme?.id : undefined)
+    : [];
 
   const loadSchemes = React.useCallback(async (preferredId?: string) => {
     setLoading(true);
@@ -310,7 +332,7 @@ export function TaxationSchemeControl() {
     setSelectedId('');
     setCloneSourceId('');
     setEditorMode('create');
-    setEditor(initialEditor());
+    setEditor(initialEditor(nextAvailableAnnualYear(schemes)));
     setError('');
   };
 
@@ -324,7 +346,7 @@ export function TaxationSchemeControl() {
       ...cloned,
       name: `${selectedScheme.name} - New Version`,
       effectiveMode: 'year',
-      effectiveFrom: `${currentYear()}-01`,
+      effectiveFrom: `${nextAvailableAnnualYear(schemes)}-01`,
       brackets: cloned.brackets.map((bracket, index) => ({ ...bracket, id: `clone-${index}` })),
     });
     setError('');
@@ -613,7 +635,8 @@ export function TaxationSchemeControl() {
                             type="button"
                             disabled={selectedScheme?.status === 'published'}
                             aria-pressed={active}
-                            onClick={() =>
+                            onClick={() => {
+                              setError('');
                               setEditor({
                                 ...editor,
                                 effectiveMode: option.value,
@@ -621,8 +644,8 @@ export function TaxationSchemeControl() {
                                   option.value === 'year'
                                     ? `${editor.effectiveFrom.slice(0, 4) || currentYear()}-01`
                                     : editor.effectiveFrom || currentMonth(),
-                              })
-                            }
+                              });
+                            }}
                             className={`rounded-md px-2 text-xs font-bold transition-colors ${
                               active ? 'bg-white text-slate-950 shadow-sm' : 'text-slate-500 hover:text-slate-800'
                             } disabled:cursor-not-allowed disabled:opacity-70`}
@@ -645,7 +668,10 @@ export function TaxationSchemeControl() {
                         step="1"
                         value={editor.effectiveFrom.slice(0, 4)}
                         disabled={selectedScheme?.status === 'published'}
-                        onChange={(event) => setEditor({ ...editor, effectiveFrom: `${event.target.value}-01` })}
+                        onChange={(event) => {
+                          setError('');
+                          setEditor({ ...editor, effectiveFrom: `${event.target.value}-01` });
+                        }}
                         className="h-11 w-full rounded-lg border border-slate-200 bg-white px-3 text-sm font-semibold text-slate-900 outline-none focus:border-amber-500 disabled:bg-slate-50 disabled:text-slate-500"
                       />
                     ) : (
@@ -653,7 +679,10 @@ export function TaxationSchemeControl() {
                         type="month"
                         value={editor.effectiveFrom}
                         disabled={selectedScheme?.status === 'published'}
-                        onChange={(event) => setEditor({ ...editor, effectiveFrom: event.target.value })}
+                        onChange={(event) => {
+                          setError('');
+                          setEditor({ ...editor, effectiveFrom: event.target.value });
+                        }}
                         className="h-11 w-full rounded-lg border border-slate-200 bg-white px-3 text-sm font-semibold text-slate-900 outline-none focus:border-amber-500 disabled:bg-slate-50 disabled:text-slate-500"
                       />
                     )}
