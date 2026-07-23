@@ -49,6 +49,7 @@ interface EditableBracket {
 
 interface DraftEditor {
   name: string;
+  effectiveMode: 'year' | 'month';
   effectiveFrom: string;
   firstMinimum: number;
   brackets: EditableBracket[];
@@ -94,12 +95,21 @@ const monthValue = (value?: string | null) => {
 };
 
 const currentMonth = () => new Date().toISOString().slice(0, 7);
+const currentYear = () => new Date().getFullYear().toString();
+
+const effectiveModeFromValue = (value?: string | null): DraftEditor['effectiveMode'] =>
+  monthValue(value).endsWith('-01') ? 'year' : 'month';
 
 const displayMonth = (value: string) => {
   const normalized = monthValue(value);
   if (!normalized) return 'Not scheduled';
   return monthFormatter.format(new Date(`${normalized}-01T00:00:00Z`));
 };
+
+const displayEffectivePeriod = (scheme: TaxScheme) =>
+  effectiveModeFromValue(scheme.effectiveFrom) === 'year'
+    ? `Effective ${scheme.effectiveFrom.slice(0, 4)}`
+    : `Effective ${displayMonth(scheme.effectiveFrom)}`;
 
 const normalizeBracket = (raw: any, index: number): TaxBracket => ({
   id: raw?.id ? String(raw.id) : undefined,
@@ -141,6 +151,7 @@ const normalizeSchemes = (body: any): TaxScheme[] => {
 
 const editorFromScheme = (scheme: TaxScheme): DraftEditor => ({
   name: scheme.name,
+  effectiveMode: effectiveModeFromValue(scheme.effectiveFrom),
   effectiveFrom: monthValue(scheme.effectiveFrom),
   firstMinimum: scheme.brackets[0]?.minimumAmount || 1,
   brackets: scheme.brackets.map((bracket, index) => ({
@@ -152,7 +163,8 @@ const editorFromScheme = (scheme: TaxScheme): DraftEditor => ({
 
 const initialEditor = (): DraftEditor => ({
   name: 'Progressive Taxation Scheme',
-  effectiveFrom: currentMonth(),
+  effectiveMode: 'year',
+  effectiveFrom: `${currentYear()}-01`,
   firstMinimum: 1,
   brackets: INITIAL_BRACKETS.map((bracket, index) => ({
     id: `new-bracket-${index}`,
@@ -179,7 +191,12 @@ async function apiRequest<T>(path: string, init: RequestInit = {}): Promise<T> {
 function editorValidation(editor: DraftEditor) {
   const errors: string[] = [];
   if (!editor.name.trim()) errors.push('Scheme name is required.');
-  if (!/^\d{4}-\d{2}$/.test(editor.effectiveFrom)) errors.push('Effective month is required.');
+  if (!/^\d{4}-\d{2}$/.test(editor.effectiveFrom)) {
+    errors.push(editor.effectiveMode === 'year' ? 'Effective year is required.' : 'Effective month is required.');
+  }
+  if (editor.effectiveMode === 'year' && !editor.effectiveFrom.endsWith('-01')) {
+    errors.push('Whole-year schemes must begin in January.');
+  }
   if (editor.brackets.length === 0) errors.push('At least one bracket is required.');
 
   let minimum = roundMoney(editor.firstMinimum);
@@ -306,7 +323,8 @@ export function TaxationSchemeControl() {
     setEditor({
       ...cloned,
       name: `${selectedScheme.name} - New Version`,
-      effectiveFrom: currentMonth(),
+      effectiveMode: 'year',
+      effectiveFrom: `${currentYear()}-01`,
       brackets: cloned.brackets.map((bracket, index) => ({ ...bracket, id: `clone-${index}` })),
     });
     setError('');
@@ -538,7 +556,7 @@ export function TaxationSchemeControl() {
                       <span className="min-w-0">
                         <span className="block truncate text-sm font-bold text-slate-900">{scheme.name}</span>
                         <span className="mt-1 block text-xs font-medium text-slate-500">
-                          v{scheme.version} - {displayMonth(scheme.effectiveFrom)}
+                          v{scheme.version} - {displayEffectivePeriod(scheme)}
                         </span>
                       </span>
                       <span
@@ -570,7 +588,7 @@ export function TaxationSchemeControl() {
           ) : (
             <div className="space-y-6">
               <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-                <div className="grid flex-1 gap-4 sm:grid-cols-2">
+                <div className="grid flex-1 gap-4 sm:grid-cols-2 xl:grid-cols-[minmax(220px,1.4fr)_minmax(220px,1fr)_minmax(180px,1fr)]">
                   <label className="block">
                     <span className="mb-1.5 block text-xs font-bold text-slate-600">Scheme Name</span>
                     <input
@@ -581,15 +599,64 @@ export function TaxationSchemeControl() {
                       className="h-11 w-full rounded-lg border border-slate-200 bg-white px-3 text-sm font-semibold text-slate-900 outline-none focus:border-amber-500 disabled:bg-slate-50 disabled:text-slate-500"
                     />
                   </label>
+                  <fieldset className="block">
+                    <legend className="mb-1.5 block text-xs font-bold text-slate-600">Effective Period</legend>
+                    <div className="grid h-11 grid-cols-2 rounded-lg border border-slate-200 bg-slate-50 p-1">
+                      {[
+                        { value: 'year' as const, label: 'Whole year' },
+                        { value: 'month' as const, label: 'Specific month' },
+                      ].map((option) => {
+                        const active = editor.effectiveMode === option.value;
+                        return (
+                          <button
+                            key={option.value}
+                            type="button"
+                            disabled={selectedScheme?.status === 'published'}
+                            aria-pressed={active}
+                            onClick={() =>
+                              setEditor({
+                                ...editor,
+                                effectiveMode: option.value,
+                                effectiveFrom:
+                                  option.value === 'year'
+                                    ? `${editor.effectiveFrom.slice(0, 4) || currentYear()}-01`
+                                    : editor.effectiveFrom || currentMonth(),
+                              })
+                            }
+                            className={`rounded-md px-2 text-xs font-bold transition-colors ${
+                              active ? 'bg-white text-slate-950 shadow-sm' : 'text-slate-500 hover:text-slate-800'
+                            } disabled:cursor-not-allowed disabled:opacity-70`}
+                          >
+                            {option.label}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </fieldset>
                   <label className="block">
-                    <span className="mb-1.5 block text-xs font-bold text-slate-600">Effective Month</span>
-                    <input
-                      type="month"
-                      value={editor.effectiveFrom}
-                      disabled={selectedScheme?.status === 'published'}
-                      onChange={(event) => setEditor({ ...editor, effectiveFrom: event.target.value })}
-                      className="h-11 w-full rounded-lg border border-slate-200 bg-white px-3 text-sm font-semibold text-slate-900 outline-none focus:border-amber-500 disabled:bg-slate-50 disabled:text-slate-500"
-                    />
+                    <span className="mb-1.5 block text-xs font-bold text-slate-600">
+                      {editor.effectiveMode === 'year' ? 'Effective Year' : 'Effective Month'}
+                    </span>
+                    {editor.effectiveMode === 'year' ? (
+                      <input
+                        type="number"
+                        min="2000"
+                        max="2100"
+                        step="1"
+                        value={editor.effectiveFrom.slice(0, 4)}
+                        disabled={selectedScheme?.status === 'published'}
+                        onChange={(event) => setEditor({ ...editor, effectiveFrom: `${event.target.value}-01` })}
+                        className="h-11 w-full rounded-lg border border-slate-200 bg-white px-3 text-sm font-semibold text-slate-900 outline-none focus:border-amber-500 disabled:bg-slate-50 disabled:text-slate-500"
+                      />
+                    ) : (
+                      <input
+                        type="month"
+                        value={editor.effectiveFrom}
+                        disabled={selectedScheme?.status === 'published'}
+                        onChange={(event) => setEditor({ ...editor, effectiveFrom: event.target.value })}
+                        className="h-11 w-full rounded-lg border border-slate-200 bg-white px-3 text-sm font-semibold text-slate-900 outline-none focus:border-amber-500 disabled:bg-slate-50 disabled:text-slate-500"
+                      />
+                    )}
                   </label>
                 </div>
                 <div className="flex flex-wrap gap-2">
