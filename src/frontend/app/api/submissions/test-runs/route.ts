@@ -3,6 +3,12 @@ export const dynamic = 'force-dynamic';
 import { createHash, randomUUID } from 'crypto';
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
+import { calculateProgressiveTax, type ProgressiveTaxScheme } from '../../../../src/lib/progressiveTax';
+import {
+  getEffectiveTaxationScheme,
+  requireTaxationCaller,
+  TaxationApiError,
+} from '../../../../src/lib/server/taxationSchemes';
 
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL ?? '';
 const SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY ?? '';
@@ -49,22 +55,26 @@ async function addStage(
   message: string,
 ) {
   const isFinished = status === 'completed' || status === 'warning' || status === 'failed';
-  const { error } = await supabase.schema('operations').from('parish_submission_test_stage_events').upsert(
-    {
-      run_id: runId,
-      stage_code: stageCode,
-      sequence_no: sequenceNo,
-      status,
-      message,
-      started_at: status === 'pending' ? null : new Date().toISOString(),
-      finished_at: isFinished ? new Date().toISOString() : null,
-    },
-    { onConflict: 'run_id,stage_code' },
-  );
+  const { error } = await supabase
+    .schema('operations')
+    .from('parish_submission_test_stage_events')
+    .upsert(
+      {
+        run_id: runId,
+        stage_code: stageCode,
+        sequence_no: sequenceNo,
+        status,
+        message,
+        started_at: status === 'pending' ? null : new Date().toISOString(),
+        finished_at: isFinished ? new Date().toISOString() : null,
+      },
+      { onConflict: 'run_id,stage_code' },
+    );
   if (error) throw new Error(error.message);
 }
 
 async function createManualRun(req: NextRequest) {
+  await requireTaxationCaller(req);
   const body = (await req.json()) as {
     institutionName?: string;
     reportingMonth?: number;
@@ -76,7 +86,7 @@ async function createManualRun(req: NextRequest) {
   const institutionName = body.institutionName?.trim() ?? '';
   const reportingMonth = Number(body.reportingMonth);
   const reportingYear = Number(body.reportingYear);
-  const entries = body.entries ?? [];
+  const submittedEntries = body.entries ?? [];
 
   if (!institutionName || !Number.isInteger(reportingMonth) || reportingMonth < 1 || reportingMonth > 12) {
     return NextResponse.json({ error: 'A valid parish and reporting month are required.' }, { status: 400 });
@@ -84,11 +94,78 @@ async function createManualRun(req: NextRequest) {
   if (!Number.isInteger(reportingYear) || reportingYear < 2000 || reportingYear > 2100) {
     return NextResponse.json({ error: 'A valid reporting year is required.' }, { status: 400 });
   }
-  if (entries.length === 0) {
+  if (submittedEntries.length === 0) {
     return NextResponse.json({ error: 'Enter at least one IAFR amount before submitting.' }, { status: 400 });
   }
-  if (entries.some((entry) => !entry.fieldKey || !entry.canonicalAccountCode || !Number.isFinite(entry.cleanedAmount))) {
+  if (
+    submittedEntries.some(
+      (entry) => !entry.fieldKey || !entry.canonicalAccountCode || !Number.isFinite(entry.cleanedAmount),
+    )
+  ) {
     return NextResponse.json({ error: 'One or more manual-entry fields are invalid.' }, { status: 400 });
+  }
+
+  const sourceAmount = (accountCode: string) =>
+    submittedEntries
+      .filter((entry) => entry.canonicalAccountCode === accountCode)
+      .reduce((sum, entry) => sum + entry.cleanedAmount, 0);
+  const weekdayCollections = sourceAmount('B.1.01');
+  const sundayCollections = sourceAmount('B.1.02');
+  const saturdayCollections = sourceAmount('B.1.03');
+  const scheme = await getEffectiveTaxationScheme(reportingYear, reportingMonth);
+  if (!scheme) {
+    throw new TaxationApiError('No published progressive taxation scheme covers this reporting month.', 422);
+  }
+
+  const calculation = calculateProgressiveTax({
+    reportingYear,
+    reportingMonth,
+    weekdayCollections,
+    sundayCollections,
+    saturdayCollections,
+    scheme: scheme as ProgressiveTaxScheme,
+  });
+  if (calculation.status === 'missing_scheme') {
+    throw new TaxationApiError('No published progressive taxation scheme covers this reporting month.', 422);
+  }
+  if (calculation.status === 'out_of_range') {
+    throw new TaxationApiError(
+      'The Mass Collections total is outside the configured progressive taxation scheme.',
+      422,
+    );
+  }
+
+  const entries = submittedEntries.filter((entry) => entry.canonicalAccountCode !== 'F.1.04');
+  if (calculation.taxAmount > 0) {
+    const roundedShare = Math.round(calculation.taxAmount * 100) / 100;
+    entries.push({
+      fieldKey: 'F.progressive_tax_share',
+      sectionCode: 'F',
+      subsectionCode: 'remittance_to_diocese',
+      canonicalAccountCode: 'F.1.04',
+      sourceLabel: 'Progressive Tax Collections - Diocese Share',
+      rawValue: roundedShare.toFixed(2),
+      cleanedAmount: roundedShare,
+      sourceMetadata: {
+        inputKind: 'derived_progressive_tax',
+        taxationSchemeId: scheme.id,
+        taxationSchemeVersion: scheme.version,
+        taxationSchemeEffectiveFrom: scheme.effectiveFrom,
+        taxationBracketId: calculation.bracket?.id ?? null,
+        taxationBracketMinimum: calculation.bracket?.minimumAmount ?? null,
+        taxationBracketMaximum: calculation.bracket?.maximumAmount ?? null,
+        taxRate: calculation.taxRate,
+        massCollectionTotal: calculation.massCollectionTotal,
+        derivedFrom: ['B.1.01', 'B.1.02', 'B.1.03'],
+        formVersion: body.formVersion ?? 'iafr_2026_v1',
+      },
+    });
+  }
+  if (entries.length === 0) {
+    return NextResponse.json(
+      { error: 'Enter at least one non-derived IAFR amount before submitting.' },
+      { status: 400 },
+    );
   }
 
   const supabase = makeServiceClient();
@@ -172,7 +249,10 @@ async function createFileRun(req: NextRequest) {
 
   const extension = file.name.split('.').pop()?.toLowerCase();
   if (!extension || !['xlsx', 'csv'].includes(extension)) {
-    return NextResponse.json({ error: 'Only XLSX and CSV files are accepted for parish IAFR testing.' }, { status: 400 });
+    return NextResponse.json(
+      { error: 'Only XLSX and CSV files are accepted for parish IAFR testing.' },
+      { status: 400 },
+    );
   }
 
   const supabase = makeServiceClient();
@@ -230,6 +310,6 @@ export async function POST(req: NextRequest) {
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Unexpected test-submission error.';
     console.error('[submission-test-runs]', message);
-    return NextResponse.json({ error: message }, { status: 500 });
+    return NextResponse.json({ error: message }, { status: error instanceof TaxationApiError ? error.status : 500 });
   }
 }

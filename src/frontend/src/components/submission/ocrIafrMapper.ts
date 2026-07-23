@@ -204,6 +204,7 @@ function buildTargets(): FieldTarget[] {
 
   for (const section of iafrManualSections) {
     for (const field of section.fields) {
+      if (field.key === 'progressive_tax_share') continue;
       addTarget({
         key: field.key,
         label: field.label,

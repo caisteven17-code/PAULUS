@@ -88,6 +88,16 @@ function getUserHeaders(): Record<string, string> {
   return headers;
 }
 
+export async function getApiRequestHeaders(includeJson = false): Promise<Record<string, string>> {
+  const headers: Record<string, string> = {
+    ...getUserHeaders(),
+    ...(includeJson ? { 'Content-Type': 'application/json' } : {}),
+  };
+  const token = await getAuthToken();
+  if (token) headers.Authorization = token;
+  return headers;
+}
+
 // ------------------------------------------------------------------
 // Helpers
 // ------------------------------------------------------------------

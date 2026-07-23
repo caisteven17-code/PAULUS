@@ -48,7 +48,7 @@ import {
 } from '../components/submission/types';
 import { SUBMISSION_CONFIG } from '../constants';
 import { usePermissions } from '../hooks/usePermissions';
-import { apiClient } from '../lib/api-client';
+import { apiClient, getApiRequestHeaders } from '../lib/api-client';
 import { combineOcrPages, recognizePdfFile } from '../lib/browserOcr';
 
 interface ParishDataSubmissionProps {
@@ -367,9 +367,7 @@ export function ParishDataSubmission({
         ]),
       );
 
-      let preview:
-        | { runId?: string; storagePath?: string; status?: string; error?: string }
-        | null = null;
+      let preview: { runId?: string; storagePath?: string; status?: string; error?: string } | null = null;
       let previewWarning = '';
       try {
         const fd = new FormData();
@@ -416,13 +414,12 @@ export function ParishDataSubmission({
             unmatchedFieldCount: mapped.summary.missingCount,
           },
           fields: fieldMetadata,
-          issues:
-            [
-              previewWarning ? `OCR preview save issue: ${previewWarning}` : '',
-              mapped.summary.lowConfidenceCount + mapped.summary.missingCount > 0
-                ? 'Some OCR fields need review before final submission.'
-                : '',
-            ].filter(Boolean),
+          issues: [
+            previewWarning ? `OCR preview save issue: ${previewWarning}` : '',
+            mapped.summary.lowConfidenceCount + mapped.summary.missingCount > 0
+              ? 'Some OCR fields need review before final submission.'
+              : '',
+          ].filter(Boolean),
         },
       });
       setCurrentStepId('mapping');
@@ -464,7 +461,11 @@ export function ParishDataSubmission({
         const result = await response.json();
         if (!response.ok) throw new Error(result.error ?? 'The sandbox upload failed.');
 
-        setSubmissionResult({ submissionId: result.runId, filePath: result.storagePath, validationStatus: result.status });
+        setSubmissionResult({
+          submissionId: result.runId,
+          filePath: result.storagePath,
+          validationStatus: result.status,
+        });
         setCurrentStepId('validation');
         setStatusMessage('Reading and validating the uploaded IAFR report...');
 
@@ -475,7 +476,9 @@ export function ParishDataSubmission({
             const status = await statusResponse.json();
             const step = testStageStepMap[status.currentStage];
             if (step) setCurrentStepId(step);
-            const activeStage = status.stages?.find((stage: { stage_code: string }) => stage.stage_code === status.currentStage);
+            const activeStage = status.stages?.find(
+              (stage: { stage_code: string }) => stage.stage_code === status.currentStage,
+            );
             if (activeStage?.message) setStatusMessage(activeStage.message);
           } catch {
             // Processing response remains authoritative if one poll is missed.
@@ -516,9 +519,7 @@ export function ParishDataSubmission({
         const message = error instanceof Error ? error.message : 'The sandbox upload failed.';
         setStatusMessage(message);
         setSubmissionIssues((current) =>
-          current.length > 0
-            ? current
-            : [{ fieldName: 'Submission', severity: 'error', message }],
+          current.length > 0 ? current : [{ fieldName: 'Submission', severity: 'error', message }],
         );
         setShowWarningModal(true);
         return;
@@ -588,9 +589,11 @@ export function ParishDataSubmission({
     setCurrentStepId('upload');
     setStatusMessage('Saving the manual IAFR report to the submission sandbox...');
     try {
+      const headers = await getApiRequestHeaders(true);
       const response = await fetch('/api/submissions/test-runs', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        headers,
         body: JSON.stringify({
           institutionName: parishName,
           reportingMonth: selectedMonth + 1,
@@ -669,13 +672,17 @@ export function ParishDataSubmission({
           <div className="flex flex-col gap-4 p-4 sm:p-5 lg:flex-row lg:items-end lg:justify-between">
             {institutionType === 'parish' && (
               <div>
-                <p className="mb-2 text-[10px] font-bold uppercase tracking-[0.12em] text-gray-500">Submission method</p>
+                <p className="mb-2 text-[10px] font-bold uppercase tracking-[0.12em] text-gray-500">
+                  Submission method
+                </p>
                 <div className="inline-flex rounded-lg border border-gray-200 bg-gray-100 p-1">
                   <button
                     type="button"
                     onClick={() => {
                       setSubmissionMode('upload');
-                      setStatusMessage('No submission has started yet. Download a template or choose a report file to begin.');
+                      setStatusMessage(
+                        'No submission has started yet. Download a template or choose a report file to begin.',
+                      );
                     }}
                     className={`inline-flex h-9 items-center gap-2 rounded-md px-4 text-sm font-semibold transition ${submissionMode === 'upload' ? 'bg-black text-white shadow-sm' : 'text-gray-600 hover:bg-white hover:text-black'}`}
                   >
@@ -689,7 +696,8 @@ export function ParishDataSubmission({
                     }}
                     className={`inline-flex h-9 items-center gap-2 rounded-md px-4 text-sm font-semibold transition ${submissionMode === 'manual' ? 'bg-black text-white shadow-sm' : 'text-gray-600 hover:bg-white hover:text-black'}`}
                   >
-                    <Keyboard className={`h-4 w-4 ${submissionMode === 'manual' ? 'text-gold-400' : ''}`} /> Manual entry
+                    <Keyboard className={`h-4 w-4 ${submissionMode === 'manual' ? 'text-gold-400' : ''}`} /> Manual
+                    entry
                   </button>
                   <button
                     type="button"
@@ -708,13 +716,19 @@ export function ParishDataSubmission({
             <div className="flex w-full flex-col gap-3 sm:flex-row sm:items-end lg:w-auto">
               {institutionType === 'parish' && (
                 <label className="w-full sm:w-56">
-                  <span className="mb-2 block text-[10px] font-bold uppercase tracking-[0.12em] text-gray-500">Reporting period</span>
+                  <span className="mb-2 block text-[10px] font-bold uppercase tracking-[0.12em] text-gray-500">
+                    Reporting period
+                  </span>
                   <select
                     value={selectedMonth}
                     onChange={(event) => setSelectedMonth(Number(event.target.value))}
                     className="h-10 w-full rounded-md border border-gray-300 bg-white px-3 text-sm font-semibold text-black outline-none transition focus:border-gold-500 focus:ring-2 focus:ring-gold-500/20"
                   >
-                    {MONTHS.map((month, index) => <option key={month} value={index}>{month} {year}</option>)}
+                    {MONTHS.map((month, index) => (
+                      <option key={month} value={index}>
+                        {month} {year}
+                      </option>
+                    ))}
                   </select>
                 </label>
               )}
@@ -725,7 +739,9 @@ export function ParishDataSubmission({
                 className="inline-flex h-10 items-center justify-center gap-2 rounded-md border border-gray-300 bg-white px-3.5 text-sm font-semibold text-gray-700 transition hover:border-gray-400 hover:bg-gray-50 hover:text-black"
               >
                 <FileText className="h-4 w-4" /> How it works
-                <ChevronDown className={`h-4 w-4 transition-transform duration-200 ${isGuideOpen ? 'rotate-180' : ''}`} />
+                <ChevronDown
+                  className={`h-4 w-4 transition-transform duration-200 ${isGuideOpen ? 'rotate-180' : ''}`}
+                />
               </button>
             </div>
           </div>
@@ -747,10 +763,21 @@ export function ParishDataSubmission({
                 <div className="grid border-t border-gray-200 bg-white sm:grid-cols-3 sm:divide-x sm:divide-gray-200">
                   {[
                     { step: '01', title: 'Download template', detail: 'Use the approved report format.' },
-                    { step: '02', title: 'Submit report', detail: `Upload ${acceptedFormatsLabel}, run OCR PDF, or use manual entry.` },
-                    { step: '03', title: 'Review result', detail: 'Confirm validation and submission status before saving.' },
+                    {
+                      step: '02',
+                      title: 'Submit report',
+                      detail: `Upload ${acceptedFormatsLabel}, run OCR PDF, or use manual entry.`,
+                    },
+                    {
+                      step: '03',
+                      title: 'Review result',
+                      detail: 'Confirm validation and submission status before saving.',
+                    },
                   ].map((item) => (
-                    <div key={item.step} className="flex gap-3 border-t border-gray-100 px-4 py-4 first:border-t-0 sm:border-t-0 sm:px-5">
+                    <div
+                      key={item.step}
+                      className="flex gap-3 border-t border-gray-100 px-4 py-4 first:border-t-0 sm:border-t-0 sm:px-5"
+                    >
                       <span className="text-xs font-bold text-gold-700">{item.step}</span>
                       <span>
                         <span className="block text-sm font-semibold text-gray-950">{item.title}</span>

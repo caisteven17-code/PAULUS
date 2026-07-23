@@ -62,6 +62,7 @@ import { DataManagementControl } from '../components/settings/DataManagementCont
 import { LiturgicalValidatorControl } from '../components/settings/LiturgicalValidatorControl';
 import { EntityManagementControl } from '../components/settings/EntityManagementControl';
 import { ParishClassificationLogic } from '../components/settings/ParishClassificationLogic';
+import { TaxationSchemeControl } from '../components/settings/TaxationSchemeControl';
 import { getAccessRoleLabel, getAppRole, normalizeAccessRole } from '../lib/access';
 import { usePermissions } from '../hooks/usePermissions';
 import { roundedField, selectField } from '../lib/formStyles';
@@ -631,8 +632,12 @@ export function Settings({ onBack, onLogout, onNavigate, role = 'bishop', initia
   });
   const [showInstitutionSuggestions, setShowInstitutionSuggestions] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
-  const editingAccount = editingAccountId === null ? null : accounts.find((account) => account.id?.toString() === editingAccountId.toString());
-  const assignmentLocked = editingAccount?.assignmentStatus === 'assigned' && normalizeAccessRole(formState.role) === 'parish_priest';
+  const editingAccount =
+    editingAccountId === null
+      ? null
+      : accounts.find((account) => account.id?.toString() === editingAccountId.toString());
+  const assignmentLocked =
+    editingAccount?.assignmentStatus === 'assigned' && normalizeAccessRole(formState.role) === 'parish_priest';
 
   const institutionOptions: { id: InstitutionType; label: string }[] = [
     { id: 'diocese', label: 'Diocese' },
@@ -788,7 +793,8 @@ export function Settings({ onBack, onLogout, onNavigate, role = 'bishop', initia
   const handleSaveAccount = async (e: React.FormEvent, createUnassignedAndRedirect = false) => {
     e.preventDefault();
     const unassignedPriest = normalizeAccessRole(formState.role) === 'parish_priest' && !formState.entity;
-    if (!formState.institutionType || (!formState.entity && !unassignedPriest) || !formState.email || !formState.role) return;
+    if (!formState.institutionType || (!formState.entity && !unassignedPriest) || !formState.email || !formState.role)
+      return;
     if (editingAccountId === null && !formState.password) {
       setShowAccountSuccess({ show: true, message: 'Error: Password is required for new accounts.' });
       setTimeout(() => setShowAccountSuccess({ show: false, message: '' }), 4000);
@@ -799,7 +805,12 @@ export function Settings({ onBack, onLogout, onNavigate, role = 'bishop', initia
       const accessRole = normalizeAccessRole(formState.role);
 
       // One-priest-per-parish rule: warn before creating/reassigning a second parish_priest.
-      if (!createUnassignedAndRedirect && accessRole === 'parish_priest' && formState.institutionType === 'parish' && formState.entity) {
+      if (
+        !createUnassignedAndRedirect &&
+        accessRole === 'parish_priest' &&
+        formState.institutionType === 'parish' &&
+        formState.entity
+      ) {
         // Account rows carry the institution under `entity` (and the normalized
         // role under `roleId`) — matching on the non-existent `a.entityName`
         // with the role label is why the warning never fired and duplicates
@@ -854,7 +865,13 @@ export function Settings({ onBack, onLogout, onNavigate, role = 'bishop', initia
         if (!res.ok) {
           const body = await res.json();
           if (body.code === 'PARISH_PRIEST_ASSIGNMENT_CONFLICT') {
-            setDuplicatePriestModal({ open: true, existingPriest: body.existingPriest, existingPriestEmail: '', parishName: body.parishName, onProceed: () => {} });
+            setDuplicatePriestModal({
+              open: true,
+              existingPriest: body.existingPriest,
+              existingPriestEmail: '',
+              parishName: body.parishName,
+              onProceed: () => {},
+            });
             return;
           }
           throw new Error(body.error ?? 'Update failed');
@@ -879,19 +896,31 @@ export function Settings({ onBack, onLogout, onNavigate, role = 'bishop', initia
         if (!res.ok) {
           const body = await res.json();
           if (body.code === 'PARISH_PRIEST_ASSIGNMENT_CONFLICT') {
-            setDuplicatePriestModal({ open: true, existingPriest: body.existingPriest, existingPriestEmail: '', parishName: body.parishName, onProceed: () => {} });
+            setDuplicatePriestModal({
+              open: true,
+              existingPriest: body.existingPriest,
+              existingPriestEmail: '',
+              parishName: body.parishName,
+              onProceed: () => {},
+            });
             return;
           }
           throw new Error(body.error ?? 'Create failed');
         }
         const createdUser = await res.json().catch(() => ({}));
-        setShowAccountSuccess({ show: true, message: createUnassignedAndRedirect ? 'Priest created as unassigned.' : 'New account created successfully!' });
+        setShowAccountSuccess({
+          show: true,
+          message: createUnassignedAndRedirect ? 'Priest created as unassigned.' : 'New account created successfully!',
+        });
         if (createUnassignedAndRedirect) {
-          sessionStorage.setItem('priest_reassignment_prefill', JSON.stringify({
-            action: 'assign',
-            priestId: createdUser.id,
-            destinationParishId: requestedParish?.id || '',
-          }));
+          sessionStorage.setItem(
+            'priest_reassignment_prefill',
+            JSON.stringify({
+              action: 'assign',
+              priestId: createdUser.id,
+              destinationParishId: requestedParish?.id || '',
+            }),
+          );
         }
 
         // If it was a local mock user, remove it from localStorage since it is now successfully saved in Supabase!
@@ -1001,7 +1030,10 @@ export function Settings({ onBack, onLogout, onNavigate, role = 'bishop', initia
   const handleArchiveAccount = (id: string | number) => {
     const account = accounts.find((item) => item.id.toString() === id.toString());
     if (account?.assignmentStatus === 'assigned') {
-      sessionStorage.setItem('priest_reassignment_prefill', JSON.stringify({ action: 'relieve', priestId: account.id }));
+      sessionStorage.setItem(
+        'priest_reassignment_prefill',
+        JSON.stringify({ action: 'relieve', priestId: account.id }),
+      );
       onNavigate?.('priest-aitwin');
       return;
     }
@@ -1349,7 +1381,9 @@ export function Settings({ onBack, onLogout, onNavigate, role = 'bishop', initia
                         }`}
                       >
                         <option value="" disabled={formState.role !== 'parish_priest'}>
-                          {formState.role === 'parish_priest' ? 'No Parish — Create as Unassigned' : institutionNamePlaceholder}
+                          {formState.role === 'parish_priest'
+                            ? 'No Parish — Create as Unassigned'
+                            : institutionNamePlaceholder}
                         </option>
                         {institutionNames.map((item) => (
                           <option key={item.name} value={item.name}>
@@ -1360,13 +1394,28 @@ export function Settings({ onBack, onLogout, onNavigate, role = 'bishop', initia
                     )}
                     {formState.role === 'parish_priest' && !formState.entity && (
                       <div className="mt-2 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs font-semibold leading-relaxed text-amber-800">
-                        This priest may sign in, but will have no parish data access until assigned through Parish Priest Reassignment.
+                        This priest may sign in, but will have no parish data access until assigned through Parish
+                        Priest Reassignment.
                       </div>
                     )}
                     {assignmentLocked && (
                       <div className="mt-2 rounded-xl border border-blue-200 bg-blue-50 px-3 py-2 text-xs font-semibold leading-relaxed text-blue-800">
-                        This parish assignment is managed through Parish Priest Reassignment. You may still edit the priest's account details.
-                        <button type="button" onClick={() => { closeModal(); sessionStorage.setItem('priest_reassignment_prefill', JSON.stringify({ action: 'transfer', priestId: editingAccount?.id })); onNavigate?.('priest-aitwin'); }} className="mt-2 block font-black text-blue-900 underline">Open Reassignment</button>
+                        This parish assignment is managed through Parish Priest Reassignment. You may still edit the
+                        priest's account details.
+                        <button
+                          type="button"
+                          onClick={() => {
+                            closeModal();
+                            sessionStorage.setItem(
+                              'priest_reassignment_prefill',
+                              JSON.stringify({ action: 'transfer', priestId: editingAccount?.id }),
+                            );
+                            onNavigate?.('priest-aitwin');
+                          }}
+                          className="mt-2 block font-black text-blue-900 underline"
+                        >
+                          Open Reassignment
+                        </button>
                       </div>
                     )}
                   </div>
@@ -1638,9 +1687,7 @@ export function Settings({ onBack, onLogout, onNavigate, role = 'bishop', initia
                         <LockKeyhole className="h-5 w-5" />
                       </div>
                       <div>
-                        <p className="text-[10px] font-black uppercase tracking-[0.18em] text-[#9A7A17]">
-                          Security
-                        </p>
+                        <p className="text-[10px] font-black uppercase tracking-[0.18em] text-[#9A7A17]">Security</p>
                         <h4 className="font-serif text-xl font-bold text-slate-950">Password Access</h4>
                       </div>
                     </div>
@@ -1735,9 +1782,7 @@ export function Settings({ onBack, onLogout, onNavigate, role = 'bishop', initia
                         </div>
                       </div>
                       <div className="rounded-[24px] border border-[#D4AF37]/30 bg-[#FFFAEA] p-5">
-                        <p className="text-[10px] font-black uppercase tracking-[0.18em] text-[#9A7A17]">
-                          Access Role
-                        </p>
+                        <p className="text-[10px] font-black uppercase tracking-[0.18em] text-[#9A7A17]">Access Role</p>
                         <p className="mt-2 text-lg font-extrabold text-slate-950">{profileRoleLabel}</p>
                         <p className="mt-1 text-xs font-semibold capitalize text-slate-500">
                           {auth.currentUser?.entityType || 'Diocese'} account
@@ -2145,7 +2190,8 @@ export function Settings({ onBack, onLogout, onNavigate, role = 'bishop', initia
                       </div>
                       <h3 className="mt-4 text-3xl font-black tracking-tight md:text-4xl">User Account Management</h3>
                       <p className="mt-3 max-w-lg text-sm font-medium leading-relaxed text-white/55">
-                        Provision personnel accounts, assign institutional access, and keep diocesan roles organized from one secure directory.
+                        Provision personnel accounts, assign institutional access, and keep diocesan roles organized
+                        from one secure directory.
                       </p>
                     </div>
 
@@ -2183,207 +2229,247 @@ export function Settings({ onBack, onLogout, onNavigate, role = 'bishop', initia
                   <div className="border-b border-slate-100 px-5 py-5 md:px-7">
                     <div className="mb-4 flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between">
                       <div>
-                        <p className="text-[9px] font-black uppercase tracking-[0.22em] text-gold-600">Personnel directory</p>
+                        <p className="text-[9px] font-black uppercase tracking-[0.22em] text-gold-600">
+                          Personnel directory
+                        </p>
                         <h4 className="mt-1 text-xl font-black text-slate-950">Authorized accounts</h4>
                       </div>
-                      <p className="text-xs font-bold text-slate-400">Showing {filteredAccounts.length} of {activeAccounts.length} active accounts</p>
+                      <p className="text-xs font-bold text-slate-400">
+                        Showing {filteredAccounts.length} of {activeAccounts.length} active accounts
+                      </p>
                     </div>
 
-                <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
-                  <div className="relative flex-1">
-                    <Search className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400" />
-                    <input
-                      type="text"
-                      placeholder="Search institutions, types, roles, or emails..."
-                      value={searchQuery}
-                      onChange={(e) => setSearchQuery(e.target.value)}
-                      className={roundedField(
-                        Boolean(searchQuery.trim()),
-                        'w-full pl-10 pr-6 py-3.5 rounded-2xl text-sm font-medium',
-                      )}
-                    />
-                  </div>
-                  <FilterModal activeCount={userFilterCount} onClear={clearUserFilters}>
-                    <FilterField label="Role">
-                      <select
-                        value={roleFilter}
-                        onChange={(e) => setRoleFilter(e.target.value)}
-                        className={selectField(roleFilter !== 'all', 'h-11 w-full rounded-2xl px-4 text-sm font-bold')}
-                      >
-                        <option value="all">All roles</option>
-                        {roleOptions.map((roleName) => (
-                          <option key={roleName} value={roleName}>
-                            {roleName}
-                          </option>
-                        ))}
-                      </select>
-                    </FilterField>
-
-                    <FilterField label="Institution type">
-                      <select
-                        value={typeFilter}
-                        onChange={(e) => {
-                          setTypeFilter(e.target.value);
-                          setInstitutionFilter('all');
-                        }}
-                        className={selectField(
-                          typeFilter !== 'all',
-                          'h-11 w-full rounded-2xl px-4 text-sm font-bold capitalize',
-                        )}
-                      >
-                        <option value="all">All types</option>
-                        <option value="diocese">Diocese</option>
-                        <option value="parish">Parish</option>
-                        <option value="seminary">Seminary</option>
-                        <option value="school">School</option>
-                      </select>
-                    </FilterField>
-
-                    <FilterField label="Assignment status">
-                      <select value={assignmentFilter} onChange={(e) => setAssignmentFilter(e.target.value)} className={selectField(assignmentFilter !== 'all', 'h-11 w-full rounded-2xl px-4 text-sm font-bold')}>
-                        <option value="all">All assignments</option>
-                        <option value="assigned">Assigned</option>
-                        <option value="unassigned">Unassigned</option>
-                      </select>
-                    </FilterField>
-
-                    <FilterField label="Institution">
-                      <select
-                        value={institutionFilter}
-                        onChange={(e) => setInstitutionFilter(e.target.value)}
-                        className={selectField(
-                          institutionFilter !== 'all',
-                          'h-11 w-full rounded-2xl px-4 text-sm font-bold',
-                        )}
-                      >
-                        <option value="all">All institutions</option>
-                        {accountInstitutionOptions.map((name) => (
-                          <option key={name} value={name}>
-                            {name}
-                          </option>
-                        ))}
-                      </select>
-                    </FilterField>
-                  </FilterModal>
-                </div>
-                  </div>
-
-                <div className="overflow-x-auto px-5 pb-5 md:px-7 md:pb-7">
-                  <table className="w-full text-left border-collapse">
-                    <thead>
-                      <tr className="border-b border-slate-200 bg-slate-50/80">
-                        <th className="pb-3.5 font-bold text-gray-400 text-[10px] uppercase tracking-widest w-[24%]">
-                          Full Name
-                        </th>
-                        <th className="pb-3.5 font-bold text-gray-400 text-[10px] uppercase tracking-widest w-[14%]">
-                          Role
-                        </th>
-                        <th className="pb-3.5 font-bold text-gray-400 text-[10px] uppercase tracking-widest w-[24%]">Institution</th>
-                        <th className="pb-3.5 font-bold text-gray-400 text-[10px] uppercase tracking-widest w-[13%]">Institution Type</th>
-                        <th className="pb-3.5 font-bold text-gray-400 text-[10px] uppercase tracking-widest w-[20%]">Email Address</th>
-                        <th className="pb-3.5 font-bold text-gray-400 text-[10px] uppercase tracking-widest text-right">
-                          Actions
-                        </th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-slate-100">
-                      {filteredAccounts.length > 0 ? (
-                        filteredAccounts.map((account) => (
-                          <tr
-                            key={account.id}
-                            onClick={() => setViewAccount(account)}
-                            className="group cursor-pointer transition-colors hover:bg-gold-50/45"
+                    <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+                      <div className="relative flex-1">
+                        <Search className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400" />
+                        <input
+                          type="text"
+                          placeholder="Search institutions, types, roles, or emails..."
+                          value={searchQuery}
+                          onChange={(e) => setSearchQuery(e.target.value)}
+                          className={roundedField(
+                            Boolean(searchQuery.trim()),
+                            'w-full pl-10 pr-6 py-3.5 rounded-2xl text-sm font-medium',
+                          )}
+                        />
+                      </div>
+                      <FilterModal activeCount={userFilterCount} onClear={clearUserFilters}>
+                        <FilterField label="Role">
+                          <select
+                            value={roleFilter}
+                            onChange={(e) => setRoleFilter(e.target.value)}
+                            className={selectField(
+                              roleFilter !== 'all',
+                              'h-11 w-full rounded-2xl px-4 text-sm font-bold',
+                            )}
                           >
-                            <td className="py-4 pr-4 text-gray-800 text-sm font-semibold">
-                              <div className="flex items-center gap-3">
-                                <Avatar
-                                  name={account.leader || account.email}
-                                  photoUrl={account.avatarUrl || account.photoURL}
-                                  size={32}
-                                  className="shadow-sm"
-                                />
-                                <span>{getFormattedFullName(account.leader)}</span>
-                              </div>
-                            </td>
-                            <td className="py-4 pr-4">
-                              <span
-                                className={`px-3 py-1 rounded-full text-[9px] font-bold uppercase tracking-wider ${
-                                  account.role === 'Bishop'
-                                    ? 'bg-amber-100 text-amber-700'
-                                    : account.role === 'Admin'
-                                      ? 'bg-gray-900 text-white'
-                                      : 'bg-gray-100 text-gray-600'
-                                }`}
-                              >
-                                {account.role}
-                              </span>
-                            </td>
-                            <td className="py-4 pr-4">
-                              <div className={`text-sm font-bold ${account.assignmentStatus === 'unassigned' ? 'text-amber-700' : 'text-gray-900'}`}>{account.entity || 'No Parish'}</div>
-                              {account.assignmentStatus === 'unassigned' && <span className="mt-1 inline-flex rounded-full bg-amber-50 px-2 py-0.5 text-[8px] font-black uppercase tracking-wider text-amber-700">Unassigned</span>}
-                            </td>
-                            <td className="py-4 pr-4 text-gray-600 text-sm font-medium capitalize">
-                              <span className="inline-flex rounded-full border border-gold-200 bg-gold-50 px-2.5 py-1 text-[9px] font-black uppercase tracking-wider text-gold-700">
-                                {account.entityType || 'Institution'}
-                              </span>
-                            </td>
-                            <td className="py-4 pr-4 text-gray-500 font-mono text-xs">{account.email}</td>
-                            <td className="py-4 text-right">
-                              <div className="flex items-center justify-end gap-1 opacity-60 transition-opacity group-hover:opacity-100">
-                                {viewMode === 'active' && (
-                                  account.assignmentStatus === 'unassigned' ? (
-                                    <button onClick={(e) => { e.stopPropagation(); sessionStorage.setItem('priest_reassignment_prefill', JSON.stringify({ action: 'assign', priestId: account.id })); onNavigate?.('priest-aitwin'); }} className="rounded-lg px-2 py-1.5 text-[10px] font-black text-amber-700 hover:bg-amber-50" title="Assign Parish">Assign Parish</button>
-                                  ) : null
+                            <option value="all">All roles</option>
+                            {roleOptions.map((roleName) => (
+                              <option key={roleName} value={roleName}>
+                                {roleName}
+                              </option>
+                            ))}
+                          </select>
+                        </FilterField>
+
+                        <FilterField label="Institution type">
+                          <select
+                            value={typeFilter}
+                            onChange={(e) => {
+                              setTypeFilter(e.target.value);
+                              setInstitutionFilter('all');
+                            }}
+                            className={selectField(
+                              typeFilter !== 'all',
+                              'h-11 w-full rounded-2xl px-4 text-sm font-bold capitalize',
+                            )}
+                          >
+                            <option value="all">All types</option>
+                            <option value="diocese">Diocese</option>
+                            <option value="parish">Parish</option>
+                            <option value="seminary">Seminary</option>
+                            <option value="school">School</option>
+                          </select>
+                        </FilterField>
+
+                        <FilterField label="Assignment status">
+                          <select
+                            value={assignmentFilter}
+                            onChange={(e) => setAssignmentFilter(e.target.value)}
+                            className={selectField(
+                              assignmentFilter !== 'all',
+                              'h-11 w-full rounded-2xl px-4 text-sm font-bold',
+                            )}
+                          >
+                            <option value="all">All assignments</option>
+                            <option value="assigned">Assigned</option>
+                            <option value="unassigned">Unassigned</option>
+                          </select>
+                        </FilterField>
+
+                        <FilterField label="Institution">
+                          <select
+                            value={institutionFilter}
+                            onChange={(e) => setInstitutionFilter(e.target.value)}
+                            className={selectField(
+                              institutionFilter !== 'all',
+                              'h-11 w-full rounded-2xl px-4 text-sm font-bold',
+                            )}
+                          >
+                            <option value="all">All institutions</option>
+                            {accountInstitutionOptions.map((name) => (
+                              <option key={name} value={name}>
+                                {name}
+                              </option>
+                            ))}
+                          </select>
+                        </FilterField>
+                      </FilterModal>
+                    </div>
+                  </div>
+
+                  <div className="overflow-x-auto px-5 pb-5 md:px-7 md:pb-7">
+                    <table className="w-full text-left border-collapse">
+                      <thead>
+                        <tr className="border-b border-slate-200 bg-slate-50/80">
+                          <th className="pb-3.5 font-bold text-gray-400 text-[10px] uppercase tracking-widest w-[24%]">
+                            Full Name
+                          </th>
+                          <th className="pb-3.5 font-bold text-gray-400 text-[10px] uppercase tracking-widest w-[14%]">
+                            Role
+                          </th>
+                          <th className="pb-3.5 font-bold text-gray-400 text-[10px] uppercase tracking-widest w-[24%]">
+                            Institution
+                          </th>
+                          <th className="pb-3.5 font-bold text-gray-400 text-[10px] uppercase tracking-widest w-[13%]">
+                            Institution Type
+                          </th>
+                          <th className="pb-3.5 font-bold text-gray-400 text-[10px] uppercase tracking-widest w-[20%]">
+                            Email Address
+                          </th>
+                          <th className="pb-3.5 font-bold text-gray-400 text-[10px] uppercase tracking-widest text-right">
+                            Actions
+                          </th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-100">
+                        {filteredAccounts.length > 0 ? (
+                          filteredAccounts.map((account) => (
+                            <tr
+                              key={account.id}
+                              onClick={() => setViewAccount(account)}
+                              className="group cursor-pointer transition-colors hover:bg-gold-50/45"
+                            >
+                              <td className="py-4 pr-4 text-gray-800 text-sm font-semibold">
+                                <div className="flex items-center gap-3">
+                                  <Avatar
+                                    name={account.leader || account.email}
+                                    photoUrl={account.avatarUrl || account.photoURL}
+                                    size={32}
+                                    className="shadow-sm"
+                                  />
+                                  <span>{getFormattedFullName(account.leader)}</span>
+                                </div>
+                              </td>
+                              <td className="py-4 pr-4">
+                                <span
+                                  className={`px-3 py-1 rounded-full text-[9px] font-bold uppercase tracking-wider ${
+                                    account.role === 'Bishop'
+                                      ? 'bg-amber-100 text-amber-700'
+                                      : account.role === 'Admin'
+                                        ? 'bg-gray-900 text-white'
+                                        : 'bg-gray-100 text-gray-600'
+                                  }`}
+                                >
+                                  {account.role}
+                                </span>
+                              </td>
+                              <td className="py-4 pr-4">
+                                <div
+                                  className={`text-sm font-bold ${account.assignmentStatus === 'unassigned' ? 'text-amber-700' : 'text-gray-900'}`}
+                                >
+                                  {account.entity || 'No Parish'}
+                                </div>
+                                {account.assignmentStatus === 'unassigned' && (
+                                  <span className="mt-1 inline-flex rounded-full bg-amber-50 px-2 py-0.5 text-[8px] font-black uppercase tracking-wider text-amber-700">
+                                    Unassigned
+                                  </span>
                                 )}
-                                {viewMode === 'active' && (
+                              </td>
+                              <td className="py-4 pr-4 text-gray-600 text-sm font-medium capitalize">
+                                <span className="inline-flex rounded-full border border-gold-200 bg-gold-50 px-2.5 py-1 text-[9px] font-black uppercase tracking-wider text-gold-700">
+                                  {account.entityType || 'Institution'}
+                                </span>
+                              </td>
+                              <td className="py-4 pr-4 text-gray-500 font-mono text-xs">{account.email}</td>
+                              <td className="py-4 text-right">
+                                <div className="flex items-center justify-end gap-1 opacity-60 transition-opacity group-hover:opacity-100">
+                                  {viewMode === 'active' &&
+                                    (account.assignmentStatus === 'unassigned' ? (
+                                      <button
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          sessionStorage.setItem(
+                                            'priest_reassignment_prefill',
+                                            JSON.stringify({ action: 'assign', priestId: account.id }),
+                                          );
+                                          onNavigate?.('priest-aitwin');
+                                        }}
+                                        className="rounded-lg px-2 py-1.5 text-[10px] font-black text-amber-700 hover:bg-amber-50"
+                                        title="Assign Parish"
+                                      >
+                                        Assign Parish
+                                      </button>
+                                    ) : null)}
+                                  {viewMode === 'active' && (
+                                    <button
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        handleEditClick(account);
+                                      }}
+                                      className="rounded-lg p-2 text-slate-400 transition-all hover:bg-gold-50 hover:text-gold-700"
+                                      title="Edit Account"
+                                    >
+                                      <Pencil className="w-3.5 h-3.5" />
+                                    </button>
+                                  )}
                                   <button
                                     onClick={(e) => {
                                       e.stopPropagation();
-                                      handleEditClick(account);
+                                      handleArchiveAccount(account.id);
                                     }}
-                                    className="rounded-lg p-2 text-slate-400 transition-all hover:bg-gold-50 hover:text-gold-700"
-                                    title="Edit Account"
+                                    className={`p-2 rounded-lg transition-all ${
+                                      viewMode === 'active'
+                                        ? 'text-gray-400 hover:text-amber-600 hover:bg-amber-50'
+                                        : 'text-gray-400 hover:text-emerald-600 hover:bg-emerald-50'
+                                    }`}
+                                    title={viewMode === 'active' ? 'Archive Account' : 'Restore Account'}
                                   >
-                                    <Pencil className="w-3.5 h-3.5" />
+                                    {viewMode === 'active' ? (
+                                      <Database className="w-3.5 h-3.5" />
+                                    ) : (
+                                      <ArrowRight className="w-3.5 h-3.5 rotate-180" />
+                                    )}
                                   </button>
-                                )}
-                                <button
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    handleArchiveAccount(account.id);
-                                  }}
-                                  className={`p-2 rounded-lg transition-all ${
-                                    viewMode === 'active'
-                                      ? 'text-gray-400 hover:text-amber-600 hover:bg-amber-50'
-                                      : 'text-gray-400 hover:text-emerald-600 hover:bg-emerald-50'
-                                  }`}
-                                  title={viewMode === 'active' ? 'Archive Account' : 'Restore Account'}
-                                >
-                                  {viewMode === 'active' ? (
-                                    <Database className="w-3.5 h-3.5" />
-                                  ) : (
-                                    <ArrowRight className="w-3.5 h-3.5 rotate-180" />
-                                  )}
-                                </button>
+                                </div>
+                              </td>
+                            </tr>
+                          ))
+                        ) : (
+                          <tr>
+                            <td colSpan={6} className="py-24 text-center">
+                              <div className="flex flex-col items-center gap-4">
+                                <div className="w-20 h-20 bg-gray-50 rounded-full flex items-center justify-center">
+                                  <Users className="w-10 h-10 text-gray-200" />
+                                </div>
+                                <p className="text-gray-400 font-medium">No accounts found matching your search.</p>
                               </div>
                             </td>
                           </tr>
-                        ))
-                      ) : (
-                        <tr>
-                          <td colSpan={6} className="py-24 text-center">
-                            <div className="flex flex-col items-center gap-4">
-                              <div className="w-20 h-20 bg-gray-50 rounded-full flex items-center justify-center">
-                                <Users className="w-10 h-10 text-gray-200" />
-                              </div>
-                              <p className="text-gray-400 font-medium">No accounts found matching your search.</p>
-                            </div>
-                          </td>
-                        </tr>
-                      )}
-                    </tbody>
-                  </table>
-                </div>
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
                 </section>
               </div>
             )}
@@ -2536,6 +2622,8 @@ export function Settings({ onBack, onLogout, onNavigate, role = 'bishop', initia
               />
             )}
 
+            {activeTab === 'taxation-scheme' && permissions.manage_entities === true && <TaxationSchemeControl />}
+
             {activeTab === 'data-management' &&
               (permissions.download_csv === true ||
                 permissions.upload_csv_admin === true ||
@@ -2641,8 +2729,8 @@ export function Settings({ onBack, onLogout, onNavigate, role = 'bishop', initia
                 <p className="mt-0.5 text-sm font-bold text-slate-900">{duplicatePriestModal.existingPriest}</p>
               </div>
               <p className="text-sm leading-relaxed text-slate-500">
-                This parish cannot be assigned to another priest here. Use Parish Priest Reassignment to transfer,
-                swap, rotate, or relieve the current priest without losing assignment history.
+                This parish cannot be assigned to another priest here. Use Parish Priest Reassignment to transfer, swap,
+                rotate, or relieve the current priest without losing assignment history.
               </p>
             </div>
 
@@ -2682,7 +2770,22 @@ export function Settings({ onBack, onLogout, onNavigate, role = 'bishop', initia
                   Choose Another Parish
                 </button>
               </div>
-              <button type="button" onClick={() => { setDuplicatePriestModal({ open: false, existingPriest: '', existingPriestEmail: '', parishName: '', onProceed: () => {} }); closeModal(); }} className="w-full px-4 py-2 text-xs font-bold text-slate-400 hover:text-slate-700">Cancel</button>
+              <button
+                type="button"
+                onClick={() => {
+                  setDuplicatePriestModal({
+                    open: false,
+                    existingPriest: '',
+                    existingPriestEmail: '',
+                    parishName: '',
+                    onProceed: () => {},
+                  });
+                  closeModal();
+                }}
+                className="w-full px-4 py-2 text-xs font-bold text-slate-400 hover:text-slate-700"
+              >
+                Cancel
+              </button>
             </div>
           </div>
         </div>

@@ -137,6 +137,7 @@ const canAccessTab = (tab: string, role: Role, permissions: Record<string, boole
   if (tab === 'profile' || tab === 'change-password') return true;
   // Archives is a standalone top-level page gated by archive permissions.
   if (tab === 'archives' || tab === 'admin-archives') return hasAnyArchiveAccess(permissions);
+  if (tab === 'admin-taxation') return permissions.manage_entities === true;
   if (tab.startsWith('admin-') || tab === 'settings' || tab === 'audit-log') {
     return tab === 'audit-log' ? permissions.view_audit_logs === true : hasAdminPermissions(permissions);
   }
@@ -202,6 +203,7 @@ const TAB_TO_PATH: Record<string, string> = {
   'admin-user-management': '/admin/user-management',
   'admin-user-role': '/admin/user-role-control',
   'admin-entity': '/admin/entity-management',
+  'admin-taxation': '/admin/taxation-scheme',
   'admin-data': '/admin/data-management',
   'admin-liturgical': '/admin/liturgical-validator',
   'parish-dashboard': '/parish/dashboard',
@@ -1098,6 +1100,7 @@ export default function App() {
       'admin-user-management': 'user-management',
       'admin-user-role': 'role-control',
       'admin-entity': 'entity-management',
+      'admin-taxation': 'taxation-scheme',
       'admin-data': 'data-management',
       'admin-liturgical': 'liturgical-validator',
       'admin-security': 'security',
@@ -1105,6 +1108,9 @@ export default function App() {
       profile: 'profile',
     };
     if (adminTabMap[activeTab] !== undefined) {
+      if (activeTab === 'admin-taxation' && permissions.manage_entities !== true) {
+        return renderAccessDenied();
+      }
       const hasAdminAccess =
         permissions.create_users === true ||
         permissions.manage_roles === true ||
@@ -1476,22 +1482,50 @@ export default function App() {
         activeTab === 'profile' || activeTab === 'change-password' ? (
           <div className="min-h-screen bg-slate-50">
             <div className="mx-auto max-w-5xl p-6">
-              <button onClick={() => setActiveTab('awaiting-assignment')} className="mb-4 inline-flex items-center gap-2 text-sm font-bold text-slate-600"><ArrowLeft className="h-4 w-4" />Back</button>
+              <button
+                onClick={() => setActiveTab('awaiting-assignment')}
+                className="mb-4 inline-flex items-center gap-2 text-sm font-bold text-slate-600"
+              >
+                <ArrowLeft className="h-4 w-4" />
+                Back
+              </button>
               {renderContent()}
             </div>
           </div>
         ) : (
           <div className="flex min-h-screen items-center justify-center bg-slate-950 p-6">
             <div className="w-full max-w-xl rounded-[32px] border border-white/10 bg-white p-8 text-center shadow-2xl md:p-12">
-              <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-2xl bg-amber-50 text-amber-600"><ShieldAlert className="h-8 w-8" /></div>
-              <p className="mt-6 text-[10px] font-black uppercase tracking-[0.24em] text-amber-600">Parish Priest Account</p>
-              <h1 className="mt-2 font-serif text-3xl font-bold text-slate-950">Awaiting Parish Assignment</h1>
-              <p className="mx-auto mt-4 max-w-md text-sm font-medium leading-relaxed text-slate-500">You currently have no parish assignment. Your account remains active, but parish information will become available only after the Chancery assigns you to a parish.</p>
-              <div className="mt-8 grid gap-3 sm:grid-cols-2">
-                <button onClick={() => setActiveTab('profile')} className="rounded-2xl border border-slate-200 px-5 py-3 text-sm font-black text-slate-700 hover:bg-slate-50">View Profile</button>
-                <button onClick={() => setActiveTab('change-password')} className="rounded-2xl border border-slate-200 px-5 py-3 text-sm font-black text-slate-700 hover:bg-slate-50">Change Password</button>
+              <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-2xl bg-amber-50 text-amber-600">
+                <ShieldAlert className="h-8 w-8" />
               </div>
-              <button onClick={requestLogout} className="mt-3 w-full rounded-2xl bg-slate-950 px-5 py-3 text-sm font-black text-white hover:bg-slate-800">Sign Out</button>
+              <p className="mt-6 text-[10px] font-black uppercase tracking-[0.24em] text-amber-600">
+                Parish Priest Account
+              </p>
+              <h1 className="mt-2 font-serif text-3xl font-bold text-slate-950">Awaiting Parish Assignment</h1>
+              <p className="mx-auto mt-4 max-w-md text-sm font-medium leading-relaxed text-slate-500">
+                You currently have no parish assignment. Your account remains active, but parish information will become
+                available only after the Chancery assigns you to a parish.
+              </p>
+              <div className="mt-8 grid gap-3 sm:grid-cols-2">
+                <button
+                  onClick={() => setActiveTab('profile')}
+                  className="rounded-2xl border border-slate-200 px-5 py-3 text-sm font-black text-slate-700 hover:bg-slate-50"
+                >
+                  View Profile
+                </button>
+                <button
+                  onClick={() => setActiveTab('change-password')}
+                  className="rounded-2xl border border-slate-200 px-5 py-3 text-sm font-black text-slate-700 hover:bg-slate-50"
+                >
+                  Change Password
+                </button>
+              </div>
+              <button
+                onClick={requestLogout}
+                className="mt-3 w-full rounded-2xl bg-slate-950 px-5 py-3 text-sm font-black text-white hover:bg-slate-800"
+              >
+                Sign Out
+              </button>
             </div>
           </div>
         )
