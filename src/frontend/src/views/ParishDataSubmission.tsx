@@ -327,6 +327,13 @@ export function ParishDataSubmission({
     }
   };
 
+  const returnToEntryReview = () => {
+    setShowWarningModal(false);
+    setFlowState('idle');
+    setCurrentStepId(null);
+    setStatusMessage('Review the mapped entries, correct any highlighted values, and submit again.');
+  };
+
   const handleRequestOcrUpload = async () => {
     const message = validateOcrFile(selectedOcrFile);
     setOcrValidationMessage(message);
@@ -1068,12 +1075,12 @@ export function ParishDataSubmission({
         title={institutionType === 'parish' ? 'Submission Needs Review' : 'Anomaly Detected'}
         message={
           institutionType === 'parish'
-            ? `${submissionIssues.length || 1} issue(s) prevented the report from being saved to the test schema. Review the details below, correct the file, and submit it again.`
+            ? `${submissionIssues.length || 1} issue(s) prevented the report from being saved to the test schema. Review the details below, correct the entries, and submit again.`
             : 'The uploaded report contains unusual values and needs review. The simulated flow stopped before loading to the database.'
         }
         details={institutionType === 'parish' ? submissionIssues : undefined}
-        primaryLabel="Replace File"
-        onPrimary={() => resetFlow(false)}
+        primaryLabel={submissionMode === 'upload' ? 'Replace File' : 'Review Entries'}
+        onPrimary={() => (submissionMode === 'upload' ? resetFlow(false) : returnToEntryReview())}
         secondaryLabel="Cancel Submission"
         onSecondary={() => resetFlow(true)}
       />

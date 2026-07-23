@@ -223,7 +223,16 @@ async function createManualRun(req: NextRequest) {
     .rpc('commit_parish_submission_test_run', { p_run_id: runId });
 
   if (commitError || !financialRecordId) {
-    const message = commitError?.message ?? 'Canonical account reconciliation failed.';
+    const { data: failedRun } = await supabase
+      .schema('operations')
+      .from('parish_submission_test_runs')
+      .select('error_summary')
+      .eq('id', runId)
+      .maybeSingle();
+    const message =
+      commitError?.message ??
+      failedRun?.error_summary ??
+      'Canonical account reconciliation failed. The sandbox canonical account catalog may be out of date.';
     await addStage(supabase, runId, 'mapping', 5, 'failed', message);
     return NextResponse.json({ runId, status: 'failed', error: message }, { status: 422 });
   }
