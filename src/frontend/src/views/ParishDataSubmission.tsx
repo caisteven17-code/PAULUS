@@ -12,6 +12,7 @@ import {
   ChevronDown,
   FileUp,
   Keyboard,
+  ScanLine,
 } from 'lucide-react';
 import { AnimatePresence, motion } from 'motion/react';
 import { Card, CardContent } from '../components/ui/Card';
@@ -21,7 +22,13 @@ import { ReportUploadCard } from '../components/submission/ReportUploadCard';
 import { UploadConfirmationModal } from '../components/submission/UploadConfirmationModal';
 import { SubmissionProgress } from '../components/submission/SubmissionProgress';
 import { SubmissionResultModal } from '../components/submission/SubmissionResultModal';
-import { ManualIAFRForm, ManualSubmissionEntry } from '../components/submission/ManualIAFRForm';
+import {
+  ManualIAFRForm,
+  ManualIAFROcrReviewMetadata,
+  ManualIAFRValueMap,
+  ManualSubmissionEntry,
+} from '../components/submission/ManualIAFRForm';
+import { mapOcrToIafrManualFields } from '../components/submission/ocrIafrMapper';
 import {
   acceptedSubmissionExtensionsByType,
   acceptedSubmissionFormatsByType,
@@ -42,6 +49,7 @@ import {
 import { SUBMISSION_CONFIG } from '../constants';
 import { usePermissions } from '../hooks/usePermissions';
 import { apiClient } from '../lib/api-client';
+import { combineOcrPages, recognizePdfFile } from '../lib/browserOcr';
 
 interface ParishDataSubmissionProps {
   parishName?: string;
@@ -135,9 +143,10 @@ export function ParishDataSubmission({
 
   // State declarations — kept together and ordered before memos that reference them
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
-  const [submissionMode, setSubmissionMode] = useState<'upload' | 'manual'>('upload');
+  const [submissionMode, setSubmissionMode] = useState<'upload' | 'manual' | 'ocr'>('upload');
   const [isGuideOpen, setIsGuideOpen] = useState(false);
   const [validationMessage, setValidationMessage] = useState('');
+  const [ocrValidationMessage, setOcrValidationMessage] = useState('');
   const [isTemplateLoading, setIsTemplateLoading] = useState(false);
   const [isConfirmationOpen, setIsConfirmationOpen] = useState(false);
   const [flowState, setFlowState] = useState<SubmissionFlowState>('idle');
@@ -149,6 +158,12 @@ export function ParishDataSubmission({
     Array<{ fieldName: string; severity: string; message: string; sourceRow?: number | null }>
   >([]);
   const [selectedMonth, setSelectedMonth] = useState<number>(new Date().getMonth());
+  const [selectedOcrFile, setSelectedOcrFile] = useState<File | null>(null);
+  const [ocrProgressLabel, setOcrProgressLabel] = useState('');
+  const [ocrDraft, setOcrDraft] = useState<{
+    values: ManualIAFRValueMap;
+    metadata: ManualIAFROcrReviewMetadata;
+  } | null>(null);
   const [statusMessage, setStatusMessage] = useState(
     'No submission has started yet. Download a template or choose a report file to begin.',
   );
@@ -162,6 +177,7 @@ export function ParishDataSubmission({
   );
 
   const fileSizeLabel = selectedFile ? formatFileSize(selectedFile.size) : '';
+  const ocrFileSizeLabel = selectedOcrFile ? formatFileSize(selectedOcrFile.size) : '';
 
   const [realTemplateUrls, setRealTemplateUrls] = useState<Partial<Record<'xlsx' | 'csv', string>>>({});
 
@@ -236,6 +252,15 @@ export function ParishDataSubmission({
     return '';
   };
 
+  const validateOcrFile = (file: File | null) => {
+    if (!file) return 'Please select a scanned PDF file first.';
+    const extension = file.name.split('.').pop()?.toLowerCase() ?? '';
+    const isPdf = file.type === 'application/pdf' || extension === 'pdf';
+    if (!isPdf) return 'Invalid file type. Please upload a scanned PDF file.';
+    if (file.size > 20 * 1024 * 1024) return 'The selected PDF is too large. Please keep OCR uploads below 20 MB.';
+    return '';
+  };
+
   const handleFileSelection = (file: File | null) => {
     setSelectedFile(file);
     setValidationMessage(validateFile(file));
@@ -245,6 +270,20 @@ export function ParishDataSubmission({
       file
         ? 'Valid file selected. Review the file details, then confirm the upload to begin the submission process.'
         : 'No submission has started yet. Download a template or choose a report file to begin.',
+    );
+  };
+
+  const handleOcrFileSelection = (file: File | null) => {
+    setSelectedOcrFile(file);
+    setOcrValidationMessage(validateOcrFile(file));
+    setOcrDraft(null);
+    setFlowState('idle');
+    setCurrentStepId(null);
+    setOcrProgressLabel('');
+    setStatusMessage(
+      file
+        ? 'Scanned PDF selected. Run OCR to prefill the manual review form.'
+        : 'No OCR file selected yet. Choose a scanned PDF to begin OCR review.',
     );
   };
 
@@ -272,6 +311,7 @@ export function ParishDataSubmission({
     setSubmissionIssues([]);
     setSubmissionResult(null);
     setProcessResult(null);
+    setOcrProgressLabel('');
     setStatusMessage(
       keepFile && selectedFile
         ? 'You can review the same file again or replace it before submitting a new report.'
@@ -280,7 +320,126 @@ export function ParishDataSubmission({
 
     if (!keepFile) {
       setSelectedFile(null);
+      setSelectedOcrFile(null);
+      setOcrDraft(null);
       setValidationMessage('');
+      setOcrValidationMessage('');
+    }
+  };
+
+  const handleRequestOcrUpload = async () => {
+    const message = validateOcrFile(selectedOcrFile);
+    setOcrValidationMessage(message);
+    if (message || !selectedOcrFile) return;
+
+    setFlowState('running');
+    setCurrentStepId('validation');
+    setSubmissionIssues([]);
+    setOcrDraft(null);
+    setStatusMessage('Running OCR locally in your browser...');
+
+    try {
+      const ocr = await recognizePdfFile(selectedOcrFile, (progress) => {
+        setOcrProgressLabel(progress.label);
+        setStatusMessage(progress.label);
+      });
+      setCurrentStepId('mapping');
+      setStatusMessage('Mapping OCR values into the manual IAFR fields...');
+      const combined = combineOcrPages(ocr.pages);
+      const mapped = mapOcrToIafrManualFields(combined.text, combined.words, combined.meanConfidence);
+
+      const fieldMetadata = Object.fromEntries(
+        Object.entries(mapped.reviews).map(([key, review]) => [
+          key,
+          {
+            confidence: review.confidence,
+            status: review.status,
+            pageNumber: review.sourcePage,
+            sourceLabel: review.label,
+            snippet: review.sourceLine,
+            message:
+              review.status === 'mapped'
+                ? 'OCR mapped this value.'
+                : review.status === 'low_confidence'
+                  ? 'OCR found a possible value. Please verify it.'
+                  : 'OCR could not confidently find this field.',
+          },
+        ]),
+      );
+
+      let preview:
+        | { runId?: string; storagePath?: string; status?: string; error?: string }
+        | null = null;
+      let previewWarning = '';
+      try {
+        const fd = new FormData();
+        fd.append('file', selectedOcrFile);
+        fd.append('institutionName', parishName);
+        fd.append('reportingMonth', String(selectedMonth + 1));
+        fd.append('reportingYear', String(year));
+        fd.append('meanConfidence', String(mapped.summary.meanConfidence));
+        fd.append('mappedFieldCount', String(mapped.summary.mappedCount));
+        fd.append('lowConfidenceCount', String(mapped.summary.lowConfidenceCount));
+        fd.append('missingFieldCount', String(mapped.summary.missingCount));
+
+        const response = await fetch('/api/submissions/test-runs/ocr-preview', { method: 'POST', body: fd });
+        preview = await response.json();
+        if (!response.ok) throw new Error(preview?.error ?? 'The OCR preview could not be saved.');
+      } catch (previewError) {
+        previewWarning =
+          previewError instanceof Error
+            ? previewError.message
+            : 'The OCR preview PDF could not be saved, but the mapped draft is still available for review.';
+      }
+
+      const localRunId =
+        typeof crypto !== 'undefined' && 'randomUUID' in crypto
+          ? `local-ocr-${crypto.randomUUID()}`
+          : `local-ocr-${Date.now()}`;
+      const ocrRunId = preview?.runId ?? localRunId;
+
+      setSubmissionResult({
+        submissionId: ocrRunId,
+        filePath: preview?.storagePath ?? '',
+        validationStatus: preview?.status ?? (previewWarning ? 'local_review' : 'warning'),
+      });
+      setOcrDraft({
+        values: mapped.values,
+        metadata: {
+          runId: ocrRunId,
+          fileName: selectedOcrFile.name,
+          confidence: mapped.summary.meanConfidence,
+          confidenceSummary: {
+            average: mapped.summary.meanConfidence,
+            mappedFieldCount: mapped.summary.mappedCount,
+            lowConfidenceCount: mapped.summary.lowConfidenceCount,
+            unmatchedFieldCount: mapped.summary.missingCount,
+          },
+          fields: fieldMetadata,
+          issues:
+            [
+              previewWarning ? `OCR preview save issue: ${previewWarning}` : '',
+              mapped.summary.lowConfidenceCount + mapped.summary.missingCount > 0
+                ? 'Some OCR fields need review before final submission.'
+                : '',
+            ].filter(Boolean),
+        },
+      });
+      setCurrentStepId('mapping');
+      setFlowState('idle');
+      setStatusMessage(
+        previewWarning
+          ? 'OCR draft is ready for review. The PDF preview copy was not saved, so final submit will continue from the reviewed manual values.'
+          : 'OCR draft is ready. Review the mapped manual fields, edit if needed, then submit.',
+      );
+    } catch (error) {
+      console.error('[parish-ocr] Browser OCR failed.', error);
+      setCurrentStepId('mapping');
+      setFlowState('error');
+      const errorMessage = error instanceof Error ? error.message : 'OCR processing failed.';
+      setStatusMessage(errorMessage);
+      setSubmissionIssues([{ fieldName: 'OCR PDF', severity: 'error', message: errorMessage }]);
+      setShowWarningModal(true);
     }
   };
 
@@ -514,17 +673,33 @@ export function ParishDataSubmission({
                 <div className="inline-flex rounded-lg border border-gray-200 bg-gray-100 p-1">
                   <button
                     type="button"
-                    onClick={() => setSubmissionMode('upload')}
+                    onClick={() => {
+                      setSubmissionMode('upload');
+                      setStatusMessage('No submission has started yet. Download a template or choose a report file to begin.');
+                    }}
                     className={`inline-flex h-9 items-center gap-2 rounded-md px-4 text-sm font-semibold transition ${submissionMode === 'upload' ? 'bg-black text-white shadow-sm' : 'text-gray-600 hover:bg-white hover:text-black'}`}
                   >
                     <FileUp className={`h-4 w-4 ${submissionMode === 'upload' ? 'text-gold-400' : ''}`} /> Upload file
                   </button>
                   <button
                     type="button"
-                    onClick={() => setSubmissionMode('manual')}
+                    onClick={() => {
+                      setSubmissionMode('manual');
+                      setStatusMessage('Enter IAFR values manually, then review and submit the test report.');
+                    }}
                     className={`inline-flex h-9 items-center gap-2 rounded-md px-4 text-sm font-semibold transition ${submissionMode === 'manual' ? 'bg-black text-white shadow-sm' : 'text-gray-600 hover:bg-white hover:text-black'}`}
                   >
                     <Keyboard className={`h-4 w-4 ${submissionMode === 'manual' ? 'text-gold-400' : ''}`} /> Manual entry
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setSubmissionMode('ocr');
+                      setStatusMessage('Upload a scanned PDF, run OCR, then validate the mapped manual fields.');
+                    }}
+                    className={`inline-flex h-9 items-center gap-2 rounded-md px-4 text-sm font-semibold transition ${submissionMode === 'ocr' ? 'bg-black text-white shadow-sm' : 'text-gray-600 hover:bg-white hover:text-black'}`}
+                  >
+                    <ScanLine className={`h-4 w-4 ${submissionMode === 'ocr' ? 'text-gold-400' : ''}`} /> OCR PDF
                   </button>
                 </div>
               </div>
@@ -572,8 +747,8 @@ export function ParishDataSubmission({
                 <div className="grid border-t border-gray-200 bg-white sm:grid-cols-3 sm:divide-x sm:divide-gray-200">
                   {[
                     { step: '01', title: 'Download template', detail: 'Use the approved report format.' },
-                    { step: '02', title: 'Submit report', detail: `Upload ${acceptedFormatsLabel} or use manual entry.` },
-                    { step: '03', title: 'Review result', detail: 'Confirm validation and submission status.' },
+                    { step: '02', title: 'Submit report', detail: `Upload ${acceptedFormatsLabel}, run OCR PDF, or use manual entry.` },
+                    { step: '03', title: 'Review result', detail: 'Confirm validation and submission status before saving.' },
                   ].map((item) => (
                     <div key={item.step} className="flex gap-3 border-t border-gray-100 px-4 py-4 first:border-t-0 sm:border-t-0 sm:px-5">
                       <span className="text-xs font-bold text-gold-700">{item.step}</span>
@@ -784,6 +959,55 @@ export function ParishDataSubmission({
             isSubmitting={flowState === 'running'}
             onSubmit={handleManualSubmit}
           />
+        )}
+
+        {institutionType === 'parish' && submissionMode === 'ocr' && (
+          <div className="space-y-5">
+            <div className="grid grid-cols-1 items-start gap-5 xl:grid-cols-[360px_minmax(0,1fr)]">
+              <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }}>
+                <TemplateDownloadCard
+                  template={template}
+                  institutionLabel={heading}
+                  isLoading={isTemplateLoading}
+                  onDownload={handleDownloadTemplate}
+                  disabled={permissions?.download_csv !== true}
+                  formatOptions={templateFormatOptions.length > 0 ? templateFormatOptions : undefined}
+                />
+              </motion.div>
+
+              <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.05 }}>
+                <ReportUploadCard
+                  file={selectedOcrFile}
+                  fileSizeLabel={ocrFileSizeLabel}
+                  validationMessage={ocrValidationMessage}
+                  acceptedFormats=".pdf"
+                  isSubmitting={flowState === 'running'}
+                  anomalyMode={anomalyMode}
+                  onModeChange={setAnomalyMode}
+                  onFileSelect={handleOcrFileSelection}
+                  onRequestUpload={handleRequestOcrUpload}
+                  onRemoveFile={() => handleOcrFileSelection(null)}
+                  disabled={permissions?.upload_csv_entity !== true}
+                  showAnomalyControls={false}
+                  requestLabel="Run OCR and Prefill"
+                  submittingLabel="Reading Scanned PDF..."
+                />
+              </motion.div>
+            </div>
+
+            {ocrDraft && (
+              <ManualIAFRForm
+                parishName={parishName}
+                reportingMonth={selectedMonth + 1}
+                reportingYear={year}
+                disabled={permissions?.upload_csv_entity !== true}
+                isSubmitting={flowState === 'running'}
+                initialValues={ocrDraft.values}
+                ocrReviewMetadata={ocrDraft.metadata}
+                onSubmit={handleManualSubmit}
+              />
+            )}
+          </div>
         )}
 
         <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }}>

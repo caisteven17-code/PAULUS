@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useEffect, useMemo, useState } from 'react';
-import { Calculator, Check, ChevronDown, FilePenLine, Save, Send } from 'lucide-react';
+import { AlertTriangle, Calculator, Check, ChevronDown, FilePenLine, Save, ScanLine, Send } from 'lucide-react';
 import { AnimatePresence, motion } from 'motion/react';
 import {
   iafrManualSections,
@@ -22,16 +22,44 @@ export interface ManualSubmissionEntry {
   sourceMetadata?: Record<string, unknown>;
 }
 
-interface ManualIAFRFormProps {
+export interface ManualIAFRFormProps {
   parishName: string;
   reportingMonth: number;
   reportingYear: number;
   disabled?: boolean;
   isSubmitting?: boolean;
+  initialValues?: ManualIAFRValueMap;
+  ocrReviewMetadata?: ManualIAFROcrReviewMetadata;
   onSubmit: (entries: ManualSubmissionEntry[]) => Promise<void>;
 }
 
-type ValueMap = Record<string, string>;
+export type ManualIAFRValueMap = Record<string, string>;
+
+type ValueMap = ManualIAFRValueMap;
+
+export interface ManualIAFROcrFieldMetadata {
+  confidence?: number;
+  status?: 'mapped' | 'low_confidence' | 'needs_review' | 'unmatched';
+  pageNumber?: number;
+  sourceLabel?: string;
+  snippet?: string;
+  message?: string;
+}
+
+export interface ManualIAFROcrReviewMetadata {
+  runId?: string;
+  fileName?: string;
+  confidence?: number;
+  confidenceSummary?: {
+    average?: number;
+    mappedFieldCount?: number;
+    lowConfidenceCount?: number;
+    needsReviewCount?: number;
+    unmatchedFieldCount?: number;
+  };
+  fields?: Record<string, ManualIAFROcrFieldMetadata>;
+  issues?: string[];
+}
 
 const money = new Intl.NumberFormat('en-PH', { style: 'currency', currency: 'PHP' });
 
@@ -44,14 +72,50 @@ function specialCollectionKey(date: string) {
   return `special_collection.${date}`;
 }
 
-function AmountInput({ field, value, onChange }: { field: IAFRAmountField; value: string; onChange: (value: string) => void }) {
+function formatConfidence(confidence?: number) {
+  if (typeof confidence !== 'number' || !Number.isFinite(confidence)) return null;
+  return `${Math.round(confidence * 100)}%`;
+}
+
+function isLowConfidence(metadata?: ManualIAFROcrFieldMetadata) {
+  if (!metadata) return false;
+  return metadata.status === 'low_confidence' || metadata.status === 'needs_review' || (typeof metadata.confidence === 'number' && metadata.confidence < 0.75);
+}
+
+function AmountInput({
+  field,
+  value,
+  onChange,
+  ocrMetadata,
+}: {
+  field: IAFRAmountField;
+  value: string;
+  onChange: (value: string) => void;
+  ocrMetadata?: ManualIAFROcrFieldMetadata;
+}) {
+  const needsReview = isLowConfidence(ocrMetadata);
+  const confidenceLabel = formatConfidence(ocrMetadata?.confidence);
   return (
     <label className="grid gap-2 border-t border-gray-100 px-4 py-3 first:border-t-0 sm:grid-cols-[minmax(0,1fr)_180px] sm:items-center sm:px-5">
       <span className="min-w-0">
-        <span className="block text-sm font-medium text-gray-900">{field.label}</span>
+        <span className="flex flex-wrap items-center gap-2 text-sm font-medium text-gray-900">
+          {field.label}
+          {needsReview && (
+            <span className="inline-flex items-center gap-1 rounded-full border border-amber-200 bg-amber-50 px-2 py-0.5 text-[10px] font-bold uppercase tracking-[0.08em] text-amber-700">
+              <AlertTriangle className="h-3 w-3" /> Review
+            </span>
+          )}
+        </span>
         <span className="mt-0.5 block text-[10px] font-semibold uppercase tracking-[0.1em] text-gray-400">
           {field.accountCode}
         </span>
+        {ocrMetadata && (
+          <span className="mt-1 block text-[11px] text-gray-500">
+            OCR {confidenceLabel ? `${confidenceLabel} confidence` : 'mapped value'}
+            {ocrMetadata.pageNumber ? ` - page ${ocrMetadata.pageNumber}` : ''}
+            {ocrMetadata.message ? ` - ${ocrMetadata.message}` : ''}
+          </span>
+        )}
       </span>
       <span className="relative block">
         <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-xs font-semibold text-gray-500">PHP</span>
@@ -62,7 +126,7 @@ function AmountInput({ field, value, onChange }: { field: IAFRAmountField; value
           value={value}
           onChange={(event) => onChange(event.target.value)}
           placeholder="0.00"
-          className="h-10 w-full rounded-md border border-gold-200 bg-gold-50/50 pl-12 pr-3 text-right text-sm font-semibold text-gray-900 outline-none transition focus:border-gold-500 focus:ring-2 focus:ring-gold-500/20"
+          className={`h-10 w-full rounded-md border bg-gold-50/50 pl-12 pr-3 text-right text-sm font-semibold text-gray-900 outline-none transition focus:ring-2 ${needsReview ? 'border-amber-400 focus:border-amber-500 focus:ring-amber-500/20' : 'border-gold-200 focus:border-gold-500 focus:ring-gold-500/20'}`}
         />
       </span>
     </label>
@@ -75,16 +139,24 @@ export function ManualIAFRForm({
   reportingYear,
   disabled = false,
   isSubmitting = false,
+  initialValues,
+  ocrReviewMetadata,
   onSubmit,
 }: ManualIAFRFormProps) {
   const storageKey = `iafr-manual-draft:${parishName}:${reportingYear}:${reportingMonth}`;
   const [openSection, setOpenSection] = useState<IAFRSectionCode | null>('A');
-  const [values, setValues] = useState<ValueMap>({});
+  const [values, setValues] = useState<ValueMap>(initialValues ?? {});
   const [draftStatus, setDraftStatus] = useState('Draft not saved');
   const [validationMessage, setValidationMessage] = useState('');
+  const isOcrReview = Boolean(ocrReviewMetadata);
   const specialCollections = reportingYear === 2026 ? (iafrSpecialCollections2026[reportingMonth] ?? []) : [];
 
   useEffect(() => {
+    if (initialValues) {
+      setValues(initialValues);
+      setDraftStatus('OCR draft ready for review');
+      return;
+    }
     try {
       const saved = window.localStorage.getItem(storageKey);
       if (saved) {
@@ -94,7 +166,7 @@ export function ManualIAFRForm({
     } catch {
       setDraftStatus('Draft could not be restored');
     }
-  }, [storageKey]);
+  }, [initialValues, storageKey]);
 
   useEffect(() => {
     if (Object.keys(values).length === 0) return;
@@ -110,6 +182,30 @@ export function ManualIAFRForm({
     if (value !== '' && Number(value) < 0) return;
     setValues((current) => ({ ...current, [key]: value }));
     setValidationMessage('');
+  };
+
+  const getOcrFieldMetadata = (key: string, entryFieldKey?: string) => {
+    if (!ocrReviewMetadata?.fields) return undefined;
+    return ocrReviewMetadata.fields[key] ?? (entryFieldKey ? ocrReviewMetadata.fields[entryFieldKey] : undefined);
+  };
+
+  const withSourceMetadata = (base: Record<string, unknown>, formValueKey: string, entryFieldKey?: string) => {
+    if (!ocrReviewMetadata) return base;
+    const fieldMetadata = getOcrFieldMetadata(formValueKey, entryFieldKey);
+    return {
+      ...base,
+      originalInputKind: base.inputKind,
+      inputKind: 'ocr_pdf',
+      ocrRunId: ocrReviewMetadata.runId,
+      ocrFileName: ocrReviewMetadata.fileName,
+      ocrConfidence: ocrReviewMetadata.confidence ?? ocrReviewMetadata.confidenceSummary?.average,
+      ocrFieldConfidence: fieldMetadata?.confidence,
+      ocrFieldStatus: fieldMetadata?.status,
+      ocrPageNumber: fieldMetadata?.pageNumber,
+      ocrSourceLabel: fieldMetadata?.sourceLabel,
+      ocrSnippet: fieldMetadata?.snippet,
+      ocrReviewMessage: fieldMetadata?.message,
+    };
   };
 
   const sectionTotals = useMemo(() => {
@@ -154,7 +250,7 @@ export function ManualIAFRForm({
           sourceLabel: field.label,
           rawValue: values[field.key] ?? '',
           cleanedAmount: Math.round(amount * 100) / 100,
-          sourceMetadata: { formVersion: 'iafr_2026_v1', inputKind: 'amount' },
+          sourceMetadata: withSourceMetadata({ formVersion: 'iafr_2026_v1', inputKind: 'amount' }, field.key, `${section.code}.${field.key}`),
         });
       }
     }
@@ -177,7 +273,7 @@ export function ManualIAFRForm({
           sourceLabel: `${row.label} - Total Prescribed Amount`,
           rawValue: String(prescribed),
           cleanedAmount: prescribed,
-          sourceMetadata: metadata,
+          sourceMetadata: withSourceMetadata(metadata, `${row.accountCode}.chargeable`, `${row.accountCode}.prescribed_total`),
         });
       }
       if (overAbove > 0) {
@@ -189,7 +285,7 @@ export function ManualIAFRForm({
           sourceLabel: `${row.label} - Total Over/Above Amount`,
           rawValue: String(overAbove),
           cleanedAmount: overAbove,
-          sourceMetadata: metadata,
+          sourceMetadata: withSourceMetadata(metadata, `${row.accountCode}.overAboveRate`, `${row.accountCode}.over_above_total`),
         });
       }
     }
@@ -206,12 +302,12 @@ export function ManualIAFRForm({
         sourceLabel: `${collection.displayDate} - ${collection.label}`,
         rawValue: values[key] ?? '',
         cleanedAmount: Math.round(amount * 100) / 100,
-        sourceMetadata: {
+        sourceMetadata: withSourceMetadata({
           collectionDate: collection.date,
           collectionName: collection.label,
           formVersion: 'iafr_2026_v1',
           inputKind: 'scheduled_special_collection',
-        },
+        }, key, `F.${key}`),
       });
     }
 
@@ -226,11 +322,17 @@ export function ManualIAFRForm({
         sourceLabel: 'Mass Intentions - Unclaimed',
         rawValue: String(intentionTotal - intentionClaimed),
         cleanedAmount: Math.round((intentionTotal - intentionClaimed) * 100) / 100,
-        sourceMetadata: { derivedFrom: ['A.3.01', 'A.3.02'], formVersion: 'iafr_2026_v1' },
+        sourceMetadata: withSourceMetadata({ derivedFrom: ['A.3.01', 'A.3.02'], formVersion: 'iafr_2026_v1' }, 'mass_intentions_total', 'A.mass_intentions_unclaimed'),
       });
     }
     return entries;
   };
+
+  const ocrConfidenceLabel = formatConfidence(ocrReviewMetadata?.confidence ?? ocrReviewMetadata?.confidenceSummary?.average);
+  const ocrNeedsReviewCount =
+    (ocrReviewMetadata?.confidenceSummary?.lowConfidenceCount ?? 0)
+    + (ocrReviewMetadata?.confidenceSummary?.needsReviewCount ?? 0)
+    + (ocrReviewMetadata?.confidenceSummary?.unmatchedFieldCount ?? 0);
 
   const submit = async () => {
     const intentionTotal = numberValue(values, 'mass_intentions_total');
@@ -264,6 +366,42 @@ export function ManualIAFRForm({
           <Save className="h-4 w-4" /> {draftStatus}
         </span>
       </div>
+
+      {isOcrReview && (
+        <div className="border-b border-amber-200 bg-amber-50 px-5 py-4 sm:px-6">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+            <div className="flex gap-3">
+              <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md bg-white text-amber-700 ring-1 ring-amber-200">
+                <ScanLine className="h-4 w-4" />
+              </span>
+              <div>
+                <h3 className="text-sm font-bold text-amber-950">OCR review required</h3>
+                <p className="mt-1 max-w-3xl text-sm text-amber-900">
+                  Scanned PDF values were mapped into this manual form. Please check every highlighted field and edit anything that does not match the document before submitting.
+                </p>
+                {ocrReviewMetadata?.issues && ocrReviewMetadata.issues.length > 0 && (
+                  <ul className="mt-2 space-y-1 text-xs font-medium text-amber-800">
+                    {ocrReviewMetadata.issues.slice(0, 3).map((issue) => (
+                      <li key={issue}>- {issue}</li>
+                    ))}
+                  </ul>
+                )}
+              </div>
+            </div>
+            <div className="flex flex-wrap gap-2 sm:justify-end">
+              {ocrReviewMetadata?.fileName && (
+                <span className="rounded-full border border-amber-200 bg-white px-3 py-1 text-xs font-semibold text-amber-900">{ocrReviewMetadata.fileName}</span>
+              )}
+              {ocrConfidenceLabel && (
+                <span className="rounded-full border border-amber-200 bg-white px-3 py-1 text-xs font-semibold text-amber-900">{ocrConfidenceLabel} confidence</span>
+              )}
+              {ocrNeedsReviewCount > 0 && (
+                <span className="rounded-full border border-amber-300 bg-amber-100 px-3 py-1 text-xs font-bold text-amber-900">{ocrNeedsReviewCount} need review</span>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
 
       <div className="divide-y divide-gray-200">
         {iafrManualSections.map((section) => {
@@ -334,16 +472,21 @@ export function ManualIAFRForm({
                                 {money.format(rate)}
                               </span>
                               {['gratis', 'chargeable'].map((part) => (
-                                <input
-                                  key={part}
-                                  type="number"
-                                  min="0"
-                                  step={part === 'gratis' || part === 'chargeable' ? '1' : '0.01'}
-                                  value={values[`${row.accountCode}.${part}`] ?? ''}
-                                  onChange={(event) => setValue(`${row.accountCode}.${part}`, event.target.value)}
-                                  placeholder="0"
-                                  className="h-9 w-full rounded-md border border-gold-200 bg-gold-50/50 px-2 text-right text-xs font-semibold outline-none focus:border-gold-500 focus:ring-2 focus:ring-gold-500/20"
-                                />
+                                <span key={part} className="relative block">
+                                  <input
+                                    type="number"
+                                    min="0"
+                                    step={part === 'gratis' || part === 'chargeable' ? '1' : '0.01'}
+                                    value={values[`${row.accountCode}.${part}`] ?? ''}
+                                    onChange={(event) => setValue(`${row.accountCode}.${part}`, event.target.value)}
+                                    placeholder="0"
+                                    title={getOcrFieldMetadata(`${row.accountCode}.${part}`)?.message}
+                                    className={`h-9 w-full rounded-md border bg-gold-50/50 px-2 text-right text-xs font-semibold outline-none focus:ring-2 ${isLowConfidence(getOcrFieldMetadata(`${row.accountCode}.${part}`)) ? 'border-amber-400 focus:border-amber-500 focus:ring-amber-500/20' : 'border-gold-200 focus:border-gold-500 focus:ring-gold-500/20'}`}
+                                  />
+                                  {isLowConfidence(getOcrFieldMetadata(`${row.accountCode}.${part}`)) && (
+                                    <AlertTriangle className="pointer-events-none absolute left-2 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-amber-600" />
+                                  )}
+                                </span>
                               ))}
                               <span className="flex h-9 items-center justify-end rounded-md bg-gray-100 px-3 text-sm font-semibold text-gray-800">{money.format(prescribedTotal)}</span>
                               <input
@@ -353,7 +496,8 @@ export function ManualIAFRForm({
                                 value={values[`${row.accountCode}.overAboveRate`] ?? ''}
                                 onChange={(event) => setValue(`${row.accountCode}.overAboveRate`, event.target.value)}
                                 placeholder="0.00"
-                                className="h-9 w-full rounded-md border border-gold-200 bg-gold-50/50 px-2 text-right text-xs font-semibold outline-none focus:border-gold-500 focus:ring-2 focus:ring-gold-500/20"
+                                title={getOcrFieldMetadata(`${row.accountCode}.overAboveRate`)?.message}
+                                className={`h-9 w-full rounded-md border bg-gold-50/50 px-2 text-right text-xs font-semibold outline-none focus:ring-2 ${isLowConfidence(getOcrFieldMetadata(`${row.accountCode}.overAboveRate`)) ? 'border-amber-400 focus:border-amber-500 focus:ring-amber-500/20' : 'border-gold-200 focus:border-gold-500 focus:ring-gold-500/20'}`}
                               />
                               <span className="flex h-9 items-center justify-end rounded-md bg-gray-100 px-3 text-sm font-semibold text-gray-800">{money.format(overAboveTotal)}</span>
                               <span className="flex h-9 items-center justify-end rounded-md bg-gray-900 px-3 text-sm font-semibold text-white">{money.format(total)}</span>
@@ -408,8 +552,12 @@ export function ManualIAFRForm({
                                     value={values[key] ?? ''}
                                     onChange={(event) => setValue(key, event.target.value)}
                                     placeholder="0.00"
-                                    className="h-10 w-full rounded-md border border-gold-200 bg-gold-50/50 pl-12 pr-3 text-right text-sm font-semibold text-gray-900 outline-none transition focus:border-gold-500 focus:ring-2 focus:ring-gold-500/20"
+                                    title={getOcrFieldMetadata(key, `F.${key}`)?.message}
+                                    className={`h-10 w-full rounded-md border bg-gold-50/50 pl-12 pr-3 text-right text-sm font-semibold text-gray-900 outline-none transition focus:ring-2 ${isLowConfidence(getOcrFieldMetadata(key, `F.${key}`)) ? 'border-amber-400 focus:border-amber-500 focus:ring-amber-500/20' : 'border-gold-200 focus:border-gold-500 focus:ring-gold-500/20'}`}
                                   />
+                                  {isLowConfidence(getOcrFieldMetadata(key, `F.${key}`)) && (
+                                    <AlertTriangle className="pointer-events-none absolute right-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-amber-600" />
+                                  )}
                                 </span>
                               </label>
                             );
@@ -429,7 +577,13 @@ export function ManualIAFRForm({
 
                   <div className="overflow-hidden rounded-lg border border-gray-200 bg-white">
                     {section.fields.map((field) => (
-                      <AmountInput key={field.key} field={field} value={values[field.key] ?? ''} onChange={(value) => setValue(field.key, value)} />
+                      <AmountInput
+                        key={field.key}
+                        field={field}
+                        value={values[field.key] ?? ''}
+                        onChange={(value) => setValue(field.key, value)}
+                        ocrMetadata={getOcrFieldMetadata(field.key, `${section.code}.${field.key}`)}
+                      />
                     ))}
                   </div>
 

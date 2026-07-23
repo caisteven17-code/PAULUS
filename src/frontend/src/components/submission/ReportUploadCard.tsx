@@ -18,6 +18,8 @@ interface ReportUploadCardProps {
   onRemoveFile: () => void;
   disabled?: boolean;
   showAnomalyControls?: boolean;
+  requestLabel?: string;
+  submittingLabel?: string;
 }
 
 const anomalyOptions: Array<{ value: AnomalySimulationMode; label: string; description: string }> = [
@@ -39,6 +41,8 @@ export function ReportUploadCard({
   onRemoveFile,
   disabled,
   showAnomalyControls = true,
+  requestLabel = 'Submit Report',
+  submittingLabel = 'Submission In Progress...',
 }: ReportUploadCardProps) {
   const inputRef = useRef<HTMLInputElement>(null);
 
@@ -176,7 +180,7 @@ export function ReportUploadCard({
           className="flex h-11 w-full items-center justify-center gap-2 rounded-md bg-black px-4 text-sm font-bold text-white transition hover:bg-gray-800 disabled:cursor-not-allowed disabled:bg-gray-300"
         >
           <Upload className="h-4 w-4" />
-          {isSubmitting ? 'Submission In Progress...' : 'Submit Report'}
+          {isSubmitting ? submittingLabel : requestLabel}
         </button>
       </CardContent>
     </Card>
