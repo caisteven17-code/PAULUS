@@ -11,6 +11,7 @@ import re
 from dataclasses import dataclass
 from typing import Any
 
+from app.config import REFERENCE_SILVER_SCHEMA
 from app.services import analytics_db
 
 _WEATHER_TABLES = {
@@ -22,6 +23,14 @@ _WEATHER_TABLES = {
     "weather_runs",
 }
 _IDENTIFIER = re.compile(r"^[a-z_][a-z0-9_]*$")
+if REFERENCE_SILVER_SCHEMA not in {"reference", "reference_silver"}:
+    raise ValueError("REFERENCE_SILVER_SCHEMA must be 'reference' or 'reference_silver'")
+_WEATHER_SILVER_SCHEMA = REFERENCE_SILVER_SCHEMA
+_TABLE_ALIASES = {
+    "weather_monthly_summary": "weather_municipality_monthly"
+    if _WEATHER_SILVER_SCHEMA == "reference_silver"
+    else "weather_monthly_summary"
+}
 
 
 @dataclass
@@ -77,7 +86,8 @@ class AwsWeatherQuery:
 
     def execute(self) -> WeatherResponse:
         select_sql = ", ".join("*" if column == "*" else f'"{column}"' for column in self.columns)
-        statement = f'SELECT {select_sql} FROM reference."{self.table}"'
+        physical_table = _TABLE_ALIASES.get(self.table, self.table)
+        statement = f'SELECT {select_sql} FROM "{_WEATHER_SILVER_SCHEMA}"."{physical_table}"'
         params: list[Any] = []
         if self.filters:
             statement += " WHERE " + " AND ".join(f'"{column}" {operator} %s' for column, operator, _ in self.filters)
@@ -93,8 +103,8 @@ class AwsWeatherQuery:
 
 
 def get_table(schema: str, table: str) -> AwsWeatherQuery:
-    if schema != "reference":
-        raise ValueError("Weather repository only exposes the AWS reference schema")
+    if schema not in {"reference", "reference_silver"}:
+        raise ValueError("Weather repository only exposes the configured AWS Silver schema")
     return AwsWeatherQuery(table)
 
 

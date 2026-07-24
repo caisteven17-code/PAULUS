@@ -182,7 +182,7 @@ export class EntityService {
       .schema('diocese')
       .from('institutions')
       .select(
-        'id, name, institution_code, institution_type, vicariate, district, cluster, class, address, contact_number, email, latitude, longitude, is_active, subsidy_type',
+        'id, name, institution_code, institution_type, vicariate, district, cluster, class, address, municipality, contact_number, email, latitude, longitude, is_active, subsidy_type',
       )
       .eq('institution_type', this.domainInstitutionType(type))
       .order('name');
@@ -209,6 +209,7 @@ export class EntityService {
       district: institution.district ?? '',
       class: this.fromInstitutionClass(institution.class) ?? institution.class ?? 'Class C',
       address: institution.address ?? '',
+      municipality: institution.municipality ?? '',
       contact_number: institution.contact_number ?? '',
       contactNumber: institution.contact_number ?? '',
       email: institution.email ?? '',
@@ -457,6 +458,7 @@ export class EntityService {
           vicariate: parish.vicariate,
           class: parish.class,
           address: parish.address,
+          municipality: parish.municipality ?? parish.city,
           contact_number: parish.contactNumber ?? parish.contact_number,
           email: parish.email,
           latitude: parish.lat ?? parish.latitude,
@@ -485,6 +487,7 @@ export class EntityService {
         vicariate: parish.vicariate,
         class: parish.class,
         address: parish.address,
+        municipality: parish.municipality ?? parish.city,
         institutionCode: requestedSourceCode,
         iafrSourceCode: requestedSourceCode,
         status: 'active',
@@ -695,6 +698,8 @@ export class EntityService {
 
     if (entity?.name !== undefined) payload.name = entity.name;
     if (entity?.address !== undefined) payload.address = entity.address;
+    const municipality = entity?.municipality ?? entity?.city;
+    if (municipality !== undefined) payload.municipality = String(municipality ?? '').trim() || null;
     if (entity?.vicariate !== undefined) payload.vicariate = entity.vicariate;
     if (entity?.district !== undefined) payload.district = entity.district;
     const institutionCode = entity?.institutionCode ?? entity?.institution_code ?? entity?.iafrSourceCode ?? entity?.iafr_source_code;
@@ -765,6 +770,7 @@ export class EntityService {
     delete legacyPayload.iafrSourceCode;
     delete legacyPayload.iafr_source_code;
     delete legacyPayload.district;
+    delete legacyPayload.municipality;
     delete legacyPayload.lat;
     delete legacyPayload.lng;
 

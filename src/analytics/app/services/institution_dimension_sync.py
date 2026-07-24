@@ -19,7 +19,7 @@ from app.services.supabase_client import get_table
 
 logger = logging.getLogger(__name__)
 
-PIPELINE_NAME = "institution_dimension_incremental_v1"
+PIPELINE_NAME = "institution_dimension_incremental_v3"
 SOURCE_SCHEMA = "diocese"
 SOURCE_TABLE = "institutions"
 PAGE_SIZE = 500
@@ -27,9 +27,44 @@ ZERO_UUID = "00000000-0000-0000-0000-000000000000"
 EPOCH = "1970-01-01T00:00:00+00:00"
 
 SOURCE_COLUMNS = (
-    "id,name,institution_code,institution_type,vicariate,district,cluster,class,"
+    "id,name,address,municipality,institution_code,institution_type,vicariate,district,cluster,class,"
     "subsidy_type,latitude,longitude,is_active,updated_at,deleted_at"
 )
+LEGACY_SOURCE_COLUMNS = SOURCE_COLUMNS.replace("municipality,", "")
+
+_CITY_ALIASES = {
+    "biñan": "Biñan City",
+    "biñan city": "Biñan City",
+    "city of biñan": "Biñan City",
+    "cabuyao": "Cabuyao City",
+    "cabuyao city": "Cabuyao City",
+    "city of cabuyao": "Cabuyao City",
+    "calamba": "Calamba City",
+    "calamba city": "Calamba City",
+    "city of calamba": "Calamba City",
+    "san pablo": "San Pablo City",
+    "san pablo city": "San Pablo City",
+    "city of san pablo": "San Pablo City",
+    "san pedro": "San Pedro City",
+    "san pedro city": "San Pedro City",
+    "city of san pedro": "San Pedro City",
+    "santa rosa": "Santa Rosa City",
+    "santa rosa city": "Santa Rosa City",
+    "city of santa rosa": "Santa Rosa City",
+}
+
+
+def _municipality(source: dict[str, Any]) -> str | None:
+    candidate = str(source.get("municipality") or "").strip()
+    if not candidate:
+        parts = [part.strip() for part in str(source.get("address") or "").split(",") if part.strip()]
+        while parts and parts[-1].lower() in {"laguna", "province of laguna", "philippines"}:
+            parts.pop()
+        candidate = parts[-1] if parts else ""
+    if not candidate:
+        return None
+    normalized = " ".join(candidate.lower().split())
+    return _CITY_ALIASES.get(normalized, candidate)
 
 
 def _timestamp_text(value: str | datetime | None) -> str:
@@ -84,15 +119,31 @@ def _fetch_changes(watermark: dict[str, Any]) -> list[dict[str, Any]]:
     offset = 0
 
     while True:
-        response = (
-            get_table(SOURCE_SCHEMA, SOURCE_TABLE)
-            .select(SOURCE_COLUMNS)
-            .gte("updated_at", updated_at)
-            .order("updated_at")
-            .order("id")
-            .range(offset, offset + PAGE_SIZE - 1)
-            .execute()
-        )
+        try:
+            response = (
+                get_table(SOURCE_SCHEMA, SOURCE_TABLE)
+                .select(SOURCE_COLUMNS)
+                .gte("updated_at", updated_at)
+                .order("updated_at")
+                .order("id")
+                .range(offset, offset + PAGE_SIZE - 1)
+                .execute()
+            )
+        except Exception as exc:
+            # Compatibility during rollout: old Supabase schemas do not have
+            # municipality yet. Derive it from address until migration 238 is
+            # applied, without preventing the AWS dimension from progressing.
+            if "municipality" not in str(exc).lower():
+                raise
+            response = (
+                get_table(SOURCE_SCHEMA, SOURCE_TABLE)
+                .select(LEGACY_SOURCE_COLUMNS)
+                .gte("updated_at", updated_at)
+                .order("updated_at")
+                .order("id")
+                .range(offset, offset + PAGE_SIZE - 1)
+                .execute()
+            )
         batch = response.data or []
         rows.extend(row for row in batch if (_timestamp_text(row.get("updated_at")), str(row["id"])) > last_pair)
         if len(batch) < PAGE_SIZE:
@@ -110,6 +161,8 @@ def _dimension_row(source: dict[str, Any]) -> dict[str, Any]:
         "institution_id": source["id"],
         "institution_code": source.get("institution_code"),
         "institution_name": source["name"],
+        "address": source.get("address"),
+        "municipality": _municipality(source),
         "institution_type": source["institution_type"],
         "vicariate": source.get("vicariate"),
         "district": source.get("district"),

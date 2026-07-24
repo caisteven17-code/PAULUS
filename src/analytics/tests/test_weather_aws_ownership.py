@@ -7,7 +7,7 @@ from app.services import weather_loader
 class WeatherAwsOwnershipTests(unittest.TestCase):
     @patch.object(weather_loader.analytics_db, "fetch_query")
     @patch.object(weather_loader.analytics_db, "upsert_rows")
-    def test_daily_weather_upserts_to_aws_reference_schema(self, upsert_rows, fetch_query):
+    def test_daily_weather_upserts_to_configured_aws_silver_schema(self, upsert_rows, fetch_query):
         fetch_query.return_value = [
             {"column_name": column}
             for column in (
@@ -29,7 +29,7 @@ class WeatherAwsOwnershipTests(unittest.TestCase):
 
         self.assertEqual(loaded, 1)
         upsert_rows.assert_called_once_with(
-            "reference",
+            weather_loader._WEATHER_SILVER_SCHEMA,
             "weather_rainfall_daily",
             rows,
             "date,municipality",
@@ -43,7 +43,7 @@ class WeatherAwsOwnershipTests(unittest.TestCase):
 
         self.assertEqual(rebuilt, 12)
         call_function.assert_called_once_with(
-            "reference",
+            weather_loader._WEATHER_SILVER_SCHEMA,
             "rebuild_weather_monthly_summary",
             p_period_start="2026-01-01",
             p_period_end="2026-12-31",

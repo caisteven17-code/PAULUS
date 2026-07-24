@@ -55,3 +55,16 @@ WAREHOUSE_EDUCATION_POLL_SECONDS: int = max(30, int(os.getenv("WAREHOUSE_EDUCATI
 LITURGICAL_CANONICAL_SOURCE: str = os.getenv("LITURGICAL_CANONICAL_SOURCE", "supabase").lower()
 LITURGICAL_APPROVAL_SYNC_ENABLED: bool = os.getenv("LITURGICAL_APPROVAL_SYNC_ENABLED", "false").lower() == "true"
 LITURGICAL_APPROVAL_POLL_SECONDS: int = max(30, int(os.getenv("LITURGICAL_APPROVAL_POLL_SECONDS", "300")))
+LITURGICAL_OPERATIONS_WORKFLOW_ENABLED: bool = (
+    os.getenv("LITURGICAL_OPERATIONS_WORKFLOW_ENABLED", "false").lower() == "true"
+)
+
+# Reference-data medallion rollout. Bronze weather payloads are immutable RDS
+# JSONB records; operations tables retain only workflow state and lineage.
+# The existing `reference` schema remains the default until the shadow
+# `reference_silver` tables have been backfilled and reconciled.
+WEATHER_BRONZE_ENABLED: bool = os.getenv("WEATHER_BRONZE_ENABLED", "false").lower() == "true"
+REFERENCE_SILVER_SCHEMA: str = os.getenv("REFERENCE_SILVER_SCHEMA", "reference")
+REFERENCE_SILVER_WRITE_ENABLED: bool = (
+    os.getenv("REFERENCE_SILVER_WRITE_ENABLED", "false").lower() == "true"
+)

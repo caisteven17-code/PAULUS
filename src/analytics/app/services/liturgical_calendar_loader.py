@@ -26,13 +26,20 @@ from psycopg import sql
 from psycopg.rows import dict_row
 from psycopg.types.json import Jsonb
 
-from app.config import LITURGICAL_CANONICAL_SOURCE
+from app.config import (
+    LITURGICAL_CANONICAL_SOURCE,
+    LITURGICAL_OPERATIONS_WORKFLOW_ENABLED,
+    REFERENCE_SILVER_SCHEMA,
+)
 
 logger = logging.getLogger(__name__)
 
 PROJECT_ROOT = Path(__file__).resolve().parents[4]
 DEFAULT_OUT_DIR = PROJECT_ROOT / "liturgical_calendar_output"
 _LITURGICAL_CHUNK = 300
+if REFERENCE_SILVER_SCHEMA not in {"reference", "reference_silver"}:
+    raise ValueError("REFERENCE_SILVER_SCHEMA must be 'reference' or 'reference_silver'")
+_AWS_SILVER_SCHEMA = REFERENCE_SILVER_SCHEMA
 
 
 def _chunks(items: list[Any], size: int = _LITURGICAL_CHUNK):
@@ -73,7 +80,7 @@ def _db_payload(row: dict[str, Any]) -> dict[str, Any]:
     return payload
 
 
-def _publish_review_candidates(rows: list[dict[str, Any]]) -> int:
+def _publish_review_candidates(rows: list[dict[str, Any]], run_id: Optional[str] = None) -> int:
     """Publish candidates to the Supabase-owned human approval workflow.
 
     Existing approved rows are protected from collector overwrite. Pending or
@@ -82,6 +89,18 @@ def _publish_review_candidates(rows: list[dict[str, Any]]) -> int:
     if not rows:
         return 0
     from app.services.supabase_client import get_table
+
+    if LITURGICAL_OPERATIONS_WORKFLOW_ENABLED and run_id:
+        years = sorted({int(row["year"]) for row in rows if row.get("year") is not None})
+        get_table("operations", "liturgical_calendar_ingestion_runs").upsert(
+            {
+                "run_id": run_id,
+                "years": years,
+                "run_mode": "scheduled",
+                "status": "collecting",
+                "candidate_count": len(rows),
+            }
+        ).execute()
 
     published = 0
     for row in rows:
@@ -99,8 +118,33 @@ def _publish_review_candidates(rows: list[dict[str, Any]]) -> int:
             continue
         if existing:
             payload["id"] = existing["id"]
-        get_table("reference", "liturgical_calendar").upsert(payload).execute()
+        response = get_table("reference", "liturgical_calendar").upsert(payload).execute()
+        canonical = (response.data or [payload])[0]
+        if LITURGICAL_OPERATIONS_WORKFLOW_ENABLED and run_id:
+            get_table("operations", "liturgical_calendar_ingestion_items").upsert(
+                {
+                    "run_id": run_id,
+                    "calendar_date": payload["date"],
+                    "source_name": payload["source_name"],
+                    "source_reference": payload.get("source_reference"),
+                    "candidate_record_id": canonical.get("id"),
+                    "validation_status": payload.get("validation_status") or "pending",
+                    "review_status": payload.get("review_status") or "pending",
+                    "processing_status": "published",
+                    "validation_payload": {
+                        "validation_reason": payload.get("validation_reason"),
+                        "gcatholic_match_status": payload.get("gcatholic_match_status"),
+                        "romcal_match_status": payload.get("romcal_match_status"),
+                        "litcal_match_status": payload.get("litcal_match_status"),
+                    },
+                },
+                on_conflict="run_id,calendar_date,source_name",
+            ).execute()
         published += 1
+    if LITURGICAL_OPERATIONS_WORKFLOW_ENABLED and run_id:
+        get_table("operations", "liturgical_calendar_ingestion_runs").update(
+            {"status": "awaiting_review", "candidate_count": published}
+        ).eq("run_id", run_id).execute()
     return published
 
 
@@ -142,12 +186,14 @@ def _upsert_authoritative_calendar(rows: list[dict[str, Any]]) -> int:
     sources = list({row["source_name"] for row in rows})
     source_ids = [row["id"] for row in rows if row.get("id")]
     existing = analytics_db.fetch_query(
-        """
+        sql.SQL(
+            """
         SELECT id::text AS id, date::text AS date, source_name
-        FROM reference.liturgical_calendar
+        FROM {}.liturgical_calendar
         WHERE (date = ANY(%s::date[]) AND source_name = ANY(%s::text[]))
            OR id = ANY(%s::uuid[])
         """,
+        ).format(sql.Identifier(_AWS_SILVER_SCHEMA)),
         (dates, sources, source_ids),
         pool=analytics_db.get_etl_pool(),
     )
@@ -165,7 +211,7 @@ def _upsert_authoritative_calendar(rows: list[dict[str, Any]]) -> int:
 
     for offset in range(0, len(payloads), _LITURGICAL_CHUNK):
         analytics_db.upsert_rows(
-            "reference",
+            _AWS_SILVER_SCHEMA,
             "liturgical_calendar",
             payloads[offset : offset + _LITURGICAL_CHUNK],
             "id",
@@ -193,7 +239,7 @@ def _upsert_batch(
 
     canonical_in_supabase = LITURGICAL_CANONICAL_SOURCE == "supabase" and not authoritative_approval
     if canonical_in_supabase:
-        published = _publish_review_candidates(rows)
+        published = _publish_review_candidates(rows, run_id=run_id)
         logger.info("Published %d liturgical candidates to Supabase for review", published)
 
     dates = list({row["date"] for row in rows})
@@ -203,12 +249,14 @@ def _upsert_batch(
     with analytics_db.get_etl_pool().connection() as conn:
         with conn.cursor(row_factory=dict_row) as cur:
             cur.execute(
-                """
+                sql.SQL(
+                    """
                 SELECT id, date::text AS date, source_name, review_status
-                FROM reference.liturgical_calendar
+                FROM {}.liturgical_calendar
                 WHERE (date = ANY(%s::date[]) AND source_name = ANY(%s::text[]))
                    OR id = ANY(%s::uuid[])
                 """,
+                ).format(sql.Identifier(_AWS_SILVER_SCHEMA)),
                 (dates, sources, source_ids),
             )
             existing_by_key = {
@@ -263,7 +311,8 @@ def _upsert_batch(
             promotions: list[tuple[str, str]] = []
             for payload in inserts:
                 columns = list(payload)
-                statement = sql.SQL("INSERT INTO reference.liturgical_calendar ({}) VALUES ({}) RETURNING id").format(
+                statement = sql.SQL("INSERT INTO {}.liturgical_calendar ({}) VALUES ({}) RETURNING id").format(
+                    sql.Identifier(_AWS_SILVER_SCHEMA),
                     sql.SQL(", ").join(sql.Identifier(column) for column in columns),
                     sql.SQL(", ").join(sql.Placeholder() * len(columns)),
                 )
@@ -275,7 +324,8 @@ def _upsert_batch(
 
             for record_id, payload in updates:
                 columns = list(payload)
-                statement = sql.SQL("UPDATE reference.liturgical_calendar SET {} WHERE id = %s").format(
+                statement = sql.SQL("UPDATE {}.liturgical_calendar SET {} WHERE id = %s").format(
+                    sql.Identifier(_AWS_SILVER_SCHEMA),
                     sql.SQL(", ").join(sql.SQL("{} = %s").format(sql.Identifier(column)) for column in columns)
                 )
                 cur.execute(statement, [*[_adapt(payload[column]) for column in columns], record_id])

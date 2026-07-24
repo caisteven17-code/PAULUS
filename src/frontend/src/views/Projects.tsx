@@ -81,16 +81,18 @@ export function Projects({ role }: ProjectsProps) {
 
   // Role-based visibility
   const isDiocese = permissions.view_diocese === true;
-  // Oversight roles (e.g. School Superintendent) see every school's projects but
-  // do not own any single institution, so they are view-only like the diocese.
+  // Oversight roles that see multiple schools but do NOT own a single institution.
+  // Finance Supervisor (view_school_cluster=true, manage_projects=false) is view-only.
+  // School Superintendent Supervisor (view_school_all=true, manage_projects=true) CAN manage.
   const isSchoolOverseer =
     !isDiocese && (permissions.view_school_all === true || permissions.view_school_cluster === true);
   const isOverview = isDiocese || isSchoolOverseer;
-  // The diocese can add projects and edit the ones it owns (entityType 'diocese');
-  // school overseers are fully view-only; institution owners manage their own.
-  const canCreate = permissions.manage_projects === true && !isSchoolOverseer;
+  // Bug 1.6: School Superintendent Supervisor has manage_projects=true and should be
+  // able to add/edit projects. Only block creation for pure-viewer overseer roles
+  // (e.g. Finance Supervisor whose manage_projects is false).
+  const canCreate = permissions.manage_projects === true && !(isSchoolOverseer && !permissions.manage_projects);
   const canManageProject = (p?: Project | null) =>
-    permissions.manage_projects === true && (isDiocese ? p?.entityType === 'diocese' : isSchoolOverseer ? false : true);
+    permissions.manage_projects === true && (isDiocese ? p?.entityType === 'diocese' : true);
 
   // Client-side soft archive (projects have no archive column yet).
   const [archivedIds, setArchivedIds] = useState<string[]>(() => {
@@ -803,18 +805,31 @@ export function Projects({ role }: ProjectsProps) {
                       className="group relative"
                     >
                       <ProjectDashboardCard project={project} onClick={setSelectedProject} />
-                      {canManageProject(project) && (
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            setArchiveConfirm({ id: project.id, name: project.name });
-                          }}
-                          className="absolute right-4 top-4 z-10 inline-flex h-9 w-9 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-500 opacity-0 shadow-sm transition-all hover:bg-rose-500 hover:text-white group-hover:opacity-100"
-                          title="Archive project"
-                        >
-                          <Archive className="h-4 w-4" />
-                        </button>
-                      )}
+                      {canManageProject(project) && (() => {
+                        const now = new Date().getTime();
+                        const start = new Date(project.startDate).getTime();
+                        const end = new Date(project.endDate).getTime();
+                        const isActive = project.status === 'active' || (now >= start && now <= end);
+
+                        return (
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              if (isActive) return;
+                              setArchiveConfirm({ id: project.id, name: project.name });
+                            }}
+                            className={`absolute right-4 top-4 z-10 inline-flex h-9 w-9 items-center justify-center rounded-full border border-slate-200 bg-white shadow-sm transition-all group-hover:opacity-100 ${
+                              isActive
+                                ? 'opacity-0 text-slate-300 cursor-not-allowed hover:bg-slate-100'
+                                : 'opacity-0 text-slate-500 hover:bg-rose-500 hover:text-white'
+                            }`}
+                            title={isActive ? "Active projects cannot be archived" : "Archive project"}
+                            disabled={isActive}
+                          >
+                            <Archive className="h-4 w-4" />
+                          </button>
+                        );
+                      })()}
                     </motion.div>
                   );
                 })}

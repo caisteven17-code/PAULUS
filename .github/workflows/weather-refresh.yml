@@ -19,9 +19,10 @@ jobs:
   refresh:
     runs-on: ubuntu-latest
     env:
-      SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
-      NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
-      SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+      ANALYTICS_DB_URL: ${{ secrets.ANALYTICS_DB_URL }}
+      WEATHER_BRONZE_ENABLED: "true"
+      REFERENCE_SILVER_SCHEMA: reference_silver
+      REFERENCE_SILVER_WRITE_ENABLED: "true"
     steps:
       - name: Checkout
         uses: actions/checkout@v4

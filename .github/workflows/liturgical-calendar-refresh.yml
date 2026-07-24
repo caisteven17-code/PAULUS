@@ -22,6 +22,9 @@ jobs:
       needed: ${{ steps.check.outputs.needed }}
     env:
       ANALYTICS_DB_URL: ${{ secrets.ANALYTICS_DB_URL }}
+      SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+      SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+      LITURGICAL_CANONICAL_SOURCE: supabase
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -44,6 +47,11 @@ jobs:
     runs-on: ubuntu-latest
     env:
       ANALYTICS_DB_URL: ${{ secrets.ANALYTICS_DB_URL }}
+      SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+      SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+      LITURGICAL_CANONICAL_SOURCE: supabase
+      REFERENCE_SILVER_SCHEMA: reference_silver
+      LITURGICAL_OPERATIONS_WORKFLOW_ENABLED: ${{ vars.LITURGICAL_OPERATIONS_WORKFLOW_ENABLED || 'false' }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4

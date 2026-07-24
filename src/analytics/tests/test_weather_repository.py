@@ -6,7 +6,7 @@ from app.services import weather_repository
 
 class WeatherRepositoryTests(unittest.TestCase):
     @patch.object(weather_repository.analytics_db, "fetch_query")
-    def test_query_is_routed_to_aws_reference(self, fetch_query):
+    def test_query_is_routed_to_configured_aws_silver(self, fetch_query):
         fetch_query.return_value = [{"municipality": "Example"}]
 
         response = (
@@ -21,7 +21,11 @@ class WeatherRepositoryTests(unittest.TestCase):
 
         self.assertEqual(response.data, [{"municipality": "Example"}])
         statement, params = fetch_query.call_args.args
-        self.assertIn('FROM reference."weather_monthly_summary"', statement)
+        self.assertIn(
+            f'FROM "{weather_repository._WEATHER_SILVER_SCHEMA}".'
+            f'"{weather_repository._TABLE_ALIASES["weather_monthly_summary"]}"',
+            statement,
+        )
         self.assertEqual(params, ["Example", "2026-01-01", 100, 0])
 
     def test_non_weather_table_is_rejected(self):

@@ -379,22 +379,35 @@ def update(
 
     records_loaded = 0
     daily_rows_loaded = 0
+    gold_rows_loaded = 0
     legacy_error: Optional[str] = None
     try:
         if load:
+            from app.services.weather_bronze import archive_file
             from app.services.weather_loader import (
                 load_incremental,
                 rebuild_monthly_summary,
+                refresh_parish_weather_gold,
                 upsert_weather_rainfall_daily,
                 upsert_weather_temperature_daily,
                 upsert_weather_wind_daily,
             )
 
             # New pipeline first: split daily tables + monthly summary
+            archive_file(
+                out_path,
+                run_id=run_id,
+                run_mode="incremental",
+                period_start=start_date,
+                period_end=end_date,
+                artifact_type="incremental_sources",
+            )
+
             daily_rows_loaded = upsert_weather_rainfall_daily(daily_rain_rows)
             daily_rows_loaded += upsert_weather_temperature_daily(daily_temp_rows)
             daily_rows_loaded += upsert_weather_wind_daily(daily_wind_rows)
             rebuild_monthly_summary(start_date.isoformat(), end_date.isoformat())
+            gold_rows_loaded = refresh_parish_weather_gold()
             logger.info(
                 "Loaded %d rows into reference.weather_rainfall_daily + reference.weather_temperature_daily",
                 daily_rows_loaded,
@@ -412,8 +425,19 @@ def update(
         _update_run_record(
             run_id, "success", len(results), records_loaded + daily_rows_loaded, error_detail=legacy_error
         )
+        from app.services.weather_bronze import mark_completed
+
+        mark_completed(
+            run_id,
+            silver_rows=daily_rows_loaded,
+            gold_rows=gold_rows_loaded,
+            error_detail=legacy_error,
+        )
     except Exception as exc:
         _update_run_record(run_id, "failed", len(results), records_loaded + daily_rows_loaded, error_detail=str(exc))
+        from app.services.weather_bronze import mark_completed
+
+        mark_completed(run_id, silver_rows=daily_rows_loaded, gold_rows=gold_rows_loaded, error_detail=str(exc))
         raise
 
     return {
@@ -423,6 +447,7 @@ def update(
         "record_count": sum(len(m["daily_records"]) for m in results),
         "records_loaded": records_loaded,
         "daily_rows_loaded": daily_rows_loaded,
+        "gold_rows_loaded": gold_rows_loaded,
         "daily_rows_classified": len(daily_rain_rows) + len(daily_temp_rows) + len(daily_wind_rows),
     }
 

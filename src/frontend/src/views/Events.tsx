@@ -21,6 +21,7 @@ import {
 } from 'lucide-react';
 import { usePermissions } from '../hooks/usePermissions';
 import { apiClient } from '../lib/api-client';
+import { supabaseBrowser } from '../lib/supabase';
 import { InlineLoader } from '../components/ui/LoadingScreen';
 import { FilterModal, FilterField } from '../components/ui/FilterModal';
 import { selectField, dateField } from '../lib/formStyles';
@@ -158,6 +159,7 @@ export function Events() {
   const [filter, setFilter] = useState<EventTab>('ongoing');
   const [typeFilter, setTypeFilter] = useState<string>('all'); // institution type (parish/school/...)
   const [institutionFilter, setInstitutionFilter] = useState<string>('all'); // specific institution name
+  const [sortMode, setSortMode] = useState<'oldest' | 'newest'>('oldest');
   const [filters, setFilters] = useState(EMPTY_FILTERS);
 
   const [archiveConfirmEvent, setArchiveConfirmEvent] = useState<DiocesanEvent | null>(null);
@@ -208,29 +210,37 @@ export function Events() {
   useEffect(() => {
     if (permissionsLoading) return;
     let active = true;
-    setLoading(true);
-    apiClient
-      .getEvents(scopeParams)
-      .then((data) => active && setEvents(data ?? []))
-      .catch(() => active && setEvents([]))
-      .finally(() => active && setLoading(false));
-    return () => {
-      active = false;
-    };
-  }, [permissionsLoading, scopeParams]);
 
-  // Archived list — managers only, fetched up front so the tab count is accurate
-  useEffect(() => {
-    if (permissionsLoading || !canManage) return;
-    let active = true;
-    apiClient
-      .getArchivedEvents(scopeParams)
-      .then((data) => active && setArchivedEvents(data ?? []))
-      .catch(() => active && setArchivedEvents([]));
+    const fetchAll = () => {
+      setLoading(true);
+      apiClient
+        .getEvents(scopeParams)
+        .then((data) => active && setEvents(data ?? []))
+        .catch(() => active && setEvents([]))
+        .finally(() => active && setLoading(false));
+
+      if (canManage) {
+        apiClient
+          .getArchivedEvents(scopeParams)
+          .then((data) => active && setArchivedEvents(data ?? []))
+          .catch(() => active && setArchivedEvents([]));
+      }
+    };
+
+    fetchAll();
+
+    const channel = supabaseBrowser
+      .channel('public:diocesan_events')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'diocesan_events' }, () => {
+        fetchAll();
+      })
+      .subscribe();
+
     return () => {
       active = false;
+      supabaseBrowser.removeChannel(channel);
     };
-  }, [permissionsLoading, canManage, scopeParams]);
+  }, [permissionsLoading, scopeParams, canManage]);
 
   // School overseers receive every institution's events from the API, so trim
   // to schools before anything else looks at the data.
@@ -303,30 +313,32 @@ export function Events() {
   const scoped = useMemo(() => applyFilters(baseEvents), [baseEvents, applyFilters]);
   const scopedArchived = useMemo(() => applyFilters(baseArchived), [baseArchived, applyFilters]);
 
+  const sortMult = sortMode === 'newest' ? -1 : 1;
+
   const ongoing = useMemo(
     () =>
       scoped
         .filter((e) => isOngoing(e))
-        .sort((a, b) => new Date(a.start_date).getTime() - new Date(b.start_date).getTime()),
-    [scoped],
+        .sort((a, b) => sortMult * (new Date(a.start_date).getTime() - new Date(b.start_date).getTime())),
+    [scoped, sortMode],
   );
   const upcoming = useMemo(
     () =>
       scoped
         .filter((e) => isUpcoming(e))
-        .sort((a, b) => new Date(a.start_date).getTime() - new Date(b.start_date).getTime()),
-    [scoped],
+        .sort((a, b) => sortMult * (new Date(a.start_date).getTime() - new Date(b.start_date).getTime())),
+    [scoped, sortMode],
   );
   const past = useMemo(
     () =>
       scoped
         .filter((e) => !isCurrent(e))
-        .sort((a, b) => new Date(b.start_date).getTime() - new Date(a.start_date).getTime()),
-    [scoped],
+        .sort((a, b) => sortMult * (new Date(b.start_date).getTime() - new Date(a.start_date).getTime())),
+    [scoped, sortMode],
   );
   const all = useMemo(
-    () => [...scoped].sort((a, b) => new Date(a.start_date).getTime() - new Date(b.start_date).getTime()),
-    [scoped],
+    () => [...scoped].sort((a, b) => sortMult * (new Date(a.start_date).getTime() - new Date(b.start_date).getTime())),
+    [scoped, sortMode],
   );
 
   const displayed =
@@ -570,6 +582,14 @@ export function Events() {
               {displayed.length} found
             </span>
           )}
+          <select
+            value={sortMode}
+            onChange={(e) => setSortMode(e.target.value as 'oldest' | 'newest')}
+            className="h-11 rounded-2xl border border-slate-200 bg-slate-50 px-4 text-sm font-semibold text-slate-800 transition-all focus:border-gold-500 focus:bg-white focus:outline-none focus:ring-4 focus:ring-gold-500/10"
+          >
+            <option value="oldest">Oldest First</option>
+            <option value="newest">Newest First</option>
+          </select>
           <FilterModal activeCount={eventsFilterCount} onClear={clearAllEventFilters}>
             {isOverview && (
               <FilterField label="Institution type">
@@ -929,7 +949,7 @@ export function Events() {
                       <input
                         type="date"
                         value={formData.end_date}
-                        min={formData.start_date}
+                        min={formData.start_date || new Date(Date.now() + 86400000).toISOString().split('T')[0]}
                         onChange={(e) => setFormData({ ...formData, end_date: e.target.value })}
                         className="w-full px-5 py-4 bg-slate-50/50 border border-slate-200 rounded-2xl text-sm font-medium focus:outline-none focus:ring-4 focus:ring-gold-500/10 focus:border-gold-500 focus:bg-white transition-all"
                       />

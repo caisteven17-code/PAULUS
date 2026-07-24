@@ -27,6 +27,7 @@ import { apiClient } from '../lib/api-client';
 import { InlineLoader } from '../components/ui/LoadingScreen';
 import { usePermissions } from '../hooks/usePermissions';
 import { normalizeAccessRole } from '../lib/access';
+import { ALL_PARISHES, INITIAL_SCHOOLS, INITIAL_SEMINARIES } from '../constants';
 
 type AITwinMode = 'parish' | 'priest' | 'seminary' | 'school';
 type FinancialAITwinMode = Exclude<AITwinMode, 'priest'>;
@@ -594,15 +595,78 @@ function ParishAITwin({ mode = 'parish' }: { mode?: FinancialAITwinMode }) {
       );
   const [selectedParishId, setSelectedParishId] = useState<string>('');
 
-  // Fetch real institution financial profiles; fall back to hardcoded on failure.
+
+  // Fetch real institution financial profiles; fall back to constants-defined
+  // institutions when the API returns empty data (Bug 2.4).
   // Institutions without submissions get class-based baseline estimates so the
   // simulation still produces meaningful numbers.
   useEffect(() => {
     const entityType = mode === 'seminary' ? 'seminary' : mode === 'school' ? 'school' : 'parish';
+
+    const buildFromConstants = (): FinancialTwinProfile[] => {
+      if (mode === 'school') {
+        return (INITIAL_SCHOOLS as any[]).map((s: any) => {
+          const estimate = baselineFor('school', s.class?.replace('Class ', '') || 'C');
+          return {
+            id: s.id,
+            institutionCode: undefined,
+            classRaw: s.class?.replace('Class ', '') || 'C',
+            name: s.name,
+            cashBalance: estimate.balance,
+            monthlyIncome: estimate.income,
+            monthlyExpenses: estimate.expenses,
+            healthScore: 50,
+            collectionsHistory: Array(6).fill(estimate.income),
+            expensesHistory: Array(6).fill(estimate.expenses),
+          };
+        });
+      }
+      if (mode === 'seminary') {
+        return (INITIAL_SEMINARIES as any[]).map((s: any) => {
+          const estimate = baselineFor('seminary');
+          return {
+            id: s.id,
+            institutionCode: undefined,
+            classRaw: undefined,
+            name: s.name,
+            cashBalance: estimate.balance,
+            monthlyIncome: estimate.income,
+            monthlyExpenses: estimate.expenses,
+            healthScore: 50,
+            collectionsHistory: Array(6).fill(estimate.income),
+            expensesHistory: Array(6).fill(estimate.expenses),
+          };
+        });
+      }
+      // parish fallback
+      return ALL_PARISHES.slice(0, 10).map((p: any) => {
+        const cls = (p.class || 'Class C').replace('Class ', '');
+        const estimate = baselineFor('parish', cls);
+        return {
+          id: p.name.toLowerCase().replace(/\s+/g, '-'),
+          institutionCode: undefined,
+          classRaw: cls,
+          name: p.name,
+          cashBalance: estimate.balance,
+          monthlyIncome: estimate.income,
+          monthlyExpenses: estimate.expenses,
+          healthScore: 50,
+          collectionsHistory: Array(6).fill(estimate.income),
+          expensesHistory: Array(6).fill(estimate.expenses),
+        };
+      });
+    };
+
     apiClient
       .getFinancialProfiles(entityType as any)
       .then((data) => {
-        if (!data) return;
+        if (!data || data.length === 0) {
+          // No records from API — seed from constants (Bug 2.4)
+          setLiveProfiles(buildFromConstants());
+          setSelectedParishId('');
+          setProfilesLoaded(true);
+          return;
+        }
         const mapped: FinancialTwinProfile[] = data.map((p: any) => {
           const hasFinancials = (p.monthlyCollections ?? 0) > 0 || (p.monthlyExpenses ?? 0) > 0;
           const estimate = baselineFor(mode, p.classRaw);
@@ -627,10 +691,13 @@ function ParishAITwin({ mode = 'parish' }: { mode?: FinancialAITwinMode }) {
       })
       .catch((err) => {
         console.error('[WhatIfSimulator] failed to load institution profiles:', err);
+        // On error, use constants as offline fallback rather than showing an empty state.
+        setLiveProfiles(buildFromConstants());
         setLoadError(true);
         setProfilesLoaded(true);
       });
   }, [mode]);
+
   const [isSimulating, setIsSimulating] = useState(false);
   const [savedScenarios, setSavedScenarios] = useState<ParishSavedScenario[]>([]);
   const [loadingScenarios, setLoadingScenarios] = useState(true);

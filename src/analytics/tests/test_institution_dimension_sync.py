@@ -2,10 +2,15 @@ import unittest
 from unittest.mock import call, patch
 
 from app.services import institution_dimension_sync as sync
-from app.services.institution_dimension_sync import _dimension_row
+from app.services.institution_dimension_sync import _dimension_row, _municipality
 
 
 class InstitutionDimensionProjectionTests(unittest.TestCase):
+    def test_location_fields_are_requested_from_the_authoritative_source(self):
+        self.assertIn("address", sync.SOURCE_COLUMNS.split(","))
+        self.assertIn("municipality", sync.SOURCE_COLUMNS.split(","))
+        self.assertEqual(sync.PIPELINE_NAME, "institution_dimension_incremental_v3")
+
     def test_projection_allows_only_analytics_fields(self):
         source = {
             "id": "00000000-0000-0000-0000-000000000001",
@@ -19,12 +24,13 @@ class InstitutionDimensionProjectionTests(unittest.TestCase):
             "subsidy_type": "independent",
             "latitude": 14.0,
             "longitude": 121.0,
+            "address": "Example Street, Example City",
+            "municipality": "Example City",
             "is_active": True,
             "updated_at": "2026-07-21T00:00:00+00:00",
             "deleted_at": None,
             "email": "must-not-be-copied@example.test",
             "contact_number": "must-not-be-copied",
-            "address": "must-not-be-copied",
         }
 
         with patch("app.services.institution_dimension_sync.datetime") as clock:
@@ -33,10 +39,11 @@ class InstitutionDimensionProjectionTests(unittest.TestCase):
 
         self.assertEqual(result["institution_id"], source["id"])
         self.assertEqual(result["district"], "District I")
+        self.assertEqual(result["address"], source["address"])
+        self.assertEqual(result["municipality"], source["municipality"])
         self.assertEqual(result["warehouse_updated_at"], "warehouse-time")
         self.assertNotIn("email", result)
         self.assertNotIn("contact_number", result)
-        self.assertNotIn("address", result)
 
     def test_soft_deleted_source_is_inactive(self):
         source = {
@@ -52,6 +59,18 @@ class InstitutionDimensionProjectionTests(unittest.TestCase):
 
         self.assertFalse(result["is_active"])
         self.assertEqual(result["source_deleted_at"], source["deleted_at"])
+
+    def test_legacy_address_derives_canonical_municipality(self):
+        self.assertEqual(
+            _municipality({"address": "Gulod, Cabuyao, Laguna"}),
+            "Cabuyao City",
+        )
+
+    def test_explicit_municipality_wins_over_address(self):
+        self.assertEqual(
+            _municipality({"municipality": "Calamba", "address": "Other Place, Laguna"}),
+            "Calamba City",
+        )
 
 
 class InstitutionDimensionRunTests(unittest.TestCase):

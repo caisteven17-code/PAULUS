@@ -314,10 +314,34 @@ export function Announcements() {
     if (res.ok) setArchivedList(await res.json());
   }, [authHeaders]);
 
-  // Initial load — fetch all lists up front so the tab count badges are accurate
+  // Initial load and Real-time subscription — fetch all lists up front and on database changes
   useEffect(() => {
     fetchActive().catch(() => {});
-  }, [fetchActive]);
+    if (canManage) {
+      fetchScheduled();
+      fetchDrafts();
+      fetchPast();
+      fetchArchived();
+    }
+
+    const channel = supabaseBrowser
+      .channel('public:announcements')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'announcements' }, () => {
+        fetchActive().catch(() => {});
+        if (canManage) {
+          fetchScheduled();
+          fetchDrafts();
+          fetchPast();
+          fetchArchived();
+        }
+      })
+      .subscribe();
+
+    return () => {
+      supabaseBrowser.removeChannel(channel);
+    };
+  }, [fetchActive, canManage, fetchScheduled, fetchDrafts, fetchPast, fetchArchived]);
+
   useEffect(() => {
     if (!canManage) return;
     setAudienceState('loading');
@@ -326,6 +350,7 @@ export function Announcements() {
       .then((rows) => { setAudienceOptions(Array.isArray(rows) ? rows : []); setAudienceState('ready'); })
       .catch(() => { setAudienceOptions([]); setAudienceState('error'); });
   }, [canManage, authHeaders]);
+
   useEffect(() => {
     if (!selectedAnnouncement) return;
     const images = (selectedAnnouncement.attachments ?? []).filter((attachment) => attachment.kind === 'image');
@@ -341,13 +366,6 @@ export function Announcements() {
         .catch(() => {});
     });
   }, [selectedAnnouncement, authHeaders]);
-  useEffect(() => {
-    if (!canManage) return;
-    fetchScheduled();
-    fetchDrafts();
-    fetchPast();
-    fetchArchived();
-  }, [canManage, fetchScheduled, fetchDrafts, fetchPast, fetchArchived]);
 
   // Refresh the list behind a tab when it is opened
   useEffect(() => {
@@ -1296,7 +1314,7 @@ export function Announcements() {
                       <input
                         type="datetime-local"
                         value={formData.endDate}
-                        min={formData.startDate || undefined}
+                        min={formData.startDate || new Date(Date.now() + 86400000).toISOString().slice(0, 16)}
                         onChange={(e) => setFormData({ ...formData, endDate: e.target.value })}
                         className="w-full rounded-2xl border border-slate-200 bg-slate-50/50 px-5 py-4 text-sm font-medium transition-all focus:border-gold-500 focus:bg-white focus:outline-none focus:ring-4 focus:ring-gold-500/10"
                       />

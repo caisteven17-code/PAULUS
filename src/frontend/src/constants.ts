@@ -508,7 +508,7 @@ export const INITIAL_ROLES: UserRole[] = [
   // (Seminary Team)
   {
     id: 'seminary_rector',
-    name: 'Rector',
+    name: 'Seminary Rector',
     color: '#DC2626',
     permissions: {
       view_diocese: false,
@@ -580,7 +580,7 @@ export const INITIAL_ROLES: UserRole[] = [
   // (School Team)
   {
     id: 'school_superintendent',
-    name: 'School Superintendent',
+    name: 'School Superintendent Supervisor',
     color: '#6D28D9',
     permissions: {
       view_diocese: false,
@@ -615,7 +615,7 @@ export const INITIAL_ROLES: UserRole[] = [
   },
   {
     id: 'finance_supervisor',
-    name: 'Finance Supervisor',
+    name: 'School Finance Supervisor',
     color: '#7C3AED',
     permissions: {
       view_diocese: false,
@@ -630,7 +630,7 @@ export const INITIAL_ROLES: UserRole[] = [
       create_users: false,
       manage_roles: false,
       digital_twin: false,
-      manage_entities: false,
+      manage_entities: true,       // Bug 1.5: School Finance Supervisor needs Data Management access
       manage_projects: false,
       view_projects: true,
       manage_announcements: false,
@@ -650,7 +650,7 @@ export const INITIAL_ROLES: UserRole[] = [
   },
   {
     id: 'finance_officer',
-    name: 'Finance Officer',
+    name: 'School Finance Officer',
     color: '#8B5CF6',
     permissions: {
       view_diocese: false,

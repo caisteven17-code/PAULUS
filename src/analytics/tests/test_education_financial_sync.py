@@ -33,6 +33,36 @@ class EducationFinancialSyncTests(unittest.TestCase):
         self.assertEqual(sync.MONTHS["Jan"], 1)
         self.assertEqual(sync.MONTHS["Dec"], 12)
 
+    @patch.object(sync.analytics_db, "upsert_rows")
+    @patch.object(sync, "_fetch_all")
+    @patch.object(sync.analytics_db, "fetch_query")
+    def test_dimension_sync_copies_institution_address(self, fetch_query, fetch_all, upsert_rows):
+        fetch_query.return_value = [
+            {
+                "institution_key": 11,
+                "institution_id": "00000000-0000-0000-0000-000000000011",
+                "address": "Example School Address",
+                "municipality": "Example Municipality",
+            }
+        ]
+        fetch_all.side_effect = [
+            [
+                {
+                    "institution_id": "00000000-0000-0000-0000-000000000011",
+                    "principal_id": None,
+                    "deleted_at": None,
+                }
+            ],
+            [],
+        ]
+
+        result = sync.sync_dimensions(sync.CONFIGS["school"])
+
+        self.assertEqual(result, {"dimensions": 1, "accounts": 0})
+        dimension_rows = upsert_rows.call_args.args[2]
+        self.assertEqual(dimension_rows[0]["address"], "Example School Address")
+        self.assertEqual(dimension_rows[0]["municipality"], "Example Municipality")
+
 
 if __name__ == "__main__":
     unittest.main()

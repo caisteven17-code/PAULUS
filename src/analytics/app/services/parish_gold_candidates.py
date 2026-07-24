@@ -56,7 +56,7 @@ def sync_parish_dimensions() -> dict[str, int]:
         """
         SELECT institution_id::text AS id, institution_key, institution_code,
                institution_name AS name, institution_type, vicariate, district,
-               cluster, class, latitude, longitude
+               cluster, class, address, municipality, latitude, longitude
         FROM shared_analytics.dim_institutions
         WHERE institution_type = 'parish' AND is_active = true
         ORDER BY institution_id
@@ -83,6 +83,8 @@ def sync_parish_dimensions() -> dict[str, int]:
                 "district": institution.get("district"),
                 "cluster": institution.get("cluster"),
                 "assigned_priest_source_id": assigned_priest_id,
+                "address": institution.get("address"),
+                "municipality": institution.get("municipality"),
                 "latitude": institution.get("latitude"),
                 "longitude": institution.get("longitude"),
             }

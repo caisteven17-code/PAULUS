@@ -940,7 +940,7 @@ export function EntityManagementControl({
     if (entity) {
       setEditingEntity(entity);
       const rawAddress = entity.address || '';
-      let extractedCity = rawAddress.replace(', Laguna', '').trim();
+      let extractedCity = entity.municipality || rawAddress.replace(', Laguna', '').trim();
       if (extractedCity.toLowerCase() === 'laguna') {
         extractedCity = '';
       }
@@ -1216,6 +1216,7 @@ export function EntityManagementControl({
               vicariate: formState.vicariate,
               class: formState.class,
               address: formState.address,
+              municipality: formState.city,
               lat: formState.lat,
               lng: formState.lng,
             },
@@ -1251,6 +1252,7 @@ export function EntityManagementControl({
       vicariate: formState.vicariate,
       class: formState.class,
       address: formState.address,
+      municipality: formState.city,
       institutionCode: normalizeInstitutionCode(formState.iafrSourceCode),
       iafrSourceCode: normalizeInstitutionCode(formState.iafrSourceCode),
     };
@@ -1332,6 +1334,7 @@ export function EntityManagementControl({
         vicariate: savedEntity.vicariate,
         class: savedEntity.class,
         address: savedEntity.address,
+        municipality: savedEntity.municipality || formState.city,
         status: savedEntity.status || 'active',
         district: savedEntity.district,
         institutionCode: savedEntity.institutionCode || savedEntity.institution_code || savedEntity.iafrSourceCode || savedEntity.iafr_source_code || normalizeInstitutionCode(formState.iafrSourceCode),
@@ -1393,6 +1396,7 @@ export function EntityManagementControl({
         vicariate: formState.vicariate,
         class: formState.class,
         address: formState.address,
+        municipality: formState.city,
         status: 'active' as const,
       };
 

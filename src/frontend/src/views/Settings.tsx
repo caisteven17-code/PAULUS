@@ -499,6 +499,13 @@ export function Settings({ onBack, onLogout, onNavigate, role = 'bishop', initia
 
   const handleProfileSave = async (event: React.FormEvent) => {
     event.preventDefault();
+
+    const nameRegex = /^[a-zA-Z\s\-']+$/;
+    if ((profileForm.firstName && !nameRegex.test(profileForm.firstName)) || (profileForm.lastName && !nameRegex.test(profileForm.lastName))) {
+      alert('Error: Name cannot contain digits or special characters.');
+      return;
+    }
+
     const currentUser = auth.currentUser || {};
     const originalEmail = currentUser.email || '';
     const newEmail = profileForm.email.trim();
@@ -797,6 +804,13 @@ export function Settings({ onBack, onLogout, onNavigate, role = 'bishop', initia
       return;
     if (editingAccountId === null && !formState.password) {
       setShowAccountSuccess({ show: true, message: 'Error: Password is required for new accounts.' });
+      setTimeout(() => setShowAccountSuccess({ show: false, message: '' }), 4000);
+      return;
+    }
+
+    const nameRegex = /^[a-zA-Z\s\-']+$/;
+    if ((formState.firstName && !nameRegex.test(formState.firstName)) || (formState.lastName && !nameRegex.test(formState.lastName))) {
+      setShowAccountSuccess({ show: true, message: 'Error: Name cannot contain digits or special characters.' });
       setTimeout(() => setShowAccountSuccess({ show: false, message: '' }), 4000);
       return;
     }

@@ -55,11 +55,20 @@ from typing import Optional
 
 import httpx
 
+from app.config import REFERENCE_SILVER_SCHEMA
 from app.services import analytics_db
 
 logger = logging.getLogger(__name__)
 
 DEFAULT_OUT_DIR = Path(__file__).resolve().parents[4] / "weather_output"
+if REFERENCE_SILVER_SCHEMA not in {"reference", "reference_silver"}:
+    raise ValueError("REFERENCE_SILVER_SCHEMA must be 'reference' or 'reference_silver'")
+_WEATHER_SILVER_SCHEMA = REFERENCE_SILVER_SCHEMA
+_WEATHER_MONTHLY_TABLE = (
+    "weather_municipality_monthly"
+    if _WEATHER_SILVER_SCHEMA == "reference_silver"
+    else "weather_monthly_summary"
+)
 
 # ── Retry helper for Supabase requests ────────────────────────────────────────
 # Bulk loads run for tens of minutes; a single transient network blip
@@ -428,9 +437,9 @@ def _upsert_daily_table(table: str, rows: list[dict]) -> int:
             """
             SELECT column_name
             FROM information_schema.columns
-            WHERE table_schema = 'reference' AND table_name = %s
+            WHERE table_schema = %s AND table_name = %s
             """,
-            (table,),
+            (_WEATHER_SILVER_SCHEMA, table),
         )
     }
     unsupported = sorted(set().union(*(row.keys() for row in rows)) - available)
@@ -445,7 +454,7 @@ def _upsert_daily_table(table: str, rows: list[dict]) -> int:
     total = 0
     for i in range(0, len(rows), _DAILY_UPSERT_CHUNK):
         chunk = rows[i : i + _DAILY_UPSERT_CHUNK]
-        analytics_db.upsert_rows("reference", table, chunk, "date,municipality")
+        analytics_db.upsert_rows(_WEATHER_SILVER_SCHEMA, table, chunk, "date,municipality")
         total += len(chunk)
         logger.info("Upserted %d/%d %s rows", total, len(rows), table)
 
@@ -474,7 +483,7 @@ def rebuild_monthly_summary(period_start: Optional[str] = None, period_end: Opti
     (ISO dates; None = unbounded). Returns the number of month-rows upserted.
     """
     result = analytics_db.call_function(
-        "reference",
+        _WEATHER_SILVER_SCHEMA,
         "rebuild_weather_monthly_summary",
         p_period_start=period_start,
         p_period_end=period_end,
@@ -484,6 +493,20 @@ def rebuild_monthly_summary(period_start: Optional[str] = None, period_end: Opti
     except (TypeError, ValueError):
         count = 0
     logger.info("Monthly summary rebuilt — %d month-rows upserted", count)
+    return count
+
+
+def refresh_parish_weather_gold() -> int:
+    """Map municipality-month Silver weather into the existing Gold aggregate."""
+    result = analytics_db.call_function(
+        "parish_analytics",
+        "refresh_parish_weather_analytics",
+    )
+    try:
+        count = int(result)
+    except (TypeError, ValueError):
+        count = 0
+    logger.info("Parish weather Gold refreshed - %d parish-month rows", count)
     return count
 
 
@@ -519,9 +542,11 @@ def upsert_monthly_confidence(
             """
             SELECT column_name
             FROM information_schema.columns
-            WHERE table_schema = 'reference'
-              AND table_name = 'weather_monthly_summary'
+            WHERE table_schema = %s
+              AND table_name = %s
             """
+            ,
+            (_WEATHER_SILVER_SCHEMA, _WEATHER_MONTHLY_TABLE),
         )
     }
     if not confidence_columns.issubset(available):
@@ -573,7 +598,12 @@ def upsert_monthly_confidence(
     if not upsert_rows:
         return 0
 
-    analytics_db.upsert_rows("reference", "weather_monthly_summary", upsert_rows, "year_month,municipality")
+    analytics_db.upsert_rows(
+        _WEATHER_SILVER_SCHEMA,
+        _WEATHER_MONTHLY_TABLE,
+        upsert_rows,
+        "year_month,municipality",
+    )
 
     logger.info("Cohen's Kappa + Lin's CCC upserted for %d municipality-months", len(upsert_rows))
     return len(upsert_rows)
@@ -581,7 +611,7 @@ def upsert_monthly_confidence(
 
 def _fetch_all_daily_rows(table: str) -> list[dict]:
     """Paginate through every row in a reference daily table and return them all."""
-    return analytics_db.fetch_all("reference", table, order_by="date")
+    return analytics_db.fetch_all(_WEATHER_SILVER_SCHEMA, table, order_by="date")
 
 
 def confidence_from_db() -> int:

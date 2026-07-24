@@ -22,6 +22,7 @@ import { auth } from '../../firebase';
 import { ALL_PARISHES } from '../../constants';
 import { supabaseBrowser } from '../../lib/supabase';
 import { Avatar } from '../ui/Avatar';
+import { getAccessRoleLabel, normalizeAccessRole } from '../../lib/access';
 
 const TIMEFRAME_LABELS: Record<Timeframe, string> = {
   '6m': 'Past 6 Months',
@@ -300,16 +301,44 @@ export function TopNav({
       user?.displayName ||
       (role === 'school' ? 'Rev. Fr. John Doe' : role === 'seminary' ? 'Rev. Fr. James Smith' : 'Not assigned');
 
-    // Resolve vicariate dynamically from predefined ALL_PARISHES list
+    // Resolve canonical role label — always use the fine-grained accessRole on
+    // the auth user object so Seminary Oeconomus, Parish Secretary, etc. are
+    // never conflated with the coarse AppRole string (Bug 1.1, 1.2, 1.3).
+    const rawRole = (user as any)?.roleId || (user as any)?.accessRole || (user as any)?.role || '';
+    const canonicalRoleLabel = rawRole ? getAccessRoleLabel(normalizeAccessRole(rawRole)) : '';
+
+    // Build the district/vicariate label (only for parish roles).
     const matchedParish = ALL_PARISHES.find((p) => p.name.toLowerCase() === (user?.entityName || '').toLowerCase());
     const vicariateLabel = matchedParish ? `${matchedParish.vicariate} Vicariate` : 'St. John the Baptist Vicariate';
 
-    const metadata =
+    // District label — only shown for parish roles; parish_secretary also shows
+    // their assigned district number (Bug 1.3 acceptance criteria).
+    const isPriestOrSecretary =
+      normalizeAccessRole(rawRole) === 'parish_priest' ||
+      normalizeAccessRole(rawRole) === 'parish_secretary';
+    const districtLabel = (user as any)?.district
+      ? `District ${(user as any).district}`
+      : isPriestOrSecretary
+        ? 'District not assigned'
+        : null;
+
+    const metadata: string[] =
       role === 'school'
-        ? ['Cluster 1', `School Director: ${pastorName}`, 'Access: School']
+        ? [
+            ...(canonicalRoleLabel ? [`Role: ${canonicalRoleLabel}`] : []),
+            'Access: School',
+          ]
         : role === 'seminary'
-          ? [`Rector: ${pastorName}`, 'Access: Seminary']
-          : ['District not assigned', vicariateLabel, `Parish Priest: ${pastorName}`, 'Access: Parish Priest'];
+          ? [
+              ...(canonicalRoleLabel ? [`Role: ${canonicalRoleLabel}`] : []),
+              'Access: Seminary',
+            ]
+          : [
+              ...(districtLabel ? [districtLabel] : []),
+              vicariateLabel,
+              ...(canonicalRoleLabel ? [`${canonicalRoleLabel}`] : [`Parish Priest: ${pastorName}`]),
+              'Access: Parish',
+            ];
 
     const avatarPhoto = (user as any)?.avatarUrl || (user as any)?.photoURL || '';
 

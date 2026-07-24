@@ -57,6 +57,14 @@ const legacyRoleToAccessRole: Record<string, AccessRole> = {
   school: 'school_principal',
   seminary: 'seminary_rector',
   school_registrar: 'school_principal',
+
+  // Corrective aliases — remap invalid/stale role names to the canonical id
+  school_director: 'finance_officer',         // Bug 1.2: was stored as 'school_director'
+  rector: 'seminary_rector',                  // Bug 1.1: was displayed/stored as 'Rector' only
+  finance_supervisor_school: 'finance_supervisor',
+  school_finance_supervisor: 'finance_supervisor',
+  school_finance_officer: 'finance_officer',
+  superintendent_supervisor: 'school_superintendent',
 };
 
 export function normalizeAccessRole(role?: string): string {

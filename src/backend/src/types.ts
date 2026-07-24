@@ -92,6 +92,7 @@ export interface Parish {
   class: EntityClass;
   pastor: string;
   address: string;
+  municipality?: string;
   contactNumber: string;
   email: string;
   collections?: number;
@@ -111,6 +112,7 @@ export interface Seminary {
   class: EntityClass;
   rector: string;
   address: string;
+  municipality?: string;
   enrollment: number;
   capacity: number;
   staff: number;
@@ -126,6 +128,7 @@ export interface DiocesanSchool {
   class: EntityClass;
   principal: string;
   address: string;
+  municipality?: string;
   level: string;
   enrollment: number;
   capacity: number;

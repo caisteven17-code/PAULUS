@@ -496,6 +496,21 @@ export function HealthTracker() {
     [],
   );
 
+  // Auto-generated medical-records reminders (System / Important)
+  const priestRolesList = ['bishop', 'chancellor', 'parish_priest', 'seminary_rector', 'diocesan_oeconomus'];
+  const userRoleStr = String((user as any)?.roleId || (user as any)?.role || '').toLowerCase();
+  const isUserPriest = priestRolesList.some(r => userRoleStr.includes(r));
+  
+  const personalRecord = isUserPriest
+    ? priests
+        .filter((p) => {
+          const userEmail = ((user as any)?.email || '').toLowerCase();
+          return userEmail && p.email ? p.email.toLowerCase() === userEmail : false;
+        })
+        .sort((a, b) => new Date(b.lastCheckup || 0).getTime() - new Date(a.lastCheckup || 0).getTime())[0]
+    : undefined;
+  const myReminder = personalRecord ? getPriestHealthReminder(personalRecord) : null;
+
   // --------- PRIEST SELF-VIEW ------------------------------------------------------------------------------------------------------------------------------------------------------------------------
   if (isPriestView) {
     const priestName =
@@ -556,6 +571,23 @@ export function HealthTracker() {
               Add Record
             </button>
           </div>
+
+          {myReminder && (
+            <div className="mb-6 flex items-start gap-4 rounded-3xl border border-amber-200 bg-amber-50 p-5 md:p-6">
+              <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-amber-500 text-white">
+                <Stethoscope className="h-5 w-5" />
+              </div>
+              <div className="min-w-0 flex-1">
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className="rounded-md bg-amber-500/15 px-2 py-0.5 text-[9px] font-black uppercase tracking-wider text-amber-700">
+                    System · Important
+                  </span>
+                  <p className="text-sm font-black text-amber-900">{myReminder.title}</p>
+                </div>
+                <p className="mt-1 text-sm font-medium leading-relaxed text-amber-800">{myReminder.content}</p>
+              </div>
+            </div>
+          )}
 
           {/* Records list */}
           <h2 className="text-base font-bold text-slate-700 mb-3 flex items-center gap-2">
@@ -771,13 +803,48 @@ export function HealthTracker() {
   }
 
   // --------- ADMIN / BISHOP FULL VIEW ------------------------------------------------------------------------------------------------------------------------------------------------
-  const upcomingBirthdays = getUpcomingBirthdays();
-  const priestsNeedingCheckup = priests.filter((p) => needsCheckup(p.lastCheckup));
+  const isArchived = (p: PriestRecord) => archivedIds.includes(p.id);
+
+  const priestRolesListAdmin = ['bishop', 'chancellor', 'parish_priest', 'seminary_rector', 'diocesan_oeconomus'];
+  const allPriestRecords = [...priests];
+  for (const profile of allProfiles) {
+    const roleId = String(profile.roleId || profile.role || '').toLowerCase();
+    const isPriest = priestRolesListAdmin.some(r => roleId.includes(r));
+    if (isPriest && profile.status !== 'archived') {
+       const k = profile.email?.trim().toLowerCase() || profile.displayName?.trim().toLowerCase() || profile.id;
+       const exists = priests.some(p => (p.email?.trim().toLowerCase() || p.name?.trim().toLowerCase() || p.id) === k);
+       if (!exists) {
+         allPriestRecords.push({
+           id: profile.id?.toString() || Math.random().toString(36).substr(2, 9),
+           name: profile.displayName || profile.email?.split('@')[0] || '',
+           position: getAccessRoleLabel(profile.roleId || profile.role) || '',
+           parish: profile.entityName || '',
+           birthDate: profile.birthday || '',
+           age: profile.birthday ? calculateAge(profile.birthday) : 0,
+           lastCheckup: '',
+           healthStatus: 'good',
+           notes: '',
+           email: profile.email || '',
+           phone: profile.contactNumber || '',
+         });
+       }
+    }
+  }
+
+  const upcomingBirthdays = allPriestRecords
+    .map((p) => ({
+      ...p,
+      age: calculateAge(p.birthDate),
+      daysUntilBirthday: getDaysUntilBirthday(p.birthDate),
+    }))
+    .filter((p) => p.daysUntilBirthday <= 30 && p.daysUntilBirthday >= 0)
+    .sort((a, b) => a.daysUntilBirthday - b.daysUntilBirthday);
+
+  const priestsNeedingCheckup = allPriestRecords.filter((p) => needsCheckup(p.lastCheckup));
   // Age stored in the DB may be stale/missing - always derive it from birthDate
   const displayAge = (p: PriestRecord) => calculateAge(p.birthDate) || p.age || 0;
 
-  const isArchived = (p: PriestRecord) => archivedIds.includes(p.id);
-  const activePriests = priests.filter((p) => !isArchived(p));
+  const activePriests = allPriestRecords.filter((p) => !isArchived(p));
   const latestActivePriests = Array.from(
     activePriests.reduce((latestByPriest, priest) => {
       const key = priest.email?.trim().toLowerCase() || priest.name?.trim().toLowerCase() || priest.id;
@@ -848,7 +915,7 @@ export function HealthTracker() {
     p.email?.trim().toLowerCase() || p.name?.trim().toLowerCase() || p.id;
 
   const historyByKey = new Map<string, PriestRecord[]>();
-  for (const p of priests) {
+  for (const p of allPriestRecords) {
     const k = groupKey(p);
     if (!historyByKey.has(k)) historyByKey.set(k, []);
     historyByKey.get(k)!.push(p);
@@ -899,17 +966,6 @@ export function HealthTracker() {
   const totalPages = Math.max(1, Math.ceil(priestGroups.length / PAGE_SIZE));
   const safePage = Math.min(page, totalPages);
   const pagedGroups = priestGroups.slice((safePage - 1) * PAGE_SIZE, safePage * PAGE_SIZE);
-
-  // ── Auto-generated medical-records reminders (System / Important) ──────────
-  // Computed live from the records, so they disappear once a record is submitted.
-  const myRecord = isPriestView
-    ? priests.find(
-        (p) =>
-          (p.email && user?.email && p.email.toLowerCase() === user.email.toLowerCase()) ||
-          (p.name && user?.displayName && p.name.toLowerCase() === user.displayName.toLowerCase()),
-      )
-    : undefined;
-  const myReminder = isPriestView && myRecord ? getPriestHealthReminder(myRecord) : null;
 
   return (
     <div className="min-h-screen bg-[#f4f3ef] pt-8 pb-20 px-4 sm:px-6 lg:px-8">
@@ -1059,7 +1115,7 @@ export function HealthTracker() {
                     <option value="submitted">Submitted</option>
                     <option value="pending">Pending this month</option>
                     <option value="late">Late</option>
-                    <option value="year-late">1 year late</option>
+                    <option value="year-late">1+ years late</option>
                   </select>
                 </FilterField>
 

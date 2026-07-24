@@ -937,12 +937,15 @@ def collect(
 
     records_loaded = 0
     daily_rows_loaded = 0
+    gold_rows_loaded = 0
     legacy_error: Optional[str] = None
     try:
         if load:
+            from app.services.weather_bronze import archive_file
             from app.services.weather_loader import (
                 load_from_file,
                 rebuild_monthly_summary,
+                refresh_parish_weather_gold,
                 upsert_monthly_confidence,
                 upsert_weather_rainfall_daily,
                 upsert_weather_temperature_daily,
@@ -950,11 +953,22 @@ def collect(
             )
 
             # Pipeline: daily tables → monthly WCI (SQL) → monthly Fleiss Kappa (Python)
+            for city_file in sorted(per_city_dir.glob("*.json")):
+                archive_file(
+                    city_file,
+                    run_id=run_id,
+                    run_mode="full",
+                    period_start=start,
+                    period_end=end,
+                    artifact_type="municipality_sources",
+                )
+
             daily_rows_loaded = upsert_weather_rainfall_daily(daily_rain_rows)
             daily_rows_loaded += upsert_weather_temperature_daily(daily_temp_rows)
             daily_rows_loaded += upsert_weather_wind_daily(daily_wind_rows)
             rebuild_monthly_summary(start.isoformat(), end.isoformat())
             upsert_monthly_confidence(daily_rain_rows, daily_temp_rows, daily_wind_rows)
+            gold_rows_loaded = refresh_parish_weather_gold()
             logger.info(
                 "Loaded %d rows into rainfall + temperature + wind daily tables",
                 daily_rows_loaded,
@@ -972,8 +986,19 @@ def collect(
         _update_run_record(
             run_id, "success", len(master), records_loaded + daily_rows_loaded, error_detail=legacy_error
         )
+        from app.services.weather_bronze import mark_completed
+
+        mark_completed(
+            run_id,
+            silver_rows=daily_rows_loaded,
+            gold_rows=gold_rows_loaded,
+            error_detail=legacy_error,
+        )
     except Exception as exc:
         _update_run_record(run_id, "failed", len(master), records_loaded + daily_rows_loaded, error_detail=str(exc))
+        from app.services.weather_bronze import mark_completed
+
+        mark_completed(run_id, silver_rows=daily_rows_loaded, gold_rows=gold_rows_loaded, error_detail=str(exc))
         raise
 
     return {
@@ -982,6 +1007,7 @@ def collect(
         "champion_map": champion_map,
         "records_loaded": records_loaded,
         "daily_rows_loaded": daily_rows_loaded,
+        "gold_rows_loaded": gold_rows_loaded,
         "daily_rows_classified": len(daily_rain_rows) + len(daily_temp_rows),
     }
 

@@ -214,7 +214,15 @@ export class AnnouncementService {
         return row.audience_type !== 'specific' || (profileId && row.announcement_recipients?.some((r: any) => r.profile_id === profileId));
       })
       .map((row: any) => this.toAnnouncement(row))
-      .sort((a, b) => Number(b.pinned) - Number(a.pinned));
+      .sort((a, b) => {
+        if (a.pinned !== b.pinned) {
+          return Number(b.pinned) - Number(a.pinned);
+        }
+        const timeA = new Date(a.createdAt).getTime();
+        const timeB = new Date(b.createdAt).getTime();
+        if (timeA !== timeB) return timeB - timeA;
+        return a.id.localeCompare(b.id);
+      });
   }
 
   /** Published announcements whose start_date is still in the future. */

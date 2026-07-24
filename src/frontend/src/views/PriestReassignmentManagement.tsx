@@ -30,7 +30,8 @@ const MOVEMENT_OPTIONS: Array<{ type: MovementType; title: string; description: 
 ];
 
 export function PriestReassignmentManagement() {
-  const { user } = usePermissions();
+  const { user, permissions } = usePermissions();
+  const canManageAll = permissions.manage_assignments === true;
   const [activeSection, setActiveSection] = useState<'assignments' | 'planner' | 'history'>('assignments');
   const [priests, setPriests] = useState<Priest[]>([]);
   const [parishes, setParishes] = useState<Parish[]>([]);
@@ -142,9 +143,22 @@ export function PriestReassignmentManagement() {
     const orphanedAssignments = activeAssignments.filter((assignment) => !priestIds.has(assignment.priestId));
     return [...rows, ...orphanedAssignments];
   }, [activeAssignments, assignmentByPriest, priests]);
-  const filteredAssignments = assignmentRows.filter((assignment) =>
-    `${assignment.priestName} ${assignment.parishName}`.toLowerCase().includes(search.trim().toLowerCase()),
-  );
+  // Bug 2.5: Non-admin users (Parish Priest / Secretary) may only see their
+  // own assignment row, not the entire diocesan priest list.
+  const filteredAssignments = useMemo(() => {
+    const ownId = String(user?.id || user?.uid || '').trim();
+    const ownName = String(user?.displayName || user?.name || '').trim().toLowerCase();
+    const rows = assignmentRows.filter((assignment) =>
+      `${assignment.priestName} ${assignment.parishName}`.toLowerCase().includes(search.trim().toLowerCase()),
+    );
+    if (canManageAll) return rows; // admins see everyone
+    // Parish Priest: scope to their own row by Firebase UID or display name match
+    return rows.filter((a) =>
+      (ownId && (a.priestId === ownId ||
+        (user as any)?.externalAuthId === a.priestId)) ||
+      (ownName && a.priestName.toLowerCase() === ownName)
+    );
+  }, [assignmentRows, search, canManageAll, user]);
   const vacantParishes = parishes.filter(
     (parish) => !activeAssignments.some((assignment) => assignment.parishId === parish.id),
   );
@@ -298,8 +312,10 @@ export function PriestReassignmentManagement() {
 
         <div className="flex flex-wrap gap-2 rounded-2xl border border-slate-200 bg-white p-2 shadow-sm">
           <Tab active={activeSection === 'assignments'} onClick={() => switchSection('assignments')} icon={Users}>Current Assignments</Tab>
-          <Tab active={activeSection === 'planner'} onClick={() => switchSection('planner')} icon={ArrowRight}>Reassign Priests</Tab>
-          <Tab active={activeSection === 'history'} onClick={() => switchSection('history')} icon={History}>History</Tab>
+          {canManageAll && <>
+            <Tab active={activeSection === 'planner'} onClick={() => switchSection('planner')} icon={ArrowRight}>Reassign Priests</Tab>
+            <Tab active={activeSection === 'history'} onClick={() => switchSection('history')} icon={History}>History</Tab>
+          </>}
         </div>
 
         {success && <div className="flex flex-wrap items-center gap-3 rounded-2xl border border-emerald-200 bg-emerald-50 p-4 text-sm font-bold text-emerald-700"><CheckCircle2 className="h-5 w-5" /><span className="flex-1">{success}</span>{vacatedParish && <button onClick={() => { setMovementType('assign'); const first = priests.find((priest) => !assignmentByPriest.has(priest.id)); setMoves(first ? [{ priestId: first.id, toParishId: vacatedParish.id }] : []); setActiveSection('planner'); setSuccess(''); setGuidance(`${vacatedParish.name} is selected. Choose an unassigned priest.`); }} className="rounded-xl bg-emerald-700 px-3 py-2 text-xs font-black text-white">Assign Another Priest</button>}<button onClick={() => { setSuccess(''); setVacatedParish(null); setActiveSection('assignments'); }} className="rounded-xl border border-emerald-300 px-3 py-2 text-xs font-black">Current Assignments</button></div>}

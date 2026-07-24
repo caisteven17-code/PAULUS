@@ -150,6 +150,7 @@ portable_migrations/219_fix_rebuild_function_wci_removal.sql
 portable_migrations/220_add_profile_onboarding_columns.sql
 portable_migrations/221_audit_parish_financial_detail.sql
 portable_migrations/222_reclassify_charge_over_above_receipts.sql
+portable_migrations/238_add_institution_municipality.sql
 
 # AWS-only ETL observability and reconciliation controls. These tables do not
 # contain parish financial payloads and are safe before any backfill.
@@ -184,6 +185,12 @@ aws_migrations/073_prepare_diocese_retirement.sql
 aws_migrations/074_decouple_remaining_operational_mirrors.sql
 aws_migrations/075_school_seminary_silver.sql
 aws_migrations/076_rename_collections_other_net.sql
+aws_migrations/077_reference_medallion_foundation.sql
+aws_migrations/078_reference_silver_cutover.sql
+aws_migrations/079_rds_weather_bronze.sql
+aws_migrations/080_sync_institution_addresses.sql
+aws_migrations/081_sync_institution_municipalities.sql
+aws_migrations/082_refresh_weather_on_municipality_change.sql
 
 # Analytics refresh — run last, after all schema DDL above (see note near 125).
 # Phase 4: these legacy refresh scripts are intentionally excluded because they

@@ -482,7 +482,7 @@ function InstitutionBudget({
                         )}
                       </div>
 
-                      {canEdit ? (
+                      {canEdit && !(year === currentYear && month < new Date().getMonth() + 1) ? (
                         <label className="relative block">
                           <span className="absolute left-4 top-1/2 -translate-y-1/2 text-xs font-black text-gray-400">
                             PHP

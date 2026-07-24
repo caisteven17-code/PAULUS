@@ -234,18 +234,28 @@ export function Home({ onNavigate, role = 'bishop', permissions = {} }: HomeProp
             Guiding the faithful, nurturing vocations, and educating the youth in the heart of Laguna.
           </motion.p>
 
-          <motion.button
-            initial={{ opacity: 0, scale: 0.9 }}
-            animate={{ opacity: 1, scale: 1 }}
-            transition={{ duration: 0.5, delay: 0.4 }}
-            whileHover={{ scale: 1.05 }}
-            whileTap={{ scale: 0.95 }}
-            onClick={() => document.getElementById('dashboard-section')?.scrollIntoView({ behavior: 'smooth' })}
-            className="bg-gold-500 hover:bg-gold-600 text-black font-bold py-2.5 md:py-3 px-6 md:px-10 rounded-full flex items-center gap-2 md:gap-3 shadow-lg hover:shadow-xl transition-all duration-300 text-sm md:text-base"
-          >
-            <Target className="w-4 md:w-5 h-4 md:h-5" />
-            Launch Dashboard
-          </motion.button>
+          {/* Launch Dashboard button — only shown to roles that have a dashboard
+              to navigate to. Liturgical Validator has no dashboard tab, so the
+              button is hidden for them (Bug 1.4). */}
+          {(permissions.view_diocese ||
+            permissions.view_parish_dashboard ||
+            permissions.view_seminary_dashboard ||
+            permissions.view_school_dashboard ||
+            permissions.digital_twin) && (
+            <motion.button
+              initial={{ opacity: 0, scale: 0.9 }}
+              animate={{ opacity: 1, scale: 1 }}
+              transition={{ duration: 0.5, delay: 0.4 }}
+              whileHover={{ scale: 1.05 }}
+              whileTap={{ scale: 0.95 }}
+              onClick={() => document.getElementById('dashboard-section')?.scrollIntoView({ behavior: 'smooth' })}
+              className="bg-gold-500 hover:bg-gold-600 text-black font-bold py-2.5 md:py-3 px-6 md:px-10 rounded-full flex items-center gap-2 md:gap-3 shadow-lg hover:shadow-xl transition-all duration-300 text-sm md:text-base"
+            >
+              <Target className="w-4 md:w-5 h-4 md:h-5" />
+              Launch Dashboard
+            </motion.button>
+          )}
+
         </div>
 
         {/* Carousel Controls */}

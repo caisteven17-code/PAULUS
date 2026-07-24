@@ -168,7 +168,7 @@ def _fetch_changes(config: EntityConfig) -> list[dict]:
 def sync_dimensions(config: EntityConfig) -> dict[str, int]:
     institutions = analytics_db.fetch_query(
         """
-        SELECT institution_key,institution_id::text AS institution_id
+        SELECT institution_key,institution_id::text AS institution_id,address,municipality
         FROM shared_analytics.dim_institutions
         WHERE institution_type=%s AND is_active=true
         """,
@@ -190,6 +190,8 @@ def sync_dimensions(config: EntityConfig) -> dict[str, int]:
             {
                 "institution_key": institution["institution_key"],
                 config.person_column: str(source_person) if source_person else None,
+                "address": institution.get("address"),
+                "municipality": institution.get("municipality"),
             }
         )
     if dimension_rows:

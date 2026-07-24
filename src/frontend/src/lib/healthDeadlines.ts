@@ -78,7 +78,12 @@ export function getSubmissionStatus(
     return { code: 'pending', monthsLate: 0, label: 'Pending this month', severity: 'due', needsAttention: true };
   }
   if (monthsLate >= 12) {
-    return { code: 'year-late', monthsLate, label: '1 year late', severity: 'critical', needsAttention: true };
+    const years = Math.floor(monthsLate / 12);
+    const remainingMonths = monthsLate % 12;
+    const label = remainingMonths === 0
+      ? `${years} year${years !== 1 ? 's' : ''} late`
+      : `${years} year${years !== 1 ? 's' : ''} and ${remainingMonths} month${remainingMonths !== 1 ? 's' : ''} late`;
+    return { code: 'year-late', monthsLate, label, severity: 'critical', needsAttention: true };
   }
   return {
     code: 'late',

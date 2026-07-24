@@ -64,6 +64,8 @@ function getUserHeaders(): Record<string, string> {
     const sessionUser = auth.currentUser as any;
     let name = sessionUser?.name || sessionUser?.displayName || sessionUser?.email;
     let role = sessionUser?.roleId || sessionUser?.accessRole || sessionUser?.role;
+    let entityId = sessionUser?.entityId;
+    let entityName = sessionUser?.entityName;
 
     if (!name || !role) {
       const stored = localStorage.getItem('currentUser');
@@ -71,6 +73,8 @@ function getUserHeaders(): Record<string, string> {
         const user = JSON.parse(stored);
         name = name || user?.name || user?.displayName || user?.email;
         role = role || user?.roleId || user?.accessRole || user?.role;
+        entityId = entityId || user?.entityId;
+        entityName = entityName || user?.entityName;
       }
     }
 
@@ -82,6 +86,8 @@ function getUserHeaders(): Record<string, string> {
 
     if (name) headers['x-user-name'] = sanitize(name);
     if (role) headers['x-user-role'] = sanitize(role);
+    if (entityId) headers['x-user-institution-id'] = sanitize(entityId);
+    if (entityName) headers['x-user-institution-name'] = sanitize(entityName);
   } catch {
     // Ignore — backend falls back to "Unknown User"
   }

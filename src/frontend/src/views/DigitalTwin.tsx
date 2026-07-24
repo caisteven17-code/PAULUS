@@ -216,11 +216,15 @@ export function DigitalTwin({ onLaunch }: DigitalTwinProps) {
     filteredInstitutions.find((item) => item.id === selectedInstitutionId) ?? filteredInstitutions[0];
   const activeMeta = institutionTypeMeta[institutionType];
 
-  // Fetch live institution profiles from DB on mount
+  // Fetch live institution profiles from DB on mount.
+  // Bug 2.3/2.4: Also load the canonical entity list from Entity Management
+  // as a fallback so the school/seminary selectors always show registered
+  // institutions even if financial submissions are not yet present.
   useEffect(() => {
-    apiClient
-      .getFinancialProfiles()
-      .then((data) => {
+    const loadProfiles = async () => {
+      try {
+        // Load financial profiles (these have health scores, trends, etc.)
+        const data = await apiClient.getFinancialProfiles();
         if (data?.length) {
           setLiveProfiles(
             data.map((p: any) => ({
@@ -237,9 +241,69 @@ export function DigitalTwin({ onLaunch }: DigitalTwinProps) {
               insight: p.insight ?? '',
             })),
           );
+          return; // financial profiles loaded — no need for entity fallback
         }
-      })
-      .catch(() => {}); // silently keep fallback data
+      } catch {
+        // silently fall through to entity management fallback
+      }
+
+      // Fallback: load raw entity list from Entity Management so the
+      // selectors are never empty when schools/seminaries are registered
+      // but have no financial submissions yet (Bug 2.3).
+      try {
+        const res = await fetch('/api/admin/entities?all=true');
+        if (!res.ok) throw new Error('entity fetch failed');
+        const entity = await res.json();
+        const built: InstitutionProfile[] = [
+          ...(entity.parishes ?? []).map((p: any) => ({
+            id: String(p.id),
+            name: p.name,
+            type: 'parish' as InstitutionType,
+            location: p.vicariate ?? p.location ?? '',
+            healthScore: 50,
+            risk: 'Moderate' as const,
+            currentBalance: 0,
+            monthlyCollections: 0,
+            monthlyExpenses: 0,
+            trend: '0.0%',
+            insight: 'No financial data submitted yet — baseline estimates are used for simulation.',
+          })),
+          ...(entity.seminaries ?? []).map((s: any) => ({
+            id: String(s.id),
+            name: s.name,
+            type: 'seminary' as InstitutionType,
+            location: s.location ?? '',
+            healthScore: 50,
+            risk: 'Moderate' as const,
+            currentBalance: 0,
+            monthlyCollections: 0,
+            monthlyExpenses: 0,
+            trend: '0.0%',
+            insight: 'No financial data submitted yet — baseline estimates are used for simulation.',
+          })),
+          ...(entity.schools ?? []).map((s: any) => ({
+            id: String(s.id),
+            name: s.name,
+            type: 'school' as InstitutionType,
+            location: s.cluster ? `Cluster ${s.cluster}` : (s.location ?? ''),
+            healthScore: 50,
+            risk: 'Moderate' as const,
+            currentBalance: 0,
+            monthlyCollections: 0,
+            monthlyExpenses: 0,
+            trend: '0.0%',
+            insight: 'No financial data submitted yet — baseline estimates are used for simulation.',
+          })),
+        ];
+        if (built.length > 0) {
+          setLiveProfiles(built);
+          return;
+        }
+      } catch {
+        // silently keep FALLBACK_PROFILES
+      }
+    };
+    loadProfiles();
   }, []);
 
   useEffect(() => {
