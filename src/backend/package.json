@@ -17,6 +17,7 @@
     "typecheck": "tsc --noEmit -p tsconfig.json",
     "format": "prettier --write \"src/**/*.ts\"",
     "format:check": "prettier --check \"src/**/*.ts\"",
+    "test": "tsx --test src/**/*.spec.ts",
     "start": "npm run start:all",
     "start:gateway": "dotenv -e ../../.env -- node dist/apps/api-gateway/main.js",
     "start:auth": "dotenv -e ../../.env -- node dist/apps/auth-service/main.js",
