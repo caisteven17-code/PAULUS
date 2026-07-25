@@ -277,6 +277,56 @@ as the Health Score's weights in §8.
 
 ---
 
+## 10. Manuscript accuracy corrections — Predictive/Prescriptive module descriptions
+
+Found while cross-checking the pipeline diagram against both the actual codebase and the
+manuscript itself (Section 3.2.1.2.2 "Proposed System (Data Pipeline)", duplicated in the
+Appendix). State this as a deliberate accuracy pass if a panel asks, not something discovered
+under cross-examination — same framing this guide already uses in §5 and §9.
+
+**Confirmed typo — Parish Upgrade Recommendation's model list.** The manuscript currently
+describes this module as using "Multi-Layer Perceptron and Data Envelopment Analysis" — the same
+phrase used for Pastoral Assignment Financial Action. This is very likely a copy-paste of that
+adjacent sentence. The actual implementation (`parish_upgrade.py`) uses genuine binary
+Mixed-Integer Linear Programming (PuLP, `cat="Binary"`), not a neural network — and MILP is
+objectively the right tool for this specific decision (a discrete "which parishes to fund"
+selection under a budget constraint is a textbook knapsack/binary-selection problem; an MLP alone
+would only produce a score, not a budget-respecting selection). Correct the manuscript to
+"Mixed-Integer Linear Programming and Data Envelopment Analysis" for this module, in both the
+main-body paragraph and its Appendix duplicate.
+
+**Internal inconsistency, worth resolving either way — Financial Forecast's candidate list.**
+The manuscript's Financial Forecast sentence lists "Prophet, SARIMAX, Holt-Winters, BSTS, XGBoost,
+and Markov Chain" (SARIMAX only). The Seasonal Forecast sentence a few lines later lists
+"Prophet, SARIMA, SARIMAX, Holt-Winters, and XGBoost" (both SARIMA and SARIMAX). If Financial
+Forecast is meant to have both models racing (as the corrected diagram now shows, and as the
+system build adds — plain SARIMA has no exogenous inputs and can't track moveable liturgical
+feasts like Easter/Holy Week; SARIMAX with liturgical regressors is added specifically to close
+that gap), add "SARIMA" to the Financial Forecast sentence too, so both module descriptions read
+consistently.
+
+**Checked and confirmed correct as written — no manuscript change needed:**
+- "The agent-based simulation models in combination with a what-if analysis and sensitivity
+  analysis in both the institution and pastoral assignment simulation" — this phrase is accurate
+  to the intended design; the system build was changed to match it (deterministic trend
+  projection was the code's actual behavior, corrected to a genuine agent-based approach —
+  parish-agents and priest-agents carrying individual state/history — instead of weakening the
+  manuscript's claim).
+- Parish Cluster Forecast's "categorical forecasts of parish cluster assignments in the
+  **subsequent period**" — accurate; the implementation was found to actually predict against the
+  same period it trains on (no real forward-looking signal) and is being corrected to match this
+  manuscript claim, not the other way around.
+- Financial Recommendation's "suggests an Optimal Disbursement" — compatible with a corrected
+  implementation (the code previously maximized disbursement against ceiling-only constraints,
+  which is being corrected to genuinely optimize toward a minimum, peer-benchmarked floor).
+- Section 3.9.6 "Multiple Linear Regression"'s spec — "the model will consider priest assignment
+  period, weather conditions, and seasonality, while controlling for parish cluster" — accurate
+  and specific; the live Priest and Financial Diagnostic implementation was found to not use any
+  of these variables (a plain time-trend regression instead) and is being corrected to match this
+  spec.
+
+---
+
 ## Change Log
 
 *(Append an entry each time a phase completes or a decision changes. Keep entries short —
@@ -370,3 +420,13 @@ this feeds the manuscript's development narrative, not a full commit history.)*
   volatility; Markowitz 1952 for the risk-return quadrant structure itself) and flagged the
   design-evolution reasoning to state explicitly in the manuscript rather than leave for a panel to
   discover.
+- **2026-07-24** — Added §10: manuscript accuracy pass across the Predictive/Prescriptive
+  module descriptions, cross-checked against both the pipeline diagram and the live codebase.
+  Found and corrected one genuine typo (Parish Upgrade Recommendation's "Multi-Layer Perceptron"
+  should read "Mixed-Integer Linear Programming" — copy-paste from the adjacent Pastoral
+  Assignment Financial Action sentence). Flagged one internal inconsistency for resolution
+  (Financial Forecast's candidate list omits "SARIMA" that the parallel Seasonal Forecast sentence
+  includes). Confirmed four other claims (agent-based simulation, Parish Cluster Forecast's
+  subsequent-period wording, Financial Recommendation's disbursement objective, and the Multiple
+  Linear Regression spec in §3.9.6) as accurate — the system build is being corrected to match
+  these, rather than the manuscript being softened to match a weaker implementation.

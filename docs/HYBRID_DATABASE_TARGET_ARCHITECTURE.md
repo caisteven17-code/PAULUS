@@ -204,7 +204,14 @@ Phase 4 is split into three controlled deployments:
    parish details directly from Supabase and no longer copies profiles to AWS.
 2. **4B - Weather:** migration 071 replaces the operational institution foreign
    key with the local `institution_key`; collectors, loaders, run logs, and
-   summaries write to AWS `reference` tables only.
+   summaries write to AWS `reference` tables only. **Raw-layer decision
+   (reviewed, deliberately deferred, not an oversight):** no raw/bronze copy
+   of external weather API responses is preserved anywhere durable — the only
+   trace is `weather_output/*.json`, which is overwritten on every collection
+   run and lives outside any tracked schema. No precedent for a raw-response
+   archive exists elsewhere in this codebase (no S3 usage, no raw-table
+   pattern). Revisit if reproducibility/audit-trail needs for the weather
+   pipeline become a real requirement; not built as part of this phase.
 3. **4C - Liturgical calendar:** generated candidates remain pending in
    Supabase, where users can edit and approve them. Canonical Supabase rows are
    synchronized to AWS, and analytical views include approved states only.
