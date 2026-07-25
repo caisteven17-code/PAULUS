@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, useMemo, useRef } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Plus,
   Pencil,
@@ -32,9 +32,10 @@ import { VICARIATES, CLASSES, ALL_PARISHES, INITIAL_PARISHES } from '../../const
 import { dataService } from '../../services/dataService';
 import { roundedField, selectField } from '../../lib/formStyles';
 import { ENTITY_TYPE_ICON } from '../../lib/entityIcons';
-import { MapContainer, TileLayer, Marker, useMap } from 'react-leaflet';
-import L from 'leaflet';
+import { MapContainer, TileLayer } from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';
+import { EntityLocationMapModal, DraggableMarker, UpdateMapCenter } from './EntityLocationMapModal';
+import { EntityDeleteConfirmModal } from './EntityDeleteConfirmModal';
 
 interface EntityManagementControlProps {
   parishes: Parish[];
@@ -183,78 +184,6 @@ const matchLagunaCity = (geocodedName: string): string | null => {
 
   return null;
 };
-
-interface DraggableMarkerProps {
-  position: [number, number];
-  onDragEnd: (lat: number, lng: number) => void;
-  draggable?: boolean;
-}
-
-function DraggableMarker({ position, onDragEnd, draggable = true }: DraggableMarkerProps) {
-  const markerRef = useRef<any>(null);
-
-  // Custom gold pin matching the app's brand colors (#D4AF37 and #1A1A1A)
-  const goldPinIcon = useMemo(() => {
-    return L.divIcon({
-      className: 'custom-gold-pin',
-      html: `
-        <div style="
-          background-color: #D4AF37;
-          width: 28px;
-          height: 28px;
-          border-radius: 50% 50% 50% 0;
-          transform: rotate(-45deg);
-          border: 2px solid white;
-          box-shadow: 0 4px 6px -1px rgba(0,0,0,0.15), 0 2px 4px -1px rgba(0,0,0,0.1);
-          display: flex;
-          align-items: center;
-          justify-content: center;
-        ">
-          <div style="
-            background-color: #1A1A1A;
-            width: 8px;
-            height: 8px;
-            border-radius: 50%;
-            transform: rotate(45deg);
-          "></div>
-        </div>
-      `,
-      iconSize: [28, 28],
-      iconAnchor: [14, 28],
-    });
-  }, []);
-
-  const eventHandlers = useMemo(
-    () => ({
-      dragend() {
-        const marker = markerRef.current;
-        if (marker != null) {
-          const latLng = marker.getLatLng();
-          onDragEnd(latLng.lat, latLng.lng);
-        }
-      },
-    }),
-    [onDragEnd],
-  );
-
-  return (
-    <Marker
-      draggable={draggable}
-      eventHandlers={eventHandlers}
-      position={position}
-      icon={goldPinIcon}
-      ref={markerRef}
-    />
-  );
-}
-
-function UpdateMapCenter({ center }: { center: [number, number] }) {
-  const map = useMap();
-  useEffect(() => {
-    map.setView(center, map.getZoom() || 13);
-  }, [center, map]);
-  return null;
-}
 
 export function EntityManagementControl({
   parishes,
@@ -1603,138 +1532,13 @@ export function EntityManagementControl({
   return (
     <div className="space-y-5">
       {/* Delete Confirmation Modal */}
-      {isDeleteModalOpen && (
-        <div className="fixed inset-0 bg-black/40 z-[120] flex items-center justify-center p-4 backdrop-blur-sm animate-in fade-in duration-200">
-          <div className="bg-white rounded-3xl shadow-2xl w-full max-w-md overflow-hidden animate-in zoom-in-95 duration-200 border border-gray-100">
-            {deleteState.isChecking ? (
-              <div className="p-8 text-center space-y-6">
-                <div className="w-16 h-16 bg-gray-50 rounded-full flex items-center justify-center mx-auto border border-gray-100">
-                  <Loader2 className="w-8 h-8 text-[#D4AF37] animate-spin" />
-                </div>
-                <div className="space-y-2">
-                  <h3 className="text-xl font-bold text-gray-900">Analyzing Dependencies</h3>
-                  <p className="text-xs text-gray-500 leading-relaxed">
-                    Checking financial reports, historical collections, projects, and active personnel assignments for{' '}
-                    <span className="font-bold text-gray-900">"{entityToDelete?.name}"</span>...
-                  </p>
-                </div>
-              </div>
-            ) : deleteState.hasAny ? (
-              /* Soft Delete (Archive) Warning Flow */
-              <div className="p-8 text-center space-y-6">
-                <div className="w-16 h-16 bg-amber-50 rounded-full flex items-center justify-center mx-auto border border-amber-100">
-                  <ShieldAlert className="w-8 h-8 text-amber-500 animate-pulse" />
-                </div>
-                <div className="space-y-2">
-                  <h3 className="text-2xl font-bold text-gray-900">Safe Archive Required</h3>
-                  <p className="text-xs text-gray-500 leading-relaxed">
-                    Historical dependency records were detected for{' '}
-                    <span className="font-bold text-gray-900">"{entityToDelete?.name}"</span>. To protect multi-year
-                    aggregates, audit history, and reporting integrity, this entry will be safely archived and hidden
-                    from active views.
-                  </p>
-                </div>
-
-                <div className="bg-amber-50/50 rounded-2xl p-4 border border-amber-100 text-left space-y-2 max-h-[160px] overflow-y-auto scrollbar-thin">
-                  <span className="text-[10px] font-bold text-amber-600 uppercase tracking-widest block mb-1">
-                    Detected Dependencies:
-                  </span>
-                  {deleteState.hasPastor && (
-                    <div className="flex items-center gap-2 text-xs font-semibold text-gray-700">
-                      <span className="text-amber-500 text-xs">⛪</span>
-                      <span>
-                        Assigned Pastor:{' '}
-                        <span className="text-gray-900 font-bold">
-                          {entityToDelete.pastor || entityToDelete.rector || entityToDelete.principal}
-                        </span>
-                      </span>
-                    </div>
-                  )}
-                  {deleteState.hasCollections && (
-                    <div className="flex items-center gap-2 text-xs font-semibold text-gray-700">
-                      <span className="text-amber-500 text-xs">📊</span>
-                      <span>Historical Financial Records & Collections</span>
-                    </div>
-                  )}
-                  {deleteState.hasAccounts && (
-                    <div className="flex items-center gap-2 text-xs font-semibold text-gray-700">
-                      <span className="text-amber-500 text-xs">👤</span>
-                      <span>Assigned User Account / Profile</span>
-                    </div>
-                  )}
-                  {deleteState.hasProjects && (
-                    <div className="flex items-center gap-2 text-xs font-semibold text-gray-700">
-                      <span className="text-amber-500 text-xs">🏗️</span>
-                      <span>Active or Completed Special Projects</span>
-                    </div>
-                  )}
-                  {deleteState.isPredefined && (
-                    <div className="flex items-center gap-2 text-xs font-semibold text-gray-700">
-                      <span className="text-amber-500 text-xs">🛡️</span>
-                      <span>Predefined Diocesan Seed Institution</span>
-                    </div>
-                  )}
-                </div>
-
-                <div className="flex gap-3 pt-2">
-                  <button
-                    onClick={() => setIsDeleteModalOpen(false)}
-                    className="flex-1 px-6 py-3 border border-gray-200 rounded-xl font-bold text-gray-500 hover:bg-gray-50 transition-colors text-sm"
-                  >
-                    Cancel
-                  </button>
-                  <button
-                    onClick={handleDelete}
-                    className="flex-1 px-6 py-3 bg-[#D4AF37] hover:bg-[#B5952F] text-white rounded-xl font-bold transition-colors shadow-lg shadow-[#D4AF37]/20 text-sm"
-                  >
-                    Archive Entity
-                  </button>
-                </div>
-              </div>
-            ) : (
-              /* Hard Delete clean Flow */
-              <div className="p-8 text-center space-y-6">
-                <div className="w-16 h-16 bg-rose-50 rounded-full flex items-center justify-center mx-auto border border-rose-100">
-                  <Trash2 className="w-8 h-8 text-rose-500" />
-                </div>
-                <div className="space-y-2">
-                  <h3 className="text-2xl font-bold text-gray-900">Delete Permanently</h3>
-                  <p className="text-xs text-gray-500 leading-relaxed">
-                    No active dependencies, projects, or historical financial records were detected for{' '}
-                    <span className="font-bold text-gray-900">"{entityToDelete?.name}"</span>.
-                  </p>
-                  <p className="text-[11px] text-gray-400 mt-1 leading-relaxed">
-                    Since this entry appears to be a clean record (e.g. created by accident due to a typo), it will be
-                    **permanently erased** from the system. This cannot be undone.
-                  </p>
-                </div>
-
-                <div className="bg-emerald-50/50 rounded-2xl p-4 border border-emerald-100/50 text-left">
-                  <div className="flex items-center gap-2 text-xs font-bold text-emerald-700">
-                    <CheckCircle className="w-4 h-4 text-emerald-500 flex-shrink-0" />
-                    <span>Eligible for clean hard deletion</span>
-                  </div>
-                </div>
-
-                <div className="flex gap-3 pt-2">
-                  <button
-                    onClick={() => setIsDeleteModalOpen(false)}
-                    className="flex-1 px-6 py-3 border border-gray-200 rounded-xl font-bold text-gray-500 hover:bg-gray-50 transition-colors text-sm"
-                  >
-                    Cancel
-                  </button>
-                  <button
-                    onClick={handleDelete}
-                    className="flex-1 px-6 py-3 bg-rose-500 text-white rounded-xl font-bold hover:bg-rose-600 transition-colors shadow-lg shadow-rose-500/20 text-sm"
-                  >
-                    Delete Permanently
-                  </button>
-                </div>
-              </div>
-            )}
-          </div>
-        </div>
-      )}
+      <EntityDeleteConfirmModal
+        isOpen={isDeleteModalOpen}
+        onCancel={() => setIsDeleteModalOpen(false)}
+        onConfirm={handleDelete}
+        entityToDelete={entityToDelete}
+        deleteState={deleteState}
+      />
 
       {/* Add/Edit Modal */}
       {isModalOpen && (
@@ -2426,97 +2230,18 @@ export function EntityManagementControl({
       )}
 
       {/* Fullscreen Precision Map Modal */}
-      {isLargeMapOpen && (
-        <div className="fixed inset-0 bg-black/60 z-[200] flex items-center justify-center p-6 backdrop-blur-sm animate-in fade-in duration-200">
-          <div className="bg-white rounded-3xl shadow-2xl w-full max-w-4xl h-[85vh] overflow-hidden flex flex-col animate-in zoom-in-95 duration-200 border border-gray-100">
-            {/* Header */}
-            <div className="bg-[#1A1A1A] p-6 text-white relative overflow-hidden shrink-0 flex items-center justify-between">
-              <div className="absolute top-0 right-0 w-32 h-32 bg-[#D4AF37]/10 rounded-full -mr-16 -mt-16 blur-2xl"></div>
-              <div>
-                <h3 className="text-xl font-bold relative z-10">Fullscreen Precision Pinning</h3>
-                <p className="text-white/50 text-xs mt-0.5 relative z-10">
-                  Drag the gold pin to precisely locate the parish. Scroll to zoom.
-                </p>
-              </div>
-              <div className="bg-[#D4AF37]/10 border border-[#D4AF37]/20 text-[#D4AF37] px-3 py-1.5 rounded-xl text-[10px] font-bold uppercase tracking-wider">
-                🔓 Editing Active
-              </div>
-            </div>
-
-            {/* Map Area */}
-            <div className="flex-1 w-full h-full relative z-10 bg-gray-50">
-              <MapContainer
-                center={[
-                  formState.lat !== undefined ? formState.lat : 14.1686,
-                  formState.lng !== undefined ? formState.lng : 121.3253,
-                ]}
-                zoom={14}
-                style={{ height: '100%', width: '100%' }}
-                zoomControl={true}
-                maxBounds={[
-                  [13.9, 120.9],
-                  [14.45, 121.75],
-                ]}
-              >
-                <UpdateMapCenter
-                  center={[
-                    formState.lat !== undefined ? formState.lat : 14.1686,
-                    formState.lng !== undefined ? formState.lng : 121.3253,
-                  ]}
-                />
-                <TileLayer
-                  url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-                  attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
-                />
-                <DraggableMarker
-                  position={[
-                    formState.lat !== undefined ? formState.lat : 14.1686,
-                    formState.lng !== undefined ? formState.lng : 121.3253,
-                  ]}
-                  onDragEnd={(lat, lng) => {
-                    // Clamp manual pinning coordinates to Laguna Province bounds
-                    const clampedLat = Math.max(13.9, Math.min(14.45, lat));
-                    const clampedLng = Math.max(120.9, Math.min(121.75, lng));
-                    setFormState((prev) => ({ ...prev, lat: clampedLat, lng: clampedLng }));
-                  }}
-                  draggable={true}
-                />
-              </MapContainer>
-
-              {/* Floating coordinates indicator in large map */}
-              <div className="absolute bottom-4 left-4 bg-white/95 backdrop-blur shadow-xl border border-gray-100 rounded-2xl p-4 z-[1000] flex gap-4 text-xs font-bold text-gray-800">
-                <div>
-                  <span className="text-[10px] text-gray-400 block uppercase mb-0.5">Latitude</span>
-                  <span>{formState.lat !== undefined ? formState.lat.toFixed(6) : 'N/A'}</span>
-                </div>
-                <div className="w-px bg-gray-200"></div>
-                <div>
-                  <span className="text-[10px] text-gray-400 block uppercase mb-0.5">Longitude</span>
-                  <span>{formState.lng !== undefined ? formState.lng.toFixed(6) : 'N/A'}</span>
-                </div>
-              </div>
-            </div>
-
-            {/* Footer */}
-            <div className="p-6 bg-gray-50 border-t border-gray-100 flex gap-3 shrink-0 justify-end">
-              <button
-                type="button"
-                onClick={() => setIsLargeMapOpen(false)}
-                className="px-6 py-2.5 border border-gray-200 rounded-xl font-bold text-gray-500 hover:bg-gray-100 transition-colors text-xs"
-              >
-                Cancel
-              </button>
-              <button
-                type="button"
-                onClick={() => setIsLargeMapOpen(false)}
-                className="px-6 py-2.5 bg-[#D4AF37] hover:bg-[#B5952F] text-white rounded-xl font-bold transition-colors shadow-lg shadow-[#D4AF37]/20 text-xs"
-              >
-                Apply Coordinates
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      <EntityLocationMapModal
+        isOpen={isLargeMapOpen}
+        onClose={() => setIsLargeMapOpen(false)}
+        lat={formState.lat}
+        lng={formState.lng}
+        onDragEnd={(lat, lng) => {
+          // Clamp manual pinning coordinates to Laguna Province bounds
+          const clampedLat = Math.max(13.9, Math.min(14.45, lat));
+          const clampedLng = Math.max(120.9, Math.min(121.75, lng));
+          setFormState((prev) => ({ ...prev, lat: clampedLat, lng: clampedLng }));
+        }}
+      />
 
       {historyOpen && (
         <div className="fixed inset-0 z-[190] flex items-center justify-center bg-black/55 p-6 backdrop-blur-sm">
