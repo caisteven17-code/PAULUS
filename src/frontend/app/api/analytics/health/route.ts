@@ -5,3 +5,7 @@ import { proxyToBackend } from '../../../../src/lib/backend-proxy';
 export async function GET(req: NextRequest) {
   return proxyToBackend(req, { path: '/analytics/health-score' });
 }
+
+export async function POST(req: NextRequest) {
+  return proxyToBackend(req, { path: '/analytics/health-scores', method: 'POST' });
+}

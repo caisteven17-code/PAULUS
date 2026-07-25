@@ -65,6 +65,9 @@ A transform step rolls operational rows up into `fact_monthly_financials` / `fac
 ### `diocese.project_expenses` ✅ *(project.service.ts mapper — exact)*
 `id` (uuid PK) · `project_id` (uuid FK → `diocese.projects.id`) · `description` (text) · `amount` (numeric) · `date` (date) · `payment_method` (text) · `receipt_reference` (text) · `proof_file_name` (text) · `notes` (text)[cite: 2]
 
+### `diocese.events` ✅ *(Shared institution events)*
+`id` (uuid PK) · `institution_id` (uuid FK → `diocese.institutions.id`) · `event_name` (text) · `event_level` (text: Major event/Minor event) · `event_type` (text) · `expected_financial_impact` (text: inflow/outflow/both/none) · `estimated_amount` (numeric) · `linked_project_id` (uuid FK → `diocese.projects.id`, nullable) · `start_date` (date) · `end_date` (date) · `notes` (text)
+
 ### `diocese.announcements` ✅
 `id` (uuid PK) · `title` (text) · `content` (text) · `author` (text) · `author_role` (text) · `priority` (text: low/medium/high) · `category` (text: general/financial/administrative/event)[cite: 2]
 
@@ -167,12 +170,6 @@ Purpose: preserves contribution rows such as SSS, PhilHealth, and Pag-IBIG where
 
 `id` (uuid PK) · `financial_record_id` (uuid FK → `parishes.financial_records.id` on delete cascade) · `contribution_type` (text: SSS/PhilHealth/Pag-IBIG/Other) · `basic_salary` (numeric(14,2) default 0) · `employee_share` (numeric(14,2) default 0) · `employer_share` (numeric(14,2) default 0) · `total_amount` (numeric(14,2) default 0) · `source_row_number` (int) · `source_label` (text)
 
-### `parishes.fiesta_events` ✅
-`id` (uuid PK) · `institution_id` (uuid FK → `diocese.institutions.id`) · `primary_patron` (text) · `secondary_patron` (text) · `date` (date) · `expected_impact` (text: low/medium/high) · `estimated_collection_increase` (numeric)[cite: 2]
-
-### `parishes.local_calendar` 🆕 *(Per-parish contextual forecasting input)*
-`id` (uuid PK) · `institution_id` (uuid FK → `diocese.institutions.id`) · `event_date` (date) · `end_date` (date) · `title` (text) · `event_type` (text: fiesta/novena/recollection/wedding-season/outreach/construction/other) · `expected_financial_impact` (text: inflow/outflow/both/none) · `estimated_amount` (numeric) · `linked_fiesta_id` (uuid FK → `parishes.fiesta_events.id`, nullable) · `linked_project_id` (uuid FK → `diocese.projects.id`, nullable) · `notes` (text)[cite: 2]
-
 ---
 
 ## 4. `schools` Schema (Operational Sub-type)
@@ -259,10 +256,10 @@ order by a.sort_order;
 ### Reconciliation rules
 
 - `parish_analytics.fact_parish_monthly_financials.collections_mass` = sum of `parish_analytics.fact_parish_financial_breakdowns.amount` where `dim_iafr_account.is_mass_collection = true`.
-- `parish_analytics.fact_parish_monthly_financials.collections_other_95` = sum where `subsection_code = 'B.2'`.
+- Eligible B.2 collections are included internally in `total_collections` at 100% for 2021-2022 and net of 5% for 2023-2025; they are not exposed as a separate Gold column.
 - `parish_analytics.fact_parish_monthly_financials.collections_other_receipts` = sum of line amounts mapped to the consolidated "other receipts" bucket.
 - `parish_analytics.fact_parish_monthly_financials.expenses_pastoral_mass_stipend` + `expenses_parish` = sum of line amounts where `account_type = 'expense'` for the consolidated report scope.
-- `parish_analytics.fact_parish_monthly_financials.total_collections` = `sacraments_arancel_confirmation_incl` + `sacraments_parish_share` + `sacraments_over_above_confirmation_incl` + `collections_mass` + `collections_other_95` + `collections_other_receipts`.
+- `parish_analytics.fact_parish_monthly_financials.total_collections` = `sacraments_arancel_confirmation_incl` + `sacraments_parish_share` + `sacraments_over_above_confirmation_incl` + `collections_mass` + internally calculated Other Collections net + `collections_other_receipts`.
 - `parish_analytics.fact_parish_monthly_financials.total_expenses` = `expenses_pastoral_mass_stipend` + `expenses_parish`.
 - `parish_analytics.fact_parish_monthly_financials.net_receipts_deficit` = `total_collections - total_expenses`.
 - `parish_analytics.fact_parish_monthly_financials` and `parish_analytics.fact_parish_financial_breakdowns` connect by shared monthly grain: `parish_key`, `date_key`, and optionally `submission_key` when version traceability is required.
@@ -310,7 +307,7 @@ Fact tables, outriggers, and account dimensions dedicated to parishes.
 
 #### Fact Tables
 **`parish_analytics.fact_parish_monthly_financials`** 🆕 — Official consolidated parish financial report by month, stored as one analytics-ready row per parish per month:
-`parish_key` (int FK → `parish_analytics.dim_parishes.parish_key`) · `date_key` (int FK → `shared_analytics.dim_date.date_key`) · `submission_key` (int FK → `shared_analytics.dim_submission.submission_key`) · `sacraments_arancel_confirmation_incl` (numeric) · `sacraments_parish_share` (numeric) · `sacraments_over_above_confirmation_incl` (numeric) · `collections_mass` (numeric) · `collections_other_95` (numeric) · `collections_other_receipts` (numeric) · `total_collections` (numeric) · `expenses_pastoral_mass_stipend` (numeric) · `expenses_parish` (numeric) · `total_expenses` (numeric) · `net_receipts_deficit` (numeric) · `mass_intentions_not_claimed_by_parish_priest` (numeric) · `mass_intentions_claimed_by_parish_priest` (numeric) · `special_collections` (numeric) · `pastoral_parish_fund_total_net_receipts_deficit` (numeric) · `typhoon_days_count` (smallint) · `major_events_count` (smallint) · `has_fiesta` (bool) · `total_rainfall_mm` (numeric) — PK (`parish_key`, `date_key`)
+`parish_key` (int FK → `parish_analytics.dim_parishes.parish_key`) · `date_key` (int FK → `shared_analytics.dim_date.date_key`) · `submission_key` (int FK → `shared_analytics.dim_submission.submission_key`) · `sacraments_arancel_confirmation_incl` (numeric) · `sacraments_parish_share` (numeric) · `sacraments_over_above_confirmation_incl` (numeric) · `collections_mass` (numeric) · `collections_other_receipts` (numeric) · `total_collections` (numeric) · `expenses_pastoral_mass_stipend` (numeric) · `expenses_parish` (numeric) · `total_expenses` (numeric) · `net_receipts_deficit` (numeric) · `mass_intentions_not_claimed_by_parish_priest` (numeric) · `mass_intentions_claimed_by_parish_priest` (numeric) · `special_collections` (numeric) · `pastoral_parish_fund_total_net_receipts_deficit` (numeric) · `total_remittance` (numeric) · `typhoon_days_count` (smallint) · `major_events_count` (smallint) · `has_fiesta` (bool) · `total_rainfall_mm` (numeric) — PK (`parish_key`, `date_key`)
 
 **`parish_analytics.fact_parish_financial_breakdowns`** 🆕 — Granular account-level breakdown facts supporting drill-down and the roll-up into the monthly consolidated report:
 `parish_key` (int FK → `parish_analytics.dim_parishes.parish_key`) · `date_key` (int FK → `shared_analytics.dim_date.date_key`) · `submission_key` (int FK → `shared_analytics.dim_submission.submission_key`, nullable if backfilled) · `iafr_account_key` (int FK → `parish_analytics.dim_iafr_account.iafr_account_key`) · `amount` (numeric) — PK (`parish_key`, `date_key`, `iafr_account_key`)

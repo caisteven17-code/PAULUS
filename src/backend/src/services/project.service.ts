@@ -1,13 +1,145 @@
 import { Injectable } from '@nestjs/common';
 import { SupabaseService } from './supabase.service';
 import { Project, Donation, ProjectExpense } from '../types';
-import { newId } from '../utils/store';
+
+interface InstitutionRow {
+  id: string;
+  name?: string;
+}
+
+interface ProjectRow {
+  id: string;
+  name: string;
+  description?: string;
+  fund_usage?: string;
+  target_amount: number | string;
+  current_amount: number | string;
+  start_date?: string;
+  end_date?: string;
+  category: Project['category'];
+  status: Project['status'];
+  beneficiaries?: string;
+  cover_image?: string;
+  contact_person?: string;
+  health_score?: number | string;
+  success_probability?: number | string;
+  recommendation?: string;
+  total_expenses?: number | string | null;
+  entity_type?: string;
+  entity_id?: string;
+  entity_name?: string;
+  institution_id?: string;
+  institution?: { name?: string; institution_type?: string } | { name?: string; institution_type?: string }[];
+}
+
+interface DonationRow {
+  id: string;
+  project_id: string;
+  donor_name?: string;
+  amount: number | string;
+  date?: string;
+  payment_method: Donation['paymentMethod'];
+  receipt_issued?: boolean;
+  receipt_proof_name?: string;
+  notes?: string;
+}
+
+interface ExpenseRow {
+  id: string;
+  project_id: string;
+  description: string;
+  amount: number | string;
+  date?: string;
+  payment_method: ProjectExpense['paymentMethod'];
+  notes?: string;
+  receipt_reference?: string;
+  proof_file_name?: string;
+}
 
 @Injectable()
 export class ProjectService {
   constructor(private readonly supabaseService: SupabaseService) {}
 
-  private toProject(row: any): Project {
+  private db() {
+    return this.supabaseService.supabaseServer.schema('diocese');
+  }
+
+  private isUuid(value?: string): boolean {
+    return !!value && /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value);
+  }
+
+  private async resolveInstitutionIds(entityId?: string, entityType?: string, entityName?: string): Promise<string[]> {
+    if (entityId && this.isUuid(entityId)) return [entityId];
+
+    const candidates = [entityId, entityName]
+      .filter((value): value is string => typeof value === 'string' && value.trim().length > 0)
+      .map((value) => value.trim());
+
+    if (entityType === 'diocese' && !candidates.some((value) => value.toLowerCase() === 'diocese of san pablo')) {
+      candidates.push('Diocese of San Pablo');
+    }
+
+    let query: any = this.db().from('institutions').select('id, name').is('deleted_at', null);
+    if (entityType) query = query.eq('institution_type', entityType);
+
+    const { data, error } = await query;
+    if (error) {
+      console.error('[project.service] resolveInstitutionIds error:', error.message);
+      return [];
+    }
+
+    if (!candidates.length) return (data ?? []).map((row: InstitutionRow) => row.id);
+
+    const candidateSet = new Set(candidates.map((value) => value.toLowerCase()));
+    const found = (data ?? [])
+      .filter((row: InstitutionRow) => candidateSet.has(String(row.name ?? '').toLowerCase()))
+      .map((row: InstitutionRow) => row.id);
+
+    // Auto-register seminary/school/parish institutions that are not yet in
+    // diocese.institutions. This is the safety net so a school/seminary user can
+    // still save even if Entity Management never synced their institution.
+    if (found.length === 0 && (entityName || entityId) && entityType && entityType !== 'diocese') {
+      const insertName = (entityName ?? entityId ?? '').trim();
+      if (insertName) {
+        const { data: created, error: insertErr } = await this.db()
+          .from('institutions')
+          .insert({ name: insertName, institution_type: entityType, is_active: true })
+          .select('id')
+          .single();
+        if (!insertErr && created?.id) return [created.id];
+        if (insertErr) {
+          console.error(
+            `[project.service] auto-register institution failed for "${insertName}" (${entityType}):`,
+            insertErr.code,
+            insertErr.message,
+          );
+        }
+        // If insert failed (e.g. duplicate name, or it now exists), fetch it —
+        // including soft-deleted rows so we can surface a clearer reason.
+        const { data: existing } = await this.db()
+          .from('institutions')
+          .select('id, deleted_at')
+          .eq('name', insertName)
+          .eq('institution_type', entityType)
+          .limit(1)
+          .maybeSingle();
+        if (existing?.id && !existing.deleted_at) return [existing.id];
+        if (existing?.deleted_at) {
+          console.error(
+            `[project.service] institution "${insertName}" (${entityType}) exists but is archived; restore it in Entity Management to save here.`,
+          );
+        }
+      }
+    }
+
+    return found;
+  }
+
+  private toProject(row: ProjectRow): Project {
+    const institution = Array.isArray(row.institution) ? row.institution[0] : row.institution;
+    const entityType = (row.entity_type ?? institution?.institution_type ?? 'parish') as Project['entityType'];
+    const entityId = row.entity_id ?? row.institution_id ?? '';
+
     return {
       id: row.id,
       name: row.name,
@@ -26,8 +158,9 @@ export class ProjectService {
       successProbability: Number(row.success_probability ?? 0),
       recommendation: row.recommendation ?? '',
       totalExpenses: row.total_expenses != null ? Number(row.total_expenses) : undefined,
-      entityId: row.entity_id,
-      entityType: row.entity_type,
+      entityId,
+      entityName: institution?.name ?? row.entity_name ?? row.entity_id ?? entityId,
+      entityType,
     };
   }
 
@@ -49,14 +182,13 @@ export class ProjectService {
       success_probability: p.successProbability,
       recommendation: p.recommendation,
       total_expenses: p.totalExpenses ?? null,
-      entity_id: p.entityId,
-      entity_type: p.entityType,
+      institution_id: p.entityId,
     };
-    if (p.id && p.id.startsWith('PRJ-')) row.id = p.id;
+    if (p.id && (this.isUuid(p.id) || p.id.startsWith('PRJ-'))) row.id = p.id;
     return row;
   }
 
-  private toDonation(row: any): Donation {
+  private toDonation(row: DonationRow): Donation {
     return {
       id: row.id,
       projectId: row.project_id,
@@ -81,11 +213,11 @@ export class ProjectService {
       receipt_proof_name: d.receiptProofName ?? null,
       notes: d.notes ?? null,
     };
-    if (d.id && d.id.startsWith('DON-')) row.id = d.id;
+    if (d.id && (this.isUuid(d.id) || d.id.startsWith('DON-'))) row.id = d.id;
     return row;
   }
 
-  private toExpense(row: any): ProjectExpense {
+  private toExpense(row: ExpenseRow): ProjectExpense {
     return {
       id: row.id,
       projectId: row.project_id,
@@ -110,21 +242,24 @@ export class ProjectService {
       receipt_reference: e.receiptReference ?? null,
       proof_file_name: e.proofFileName ?? null,
     };
-    if (e.id && e.id.startsWith('EXP-')) row.id = e.id;
+    if (e.id && (this.isUuid(e.id) || e.id.startsWith('EXP-'))) row.id = e.id;
     return row;
   }
 
   async getProjects(entityId?: string, entityType?: string): Promise<Project[]> {
-    let query = this.supabaseService.supabaseServer
+    let query: any = this.db()
       .from('projects')
-      .select('*')
+      .select('*, institution:institutions(id, name, institution_type)')
+      .is('deleted_at', null)
       .order('created_at', { ascending: false });
 
     if (entityType === 'diocese') {
       // bishop sees all
     } else {
-      if (entityId) query = query.eq('entity_id', entityId);
-      if (entityType) query = query.eq('entity_type', entityType);
+      const ids = await this.resolveInstitutionIds(entityId, entityType);
+      if ((entityId || entityType) && ids.length === 0) return [];
+      if (ids.length === 1) query = query.eq('institution_id', ids[0]);
+      if (ids.length > 1) query = query.in('institution_id', ids);
     }
 
     const { data, error } = await query;
@@ -132,28 +267,44 @@ export class ProjectService {
       console.error('[project.service] getProjects error:', error.message);
       return [];
     }
-    return (data ?? []).map((d) => this.toProject(d));
+    return (data ?? []).map((d: ProjectRow) => this.toProject(d));
   }
 
   async saveProject(project: Project): Promise<Project> {
-    const row = this.fromProject(project);
-    const { data, error } = await this.supabaseService.supabaseServer.from('projects').upsert(row).select().single();
+    let institutionId = project.entityId;
+    if (!this.isUuid(institutionId)) {
+      const ids = await this.resolveInstitutionIds(project.entityId, project.entityType, project.entityName);
+      institutionId = ids[0];
+    }
+
+    if (!institutionId) {
+      throw new Error(
+        `Could not resolve institution for project save. entityId="${project.entityId}", entityName="${project.entityName}", entityType="${project.entityType}"`,
+      );
+    }
+
+    const row = this.fromProject({ ...project, entityId: institutionId });
+    const { data, error } = await this.db()
+      .from('projects')
+      .upsert(row)
+      .select('*, institution:institutions(id, name, institution_type)')
+      .single();
     if (error || !data) {
-      console.error('[project.service] saveProject error:', error?.message);
-      return project;
+      throw new Error(error?.message ?? 'Project save failed.');
     }
     return this.toProject(data);
   }
 
   async deleteProject(id: string): Promise<void> {
-    const { error } = await this.supabaseService.supabaseServer.from('projects').delete().eq('id', id);
+    const { error } = await this.db().from('projects').delete().eq('id', id);
     if (error) console.error('[project.service] deleteProject error:', error.message);
   }
 
   async getDonations(projectId?: string): Promise<Donation[]> {
-    let query = this.supabaseService.supabaseServer
+    let query: any = this.db()
       .from('donations')
       .select('*')
+      .is('deleted_at', null)
       .order('created_at', { ascending: false });
     if (projectId) query = query.eq('project_id', projectId);
     const { data, error } = await query;
@@ -161,12 +312,12 @@ export class ProjectService {
       console.error('[project.service] getDonations error:', error.message);
       return [];
     }
-    return (data ?? []).map((d) => this.toDonation(d));
+    return (data ?? []).map((d: DonationRow) => this.toDonation(d));
   }
 
   async saveDonation(donation: Donation): Promise<Donation> {
     const row = this.fromDonation(donation);
-    const { data, error } = await this.supabaseService.supabaseServer.from('donations').upsert(row).select().single();
+    const { data, error } = await this.db().from('donations').upsert(row).select().single();
     if (error || !data) {
       console.error('[project.service] saveDonation error:', error?.message);
       return donation;
@@ -175,9 +326,10 @@ export class ProjectService {
   }
 
   async getExpenses(projectId?: string): Promise<ProjectExpense[]> {
-    let query = this.supabaseService.supabaseServer
+    let query: any = this.db()
       .from('project_expenses')
       .select('*')
+      .is('deleted_at', null)
       .order('created_at', { ascending: false });
     if (projectId) query = query.eq('project_id', projectId);
     const { data, error } = await query;
@@ -185,16 +337,12 @@ export class ProjectService {
       console.error('[project.service] getExpenses error:', error.message);
       return [];
     }
-    return (data ?? []).map((d) => this.toExpense(d));
+    return (data ?? []).map((d: ExpenseRow) => this.toExpense(d));
   }
 
   async saveExpense(expense: ProjectExpense): Promise<ProjectExpense> {
     const row = this.fromExpense(expense);
-    const { data, error } = await this.supabaseService.supabaseServer
-      .from('project_expenses')
-      .upsert(row)
-      .select()
-      .single();
+    const { data, error } = await this.db().from('project_expenses').upsert(row).select().single();
     if (error || !data) {
       console.error('[project.service] saveExpense error:', error?.message);
       return expense;

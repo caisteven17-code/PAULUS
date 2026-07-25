@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import {
   Church,
   GraduationCap,
@@ -22,6 +22,8 @@ import {
   Upload,
 } from 'lucide-react';
 import { motion } from 'motion/react';
+import { apiClient } from '../lib/api-client';
+import { ENTITY_TYPE_ICON } from '../lib/entityIcons';
 import { SubmissionTracker } from '../components/projects/SubmissionTracker';
 import { ClassificationManagement, ClassificationRecord } from '../components/ui/ClassificationManagement';
 import ReactECharts from 'echarts-for-react';
@@ -33,141 +35,24 @@ interface HomeProps {
   permissions?: Record<string, boolean>;
 }
 
-const mockAnnouncements = [
-  {
-    id: '1',
-    title: 'Financial Reporting Deadline Extended',
-    description:
-      'The monthly financial submission deadline for April has been extended to April 20th. Please ensure all documents are submitted through the portal.',
-    type: 'info',
-    date: new Date('2026-04-18'),
-    priority: 'high',
-  },
-  {
-    id: '2',
-    title: 'Diocesan Assembly Scheduled for May',
-    description:
-      'Annual diocesan assembly will be held on May 5th at the Cathedral. All parish leaders, seminary rectors, and school principals are invited to attend.',
-    type: 'event',
-    date: new Date('2026-04-17'),
-    priority: 'medium',
-  },
-  {
-    id: '3',
-    title: 'New Parish Classification Guidelines Released',
-    description:
-      'Updated parish classification guidelines for 2026 are now available in the Settings section. Review the new criteria for Class A-E designations.',
-    type: 'update',
-    date: new Date('2026-04-16'),
-    priority: 'medium',
-  },
-  {
-    id: '4',
-    title: 'Training Session: Financial Management Best Practices',
-    description:
-      'Join us for a webinar on May 2nd at 2:00 PM on financial management best practices for parishes. Registration is open at the diocesan office.',
-    type: 'event',
-    date: new Date('2026-04-15'),
-    priority: 'medium',
-  },
-  {
-    id: '5',
-    title: 'Special Collection: Building Fund Campaign',
-    description:
-      'The Diocese launches the 2026 Building Fund Campaign. Donations support renovation and maintenance of our diocesan facilities.',
-    type: 'info',
-    date: new Date('2026-04-14'),
-    priority: 'medium',
-  },
-  {
-    id: '6',
-    title: 'Pastoral Letter: Year of Faith Initiative',
-    description:
-      'Bishop releases pastoral letter launching the "Year of Faith" initiative. All parishes are encouraged to organize faith-building activities.',
-    type: 'update',
-    date: new Date('2026-04-13'),
-    priority: 'medium',
-  },
-  {
-    id: '7',
-    title: 'Easter Celebration Schedule Released',
-    description:
-      'Official schedule for Easter celebrations at the Cathedral and diocesan parishes has been published. Please coordinate with your parishioners.',
-    type: 'event',
-    date: new Date('2026-04-12'),
-    priority: 'medium',
-  },
-  {
-    id: '8',
-    title: 'New Financial Accountability Standards',
-    description:
-      'Effective May 1st, all parishes must implement new financial accountability standards. Training materials are available in the Settings portal.',
-    type: 'update',
-    date: new Date('2026-04-10'),
-    priority: 'high',
-  },
-  {
-    id: '9',
-    title: 'Bishop Appointments for Diocesan Roles',
-    description:
-      'Bishop announces new appointments for Diocesan Vicar for Education and Vicar for Finance. Details available on the diocesan website.',
-    type: 'info',
-    date: new Date('2026-04-09'),
-    priority: 'medium',
-  },
-  {
-    id: '10',
-    title: 'Maintenance Alert: System Updates Scheduled',
-    description:
-      'The Financial Analytics System will undergo maintenance on April 25th from 10 PM to 2 AM. No access during this period.',
-    type: 'update',
-    date: new Date('2026-04-08'),
-    priority: 'medium',
-  },
-];
+// Fallback values shown until live counts load (or if the backend is unavailable)
+const FALLBACK_INSTITUTION_COUNTS = { parish: 86, seminary: 5, school: 7 };
 
-const institutionStats = [
-  {
-    title: 'Parishes',
-    value: '86',
-    icon: Church,
-    color: 'gold',
-  },
-  {
-    title: 'Seminaries',
-    value: '5',
-    icon: BookOpen,
-    color: 'emerald',
-  },
-  {
-    title: 'Diocesan Schools',
-    value: '7',
-    icon: GraduationCap,
-    color: 'purple',
-  },
-];
+interface HomeAnnouncement {
+  id: string;
+  title: string;
+  description: string;
+  date: Date;
+  priority: 'low' | 'medium' | 'high';
+}
 
-const financialMetrics = [
-  {
-    label: 'Monthly Total Collections',
-    value: '₱12,458,920.00',
-    trend: '+12.5%',
-    trendDir: 'up',
-    icon: Activity,
-  },
-  {
-    label: 'Consumable Collections',
-    value: '₱8,245,150.00',
-    trend: '+8.1%',
-    trendDir: 'up',
-  },
-  {
-    label: 'Monthly Disbursements',
-    value: '₱10,124,772.00',
-    trend: '+5.2%',
-    trendDir: 'down',
-  },
-];
+interface FinancialMetric {
+  label: string;
+  value: string;
+  trend: string;
+  trendDir: 'up' | 'down';
+  icon?: React.ElementType;
+}
 
 const contributionData = [
   { name: 'Parishes', value: 65, color: '#D4AF37', page: 'parish', desc: 'Primary spiritual and community hubs' },
@@ -176,6 +61,141 @@ const contributionData = [
 ];
 
 export function Home({ onNavigate, role = 'bishop', permissions = {} }: HomeProps) {
+  const [institutionCounts, setInstitutionCounts] = useState(FALLBACK_INSTITUTION_COUNTS);
+
+  useEffect(() => {
+    let cancelled = false;
+    // Count from the SAME source Entity Management uses (diocese.institutions),
+    // so the homepage snapshot always matches Entity Management instead of
+    // showing hardcoded fallback numbers.
+    apiClient
+      .getAdminEntities()
+      .then((data: any) => {
+        if (cancelled || !data) return;
+        const len = (v: any) => (Array.isArray(v) ? v.length : 0);
+        setInstitutionCounts({
+          parish: len(data.parishes),
+          seminary: len(data.seminaries),
+          school: len(data.schools),
+        });
+      })
+      .catch((err) => {
+        console.error('[Home] entity counts fetch failed, keeping fallback values:', err);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const institutionStats = useMemo(
+    () => [
+      { title: 'Parishes', value: String(institutionCounts.parish), icon: ENTITY_TYPE_ICON.parish, color: 'gold' },
+      { title: 'Seminaries', value: String(institutionCounts.seminary), icon: ENTITY_TYPE_ICON.seminary, color: 'emerald' },
+      { title: 'Diocesan Schools', value: String(institutionCounts.school), icon: ENTITY_TYPE_ICON.school, color: 'purple' },
+    ],
+    [institutionCounts],
+  );
+
+  // Real announcements from the same board Announcements.tsx reads/writes —
+  // top 3 most recent active posts, replacing the old fabricated preview list.
+  const [announcements, setAnnouncements] = useState<HomeAnnouncement[]>([]);
+  useEffect(() => {
+    let cancelled = false;
+    fetch('/api/announcements', { credentials: 'include' })
+      .then((res) => (res.ok ? res.json() : []))
+      .then((data: any[]) => {
+        if (cancelled || !Array.isArray(data)) return;
+        setAnnouncements(
+          data
+            .slice()
+            .sort((a, b) => (b.startDate ?? 0) - (a.startDate ?? 0))
+            .slice(0, 3)
+            .map((a) => ({
+              id: a.id,
+              title: a.title,
+              description: a.content,
+              date: new Date(a.startDate ?? a.createdAt ?? Date.now()),
+              priority: a.priority ?? 'medium',
+            })),
+        );
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  // Real diocese-wide monthly totals — same AWS-warehouse-backed descriptive
+  // endpoint the Parishes tab in BishopDashboard uses (institutionId "all"
+  // aggregates across every parish). null while loading; a dash placeholder
+  // set is shown (never fabricated numbers) if the fetch comes back empty.
+  const [financialMetrics, setFinancialMetrics] = useState<FinancialMetric[] | null>(null);
+  useEffect(() => {
+    let cancelled = false;
+    const fmtPeso = (v: number) =>
+      `₱${v.toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+    const buildMetric = (
+      label: string,
+      value: number,
+      prior: number | null,
+      increaseIsGood: boolean,
+      icon?: React.ElementType,
+    ): FinancialMetric => {
+      const pct = prior ? ((value - prior) / Math.abs(prior)) * 100 : null;
+      return {
+        label,
+        value: fmtPeso(value),
+        trend: pct === null ? 'N/A' : `${pct >= 0 ? '+' : ''}${pct.toFixed(1)}%`,
+        trendDir: pct === null ? 'up' : (pct >= 0) === increaseIsGood ? 'up' : 'down',
+        icon,
+      };
+    };
+
+    apiClient
+      .getFinancialTrend('parish', 'all', { timeframe: '6m' })
+      .then((res: any) => {
+        if (cancelled) return;
+        const rows = res?.monthly_series;
+        if (res?.data_sufficient === false || !Array.isArray(rows) || rows.length === 0) {
+          setFinancialMetrics([
+            { label: 'Monthly Total Collections', value: 'N/A', trend: 'N/A', trendDir: 'up', icon: Activity },
+            { label: 'Sacraments Collections', value: 'N/A', trend: 'N/A', trendDir: 'up' },
+            { label: 'Monthly Disbursements', value: 'N/A', trend: 'N/A', trendDir: 'up' },
+          ]);
+          return;
+        }
+        const latest = rows[rows.length - 1];
+        const prev = rows.length > 1 ? rows[rows.length - 2] : null;
+        setFinancialMetrics([
+          buildMetric(
+            'Monthly Total Collections',
+            Number(latest.total_receipts ?? 0),
+            prev ? Number(prev.total_receipts ?? 0) : null,
+            true,
+            Activity,
+          ),
+          buildMetric(
+            'Sacraments Collections',
+            Number(latest.sacraments ?? 0),
+            prev ? Number(prev.sacraments ?? 0) : null,
+            true,
+          ),
+          buildMetric(
+            'Monthly Disbursements',
+            Number(latest.total_expenses ?? 0),
+            prev ? Number(prev.total_expenses ?? 0) : null,
+            false,
+          ),
+        ]);
+      })
+      .catch(() => {
+        if (!cancelled) setFinancialMetrics(null);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
   return (
     <div className="flex flex-col min-h-[calc(100vh-80px)] bg-[#FDFCFB]">
       {/* Hero Section - Restored based on user image */}
@@ -214,18 +234,28 @@ export function Home({ onNavigate, role = 'bishop', permissions = {} }: HomeProp
             Guiding the faithful, nurturing vocations, and educating the youth in the heart of Laguna.
           </motion.p>
 
-          <motion.button
-            initial={{ opacity: 0, scale: 0.9 }}
-            animate={{ opacity: 1, scale: 1 }}
-            transition={{ duration: 0.5, delay: 0.4 }}
-            whileHover={{ scale: 1.05 }}
-            whileTap={{ scale: 0.95 }}
-            onClick={() => document.getElementById('dashboard-section')?.scrollIntoView({ behavior: 'smooth' })}
-            className="bg-gold-500 hover:bg-gold-600 text-black font-bold py-2.5 md:py-3 px-6 md:px-10 rounded-full flex items-center gap-2 md:gap-3 shadow-lg hover:shadow-xl transition-all duration-300 text-sm md:text-base"
-          >
-            <Target className="w-4 md:w-5 h-4 md:h-5" />
-            Launch Dashboard
-          </motion.button>
+          {/* Launch Dashboard button — only shown to roles that have a dashboard
+              to navigate to. Liturgical Validator has no dashboard tab, so the
+              button is hidden for them (Bug 1.4). */}
+          {(permissions.view_diocese ||
+            permissions.view_parish_dashboard ||
+            permissions.view_seminary_dashboard ||
+            permissions.view_school_dashboard ||
+            permissions.digital_twin) && (
+            <motion.button
+              initial={{ opacity: 0, scale: 0.9 }}
+              animate={{ opacity: 1, scale: 1 }}
+              transition={{ duration: 0.5, delay: 0.4 }}
+              whileHover={{ scale: 1.05 }}
+              whileTap={{ scale: 0.95 }}
+              onClick={() => document.getElementById('dashboard-section')?.scrollIntoView({ behavior: 'smooth' })}
+              className="bg-gold-500 hover:bg-gold-600 text-black font-bold py-2.5 md:py-3 px-6 md:px-10 rounded-full flex items-center gap-2 md:gap-3 shadow-lg hover:shadow-xl transition-all duration-300 text-sm md:text-base"
+            >
+              <Target className="w-4 md:w-5 h-4 md:h-5" />
+              Launch Dashboard
+            </motion.button>
+          )}
+
         </div>
 
         {/* Carousel Controls */}
@@ -274,8 +304,11 @@ export function Home({ onNavigate, role = 'bishop', permissions = {} }: HomeProp
                 </button>
               </div>
 
+              {announcements.length === 0 && (
+                <p className="text-sm text-gray-400 font-medium">No announcements posted yet.</p>
+              )}
               <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                {mockAnnouncements.map((announcement, index) => (
+                {announcements.map((announcement, index) => (
                   <motion.div
                     key={announcement.id}
                     initial={{ opacity: 0, y: 20 }}
@@ -389,7 +422,7 @@ export function Home({ onNavigate, role = 'bishop', permissions = {} }: HomeProp
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6 lg:gap-8">
-              {financialMetrics.map((metric, index) => (
+              {(financialMetrics ?? []).map((metric, index) => (
                 <motion.div
                   key={index}
                   initial={{ opacity: 0, y: 20 }}

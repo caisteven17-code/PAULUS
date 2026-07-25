@@ -11,12 +11,12 @@ INSERT INTO parish_analytics.fact_parish_monthly_financials (
   sacraments_parish_share,
   sacraments_over_above_confirmation_incl,
   collections_mass,
-  collections_other_95,
   collections_other_receipts,
   total_collections,
   expenses_pastoral_mass_stipend,
   expenses_parish,
   total_expenses,
+  total_remittance,
   net_receipts_deficit,
   mass_intentions_not_claimed_by_parish_priest,
   mass_intentions_claimed_by_parish_priest,
@@ -32,61 +32,66 @@ SELECT
   dp.parish_key,
   (pr.year * 100) + public.month_short_to_int(pr.month) AS date_key,
   ds.submission_key,
-  (pr.sacraments_total + pr.confirmation_total)::numeric(14, 2),
-  0::numeric(14, 2),
-  pr.charge_over_above,
+  -- sacraments_total already includes confirmation_total and charge_over_above via trigger
+  pr.sacraments_total::numeric(14, 2),
+  -- parish share = unclaimed mass intentions (amount that stays with the parish)
+  pr.mass_intentions_unclaimed::numeric(14, 2),
+  pr.charge_over_above::numeric(14, 2),
   (pr.mass_collection_weekday + pr.mass_collection_sunday + pr.mass_collection_saturday)::numeric(14, 2),
-  pr.other_collections_total,
   (pr.donations + pr.interest_income + pr.subsidy_inflow + pr.other_receipts)::numeric(14, 2),
+  -- total_collections: sacraments + mass + other D-section items (excl. special/second/construction — tracked separately)
   (
-    pr.sacraments_total + pr.confirmation_total + pr.charge_over_above +
+    pr.sacraments_total +
     pr.mass_collection_weekday + pr.mass_collection_sunday + pr.mass_collection_saturday +
-    pr.other_collections_total + pr.donations + pr.interest_income + pr.subsidy_inflow +
-    pr.other_receipts
+    pr.consumable_collections + pr.other_collections_total + pr.donations +
+    pr.interest_income + pr.subsidy_inflow + pr.other_receipts
   )::numeric(14, 2),
+  -- Section E pastoral expenses only
   (pr.priest_share + pr.mass_stipend + pr.other_pastoral_expenses)::numeric(14, 2),
+  -- Section E rectory + construction expenses — remittances (Section F) are separate
   (
     pr.salaries_wages_benefits + pr.govt_contributions + pr.utilities + pr.communications +
-    pr.other_rectory_expenses + pr.construction_expenses + pr.remittance_to_diocese +
-    pr.bishops_fund_share + pr.special_collections_remittance
+    pr.other_rectory_expenses + pr.construction_expenses
   )::numeric(14, 2),
+  -- total_expenses: pastoral + parish (no remittances)
   (
     pr.priest_share + pr.mass_stipend + pr.other_pastoral_expenses +
     pr.salaries_wages_benefits + pr.govt_contributions + pr.utilities + pr.communications +
-    pr.other_rectory_expenses + pr.construction_expenses + pr.remittance_to_diocese +
-    pr.bishops_fund_share + pr.special_collections_remittance
+    pr.other_rectory_expenses + pr.construction_expenses
   )::numeric(14, 2),
-  pr.net_receipts,
-  pr.mass_intentions_unclaimed,
-  pr.mass_intentions_claimed,
-  pr.special_collections,
-  pr.pastoral_parish_fund_total_net_receipts,
+  -- Section F remittances tracked separately from expenses
+  (pr.remittance_to_diocese + pr.bishops_fund_share + pr.special_collections_remittance)::numeric(14, 2),
+  pr.net_receipts::numeric(14, 2),
+  pr.mass_intentions_unclaimed::numeric(14, 2),
+  pr.mass_intentions_claimed::numeric(14, 2),
+  pr.special_collections::numeric(14, 2),
+  pr.pastoral_parish_fund_total_net_receipts::numeric(14, 2),
   0::smallint,
   COALESCE((
     SELECT COUNT(*)::smallint
-    FROM parishes.parish_events pe
-    WHERE pe.institution_id = pr.institution_id
-      AND pe.deleted_at IS NULL
-      AND pe.event_level = 'Major event'
-      AND EXTRACT(MONTH FROM pe.start_date) = public.month_short_to_int(pr.month)
-      AND EXTRACT(YEAR FROM pe.start_date) = pr.year
+    FROM diocese.events e
+    WHERE e.institution_id = pr.institution_id
+      AND e.deleted_at IS NULL
+      AND e.event_level = 'Major event'
+      AND EXTRACT(MONTH FROM e.start_date) = public.month_short_to_int(pr.month)
+      AND EXTRACT(YEAR FROM e.start_date) = pr.year
   ), 0::smallint),
   COALESCE((
     SELECT COUNT(*)::smallint
-    FROM parishes.parish_events pe
-    WHERE pe.institution_id = pr.institution_id
-      AND pe.deleted_at IS NULL
-      AND pe.event_level = 'Minor event'
-      AND EXTRACT(MONTH FROM pe.start_date) = public.month_short_to_int(pr.month)
-      AND EXTRACT(YEAR FROM pe.start_date) = pr.year
+    FROM diocese.events e
+    WHERE e.institution_id = pr.institution_id
+      AND e.deleted_at IS NULL
+      AND e.event_level = 'Minor event'
+      AND EXTRACT(MONTH FROM e.start_date) = public.month_short_to_int(pr.month)
+      AND EXTRACT(YEAR FROM e.start_date) = pr.year
   ), 0::smallint),
   EXISTS (
     SELECT 1
-    FROM parishes.parish_events pe
-    WHERE pe.institution_id = pr.institution_id
-      AND pe.deleted_at IS NULL
-      AND EXTRACT(MONTH FROM pe.start_date) = public.month_short_to_int(pr.month)
-      AND EXTRACT(YEAR FROM pe.start_date) = pr.year
+    FROM diocese.events e
+    WHERE e.institution_id = pr.institution_id
+      AND e.deleted_at IS NULL
+      AND EXTRACT(MONTH FROM e.start_date) = public.month_short_to_int(pr.month)
+      AND EXTRACT(YEAR FROM e.start_date) = pr.year
   ) AS has_event,
   0::numeric(14, 2)
 FROM parishes.financial_records pr

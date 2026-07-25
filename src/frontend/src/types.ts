@@ -44,14 +44,55 @@ export interface FinancialRecord {
   entityClass?: EntityClass;
 }
 
+export interface IAFRAccountLine {
+  code: string;
+  name: string;
+  receipts: number;
+  expenses: number;
+  total: number;
+}
+
+export interface IAFRSubsectionBreakdown {
+  code: string;
+  name: string;
+  accounts: IAFRAccountLine[];
+  receipts: number;
+  expenses: number;
+  total: number;
+}
+
+export interface IAFRSectionBreakdown {
+  code: string;
+  name: string;
+  subsections: IAFRSubsectionBreakdown[];
+  receipts: number;
+  expenses: number;
+  total: number;
+}
+
+export interface IAFRBreakdownReport {
+  data_sufficient: boolean;
+  entity_id: string;
+  year: number | null;
+  month: number | null;
+  sections: IAFRSectionBreakdown[];
+  grand_total: { receipts: number; expenses: number; total: number };
+  timestamp: string;
+}
+
 export interface Parish {
   id: string;
   name: string;
+  institutionCode?: string;
+  institution_code?: string;
+  iafrSourceCode?: string;
+  iafr_source_code?: string;
   district?: string;
   vicariate: string;
   class: EntityClass;
   pastor: string;
   address: string;
+  municipality?: string;
   contactNumber: string;
   email: string;
   collections?: number;
@@ -60,6 +101,7 @@ export interface Parish {
   primaryPatron?: string;
   secondaryPatron?: string;
   fiestaDate?: string;
+  subsidyType?: 'subsidized' | 'independent';
   status?: 'active' | 'inactive';
   updatedAt?: string;
   timestamp?: string;
@@ -69,15 +111,21 @@ export interface Parish {
 export interface Seminary {
   id: string;
   name: string;
+  institutionCode?: string;
+  institution_code?: string;
   district?: string;
   vicariate: string;
   class: EntityClass;
   rector: string;
   address: string;
+  municipality?: string;
   enrollment: number;
   capacity: number;
   staff: number;
   collections?: number;
+  lat?: number;
+  lng?: number;
+  subsidyType?: 'subsidized' | 'independent';
   status?: 'active' | 'inactive';
   updatedAt?: string;
   timestamp?: string;
@@ -87,16 +135,23 @@ export interface Seminary {
 export interface DiocesanSchool {
   id: string;
   name: string;
+  institutionCode?: string;
+  institution_code?: string;
   district?: string;
-  vicariate: string;
+  vicariate?: string;
+  cluster: 1 | 2 | 3;
   class: EntityClass;
   principal: string;
   address: string;
+  municipality?: string;
   level: string;
   enrollment: number;
   capacity: number;
   staff: number;
   collections?: number;
+  lat?: number;
+  lng?: number;
+  subsidyType?: 'subsidized' | 'independent';
   status?: 'active' | 'inactive';
   updatedAt?: string;
   timestamp?: string;
@@ -120,6 +175,13 @@ export interface FinancialHealthScore {
   percentageChange: number;
   analysis?: string;
   recommendations?: string[];
+  // Earliest/latest year of financial records actually used to compute this
+  // score. Undefined when a default (no-data) score was returned.
+  periodStartYear?: number;
+  periodEndYear?: number;
+  // False when there weren't enough records (for the whole entity, or for
+  // the requested year/timeframe window) to compute a real score.
+  dataSufficient?: boolean;
   timestamp: any;
 }
 
@@ -173,6 +235,7 @@ export interface Project {
   recommendation: string;
   totalExpenses?: number;
   entityId: string;
+  entityName?: string;
   entityType: 'parish' | 'school' | 'seminary' | 'diocese';
 }
 

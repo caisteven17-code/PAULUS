@@ -145,7 +145,7 @@ def _fetch_and_process(institution_id: str) -> dict[str, Any]:
     # XGBoost classifier
     import xgboost as xgb
     from sklearn.linear_model import LogisticRegression
-    from sklearn.metrics import f1_score
+    from sklearn.metrics import balanced_accuracy_score, brier_score_loss, f1_score, precision_score, recall_score
     from sklearn.model_selection import train_test_split
 
     n_class = int(np.sum(y))
@@ -185,23 +185,41 @@ def _fetch_and_process(institution_id: str) -> dict[str, Any]:
     )
     xgb_clf.fit(X_tr, y_tr)
     xgb_preds = xgb_clf.predict(X_te)
+    xgb_probas_te = xgb_clf.predict_proba(X_te)[:, 1]
     xgb_f1 = f1_score(y_te, xgb_preds, zero_division=0)
+    xgb_precision = precision_score(y_te, xgb_preds, zero_division=0)
+    xgb_recall = recall_score(y_te, xgb_preds, zero_division=0)
+    xgb_balanced_accuracy = balanced_accuracy_score(y_te, xgb_preds)
+    xgb_brier = brier_score_loss(y_te, xgb_probas_te)
 
     # Logistic Regression
     lr_clf = LogisticRegression(max_iter=500)
     lr_clf.fit(X_tr, y_tr)
     lr_preds = lr_clf.predict(X_te)
+    lr_probas_te = lr_clf.predict_proba(X_te)[:, 1]
     lr_f1 = f1_score(y_te, lr_preds, zero_division=0)
+    lr_precision = precision_score(y_te, lr_preds, zero_division=0)
+    lr_recall = recall_score(y_te, lr_preds, zero_division=0)
+    lr_balanced_accuracy = balanced_accuracy_score(y_te, lr_preds)
+    lr_brier = brier_score_loss(y_te, lr_probas_te)
 
     # Champion by F1
     if xgb_f1 >= lr_f1:
         champion_clf = xgb_clf
         champion_name = "XGBoost"
         champion_f1 = xgb_f1
+        champion_precision = xgb_precision
+        champion_recall = xgb_recall
+        champion_balanced_accuracy = xgb_balanced_accuracy
+        champion_brier = xgb_brier
     else:
         champion_clf = lr_clf
         champion_name = "LogisticRegression"
         champion_f1 = lr_f1
+        champion_precision = lr_precision
+        champion_recall = lr_recall
+        champion_balanced_accuracy = lr_balanced_accuracy
+        champion_brier = lr_brier
 
     champion_clf.fit(X, y)  # refit on full data
     probas = champion_clf.predict_proba(X)
@@ -227,8 +245,20 @@ def _fetch_and_process(institution_id: str) -> dict[str, Any]:
         "model_metrics": {
             "champion_model": champion_name,
             "xgboost_f1": round(float(xgb_f1), 4),
+            "xgboost_precision": round(float(xgb_precision), 4),
+            "xgboost_recall": round(float(xgb_recall), 4),
+            "xgboost_balanced_accuracy": round(float(xgb_balanced_accuracy), 4),
+            "xgboost_brier_score": round(float(xgb_brier), 4),
             "logistic_regression_f1": round(float(lr_f1), 4),
+            "logistic_regression_precision": round(float(lr_precision), 4),
+            "logistic_regression_recall": round(float(lr_recall), 4),
+            "logistic_regression_balanced_accuracy": round(float(lr_balanced_accuracy), 4),
+            "logistic_regression_brier_score": round(float(lr_brier), 4),
             "champion_f1": round(float(champion_f1), 4),
+            "champion_precision": round(float(champion_precision), 4),
+            "champion_recall": round(float(champion_recall), 4),
+            "champion_balanced_accuracy": round(float(champion_balanced_accuracy), 4),
+            "champion_brier_score": round(float(champion_brier), 4),
         },
         "timestamp": ts,
     }

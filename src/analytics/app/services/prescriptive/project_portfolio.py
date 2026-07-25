@@ -66,7 +66,7 @@ def _fetch_and_process(institution_id: str, total_budget: float) -> dict[str, An
         current = float(p.get("current_amount") or 0) + don_total.get(pid, 0.0)
         start_s = p.get("start_date")
         end_s = p.get("end_date")
-        _status = str(p.get("status") or "active").lower()  # noqa: F841
+        status = str(p.get("status") or "active").lower()
 
         completion = safe_div(current, target) if target > 0 else 0.0
 
@@ -94,6 +94,8 @@ def _fetch_and_process(institution_id: str, total_budget: float) -> dict[str, An
                 "project_id": pid,
                 "name": p.get("name", ""),
                 "target_amount": target,
+                "current_amount": current,
+                "status": status,
                 "completion_ratio": completion,
                 "time_elapsed_ratio": time_elapsed,
                 "donation_count": float(don_count.get(pid, 0)),
@@ -179,12 +181,35 @@ def _fetch_and_process(institution_id: str, total_budget: float) -> dict[str, An
         share = safe_div(p["priority_score"], total_ps)
         budget_allocation[p["project_id"]] = round(share * total_budget, 2)
 
+    # Portfolio-wide KPIs — real observed state (not the MLP's predictions),
+    # matching the diagram's 4 named KPIs, none of which existed before
+    # (only the per-project completion_rate_predictions/priority_score did).
+    n = len(feature_rows)
+    completed_count = sum(1 for r in feature_rows if r["status"] == "completed")
+    total_target = sum(r["target_amount"] for r in feature_rows)
+    total_raised = sum(r["current_amount"] for r in feature_rows)
+
+    # Delayed is meaningful only for projects still in progress — a
+    # completed project isn't "behind schedule" just because more calendar
+    # time has passed since it finished than its originally planned
+    # duration.
+    in_progress = [r for r in feature_rows if r["status"] != "completed"]
+    delayed_count = sum(1 for r in in_progress if r["progress_gap"] < 0)
+
+    kpis = {
+        "completion_rate": round(float(np.mean([r["completion_ratio"] for r in feature_rows])), 4),
+        "delayed_project_rate": round(safe_div(delayed_count, len(in_progress)), 4),
+        "resource_utilization_rate": round(safe_div(total_raised, total_target), 4),
+        "project_success_rate": round(safe_div(completed_count, n), 4),
+    }
+
     return {
         "data_sufficient": True,
         "institution_id": institution_id,
         "prioritized_projects": prioritized,
         "recommended_budget_allocation": budget_allocation,
         "completion_rate_predictions": completion_predictions,
+        "kpis": kpis,
         "timestamp": ts,
     }
 

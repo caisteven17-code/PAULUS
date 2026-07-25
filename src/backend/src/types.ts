@@ -28,6 +28,9 @@ export interface AuthUser {
   entityName?: string;
   entityType?: string;
   entityId?: string;
+  assignmentStatus?: 'assigned' | 'unassigned';
+  hasParishAccess?: boolean;
+  accountStatus?: 'active' | 'archived';
   displayName?: string;
   name?: string;
   status?: string;
@@ -40,6 +43,9 @@ export interface AuthUser {
   roleLabel?: string;
   emergencyContact?: string;
   notes?: string;
+  birthday?: string;
+  avatarUrl?: string;
+  photoURL?: string;
 }
 
 export type EntityClass = 'Class A' | 'Class B' | 'Class C' | 'Class D' | 'Class E';
@@ -86,6 +92,7 @@ export interface Parish {
   class: EntityClass;
   pastor: string;
   address: string;
+  municipality?: string;
   contactNumber: string;
   email: string;
   collections?: number;
@@ -94,6 +101,7 @@ export interface Parish {
   primaryPatron?: string;
   secondaryPatron?: string;
   fiestaDate?: string;
+  subsidyType?: 'subsidized' | 'independent';
 }
 
 export interface Seminary {
@@ -104,25 +112,29 @@ export interface Seminary {
   class: EntityClass;
   rector: string;
   address: string;
+  municipality?: string;
   enrollment: number;
   capacity: number;
   staff: number;
   collections?: number;
+  subsidyType?: 'subsidized' | 'independent';
 }
 
 export interface DiocesanSchool {
   id: string;
   name: string;
   district?: string;
-  vicariate: string;
+  cluster: 1 | 2 | 3;
   class: EntityClass;
   principal: string;
   address: string;
+  municipality?: string;
   level: string;
   enrollment: number;
   capacity: number;
   staff: number;
   collections?: number;
+  subsidyType?: 'subsidized' | 'independent';
 }
 
 export interface FinancialHealthScore {
@@ -142,6 +154,13 @@ export interface FinancialHealthScore {
   percentageChange: number;
   analysis?: string;
   recommendations?: string[];
+  // Earliest/latest year of financial records actually used to compute this
+  // score. Undefined when a default (no-data) score was returned.
+  periodStartYear?: number;
+  periodEndYear?: number;
+  // False when there weren't enough records (for the whole entity, or for
+  // the requested year/timeframe window) to compute a real score.
+  dataSufficient?: boolean;
   timestamp: any;
 }
 
@@ -195,6 +214,7 @@ export interface Project {
   recommendation: string;
   totalExpenses?: number;
   entityId: string;
+  entityName?: string;
   entityType: 'parish' | 'school' | 'seminary' | 'diocese';
 }
 

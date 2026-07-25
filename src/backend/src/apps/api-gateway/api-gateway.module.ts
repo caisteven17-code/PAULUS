@@ -11,7 +11,14 @@ import { AdminGatewayController } from './controllers/admin-gateway.controller';
 import { AdminEntitiesGatewayController } from './controllers/admin-entities-gateway.controller';
 import { AdminRolesGatewayController } from './controllers/admin-roles-gateway.controller';
 import { AnnouncementsGatewayController } from './controllers/announcements-gateway.controller';
+import { EventsGatewayController } from './controllers/events-gateway.controller';
+import { BudgetsGatewayController } from './controllers/budgets-gateway.controller';
+import { LiturgicalCalendarGatewayController } from './controllers/liturgical-calendar-gateway.controller';
 import { AuditLogGatewayController } from './controllers/audit-log-gateway.controller';
+import { ScenarioGatewayController } from './controllers/scenario-gateway.controller';
+import { ScenarioService } from '../../services/scenario.service';
+import { AuditLogService } from '../../services/audit-log.service';
+import { SupabaseService } from '../../services/supabase.service';
 
 @Module({
   imports: [
@@ -30,7 +37,12 @@ import { AuditLogGatewayController } from './controllers/audit-log-gateway.contr
     AdminEntitiesGatewayController,
     AdminRolesGatewayController,
     AnnouncementsGatewayController,
+    EventsGatewayController,
+    BudgetsGatewayController,
+    LiturgicalCalendarGatewayController,
     AuditLogGatewayController,
+    ScenarioGatewayController,
   ],
+  providers: [ScenarioService, AuditLogService, SupabaseService],
 })
 export class ApiGatewayModule {}

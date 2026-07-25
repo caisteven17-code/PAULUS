@@ -1,6 +1,6 @@
 'use client';
 
-import { Eye, Database, Users, Church, Zap, Briefcase, Bell, Heart } from 'lucide-react';
+import { Eye, Database, Users, Church, Zap, Briefcase, Bell, Heart, Wallet } from 'lucide-react';
 import { UserRole, Parish, Seminary, DiocesanSchool } from './types';
 
 // ============================================================================
@@ -52,6 +52,7 @@ export const ROLE_LABELS = {
   finance_supervisor: 'School Finance Supervisor',
   finance_officer: 'School Finance Officer',
   school_principal: 'School Principal',
+  liturgical_validator: 'Liturgical Validator',
 } as const;
 
 /** Error messages */
@@ -119,8 +120,8 @@ export const ALL_PERMISSIONS = [
       },
       {
         id: 'manage_assignments',
-        name: 'Priest Assignment Simulator',
-        description: 'Allows the user to launch scenario planning and simulate clergy assignments.',
+        name: 'Manage Parish Priest Reassignments',
+        description: 'Allows authorized diocesan users to execute Parish Priest transfers, swaps, and rotations.',
       },
     ],
   },
@@ -142,6 +143,12 @@ export const ALL_PERMISSIONS = [
         id: 'upload_csv_entity',
         name: 'Upload Entity CSV',
         description: 'Allows the user to upload updated CSVs for their specific entity.',
+      },
+      {
+        id: 'validate_liturgical_calendar',
+        name: 'Validate Liturgical Calendar',
+        description:
+          'Allows the user to review imported liturgical calendar events — approving, revising, or rejecting dates before they are used by the system.',
       },
     ],
   },
@@ -209,6 +216,38 @@ export const ALL_PERMISSIONS = [
       },
     ],
   },
+  {
+    category: 'Events',
+    icon: Bell,
+    permissions: [
+      {
+        id: 'manage_events',
+        name: 'Manage Events',
+        description: 'Allows the user to create, edit, and delete events for their institution.',
+      },
+      {
+        id: 'view_events',
+        name: 'View Events Only',
+        description: 'Allows the user to view scheduled events without the ability to modify them.',
+      },
+    ],
+  },
+  {
+    category: 'Budget',
+    icon: Wallet,
+    permissions: [
+      {
+        id: 'manage_budget',
+        name: 'Manage Budget',
+        description: 'Allows the user to set and update the monthly budget for their institution.',
+      },
+      {
+        id: 'view_budget',
+        name: 'View Budget Only',
+        description: 'Allows the user to view submitted institution budgets without editing them.',
+      },
+    ],
+  },
 ];
 
 export const INITIAL_ROLES: UserRole[] = [
@@ -235,6 +274,10 @@ export const INITIAL_ROLES: UserRole[] = [
       view_projects: false,
       manage_announcements: true,
       view_announcements: false,
+      manage_events: true,
+      view_events: false,
+      manage_budget: false,
+      view_budget: true,
       view_priests: true,
       manage_assignments: true,
       view_audit_logs: true,
@@ -242,6 +285,7 @@ export const INITIAL_ROLES: UserRole[] = [
       view_seminary_dashboard: true,
       view_school_dashboard: true,
       manage_own_institution: false,
+      validate_liturgical_calendar: true,
     },
   },
   {
@@ -266,6 +310,10 @@ export const INITIAL_ROLES: UserRole[] = [
       view_projects: false,
       manage_announcements: true,
       view_announcements: false,
+      manage_events: true,
+      view_events: false,
+      manage_budget: false,
+      view_budget: true,
       view_priests: true,
       manage_assignments: true,
       view_audit_logs: false,
@@ -273,6 +321,7 @@ export const INITIAL_ROLES: UserRole[] = [
       view_seminary_dashboard: false,
       view_school_dashboard: false,
       manage_own_institution: false,
+      validate_liturgical_calendar: false,
     },
   },
   {
@@ -297,6 +346,10 @@ export const INITIAL_ROLES: UserRole[] = [
       view_projects: false,
       manage_announcements: true,
       view_announcements: false,
+      manage_events: true,
+      view_events: false,
+      manage_budget: false,
+      view_budget: true,
       view_priests: true,
       manage_assignments: true,
       view_audit_logs: true,
@@ -304,6 +357,7 @@ export const INITIAL_ROLES: UserRole[] = [
       view_seminary_dashboard: true,
       view_school_dashboard: true,
       manage_own_institution: false,
+      validate_liturgical_calendar: true,
     },
   },
   {
@@ -328,6 +382,10 @@ export const INITIAL_ROLES: UserRole[] = [
       view_projects: false,
       manage_announcements: false,
       view_announcements: true,
+      manage_events: false,
+      view_events: true,
+      manage_budget: false,
+      view_budget: true,
       view_priests: true,
       manage_assignments: false,
       view_audit_logs: false,
@@ -335,6 +393,43 @@ export const INITIAL_ROLES: UserRole[] = [
       view_seminary_dashboard: true,
       view_school_dashboard: true,
       manage_own_institution: false,
+      validate_liturgical_calendar: false,
+    },
+  },
+  {
+    id: 'liturgical_validator',
+    name: 'Liturgical Validator',
+    color: '#0E7490',
+    permissions: {
+      view_diocese: false,
+      view_parish: false,
+      view_seminary: false,
+      view_school: false,
+      view_school_cluster: false,
+      view_school_all: false,
+      download_csv: false,
+      upload_csv_admin: false,
+      upload_csv_entity: false,
+      create_users: false,
+      manage_roles: false,
+      digital_twin: false,
+      manage_entities: false,
+      manage_projects: false,
+      view_projects: false,
+      manage_announcements: false,
+      view_announcements: false,
+      manage_events: false,
+      view_events: false,
+      manage_budget: false,
+      view_budget: false,
+      view_priests: false,
+      manage_assignments: false,
+      view_audit_logs: false,
+      view_parish_dashboard: false,
+      view_seminary_dashboard: false,
+      view_school_dashboard: false,
+      manage_own_institution: false,
+      validate_liturgical_calendar: true,
     },
   },
 
@@ -361,8 +456,12 @@ export const INITIAL_ROLES: UserRole[] = [
       view_projects: false,
       manage_announcements: false,
       view_announcements: true,
+      manage_events: true,
+      view_events: false,
+      manage_budget: true,
+      view_budget: false,
       view_priests: true,
-      manage_assignments: true,
+      manage_assignments: false,
       view_audit_logs: false,
       view_parish_dashboard: true,
       view_seminary_dashboard: false,
@@ -392,6 +491,10 @@ export const INITIAL_ROLES: UserRole[] = [
       view_projects: false,
       manage_announcements: false,
       view_announcements: true,
+      manage_events: true,
+      view_events: false,
+      manage_budget: true,
+      view_budget: false,
       view_priests: false,
       manage_assignments: false,
       view_audit_logs: false,
@@ -405,7 +508,7 @@ export const INITIAL_ROLES: UserRole[] = [
   // (Seminary Team)
   {
     id: 'seminary_rector',
-    name: 'Rector',
+    name: 'Seminary Rector',
     color: '#DC2626',
     permissions: {
       view_diocese: false,
@@ -425,8 +528,12 @@ export const INITIAL_ROLES: UserRole[] = [
       view_projects: false,
       manage_announcements: false,
       view_announcements: true,
+      manage_events: true,
+      view_events: false,
+      manage_budget: true,
+      view_budget: false,
       view_priests: true,
-      manage_assignments: true,
+      manage_assignments: false,
       view_audit_logs: false,
       view_parish_dashboard: false,
       view_seminary_dashboard: true,
@@ -456,6 +563,10 @@ export const INITIAL_ROLES: UserRole[] = [
       view_projects: false,
       manage_announcements: false,
       view_announcements: true,
+      manage_events: true,
+      view_events: false,
+      manage_budget: true,
+      view_budget: false,
       view_priests: false,
       manage_assignments: false,
       view_audit_logs: false,
@@ -469,7 +580,7 @@ export const INITIAL_ROLES: UserRole[] = [
   // (School Team)
   {
     id: 'school_superintendent',
-    name: 'School Superintendent',
+    name: 'School Superintendent Supervisor',
     color: '#6D28D9',
     permissions: {
       view_diocese: false,
@@ -489,6 +600,10 @@ export const INITIAL_ROLES: UserRole[] = [
       view_projects: false,
       manage_announcements: false,
       view_announcements: true,
+      manage_events: false,
+      view_events: true,
+      manage_budget: false,
+      view_budget: true,
       view_priests: false,
       manage_assignments: false,
       view_audit_logs: false,
@@ -500,7 +615,7 @@ export const INITIAL_ROLES: UserRole[] = [
   },
   {
     id: 'finance_supervisor',
-    name: 'Finance Supervisor',
+    name: 'School Finance Supervisor',
     color: '#7C3AED',
     permissions: {
       view_diocese: false,
@@ -515,11 +630,15 @@ export const INITIAL_ROLES: UserRole[] = [
       create_users: false,
       manage_roles: false,
       digital_twin: false,
-      manage_entities: false,
+      manage_entities: true,       // Bug 1.5: School Finance Supervisor needs Data Management access
       manage_projects: false,
       view_projects: true,
       manage_announcements: false,
       view_announcements: true,
+      manage_events: false,
+      view_events: true,
+      manage_budget: false,
+      view_budget: true,
       view_priests: false,
       manage_assignments: false,
       view_audit_logs: false,
@@ -531,7 +650,7 @@ export const INITIAL_ROLES: UserRole[] = [
   },
   {
     id: 'finance_officer',
-    name: 'Finance Officer',
+    name: 'School Finance Officer',
     color: '#8B5CF6',
     permissions: {
       view_diocese: false,
@@ -551,6 +670,10 @@ export const INITIAL_ROLES: UserRole[] = [
       view_projects: false,
       manage_announcements: false,
       view_announcements: true,
+      manage_events: true,
+      view_events: false,
+      manage_budget: true,
+      view_budget: false,
       view_priests: false,
       manage_assignments: false,
       view_audit_logs: false,
@@ -582,6 +705,10 @@ export const INITIAL_ROLES: UserRole[] = [
       view_projects: true,
       manage_announcements: false,
       view_announcements: true,
+      manage_events: false,
+      view_events: true,
+      manage_budget: false,
+      view_budget: true,
       view_priests: false,
       manage_assignments: false,
       view_audit_logs: false,
@@ -598,6 +725,7 @@ export const PREDEFINED_ROLE_IDS = [
   'chancellor',
   'diocesan_oeconomus',
   'finance_staff',
+  'liturgical_validator',
   'parish_priest',
   'parish_secretary',
   'seminary_rector',
@@ -688,7 +816,7 @@ export const INITIAL_SCHOOLS: DiocesanSchool[] = [
   {
     id: '1',
     name: 'Liceo de San Pablo',
-    vicariate: 'San Pablo',
+    cluster: 1,
     class: 'Class A',
     principal: 'Sr. Maria Clara',
     address: 'San Pablo City, Laguna',
@@ -700,7 +828,7 @@ export const INITIAL_SCHOOLS: DiocesanSchool[] = [
   {
     id: '2',
     name: 'Canossa College San Pablo',
-    vicariate: 'San Pablo',
+    cluster: 2,
     class: 'Class B',
     principal: 'Sr. Josefina',
     address: 'San Pablo City, Laguna',

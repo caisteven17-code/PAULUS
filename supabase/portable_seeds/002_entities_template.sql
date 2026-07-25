@@ -3,7 +3,7 @@
 INSERT INTO diocese.institutions (
   id,
   name,
-  entity_type,
+  institution_type,
   vicariate,
   district,
   cluster,

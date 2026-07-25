@@ -23,7 +23,26 @@ body {
   font-family: var(--font-sans);
 }
 
+html,
+body {
+  min-height: 100%;
+}
+
+body,
+#root,
+#__next {
+  background-color: var(--color-church-light);
+}
+
 /* Custom Scrollbar Utilities */
+.scrollbar-hide {
+  -ms-overflow-style: none; /* IE and Edge */
+  scrollbar-width: none; /* Firefox */
+}
+.scrollbar-hide::-webkit-scrollbar {
+  display: none; /* Chrome, Safari, Opera */
+}
+
 .scrollbar-thin::-webkit-scrollbar {
   width: 6px;
 }

@@ -94,6 +94,7 @@ These still work without a Supabase account (localStorage-only):
 
 | Email | Password | Role |
 |-------|----------|------|
+| `bishop@gmail.com` | `password123` | Bishop |
 | `bishop@diocese.com` | *(any)* | Bishop |
 | `priest@gmail.com` | `password123` | Parish Priest |
 | `seminary@church.com` | *(any)* | Seminary |

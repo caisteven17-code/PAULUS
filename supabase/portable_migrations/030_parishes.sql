@@ -90,7 +90,7 @@ CREATE TABLE IF NOT EXISTS parishes.iafr_line_items (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   financial_record_id uuid NOT NULL REFERENCES parishes.financial_records(id) ON DELETE CASCADE,
   account_title_id uuid REFERENCES parishes.iafr_account_titles(id),
-  section_code text NOT NULL CHECK (section_code IN ('A', 'B', 'C', 'D', 'E', 'F')),
+  section_code text NOT NULL CHECK (section_code IN ('B', 'C', 'D', 'E', 'F')),
   subsection_code text,
   item_code text,
   item_label text NOT NULL,
@@ -102,18 +102,6 @@ CREATE TABLE IF NOT EXISTS parishes.iafr_line_items (
   notes text,
   source_row_number integer,
   source_label text,
-  created_at timestamptz NOT NULL DEFAULT now(),
-  updated_at timestamptz NOT NULL DEFAULT now(),
-  deleted_at timestamptz
-);
-
-CREATE TABLE IF NOT EXISTS parishes.parish_events (
-  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  institution_id uuid NOT NULL REFERENCES diocese.institutions(id),
-  event_name text NOT NULL,
-  event_level text NOT NULL CHECK (event_level IN ('Major event', 'Minor event')),
-  start_date date NOT NULL,
-  end_date date,
   created_at timestamptz NOT NULL DEFAULT now(),
   updated_at timestamptz NOT NULL DEFAULT now(),
   deleted_at timestamptz
@@ -147,10 +135,6 @@ CREATE TRIGGER set_updated_at_parish_line_items
 BEFORE UPDATE ON parishes.iafr_line_items
 FOR EACH ROW EXECUTE FUNCTION public.set_row_updated_at();
 
-DROP TRIGGER IF EXISTS set_updated_at_parish_events ON parishes.parish_events;
-CREATE TRIGGER set_updated_at_parish_events
-BEFORE UPDATE ON parishes.parish_events
-FOR EACH ROW EXECUTE FUNCTION public.set_row_updated_at();
 
 
 -- -------------------------------------------------------------

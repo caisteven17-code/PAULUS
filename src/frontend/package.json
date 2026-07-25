@@ -3,13 +3,14 @@
   "private": true,
   "version": "0.0.0",
   "scripts": {
-    "dev": "dotenv -e ../../.env -- next dev --port 3000",
-    "build": "dotenv -e ../../.env -- next build",
+    "dev": "dotenv -e ../../.env -- next dev --webpack --port 3000",
+    "build": "cross-env NODE_ENV=production dotenv -e ../../.env -- next build",
     "start": "dotenv -e ../../.env -- next start",
-    "lint": "dotenv -e ../../.env -- next lint",
+    "lint": "eslint .",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "test": "tsx --test src/**/*.test.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.97.1",
@@ -17,25 +18,29 @@
     "@deck.gl/core": "^9.2.11",
     "@deck.gl/google-maps": "^9.2.11",
     "@google/genai": "^1.29.0",
+    "@nestjs/config": "4.0.4",
+    "@supabase/phoenix": "^0.4.2",
     "@supabase/supabase-js": "^2.106.1",
     "@turf/turf": "^7.3.4",
     "@vis.gl/react-google-maps": "^1.7.1",
     "clsx": "^2.1.1",
+    "echarts": "^5.6.0",
+    "echarts-for-react": "^3.0.2",
     "express": "^4.21.2",
-    "firebase": "^12.11.0",
     "leaflet": "^1.9.4",
     "lucide-react": "^0.546.0",
     "motion": "^12.23.24",
     "next": "^16.2.6",
+    "pdfjs-dist": "~5.6.205",
     "react": "^19.2.6",
     "react-dom": "^19.2.6",
     "react-leaflet": "^5.0.0",
     "react-markdown": "^10.1.0",
-    "echarts": "^5.6.0",
-    "echarts-for-react": "^3.0.2",
-    "tailwind-merge": "^3.5.0"
+    "tailwind-merge": "^3.5.0",
+    "tesseract.js": "^7.0.0"
   },
   "devDependencies": {
+    "@eslint/eslintrc": "^3.3.5",
     "@testing-library/jest-dom": "^6.9.1",
     "@testing-library/react": "^16.3.2",
     "@types/express": "^4.17.21",
@@ -44,12 +49,14 @@
     "@types/react": "^19.0.0",
     "@types/react-dom": "^19.0.0",
     "autoprefixer": "^10.4.21",
+    "cross-env": "^10.1.0",
     "dotenv-cli": "^8.0.0",
     "eslint": "9.39.4",
     "eslint-config-next": "^15.5.15",
-    "prettier": "^3.4.2",
     "postcss": "^8.4.35",
+    "prettier": "^3.4.2",
     "tailwindcss": "^3.4.0",
+    "tsx": "^4.21.0",
     "typescript": "~5.8.2"
   }
 }

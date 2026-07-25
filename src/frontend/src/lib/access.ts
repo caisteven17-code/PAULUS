@@ -14,7 +14,8 @@ export type AccessRole =
   | 'school_superintendent'
   | 'finance_supervisor'
   | 'finance_officer'
-  | 'school_principal';
+  | 'school_principal'
+  | 'liturgical_validator';
 
 export const ACCESS_ROLE_TO_APP_ROLE: Record<AccessRole, AppRole> = {
   bishop: 'bishop',
@@ -29,6 +30,7 @@ export const ACCESS_ROLE_TO_APP_ROLE: Record<AccessRole, AppRole> = {
   finance_supervisor: 'school',
   finance_officer: 'school',
   school_principal: 'school',
+  liturgical_validator: 'admin',
 };
 
 const roleNameToId = new Map(INITIAL_ROLES.map((role) => [role.name.toLowerCase(), role.id as AccessRole]));
@@ -46,6 +48,7 @@ const legacyRoleToAccessRole: Record<string, AccessRole> = {
   finance_supervisor: 'finance_supervisor',
   finance_officer: 'finance_officer',
   school_principal: 'school_principal',
+  liturgical_validator: 'liturgical_validator',
 
   // Legacy aliases
   admin: 'diocesan_oeconomus',
@@ -54,6 +57,14 @@ const legacyRoleToAccessRole: Record<string, AccessRole> = {
   school: 'school_principal',
   seminary: 'seminary_rector',
   school_registrar: 'school_principal',
+
+  // Corrective aliases — remap invalid/stale role names to the canonical id
+  school_director: 'finance_officer',         // Bug 1.2: was stored as 'school_director'
+  rector: 'seminary_rector',                  // Bug 1.1: was displayed/stored as 'Rector' only
+  finance_supervisor_school: 'finance_supervisor',
+  school_finance_supervisor: 'finance_supervisor',
+  school_finance_officer: 'finance_officer',
+  superintendent_supervisor: 'school_superintendent',
 };
 
 export function normalizeAccessRole(role?: string): string {

@@ -22,6 +22,7 @@
     "format": "npm run format --workspace=src/frontend && npm run format --workspace=src/backend",
     "format:check": "npm run format:check --workspace=src/frontend && npm run format:check --workspace=src/backend",
     "typecheck": "npm run typecheck --workspace=src/frontend && npm run typecheck --workspace=src/backend",
+    "test": "npm run test --workspace=src/frontend && npm run test --workspace=src/backend",
     "calendar:collect": "cd src/analytics && python -m app.services.liturgical_calendar_collector",
     "calendar:update": "cd src/analytics && python -m app.services.liturgical_calendar_updater",
     "calendar:load": "cd src/analytics && python -m app.services.liturgical_calendar_loader",
@@ -29,9 +30,10 @@
     "docker:down": "docker compose down"
   },
   "devDependencies": {
-    "concurrently": "^9.2.1"
+    "concurrently": "^10.0.3"
   },
   "dependencies": {
+    "@nestjs/config": "4.0.4",
     "@romcal/calendar.general-roman": "^3.0.0-alpha.0",
     "@romcal/calendar.philippines": "^3.0.0-alpha.0",
     "romcal": "^3.0.0-alpha.0"

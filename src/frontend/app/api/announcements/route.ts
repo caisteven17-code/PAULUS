@@ -7,13 +7,5 @@ export async function GET(req: NextRequest) {
 }
 
 export async function POST(req: NextRequest) {
-  return proxyToBackend(req, { path: '/announcements' });
-}
-
-export async function DELETE(req: NextRequest) {
-  const id = req.nextUrl.searchParams.get('id');
-  if (!id) {
-    return new Response(JSON.stringify({ error: 'id is required.' }), { status: 400 });
-  }
-  return proxyToBackend(req, { path: `/announcements/${id}`, method: 'DELETE', preserveQuery: false });
+  return proxyToBackend(req, { path: '/announcements', method: 'POST' });
 }

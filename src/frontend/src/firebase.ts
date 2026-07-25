@@ -15,6 +15,7 @@
 import { useState, useEffect } from 'react';
 import { supabaseBrowser } from './lib/supabase';
 import type { AppRole } from './lib/access';
+import { auditIdentity, logAuditEvent } from './lib/audit';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 export interface AuthUser {
@@ -27,6 +28,9 @@ export interface AuthUser {
   entityName?: string;
   entityType?: string;
   entityId?: string;
+  assignmentStatus?: 'assigned' | 'unassigned';
+  hasParishAccess?: boolean;
+  accountStatus?: 'active' | 'archived';
   displayName?: string;
   name?: string;
   status?: string;
@@ -39,16 +43,43 @@ export interface AuthUser {
   roleLabel?: string;
   emergencyContact?: string;
   notes?: string;
+  birthday?: string;
+  avatarUrl?: string;
+  photoURL?: string;
 }
 
 type AuthStateCallback = (user: AuthUser | null) => void;
 type Unsubscriber = () => void;
+
+const areSameAuthUsers = (a: AuthUser | null, b: AuthUser | null) => {
+  if (a === b) return true;
+  if (!a || !b) return false;
+  return (
+    (a.id || a.uid || a.email || '') === (b.id || b.uid || b.email || '') &&
+    a.role === b.role &&
+    a.entityId === b.entityId &&
+    a.entityName === b.entityName &&
+    a.assignmentStatus === b.assignmentStatus &&
+    a.avatarUrl === b.avatarUrl
+  );
+};
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 function mapSupabaseUser(supabaseUser: any): AuthUser {
   const meta = supabaseUser.user_metadata ?? supabaseUser.raw_user_meta_data ?? {};
+
+  // Keep a just-uploaded avatar if it isn't in the auth metadata yet.
+  let priorAvatar: string | undefined;
+  try {
+    const prev = JSON.parse(localStorage.getItem(STORAGE_KEY) || 'null');
+    priorAvatar = prev?.avatarUrl || prev?.photoURL || undefined;
+  } catch {
+    /* ignore */
+  }
+  const avatarUrl = meta.avatarUrl ?? meta.avatar_url ?? priorAvatar ?? undefined;
+
   return {
     id: supabaseUser.id,
     uid: supabaseUser.id,
@@ -60,8 +91,22 @@ function mapSupabaseUser(supabaseUser: any): AuthUser {
     entityName: meta.entityName ?? meta.entity_name ?? undefined,
     entityType: meta.entityType ?? meta.entity_type ?? undefined,
     displayName: meta.displayName ?? meta.display_name ?? supabaseUser.email ?? '',
+    birthday: meta.birthday ?? meta.birth_date ?? undefined,
+    avatarUrl,
+    photoURL: avatarUrl,
     status: 'active',
   };
+}
+
+async function canonicalSession(accessToken: string, fallback: AuthUser): Promise<AuthUser> {
+  try {
+    const response = await fetch('/api/auth', { headers: { Authorization: `Bearer ${accessToken}` } });
+    if (!response.ok) return fallback;
+    const body = await response.json();
+    return body?.user ? { ...fallback, ...body.user } : fallback;
+  } catch {
+    return fallback;
+  }
 }
 
 const STORAGE_KEY = 'currentUser';
@@ -90,9 +135,11 @@ export const auth = {
       .getSession()
       .then(({ data }) => {
         if (data.session?.user) {
-          const user = mapSupabaseUser(data.session.user);
-          localStorage.setItem(STORAGE_KEY, JSON.stringify(user));
-          callback(user);
+          const fallback = mapSupabaseUser(data.session.user);
+          canonicalSession(data.session.access_token, fallback).then((user) => {
+            localStorage.setItem(STORAGE_KEY, JSON.stringify(user));
+            callback(user);
+          });
           return;
         }
         // ── 2. Fall back to localStorage demo session ─────────────────────────
@@ -110,9 +157,11 @@ export const auth = {
       data: { subscription },
     } = supabaseBrowser.auth.onAuthStateChange((_event, session) => {
       if (session?.user) {
-        const user = mapSupabaseUser(session.user);
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(user));
-        callback(user);
+        const fallback = mapSupabaseUser(session.user);
+        canonicalSession(session.access_token, fallback).then((user) => {
+          localStorage.setItem(STORAGE_KEY, JSON.stringify(user));
+          callback(user);
+        });
       } else if (_event === 'SIGNED_OUT') {
         localStorage.removeItem(STORAGE_KEY);
         callback(null);
@@ -122,11 +171,20 @@ export const auth = {
     return () => subscription.unsubscribe();
   },
 
-  signOut: async (): Promise<void> => {
+  signOut: async (options?: { skipAudit?: boolean }): Promise<void> => {
+    const currentUser = auth.currentUser;
+    if (options?.skipAudit !== true) {
+      await logAuditEvent({
+        ...auditIdentity(currentUser),
+        category: 'auth',
+        severity: 'info',
+        action: 'Logout',
+        detail: `${currentUser?.displayName || currentUser?.email || 'User'} signed out`,
+      });
+    }
     localStorage.removeItem(STORAGE_KEY);
     // Sign out of Supabase (ignore errors — may not have a live session)
     await supabaseBrowser.auth.signOut().catch(() => {});
-    if (typeof window !== 'undefined') window.location.reload();
   },
 };
 
@@ -137,7 +195,7 @@ export function useAuth() {
 
   useEffect(() => {
     const unsubscribe = auth.onAuthStateChanged((authUser) => {
-      setUser(authUser);
+      setUser((previous) => (areSameAuthUsers(previous, authUser) ? previous : authUser));
       setLoading(false);
     });
     return () => unsubscribe?.();

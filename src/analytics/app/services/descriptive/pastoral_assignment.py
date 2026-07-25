@@ -13,6 +13,8 @@ from typing import Any
 import numpy as np
 import pandas as pd
 
+from app.services import _aws_financials
+from app.services._stl import run_stl
 from app.services.data_definitions import (
     _SCHEMA_MAP,
     build_date_index,
@@ -45,7 +47,7 @@ def _fetch_and_process(institution_id: str) -> dict[str, Any]:
     assignments: list[dict] = []
     try:
         res = (
-            get_table("diocese", "priest_assignments")
+            get_table("clergy", "priest_assignments")
             .select("priest_id, start_date, end_date, institution_id")
             .eq("institution_id", institution_id)
             .order("start_date")
@@ -81,42 +83,49 @@ def _fetch_and_process(institution_id: str) -> dict[str, Any]:
             "timestamp": ts,
         }
 
-    all_cols = ["institution_id", "month", "year"] + receipt_cols + expense_cols
-    seen: set[str] = set()
-    select_cols: list[str] = []
-    for c in all_cols:
-        if c not in seen:
-            select_cols.append(c)
-            seen.add(c)
+    # AWS is authoritative for parishes — Supabase's financial_records numeric
+    # columns are never populated by the real ingestion pipeline, so reading
+    # them would produce assignment-period stats that are always ~zero
+    # regardless of the priest or period involved.
+    df: pd.DataFrame | None = _aws_financials.parish_monthly_df(institution_id) if schema == "parishes" else None
 
-    fin_res = (
-        get_table(schema, "financial_records")
-        .select(", ".join(select_cols))
-        .eq("institution_id", institution_id)
-        .eq("is_current_version", True)
-        .is_("deleted_at", "null")
-        .order("year")
-        .execute()
-    )
+    if df is None or len(df) < 3:
+        all_cols = ["institution_id", "month", "year"] + receipt_cols + expense_cols
+        seen: set[str] = set()
+        select_cols: list[str] = []
+        for c in all_cols:
+            if c not in seen:
+                select_cols.append(c)
+                seen.add(c)
 
-    if not fin_res.data or len(fin_res.data) < 3:
-        return {
-            "data_sufficient": False,
-            "institution_id": institution_id,
-            "assignment_periods": [],
-            "performance_analysis": {},
-            "timestamp": ts,
-        }
+        fin_res = (
+            get_table(schema, "financial_records")
+            .select(", ".join(select_cols))
+            .eq("institution_id", institution_id)
+            .eq("is_current_version", True)
+            .is_("deleted_at", "null")
+            .order("year")
+            .execute()
+        )
 
-    df = pd.DataFrame(fin_res.data)
-    df = build_date_index(df)
+        if not fin_res.data or len(fin_res.data) < 3:
+            return {
+                "data_sufficient": False,
+                "institution_id": institution_id,
+                "assignment_periods": [],
+                "performance_analysis": {},
+                "timestamp": ts,
+            }
 
-    for col in receipt_cols + expense_cols:
-        if col not in df.columns:
-            df[col] = 0.0
-        df[col] = pd.to_numeric(df[col], errors="coerce").fillna(0.0)
+        df = pd.DataFrame(fin_res.data)
+        df = build_date_index(df)
 
-    df["total_receipts"] = df[receipt_cols].sum(axis=1)
+        for col in receipt_cols + expense_cols:
+            if col not in df.columns:
+                df[col] = 0.0
+            df[col] = pd.to_numeric(df[col], errors="coerce").fillna(0.0)
+
+        df["total_receipts"] = df[receipt_cols].sum(axis=1)
 
     # ── Build period segments ─────────────────────────────────────────────────
     period_stats: list[dict] = []
@@ -150,12 +159,32 @@ def _fetch_and_process(institution_id: str) -> dict[str, Any]:
         }
 
     avgs = [p["avg_monthly_collection"] for p in period_stats]
+    overall_avg = float(np.mean(avgs))
+
+    # Real Time Series Decomposition on the full underlying series (not per
+    # assignment-period segments, which are usually too short for STL's
+    # n>=24 real-decomposition threshold — see _stl.py) — trend_direction
+    # now reads the deseasonalized trend component's start-vs-end movement
+    # instead of comparing raw first/last period averages, which a single
+    # seasonal spike (e.g. December) or dip could flip either way.
+    full_series = df.sort_values("date")["total_receipts"].reset_index(drop=True)
+    trend_comp, _seasonal_comp, _residual_comp = run_stl(full_series)
+    trend_slope = float(trend_comp.iloc[-1]) - float(trend_comp.iloc[0])
+    trend_direction = "up" if trend_slope > 0 else "down"
+
+    # Collection Variance (%) — coefficient of variation of period averages.
+    # Raw variance is in squared-peso units and was never actually a
+    # percentage despite the name; CV (std/mean) is the standard way to
+    # express variability as a genuine, scale-free percentage.
+    collection_variance_pct = round(safe_div(float(np.std(avgs, ddof=0)), overall_avg) * 100, 2)
+
     performance_analysis = {
         "best_period": period_stats[int(np.argmax(avgs))]["period_label"],
         "worst_period": period_stats[int(np.argmin(avgs))]["period_label"],
-        "overall_avg_monthly_collection": round(float(np.mean(avgs)), 2),
+        "overall_avg_monthly_collection": round(overall_avg, 2),
         "collection_variance_across_periods": round(float(np.var(avgs, ddof=0)), 2),
-        "trend_direction": "up" if len(avgs) >= 2 and avgs[-1] > avgs[0] else "down",
+        "collection_variance_pct": collection_variance_pct,
+        "trend_direction": trend_direction,
     }
 
     return {

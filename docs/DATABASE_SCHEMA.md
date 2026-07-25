@@ -14,6 +14,7 @@ These tables manage authentication, global roles and permission privileges, proj
 *   **projects**: Tracks capital improvement and outreach projects (e.g., church repairs, school computer labs) across all entities, storing target budgets, timelines, and active progress descriptions.
 *   **donations**: Logs individual donor contributions, payment methods (Cash, Check, Online, Bank Transfer), and receipt issuance statuses tied to specific capital projects.
 *   **project_expenses**: Itemizes individual expenditures and costs disbursed during capital projects, supporting receipt reference verification.
+*   **events**: Stores shared calendar and contextual event records for parishes, schools, seminaries, and diocesan offices, linked by institution.
 *   **announcements**: Provides a central bulletin board for administrative or financial advisories published by Chancery staff.
 *   **audit_logs**: Tracks critical actions (such as logins, role modifications, or financial submissions) for security audits and tracking.
 
@@ -24,7 +25,6 @@ These tables isolate data unique to parochial administration and local community
 
 *   **details**: Stores parish profile metadata (assigned vicariate, pastoral district, current priest, coordinates, primary/secondary patron saints, and annual fiesta dates).
 *   **financial_records**: Holds monthly financial reports logged by priests or parish secretaries (mass collections, consumable cash, sacrament arancels, and parish/pastoral expenditures).
-*   **fiesta_events**: Tracks planned patron saint fiesta schedules and documents the expected collection increase tier (low, medium, high) for financial forecasting.
 
 ---
 
@@ -187,3 +187,49 @@ Stores recommended Curia subsidy allocations.
 institution_key (FK) | run_key (FK) | annual_deficit | recommended_subsidy | allocated_subsidy
 ---|---|---|---|---
 **1** | **550** *(Run #550)* | 720000 | 600000 | 600000
+
+---
+
+## Supabase Storage Buckets
+
+File storage buckets managed by Supabase Storage. All buckets are **public** (files accessible via direct URL). RLS policies restrict who can upload.
+
+### Bucket: `health-documents`
+Stores priest health record attachments.
+
+| Setting | Value |
+|---|---|
+| Public | Yes |
+| File size limit | 50 MB (unset default) |
+| Allowed MIME types | Any |
+| Migration | (created manually in dashboard) |
+
+### Bucket: `financial-submissions`
+Stores uploaded financial submission files (Excel, CSV, PDF) from the data submission workflow.
+
+| Setting | Value |
+|---|---|
+| Public | No (authenticated only) |
+| File size limit | 15 MB |
+| Allowed MIME types | `application/vnd.openxmlformats-officedocument.spreadsheetml.sheet`, `application/vnd.ms-excel`, `text/csv`, `application/pdf` |
+| Migration | (created manually in dashboard) |
+
+### Bucket: `disbursement-proofs`
+Stores proof-of-disbursement files (images, PDFs) attached to project expenses. The public URL is saved in `diocese.project_expenses.proof_file_name`. Uploaded from `ExpenseEntryModal`.
+
+| Setting | Value |
+|---|---|
+| Public | Yes |
+| File size limit | 10 MB |
+| Allowed MIME types | `image/jpeg`, `image/png`, `image/webp`, `image/gif`, `application/pdf` |
+| Migration | `183_disbursement_proof_storage.sql` |
+
+### Bucket: `donation-receipts`
+Stores proof-of-receipt files (images, PDFs) attached to project donations. The public URL is saved in `diocese.donations.receipt_proof_name`. Uploaded from `DonationEntryModal`.
+
+| Setting | Value |
+|---|---|
+| Public | Yes |
+| File size limit | 10 MB |
+| Allowed MIME types | `image/jpeg`, `image/png`, `image/webp`, `image/gif`, `application/pdf` |
+| Migration | `184_donation_receipt_storage.sql` |

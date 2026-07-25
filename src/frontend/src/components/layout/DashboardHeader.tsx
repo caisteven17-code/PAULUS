@@ -10,8 +10,8 @@ interface DashboardHeaderProps {
   userInitial?: string;
   timeframe?: '3m' | '6m' | '12m';
   onTimeframeChange?: (timeframe: '3m' | '6m' | '12m') => void;
-  year?: number;
-  onYearChange?: (year: number) => void;
+  year?: number | null;
+  onYearChange?: (year: number | null) => void;
   onSettingsClick?: () => void;
   onLogout?: () => void;
 }
@@ -23,7 +23,7 @@ export const DashboardHeader: React.FC<DashboardHeaderProps> = ({
   userInitial = 'P',
   timeframe = '6m',
   onTimeframeChange,
-  year = 2026,
+  year = null,
   onYearChange,
   onSettingsClick,
   onLogout,
@@ -94,16 +94,16 @@ export const DashboardHeader: React.FC<DashboardHeaderProps> = ({
               onClick={() => setIsYearOpen(!isYearOpen)}
               className="px-4 py-2 bg-white/10 backdrop-blur-sm hover:bg-gold-500/20 text-white text-xs font-bold uppercase tracking-wider rounded-lg border border-white/15 hover:border-gold-400/50 transition-all duration-300 hidden sm:flex items-center gap-2 group"
             >
-              <span>{year}</span>
+              <span>{year === null ? 'All Years' : year}</span>
               <ChevronDown size={14} className={`transition-transform ${isYearOpen ? 'rotate-180' : ''}`} />
             </button>
 
             {/* Year Dropdown Menu */}
             {isYearOpen && (
               <div className="absolute top-full right-0 mt-2 bg-black/95 border border-gold-500/30 rounded-lg shadow-xl z-50">
-                {[2026, 2025, 2024, 2023, 2022].map((y) => (
+                {([null, 2026, 2025, 2024, 2023, 2022, 2021] as (number | null)[]).map((y) => (
                   <button
-                    key={y}
+                    key={y ?? 'all'}
                     onClick={() => {
                       onYearChange?.(y);
                       setIsYearOpen(false);
@@ -114,7 +114,7 @@ export const DashboardHeader: React.FC<DashboardHeaderProps> = ({
                         : 'text-gray-300 hover:bg-white/5 hover:text-white'
                     }`}
                   >
-                    {y}
+                    {y === null ? 'All Years' : y}
                   </button>
                 ))}
               </div>

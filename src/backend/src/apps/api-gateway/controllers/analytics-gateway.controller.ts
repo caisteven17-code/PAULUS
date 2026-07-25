@@ -18,22 +18,35 @@ async function proxyToPython(
   if (req.headers.authorization) headers['authorization'] = req.headers.authorization;
 
   const hasBody = method === 'POST';
-  const response = await fetch(targetUrl, {
-    method,
-    headers,
-    body: hasBody ? JSON.stringify(req.body) : undefined,
-  });
-
-  const text = await response.text();
-  let data: unknown;
   try {
-    data = JSON.parse(text);
-  } catch {
-    data = text;
-  }
+    const response = await fetch(targetUrl, {
+      method,
+      headers,
+      body: hasBody ? JSON.stringify(req.body) : undefined,
+      signal: AbortSignal.timeout(10_000),
+    });
 
-  res.status(response.status);
-  return data;
+    const text = await response.text();
+    let data: unknown;
+    try {
+      data = JSON.parse(text);
+    } catch {
+      data = text;
+    }
+
+    res.status(response.status);
+    return data;
+  } catch (error) {
+    // Uvicorn can be briefly unavailable while its development reloader is
+    // restarting. Keep that expected condition out of Nest's global exception
+    // handler and give the frontend a useful, retryable response instead.
+    res.status(503);
+    return {
+      error: 'Python analytics service is temporarily unavailable.',
+      retryable: true,
+      detail: error instanceof Error ? error.message : 'Connection failed',
+    };
+  }
 }
 
 @Controller('analytics')
@@ -54,6 +67,19 @@ export class AnalyticsGatewayController {
     const result = await requestDownstream<unknown>({
       baseUrl: SERVICE_URLS.analytics,
       path: `/analytics/health-score${suffix}`,
+    });
+
+    response.status(result.status);
+    return result.data;
+  }
+
+  @Post('health-scores')
+  async calculateHealthScores(@Req() req: Request, @Res({ passthrough: true }) response: Response) {
+    const result = await requestDownstream<unknown>({
+      baseUrl: SERVICE_URLS.analytics,
+      path: '/analytics/health-scores',
+      method: 'POST',
+      body: req.body,
     });
 
     response.status(result.status);
@@ -90,6 +116,12 @@ export class AnalyticsGatewayController {
     return proxyToPython(req, res, subPath, 'GET');
   }
 
+  @Post('descriptive/*')
+  async descriptivePost(@Req() req: Request, @Res({ passthrough: true }) res: Response) {
+    const subPath = req.path.replace(/^\/api\/analytics/, '/analytics');
+    return proxyToPython(req, res, subPath, 'POST');
+  }
+
   @Get('diagnostic/*')
   async diagnosticWildcardGet(@Req() req: Request, @Res({ passthrough: true }) res: Response) {
     const subPath = req.path.replace(/^\/api\/analytics/, '/analytics');
@@ -112,5 +144,19 @@ export class AnalyticsGatewayController {
   async prescriptivePost(@Req() req: Request, @Res({ passthrough: true }) res: Response) {
     const subPath = req.path.replace(/^\/api\/analytics/, '/analytics');
     return proxyToPython(req, res, subPath, 'POST');
+  }
+
+  // ------------------------------------------------------------------
+  // IAFR cleaning pass-through (Python service root, not under /analytics)
+  // ------------------------------------------------------------------
+
+  @Post('iafr/clean-submission')
+  async cleanIafrSubmission(@Req() req: Request, @Res({ passthrough: true }) res: Response) {
+    return proxyToPython(req, res, '/iafr/clean-submission', 'POST');
+  }
+
+  @Post('iafr/clean-submission-test')
+  async cleanIafrSubmissionTest(@Req() req: Request, @Res({ passthrough: true }) res: Response) {
+    return proxyToPython(req, res, '/iafr/clean-submission-test', 'POST');
   }
 }

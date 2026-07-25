@@ -13,6 +13,7 @@ from typing import Any
 import numpy as np
 import pandas as pd
 
+from app.services import _aws_financials
 from app.services.data_definitions import (
     _SCHEMA_MAP,
     build_date_index,
@@ -67,10 +68,13 @@ def _rule_based_narrative(stats: dict[str, Any]) -> str:
     )
 
 
-def _fetch_and_process(entity_id: str, entity_type: str) -> dict[str, Any]:
-    ts = datetime.now(timezone.utc).isoformat()
-    schema, receipt_cols, expense_cols, _ = _SCHEMA_MAP[entity_type]
+def _fetch_series(entity_id: str, entity_type: str) -> pd.DataFrame | None:
+    if entity_type == "parish":
+        df = _aws_financials.parish_monthly_df(entity_id)
+        if df is not None and len(df) >= 6:
+            return df
 
+    schema, receipt_cols, _, _ = _SCHEMA_MAP[entity_type]
     all_cols = ["institution_id", "month", "year"] + receipt_cols
     seen: set[str] = set()
     select_cols: list[str] = []
@@ -88,31 +92,36 @@ def _fetch_and_process(entity_id: str, entity_type: str) -> dict[str, Any]:
         .order("year")
         .execute()
     )
-
-    insufficient = {
-        "data_sufficient": False,
-        "entity_id": entity_id,
-        "entity_type": entity_type,
-        "root_cause": "N/A",
-        "change_points": [],
-        "attribution_precision": 0.0,
-        "shap_values": {},
-        "narrative": "Insufficient data for cluster-seasonal diagnostics.",
-        "timestamp": ts,
-    }
-
     if not res.data or len(res.data) < 6:
-        return insufficient
+        return None
 
     df = pd.DataFrame(res.data)
     df = build_date_index(df)
-
     for col in receipt_cols:
         if col not in df.columns:
             df[col] = 0.0
         df[col] = pd.to_numeric(df[col], errors="coerce").fillna(0.0)
-
     df["total_receipts"] = df[receipt_cols].sum(axis=1)
+    return df
+
+
+def _fetch_and_process(entity_id: str, entity_type: str) -> dict[str, Any]:
+    ts = datetime.now(timezone.utc).isoformat()
+
+    df = _fetch_series(entity_id, entity_type)
+    if df is None:
+        return {
+            "data_sufficient": False,
+            "entity_id": entity_id,
+            "entity_type": entity_type,
+            "root_cause": "N/A",
+            "change_points": [],
+            "attribution_precision": 0.0,
+            "shap_values": {},
+            "narrative": "Insufficient data for cluster-seasonal diagnostics.",
+            "timestamp": ts,
+        }
+
     series = df["total_receipts"].copy()
     series.index = pd.RangeIndex(len(series))
 
@@ -204,6 +213,10 @@ def _fetch_and_process(entity_id: str, entity_type: str) -> dict[str, Any]:
         "attribution_precision": precision,
         "shap_values": shap_dict,
         "narrative": narrative,
+        "anomaly_count": anomaly_count,
+        # anomaly_count was already computed above but never surfaced as a
+        # rate — this is the diagram's "Seasonal-Impact Detection Rate" KPI.
+        "seasonal_impact_detection_rate": round(safe_div(anomaly_count, n), 4),
         "timestamp": ts,
     }
 

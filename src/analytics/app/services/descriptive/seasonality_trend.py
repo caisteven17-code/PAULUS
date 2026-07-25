@@ -6,12 +6,15 @@ STL decomposition + liturgical event-window aggregation + Isolation Forest.
 from __future__ import annotations
 
 import asyncio
+import logging
 from datetime import datetime, timezone
 from typing import Any
 
 import numpy as np
 import pandas as pd
 
+from app.services import analytics_db
+from app.services._stl import run_stl_residuals
 from app.services.data_definitions import (
     _SCHEMA_MAP,
     MONTH_ORDER,
@@ -19,6 +22,10 @@ from app.services.data_definitions import (
     safe_div,
 )
 from app.services.supabase_client import get_table
+
+logger = logging.getLogger(__name__)
+
+ALL_INSTITUTIONS = "all"
 
 # Liturgical season to month mapping (month number)
 _LITURGICAL_EVENTS = {
@@ -31,16 +38,7 @@ _LITURGICAL_EVENTS = {
 
 
 def _run_stl_residuals(series: pd.Series) -> pd.Series:
-    from statsmodels.tsa.seasonal import STL
-
-    n = len(series)
-    if n < 24:
-        rolling = series.rolling(window=max(1, n // 3), center=True, min_periods=1).mean()
-        return series - rolling
-
-    stl = STL(series, period=12, robust=True)
-    result = stl.fit()
-    return pd.Series(result.resid, index=series.index)
+    return run_stl_residuals(series)
 
 
 def _isolation_flags(residuals: np.ndarray) -> list[bool]:
@@ -51,7 +49,9 @@ def _isolation_flags(residuals: np.ndarray) -> list[bool]:
 
     clf = IsolationForest(contamination=0.1, random_state=42)
     preds = clf.fit_predict(residuals.reshape(-1, 1))
-    return [p == -1 for p in preds]
+    # bool(p == -1) — p == -1 is numpy.bool, which FastAPI's jsonable_encoder
+    # cannot serialize (unlike a native Python bool).
+    return [bool(p == -1) for p in preds]
 
 
 def _fetch_and_process(institution_id: str, entity_type: str) -> dict[str, Any]:
@@ -154,7 +154,171 @@ def _fetch_and_process(institution_id: str, entity_type: str) -> dict[str, Any]:
     }
 
 
-async def get_seasonality_trend(institution_id: str, entity_type: str) -> dict[str, Any]:
+def _insufficient(institution_id: str, entity_type: str) -> dict[str, Any]:
+    return {
+        "data_sufficient": False,
+        "entity_id": institution_id,
+        "entity_type": entity_type,
+        "monthly_trend": [],
+        "event_averages": [],
+        "seasonal_anomalies": [],
+        "timestamp": datetime.now(timezone.utc).isoformat(),
+    }
+
+
+_AWS_SEASONALITY_SQL = """
+    SELECT f.date_key,
+           SUM(COALESCE(f.total_collections, 0))::float8 AS total_receipts,
+           SUM(COALESCE(f.liturgical_sundays_count, 0))::float8 AS sundays_count,
+           SUM(COALESCE(f.liturgical_solemnities_count, 0))::float8 AS solemnities_count,
+           SUM(COALESCE(f.liturgical_major_celebration_days_count, 0))::float8 AS major_celebration_days_count,
+           SUM(COALESCE(f.liturgical_christmas_days_count, 0))::float8 AS christmas_days_count,
+           SUM(COALESCE(f.liturgical_holy_week_days_count, 0))::float8 AS holy_week_days_count,
+           SUM(COALESCE(f.liturgical_simbang_gabi_days_count, 0))::float8 AS simbang_gabi_days_count,
+           SUM(COALESCE(f.liturgical_lent_days_count, 0))::float8 AS lent_days_count,
+           SUM(COALESCE(f.liturgical_easter_days_count, 0))::float8 AS easter_days_count,
+           SUM(COALESCE(f.liturgical_ordinary_time_days_count, 0))::float8 AS ordinary_time_days_count,
+           SUM(COALESCE(f.liturgical_advent_days_count, 0))::float8 AS advent_days_count,
+           SUM(COALESCE(f.liturgical_feasts_count, 0))::float8 AS feasts_count,
+           SUM(COALESCE(f.liturgical_memorials_count, 0))::float8 AS memorials_count
+    FROM parish_analytics.vw_parish_monthly_financials_liturgical f
+    JOIN parish_analytics.dim_parishes dp ON dp.parish_key = f.parish_key
+    JOIN shared_analytics.dim_institutions di ON di.institution_key = dp.institution_key
+    {where_sql}
+    GROUP BY f.date_key
+    ORDER BY f.date_key
+"""
+
+# "season" events are mutually exclusive — every month falls into exactly one
+# (sourced from the view's liturgical_season-derived day counts). "day_type"
+# events are rank/day-of-week flags that can occur *within* any season above
+# (e.g. December is both "Christmas" season and, for its last 9 days,
+# "Simbang Gabi") — the two groups measure different axes of the same
+# months, not competing totals, so the frontend must not present them as one
+# flat ranked list (that would look like double-counting).
+_AWS_EVENT_DEFINITIONS = [
+    ("Christmas", ["christmas_days_count"], "season"),
+    ("Advent", ["advent_days_count"], "season"),
+    ("Lent", ["lent_days_count"], "season"),
+    ("Easter", ["easter_days_count"], "season"),
+    ("Ordinary Time", ["ordinary_time_days_count"], "season"),
+    ("Simbang Gabi", ["simbang_gabi_days_count"], "day_type"),
+    ("Holy Week", ["holy_week_days_count"], "day_type"),
+    ("Major Celebrations", ["major_celebration_days_count", "solemnities_count"], "day_type"),
+    ("Feasts", ["feasts_count"], "day_type"),
+    ("Memorials", ["memorials_count"], "day_type"),
+    ("Sundays", ["sundays_count"], "day_type"),
+]
+
+
+def _fetch_and_process_aws_parish(institution_id: str, year: int | None) -> dict[str, Any]:
+    scope_all = institution_id == ALL_INSTITUTIONS
+    where: list[str] = []
+    params: list[Any] = []
+    if not scope_all:
+        where.append("di.institution_id = %s")
+        params.append(institution_id)
+    if year:
+        where.append("f.date_key >= %s AND f.date_key < %s")
+        params.extend([year * 100, (year + 1) * 100])
+
+    where_sql = ("WHERE " + " AND ".join(where)) if where else ""
+    rows = analytics_db.fetch_query(_AWS_SEASONALITY_SQL.format(where_sql=where_sql), params)
+    if len(rows) < 3:
+        return _insufficient(institution_id, "parish")
+
+    df = pd.DataFrame(rows)
+    df["date"] = pd.to_datetime(df["date_key"].astype(str), format="%Y%m")
+    df["month_num"] = df["date"].dt.month
+    df["total_receipts"] = pd.to_numeric(df["total_receipts"], errors="coerce").fillna(0.0)
+
+    monthly_avg = df.groupby("month_num")["total_receipts"].mean()
+    baseline = float(df["total_receipts"].mean())
+    monthly_trend = []
+    for i, mname in enumerate(MONTH_ORDER, start=1):
+        avg_val = float(monthly_avg.get(i, 0.0))
+        monthly_trend.append(
+            {
+                "month": mname,
+                "avg_collection": round(avg_val, 2),
+                "seasonal_impact": round(avg_val - baseline, 2),
+            }
+        )
+
+    series = df["total_receipts"].copy()
+    series.index = pd.RangeIndex(len(series))
+    residuals = _run_stl_residuals(series)
+    iso_flags = _isolation_flags(residuals.values)
+    periods = df["date"].dt.strftime("%Y-%m").tolist()
+    seasonal_anomalies = [
+        {"period": p, "is_anomaly": iso_flags[i], "residual": round(float(residuals.iloc[i]), 2)}
+        for i, p in enumerate(periods)
+        if iso_flags[i]
+    ]
+
+    event_averages = []
+    for event_name, cols, event_group in _AWS_EVENT_DEFINITIONS:
+        mask = pd.Series(False, index=df.index)
+        for col in cols:
+            if col in df.columns:
+                mask = mask | (pd.to_numeric(df[col], errors="coerce").fillna(0.0) > 0)
+        sub = df[mask]["total_receipts"]
+        if sub.empty:
+            continue
+        avg_c = float(sub.mean())
+        event_averages.append(
+            {
+                "event_name": event_name,
+                "event_group": event_group,
+                "avg_collection": round(avg_c, 2),
+                "vs_baseline_pct": round(safe_div(avg_c - baseline, baseline) * 100, 2),
+            }
+        )
+
+    return {
+        "data_sufficient": True,
+        "entity_id": institution_id,
+        "entity_type": "parish",
+        "monthly_trend": monthly_trend,
+        "event_averages": sorted(event_averages, key=lambda e: e["vs_baseline_pct"], reverse=True),
+        "seasonal_anomalies": seasonal_anomalies,
+        "timestamp": datetime.now(timezone.utc).isoformat(),
+        "source": "aws",
+    }
+
+
+def _apply_timeframe(result: dict[str, Any], timeframe: str | None) -> dict[str, Any]:
+    window = {"6m": 6, "12m": 12}.get(timeframe or "")
+    if window and result.get("data_sufficient"):
+        result["monthly_trend"] = result["monthly_trend"][-window:]
+    return result
+
+
+async def get_seasonality_trend(
+    institution_id: str,
+    entity_type: str,
+    year: int | None = None,
+    timeframe: str | None = None,
+) -> dict[str, Any]:
     if entity_type not in _SCHEMA_MAP:
         raise ValueError(f"Unknown entity type: {entity_type}")
-    return await asyncio.to_thread(_fetch_and_process, institution_id, entity_type)
+    if entity_type == "parish" and analytics_db.enabled():
+        try:
+            result = await asyncio.to_thread(_fetch_and_process_aws_parish, institution_id, year)
+            if result.get("data_sufficient"):
+                return _apply_timeframe(result, timeframe)
+        except Exception:
+            logger.exception("AWS seasonality trend read failed; falling back to Supabase")
+
+    if entity_type == "parish" and institution_id == ALL_INSTITUTIONS:
+        # No diocese-wide Supabase aggregator exists for seasonality (unlike
+        # financial_trend.py's _fetch_and_process_supabase_all). Falling
+        # through to _fetch_and_process below would crash — it does
+        # .eq("institution_id", institution_id) against a UUID column, and
+        # "all" isn't a valid UUID. An honest "insufficient" is correct
+        # anyway: the AWS path already tried and had no real data for this
+        # scope/year.
+        return _insufficient(institution_id, entity_type)
+
+    result = await asyncio.to_thread(_fetch_and_process, institution_id, entity_type)
+    return _apply_timeframe(result, timeframe)

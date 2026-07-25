@@ -16,6 +16,10 @@ import {
   User,
   ArrowUpRight,
   Wallet,
+  Pencil,
+  X,
+  Check,
+  ChevronDown,
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { formatCurrency } from '../../lib/format';
@@ -31,6 +35,9 @@ interface ProjectDetailPageProps {
   onBack: () => void;
   onAddDonation: (donation: Omit<Donation, 'id'>) => void;
   onAddExpense: (expense: Omit<ProjectExpense, 'id'>) => void;
+  onEditProject?: (project: Project) => void;
+  onEditDonation?: (donation: Donation) => void;
+  onEditExpense?: (expense: ProjectExpense) => void;
   onCloneProject: (project: Project) => void;
   role?: string;
   canManageProjects?: boolean;
@@ -43,12 +50,31 @@ export function ProjectDetailPage({
   onBack,
   onAddDonation,
   onAddExpense,
+  onEditProject,
+  onEditDonation,
+  onEditExpense,
   onCloneProject,
   role,
   canManageProjects,
 }: ProjectDetailPageProps) {
   const [isDonationModalOpen, setIsDonationModalOpen] = useState(false);
   const [isExpenseModalOpen, setIsExpenseModalOpen] = useState(false);
+  const [editingDonation, setEditingDonation] = useState<Donation | null>(null);
+  const [editingExpense, setEditingExpense] = useState<ProjectExpense | null>(null);
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const [editForm, setEditForm] = useState({
+    name: project.name,
+    description: project.description,
+    fundUsage: project.fundUsage ?? '',
+    targetAmount: project.targetAmount.toString(),
+    startDate: project.startDate ? new Date(project.startDate).toISOString().split('T')[0] : '',
+    endDate: project.endDate ? new Date(project.endDate).toISOString().split('T')[0] : '',
+    category: project.category,
+    beneficiaries: project.beneficiaries ?? '',
+    contactPerson: project.contactPerson ?? '',
+    status: project.status,
+  });
+  const [isSavingEdit, setIsSavingEdit] = useState(false);
   const [historicalRecords, setHistoricalRecords] = useState<FinancialRecord[]>([]);
   const progress = (project.currentAmount / project.targetAmount) * 100;
   const canRecordProjectEntries =
@@ -106,6 +132,26 @@ export function ProjectDetailPage({
     return Math.min(100, Math.round((projectedTotal / project.targetAmount) * 100));
   }, [donations, historicalRecords, project.currentAmount, project.endDate, project.targetAmount]);
 
+  const handleSaveEdit = async () => {
+    if (!onEditProject) return;
+    setIsSavingEdit(true);
+    onEditProject({
+      ...project,
+      name: editForm.name,
+      description: editForm.description,
+      fundUsage: editForm.fundUsage,
+      targetAmount: Number(editForm.targetAmount),
+      startDate: editForm.startDate ? new Date(editForm.startDate).toISOString() : project.startDate,
+      endDate: editForm.endDate ? new Date(editForm.endDate).toISOString() : project.endDate,
+      category: editForm.category,
+      beneficiaries: editForm.beneficiaries,
+      contactPerson: editForm.contactPerson,
+      status: editForm.status,
+    });
+    setIsSavingEdit(false);
+    setIsEditModalOpen(false);
+  };
+
   const getStatusColor = (status: Project['status']) => {
     switch (status) {
       case 'active':
@@ -145,6 +191,15 @@ export function ProjectDetailPage({
               >
                 {project.status}
               </div>
+              {canRecordProjectEntries && onEditProject && (
+                <button
+                  onClick={() => { setEditForm({ name: project.name, description: project.description, fundUsage: project.fundUsage ?? '', targetAmount: project.targetAmount.toString(), startDate: project.startDate ? new Date(project.startDate).toISOString().split('T')[0] : '', endDate: project.endDate ? new Date(project.endDate).toISOString().split('T')[0] : '', category: project.category, beneficiaries: project.beneficiaries ?? '', contactPerson: project.contactPerson ?? '', status: project.status }); setIsEditModalOpen(true); }}
+                  className="flex items-center gap-2 px-4 py-2 rounded-full bg-white/10 backdrop-blur-md border border-white/20 text-white text-xs font-bold hover:bg-white/20 transition-all"
+                >
+                  <Pencil className="w-3.5 h-3.5" />
+                  Edit Project
+                </button>
+              )}
             </div>
 
             <div className="space-y-2">
@@ -409,12 +464,23 @@ export function ProjectDetailPage({
                                       <span className="text-sm font-bold text-church-black block tracking-tight">
                                         {donation.donorName}
                                       </span>
+                                      {donation.notes && (
+                                        <span className="text-[9px] text-gray-400 font-medium block max-w-[160px] truncate" title={donation.notes}>
+                                          {donation.notes}
+                                        </span>
+                                      )}
                                       {donation.receiptProofName && (
                                         <div className="flex items-center gap-1.5">
                                           <div className="w-1.5 h-1.5 rounded-full bg-gold-500 animate-pulse" />
-                                          <span className="text-[9px] font-bold text-gold-600 uppercase tracking-widest">
-                                            Proof: {donation.receiptProofName}
-                                          </span>
+                                          <a
+                                            href={donation.receiptProofName}
+                                            target="_blank"
+                                            rel="noopener noreferrer"
+                                            className="text-[9px] font-bold text-gold-600 uppercase tracking-widest hover:text-gold-800 underline underline-offset-2"
+                                            onClick={(e) => e.stopPropagation()}
+                                          >
+                                            View Receipt
+                                          </a>
                                         </div>
                                       )}
                                     </div>
@@ -445,13 +511,19 @@ export function ProjectDetailPage({
                                   </div>
                                 </td>
                                 <td className="px-6 md:px-10 py-7">
-                                  <div className="flex items-center justify-between">
+                                  <div className="flex items-center justify-between gap-2">
                                     <span className="px-4 py-2 rounded-xl bg-gray-100 text-gray-600 text-[10px] font-bold uppercase tracking-widest group-hover:bg-church-black group-hover:text-white transition-all duration-300 shadow-sm">
                                       {donation.paymentMethod}
                                     </span>
-                                    <button className="opacity-0 group-hover:opacity-100 transition-opacity p-2 hover:bg-gold-100 rounded-lg text-gold-600">
-                                      <ArrowUpRight className="w-4 h-4" />
-                                    </button>
+                                    {canRecordProjectEntries && onEditDonation && (
+                                      <button
+                                        onClick={(e) => { e.stopPropagation(); setEditingDonation(donation); }}
+                                        className="opacity-0 group-hover:opacity-100 transition-opacity p-2 hover:bg-gold-100 rounded-lg text-gold-600"
+                                        title="Edit donation"
+                                      >
+                                        <Pencil className="w-4 h-4" />
+                                      </button>
+                                    )}
                                   </div>
                                 </td>
                               </motion.tr>
@@ -548,9 +620,15 @@ export function ProjectDetailPage({
                                       </span>
                                     )}
                                     {expense.proofFileName && (
-                                      <span className="text-[9px] font-bold text-gold-600 uppercase tracking-widest block">
-                                        Proof: {expense.proofFileName}
-                                      </span>
+                                      <a
+                                        href={expense.proofFileName}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        className="text-[9px] font-bold text-gold-600 uppercase tracking-widest block hover:text-gold-800 underline underline-offset-2"
+                                        onClick={(e) => e.stopPropagation()}
+                                      >
+                                        View Proof
+                                      </a>
                                     )}
                                   </div>
                                 </td>
@@ -569,9 +647,20 @@ export function ProjectDetailPage({
                                   </span>
                                 </td>
                                 <td className="px-6 md:px-10 py-7">
-                                  <span className="px-4 py-2 rounded-xl bg-gray-100 text-gray-600 text-[10px] font-bold uppercase tracking-widest shadow-sm">
-                                    {expense.paymentMethod}
-                                  </span>
+                                  <div className="flex items-center gap-2">
+                                    <span className="px-4 py-2 rounded-xl bg-gray-100 text-gray-600 text-[10px] font-bold uppercase tracking-widest shadow-sm">
+                                      {expense.paymentMethod}
+                                    </span>
+                                    {canRecordProjectEntries && onEditExpense && (
+                                      <button
+                                        onClick={(e) => { e.stopPropagation(); setEditingExpense(expense); }}
+                                        className="opacity-0 group-hover:opacity-100 transition-opacity p-2 hover:bg-gold-100 rounded-lg text-gold-600"
+                                        title="Edit disbursement"
+                                      >
+                                        <Pencil className="w-4 h-4" />
+                                      </button>
+                                    )}
+                                  </div>
                                 </td>
                               </motion.tr>
                             ))
@@ -605,19 +694,125 @@ export function ProjectDetailPage({
       </div>
 
       <DonationEntryModal
-        isOpen={isDonationModalOpen}
-        onClose={() => setIsDonationModalOpen(false)}
+        isOpen={isDonationModalOpen || !!editingDonation}
+        onClose={() => { setIsDonationModalOpen(false); setEditingDonation(null); }}
         onSubmit={onAddDonation}
+        onEdit={onEditDonation}
+        initialData={editingDonation ?? undefined}
         projectId={project.id}
         projectName={project.name}
       />
       <ExpenseEntryModal
-        isOpen={isExpenseModalOpen}
-        onClose={() => setIsExpenseModalOpen(false)}
+        isOpen={isExpenseModalOpen || !!editingExpense}
+        onClose={() => { setIsExpenseModalOpen(false); setEditingExpense(null); }}
         onSubmit={onAddExpense}
+        onEdit={onEditExpense}
+        initialData={editingExpense ?? undefined}
         projectId={project.id}
         projectName={project.name}
       />
+
+      {/* ── Edit Project Modal ── */}
+      <AnimatePresence>
+        {isEditModalOpen && (
+          <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
+            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+              onClick={() => setIsEditModalOpen(false)}
+              className="absolute inset-0 bg-black/60 backdrop-blur-sm" />
+            <motion.div initial={{ opacity: 0, scale: 0.95, y: 20 }} animate={{ opacity: 1, scale: 1, y: 0 }} exit={{ opacity: 0, scale: 0.95, y: 20 }}
+              className="relative w-full max-w-2xl bg-white rounded-3xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
+              <div className="p-6 md:p-8 border-b border-gray-100 flex justify-between items-center sticky top-0 z-10 bg-white">
+                <div>
+                  <h2 className="text-xl font-serif font-bold text-church-black">Edit Project</h2>
+                  <p className="text-xs text-gray-500 mt-0.5">{project.name}</p>
+                </div>
+                <button onClick={() => setIsEditModalOpen(false)} className="w-10 h-10 rounded-full hover:bg-gray-100 flex items-center justify-center text-gray-400 transition-all hover:rotate-90">
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+              <div className="flex-1 overflow-y-auto">
+                <div className="p-6 md:p-8 space-y-6">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div className="space-y-1.5">
+                      <label className="text-[10px] font-bold text-gold-700 uppercase tracking-[0.2em]">Project Name <span className="text-rose-500">*</span></label>
+                      <input type="text" value={editForm.name} onChange={(e) => setEditForm({ ...editForm, name: e.target.value })}
+                        className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-sm font-medium focus:outline-none focus:ring-4 focus:ring-gold-500/10 focus:border-gold-500 transition-all" />
+                    </div>
+                    <div className="space-y-1.5">
+                      <label className="text-[10px] font-bold text-gold-700 uppercase tracking-[0.2em]">Category <span className="text-rose-500">*</span></label>
+                      <div className="relative">
+                        <select value={editForm.category} onChange={(e) => setEditForm({ ...editForm, category: e.target.value as Project['category'] })}
+                          className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-sm font-medium focus:outline-none focus:ring-4 focus:ring-gold-500/10 focus:border-gold-500 transition-all appearance-none cursor-pointer">
+                          {['Building/Construction','Equipment','Programs/Outreach','Education','Emergency/Relief','Liturgical','Operational'].map((c) => <option key={c} value={c}>{c}</option>)}
+                        </select>
+                        <ChevronDown className="absolute right-4 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" />
+                      </div>
+                    </div>
+                  </div>
+                  <div className="space-y-1.5">
+                    <label className="text-[10px] font-bold text-gold-700 uppercase tracking-[0.2em]">Description</label>
+                    <textarea value={editForm.description} onChange={(e) => setEditForm({ ...editForm, description: e.target.value })} rows={3}
+                      className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-sm font-medium focus:outline-none focus:ring-4 focus:ring-gold-500/10 focus:border-gold-500 transition-all resize-none" />
+                  </div>
+                  <div className="space-y-1.5">
+                    <label className="text-[10px] font-bold text-gold-700 uppercase tracking-[0.2em]">Fund Usage</label>
+                    <textarea value={editForm.fundUsage} onChange={(e) => setEditForm({ ...editForm, fundUsage: e.target.value })} rows={2}
+                      className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-sm font-medium focus:outline-none focus:ring-4 focus:ring-gold-500/10 focus:border-gold-500 transition-all resize-none" />
+                  </div>
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                    <div className="space-y-1.5">
+                      <label className="text-[10px] font-bold text-gold-700 uppercase tracking-[0.2em]">Target (₱) <span className="text-rose-500">*</span></label>
+                      <input type="number" value={editForm.targetAmount} onChange={(e) => setEditForm({ ...editForm, targetAmount: e.target.value })}
+                        className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-sm font-bold focus:outline-none focus:ring-4 focus:ring-gold-500/10 focus:border-gold-500 transition-all" />
+                    </div>
+                    <div className="space-y-1.5">
+                      <label className="text-[10px] font-bold text-gold-700 uppercase tracking-[0.2em]">Start Date</label>
+                      <input type="date" value={editForm.startDate} onChange={(e) => setEditForm({ ...editForm, startDate: e.target.value })}
+                        className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-sm font-medium focus:outline-none focus:ring-4 focus:ring-gold-500/10 focus:border-gold-500 transition-all" />
+                    </div>
+                    <div className="space-y-1.5">
+                      <label className="text-[10px] font-bold text-gold-700 uppercase tracking-[0.2em]">End Date</label>
+                      <input type="date" value={editForm.endDate} onChange={(e) => setEditForm({ ...editForm, endDate: e.target.value })}
+                        className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-sm font-medium focus:outline-none focus:ring-4 focus:ring-gold-500/10 focus:border-gold-500 transition-all" />
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div className="space-y-1.5">
+                      <label className="text-[10px] font-bold text-gold-700 uppercase tracking-[0.2em]">Beneficiaries</label>
+                      <input type="text" value={editForm.beneficiaries} onChange={(e) => setEditForm({ ...editForm, beneficiaries: e.target.value })}
+                        className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-sm font-medium focus:outline-none focus:ring-4 focus:ring-gold-500/10 focus:border-gold-500 transition-all" />
+                    </div>
+                    <div className="space-y-1.5">
+                      <label className="text-[10px] font-bold text-gold-700 uppercase tracking-[0.2em]">Contact Person</label>
+                      <input type="text" value={editForm.contactPerson} onChange={(e) => setEditForm({ ...editForm, contactPerson: e.target.value })}
+                        className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-sm font-medium focus:outline-none focus:ring-4 focus:ring-gold-500/10 focus:border-gold-500 transition-all" />
+                    </div>
+                  </div>
+                  <div className="space-y-1.5">
+                    <label className="text-[10px] font-bold text-gold-700 uppercase tracking-[0.2em]">Status</label>
+                    <div className="relative">
+                      <select value={editForm.status} onChange={(e) => setEditForm({ ...editForm, status: e.target.value as Project['status'] })}
+                        className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-sm font-medium focus:outline-none focus:ring-4 focus:ring-gold-500/10 focus:border-gold-500 transition-all appearance-none cursor-pointer">
+                        <option value="active">Active</option>
+                        <option value="completed">Completed</option>
+                        <option value="on-hold">On Hold</option>
+                      </select>
+                      <ChevronDown className="absolute right-4 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" />
+                    </div>
+                  </div>
+                </div>
+              </div>
+              <div className="p-6 border-t border-gray-100 flex gap-3">
+                <button onClick={() => setIsEditModalOpen(false)} className="flex-1 py-3 rounded-xl text-sm font-bold text-gray-500 hover:bg-gray-50 transition-all">Cancel</button>
+                <button onClick={handleSaveEdit} disabled={isSavingEdit}
+                  className="flex-[2] py-3 bg-gold-500 text-church-green-dark rounded-xl text-sm font-bold hover:bg-gold-600 transition-all shadow-lg shadow-gold-500/20 disabled:opacity-50 flex items-center justify-center gap-2">
+                  {isSavingEdit ? <div className="w-4 h-4 border-2 border-church-green-dark/30 border-t-church-green-dark rounded-full animate-spin" /> : <><Check className="w-4 h-4" />Save Changes</>}
+                </button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }

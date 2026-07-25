@@ -1,14 +1,22 @@
 {
-  "generated_at": "2026-06-07T15:36:06.448958+00:00",
+  "generated_at": "2026-06-16T09:06:08.664119+00:00",
   "start_year": 2023,
-  "end_year": 2026,
+  "end_year": 2032,
   "sources": [
     {
       "year": 2023,
-      "source": "romcal",
+      "source": "source_of_truth",
+      "source_file": "2023.json",
       "record_count": 365,
-      "matched_count": 85,
-      "pending_count": 365,
+      "dayCount": 365,
+      "matched_count": 347,
+      "review_count": 18,
+      "validation_counts": {
+        "matched_romcal_only": 227,
+        "mismatched_all": 18,
+        "matched_litcal_only": 113,
+        "source_of_truth_only": 7
+      },
       "error": null
     },
     {
@@ -17,27 +25,36 @@
       "record_count": 0,
       "validator_only": true,
       "error": "HTTPError: HTTP Error 404: Not Found"
+    },
+    {
+      "year": 2023,
+      "source": "romcal",
+      "record_count": 365,
+      "validator_only": true,
+      "error": null
     },
     {
       "year": 2023,
       "source": "litcal",
       "record_count": 544,
       "validator_only": true,
-      "error": null
-    },
-    {
-      "year": 2023,
-      "source": "universalis",
-      "record_count": 0,
-      "validator_only": true,
+      "fallback_only": true,
       "error": null
     },
     {
       "year": 2024,
-      "source": "romcal",
+      "source": "source_of_truth",
+      "source_file": "2024.json",
       "record_count": 366,
-      "matched_count": 88,
-      "pending_count": 366,
+      "dayCount": 366,
+      "matched_count": 351,
+      "review_count": 15,
+      "validation_counts": {
+        "matched_romcal_only": 232,
+        "mismatched_all": 15,
+        "matched_litcal_only": 111,
+        "source_of_truth_only": 8
+      },
       "error": null
     },
     {
@@ -49,29 +66,47 @@
     },
     {
       "year": 2024,
-      "source": "litcal",
-      "record_count": 549,
+      "source": "romcal",
+      "record_count": 366,
       "validator_only": true,
       "error": null
     },
     {
       "year": 2024,
-      "source": "universalis",
-      "record_count": 0,
+      "source": "litcal",
+      "record_count": 549,
+      "validator_only": true,
+      "fallback_only": true,
+      "error": null
+    },
+    {
+      "year": 2025,
+      "source": "source_of_truth",
+      "source_file": "2025.json",
+      "record_count": 365,
+      "dayCount": 365,
+      "matched_count": 349,
+      "review_count": 16,
+      "validation_counts": {
+        "matched_both": 203,
+        "matched_romcal_only": 20,
+        "mismatched_all": 16,
+        "matched_gcatholic_only": 52,
+        "matched_litcal_only": 66,
+        "source_of_truth_only": 8
+      },
+      "error": null
+    },
+    {
+      "year": 2025,
+      "source": "gcatholic",
+      "record_count": 365,
       "validator_only": true,
       "error": null
     },
     {
       "year": 2025,
       "source": "romcal",
-      "record_count": 365,
-      "matched_count": 126,
-      "pending_count": 365,
-      "error": null
-    },
-    {
-      "year": 2025,
-      "source": "gcatholic",
       "record_count": 365,
       "validator_only": true,
       "error": null
@@ -81,21 +116,25 @@
       "source": "litcal",
       "record_count": 539,
       "validator_only": true,
-      "error": null
-    },
-    {
-      "year": 2025,
-      "source": "universalis",
-      "record_count": 0,
-      "validator_only": true,
+      "fallback_only": true,
       "error": null
     },
     {
       "year": 2026,
-      "source": "romcal",
+      "source": "source_of_truth",
+      "source_file": "2026.json",
       "record_count": 365,
-      "matched_count": 128,
-      "pending_count": 365,
+      "dayCount": 365,
+      "matched_count": 352,
+      "review_count": 13,
+      "validation_counts": {
+        "matched_both": 204,
+        "matched_romcal_only": 18,
+        "mismatched_all": 13,
+        "matched_gcatholic_only": 53,
+        "matched_litcal_only": 69,
+        "source_of_truth_only": 8
+      },
       "error": null
     },
     {
@@ -107,16 +146,247 @@
     },
     {
       "year": 2026,
-      "source": "litcal",
-      "record_count": 547,
+      "source": "romcal",
+      "record_count": 365,
       "validator_only": true,
       "error": null
     },
     {
       "year": 2026,
-      "source": "universalis",
-      "record_count": 208,
+      "source": "litcal",
+      "record_count": 547,
       "validator_only": true,
+      "fallback_only": true,
+      "error": null
+    },
+    {
+      "year": 2027,
+      "source": "source_of_truth",
+      "source_file": "2027.json",
+      "record_count": 365,
+      "dayCount": 365,
+      "matched_count": 350,
+      "review_count": 15,
+      "validation_counts": {
+        "matched_both": 203,
+        "matched_romcal_only": 23,
+        "matched_gcatholic_only": 48,
+        "mismatched_all": 15,
+        "matched_litcal_only": 68,
+        "source_of_truth_only": 8
+      },
+      "error": null
+    },
+    {
+      "year": 2027,
+      "source": "gcatholic",
+      "record_count": 365,
+      "validator_only": true,
+      "error": null
+    },
+    {
+      "year": 2027,
+      "source": "romcal",
+      "record_count": 365,
+      "validator_only": true,
+      "error": null
+    },
+    {
+      "year": 2027,
+      "source": "litcal",
+      "record_count": 556,
+      "validator_only": true,
+      "fallback_only": true,
+      "error": null
+    },
+    {
+      "year": 2028,
+      "source": "source_of_truth",
+      "source_file": "2028.json",
+      "record_count": 366,
+      "dayCount": 366,
+      "matched_count": 347,
+      "review_count": 19,
+      "validation_counts": {
+        "matched_romcal_only": 232,
+        "mismatched_all": 19,
+        "matched_litcal_only": 108,
+        "source_of_truth_only": 7
+      },
+      "error": null
+    },
+    {
+      "year": 2028,
+      "source": "gcatholic",
+      "record_count": 0,
+      "validator_only": true,
+      "error": "HTTPError: HTTP Error 404: Not Found"
+    },
+    {
+      "year": 2028,
+      "source": "romcal",
+      "record_count": 366,
+      "validator_only": true,
+      "error": null
+    },
+    {
+      "year": 2028,
+      "source": "litcal",
+      "record_count": 549,
+      "validator_only": true,
+      "fallback_only": true,
+      "error": null
+    },
+    {
+      "year": 2029,
+      "source": "source_of_truth",
+      "source_file": "2029.json",
+      "record_count": 365,
+      "dayCount": 365,
+      "matched_count": 350,
+      "review_count": 15,
+      "validation_counts": {
+        "matched_romcal_only": 234,
+        "mismatched_all": 15,
+        "matched_litcal_only": 109,
+        "source_of_truth_only": 7
+      },
+      "error": null
+    },
+    {
+      "year": 2029,
+      "source": "gcatholic",
+      "record_count": 0,
+      "validator_only": true,
+      "error": "HTTPError: HTTP Error 404: Not Found"
+    },
+    {
+      "year": 2029,
+      "source": "romcal",
+      "record_count": 365,
+      "validator_only": true,
+      "error": null
+    },
+    {
+      "year": 2029,
+      "source": "litcal",
+      "record_count": 549,
+      "validator_only": true,
+      "fallback_only": true,
+      "error": null
+    },
+    {
+      "year": 2030,
+      "source": "source_of_truth",
+      "source_file": "2030.json",
+      "record_count": 365,
+      "dayCount": 365,
+      "matched_count": 344,
+      "review_count": 21,
+      "validation_counts": {
+        "matched_romcal_only": 231,
+        "mismatched_all": 21,
+        "matched_litcal_only": 105,
+        "source_of_truth_only": 8
+      },
+      "error": null
+    },
+    {
+      "year": 2030,
+      "source": "gcatholic",
+      "record_count": 0,
+      "validator_only": true,
+      "error": "HTTPError: HTTP Error 404: Not Found"
+    },
+    {
+      "year": 2030,
+      "source": "romcal",
+      "record_count": 365,
+      "validator_only": true,
+      "error": null
+    },
+    {
+      "year": 2030,
+      "source": "litcal",
+      "record_count": 541,
+      "validator_only": true,
+      "fallback_only": true,
+      "error": null
+    },
+    {
+      "year": 2031,
+      "source": "source_of_truth",
+      "source_file": "2031.json",
+      "record_count": 365,
+      "dayCount": 365,
+      "matched_count": 342,
+      "review_count": 23,
+      "validation_counts": {
+        "matched_romcal_only": 220,
+        "mismatched_all": 23,
+        "matched_litcal_only": 114,
+        "source_of_truth_only": 8
+      },
+      "error": null
+    },
+    {
+      "year": 2031,
+      "source": "gcatholic",
+      "record_count": 0,
+      "validator_only": true,
+      "error": "HTTPError: HTTP Error 404: Not Found"
+    },
+    {
+      "year": 2031,
+      "source": "romcal",
+      "record_count": 365,
+      "validator_only": true,
+      "error": null
+    },
+    {
+      "year": 2031,
+      "source": "litcal",
+      "record_count": 543,
+      "validator_only": true,
+      "fallback_only": true,
+      "error": null
+    },
+    {
+      "year": 2032,
+      "source": "source_of_truth",
+      "source_file": "2032.json",
+      "record_count": 366,
+      "dayCount": 366,
+      "matched_count": 342,
+      "review_count": 24,
+      "validation_counts": {
+        "matched_romcal_only": 226,
+        "mismatched_all": 24,
+        "matched_litcal_only": 108,
+        "source_of_truth_only": 8
+      },
+      "error": null
+    },
+    {
+      "year": 2032,
+      "source": "gcatholic",
+      "record_count": 0,
+      "validator_only": true,
+      "error": "HTTPError: HTTP Error 404: Not Found"
+    },
+    {
+      "year": 2032,
+      "source": "romcal",
+      "record_count": 366,
+      "validator_only": true,
+      "error": null
+    },
+    {
+      "year": 2032,
+      "source": "litcal",
+      "record_count": 554,
+      "validator_only": true,
+      "fallback_only": true,
       "error": null
     }
   ]

@@ -1,7 +1,9 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { FinancialController } from '../../controllers/financial.controller';
+import { BudgetController } from '../../controllers/budget.controller';
 import { FinancialService } from '../../services/financial.service';
+import { BudgetService } from '../../services/budget.service';
 import { AuditLogService } from '../../services/audit-log.service';
 import { SupabaseService } from '../../services/supabase.service';
 
@@ -11,7 +13,7 @@ import { SupabaseService } from '../../services/supabase.service';
       isGlobal: true,
     }),
   ],
-  controllers: [FinancialController],
-  providers: [SupabaseService, FinancialService, AuditLogService],
+  controllers: [FinancialController, BudgetController],
+  providers: [SupabaseService, FinancialService, BudgetService, AuditLogService],
 })
 export class FinancialServiceModule {}

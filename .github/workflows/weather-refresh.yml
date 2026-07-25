@@ -14,16 +14,15 @@ on:
   schedule:
     # Incremental update every 10 days at 10 AM Manila (02:00 UTC).
     - cron: "0 2 1,11,21 * *"
-    # Annual full historical collection — January 15 at 10 AM Manila (02:00 UTC).
-    - cron: "0 2 15 1 *"
 
 jobs:
   refresh:
     runs-on: ubuntu-latest
     env:
-      SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
-      NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
-      SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+      ANALYTICS_DB_URL: ${{ secrets.ANALYTICS_DB_URL }}
+      WEATHER_BRONZE_ENABLED: "true"
+      REFERENCE_SILVER_SCHEMA: reference_silver
+      REFERENCE_SILVER_WRITE_ENABLED: "true"
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -41,14 +40,7 @@ jobs:
         id: mode
         run: |
           if [ "${{ github.event_name }}" = "schedule" ]; then
-            # January 15 cron → full historical collection; all other schedule triggers → incremental.
-            MONTH=$(date -u +%m)
-            DAY=$(date -u +%d)
-            if [ "$MONTH" = "01" ] && [ "$DAY" = "15" ]; then
-              echo "mode=full" >> "$GITHUB_OUTPUT"
-            else
-              echo "mode=incremental" >> "$GITHUB_OUTPUT"
-            fi
+            echo "mode=incremental" >> "$GITHUB_OUTPUT"
           else
             echo "mode=${{ inputs.mode }}" >> "$GITHUB_OUTPUT"
           fi
@@ -81,6 +73,13 @@ jobs:
             echo "Both attempts failed."
             exit 1
           fi
+
+      - name: Validate collected data
+        working-directory: src/analytics
+        run: |
+          python -m app.services.weather_validator \
+            --file ../../weather_output/laguna_weather_final.json \
+            --out ../../weather_output/validation_report.json
 
       - name: Notify on failure
         if: failure()

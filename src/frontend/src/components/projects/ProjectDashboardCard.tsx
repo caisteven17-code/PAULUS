@@ -1,7 +1,7 @@
 'use client';
 
 import React from 'react';
-import { ArrowUpRight, Building2, CalendarDays, Church, GraduationCap, School } from 'lucide-react';
+import { ArrowUpRight, Building2, CalendarDays, Church, Clock3, GraduationCap, School, Target } from 'lucide-react';
 import { Project } from '../../types';
 import { motion } from 'motion/react';
 import { formatCurrency } from '../../lib/format';
@@ -14,6 +14,7 @@ interface ProjectDashboardCardProps {
 export function ProjectDashboardCard({ project, onClick }: ProjectDashboardCardProps) {
   const progress = project.targetAmount > 0 ? (project.currentAmount / project.targetAmount) * 100 : 0;
   const progressWidth = Math.min(progress, 100);
+  const entityLabel = project.entityName ?? project.entityId;
   const daysRemaining = Math.max(
     0,
     Math.ceil((new Date(project.endDate).getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24)),
@@ -35,123 +36,87 @@ export function ProjectDashboardCard({ project, onClick }: ProjectDashboardCardP
   };
 
   return (
-    <motion.div
-      whileHover={{ y: -6, boxShadow: '0 20px 25px -5px rgb(0 0 0 / 0.1), 0 8px 10px -6px rgb(0 0 0 / 0.1)' }}
+    <motion.button
+      type="button"
+      whileHover={{ y: -5 }}
       onClick={() => onClick(project)}
-      className="bg-white rounded-[40px] border border-gray-100 p-8 shadow-sm hover:shadow-2xl hover:shadow-gold-500/10 transition-all duration-500 cursor-pointer group relative overflow-hidden h-full flex flex-col"
+      className="group relative flex h-full min-h-[420px] w-full cursor-pointer flex-col overflow-hidden rounded-[30px] border border-slate-200 bg-white text-left shadow-sm transition-all duration-500 hover:border-gold-400/60 hover:shadow-2xl hover:shadow-slate-200/70"
     >
-      <div className="absolute top-0 right-0 w-48 h-48 bg-gold-500/5 rounded-full -mr-24 -mt-24 transition-transform duration-700 group-hover:scale-150 group-hover:bg-gold-500/10" />
-      <div className="absolute inset-0 bg-white/0 group-hover:bg-white/5 backdrop-blur-[2px] opacity-0 group-hover:opacity-100 transition-all duration-500 pointer-events-none" />
+      <div className="absolute left-0 top-0 h-full w-1.5 bg-gradient-to-b from-gold-400 via-gold-500 to-slate-950" />
+      <div className="absolute right-[-74px] top-[-74px] h-40 w-40 rounded-full bg-gold-400/10 transition-transform duration-700 group-hover:scale-125" />
 
-      <div className="flex justify-between items-start mb-8 relative z-10 gap-4">
-        <div className="flex-1 space-y-1.5 min-w-0">
-          <div className="flex flex-wrap items-center gap-2">
-            <div className="flex items-center gap-1.5 px-2 py-0.5 bg-gray-100 rounded-md">
+      <div className="relative z-10 flex flex-1 flex-col p-6">
+        <div className="mb-6 flex items-start justify-between gap-4 pr-9">
+          <div className="min-w-0">
+            <div className="mb-3 inline-flex max-w-full items-center gap-1.5 rounded-full bg-slate-100 px-3 py-1 text-slate-500">
               {getEntityIcon(project.entityType)}
-              <span className="text-[9px] font-bold text-gray-500 uppercase tracking-wider truncate max-w-[120px]">
-                {project.entityId}
-              </span>
+              <span className="truncate text-[9px] font-black uppercase tracking-[0.14em]">{entityLabel}</span>
             </div>
-            <span className="text-[10px] font-bold text-gold-600 uppercase tracking-[0.3em] truncate">
-              {project.category}
-            </span>
+            <p className="text-[10px] font-black uppercase tracking-[0.24em] text-gold-600">{project.category}</p>
+            <h3 className="mt-2 break-words font-serif text-2xl font-bold leading-[1.08] text-slate-950 transition-colors group-hover:text-gold-700">
+              {project.name}
+            </h3>
           </div>
-          <h3 className="text-2xl font-serif font-bold text-church-black group-hover:text-gold-600 transition-colors leading-[1.1] tracking-tight break-words">
-            {project.name}
-          </h3>
+          <span className="shrink-0 rounded-full border border-slate-200 bg-white px-3 py-1.5 text-[10px] font-black uppercase tracking-[0.12em] text-slate-600 shadow-sm">
+            {statusLabel}
+          </span>
         </div>
-        <div className="shrink-0 rounded-2xl border border-gray-100 bg-gray-50 px-4 py-3 text-right shadow-sm transition-all duration-500 group-hover:scale-105">
-          <p className="text-[9px] font-bold uppercase tracking-[0.18em] text-gray-400">Status</p>
-          <p className="mt-1 text-sm font-bold capitalize text-church-black">{statusLabel}</p>
-        </div>
-      </div>
 
-      <div className="space-y-8 relative z-10 flex-1 flex flex-col justify-between">
-        <div className="space-y-8">
-          <div className="flex items-center justify-between gap-4">
-            <div className="rounded-full bg-gray-100 px-3 py-1 text-[9px] font-black uppercase tracking-[0.18em] text-gray-500">
-              Record Summary
-            </div>
-            <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-gray-400">
-              Ends {new Date(project.endDate).toLocaleDateString()}
+        <div className="mb-6 grid grid-cols-[110px_minmax(0,1fr)] gap-4">
+          <div className="flex aspect-square flex-col items-center justify-center rounded-full border border-gold-400/40 bg-[#fbfaf6]">
+            <span className="font-serif text-4xl font-bold leading-none text-slate-950">{Math.round(progress)}%</span>
+            <span className="mt-1 text-[9px] font-black uppercase tracking-[0.16em] text-slate-400">Funded</span>
+          </div>
+          <div className="flex min-w-0 flex-col justify-center">
+            <p className="text-[10px] font-black uppercase tracking-[0.18em] text-slate-400">Raised To Date</p>
+            <p className="mt-1 truncate font-serif text-3xl font-bold leading-none text-slate-950">
+              {formatCurrency(project.currentAmount)}
             </p>
-          </div>
-
-          <div>
-            <div className="flex justify-between items-end mb-4 gap-2">
-              <div className="space-y-1 min-w-0">
-                <span className="text-[10px] text-gray-400 uppercase font-bold tracking-[0.2em] block truncate">
-                  Raised To Date
-                </span>
-                <div className="flex items-baseline gap-2 flex-wrap">
-                  <span className="text-3xl font-serif font-bold text-church-black leading-none">
-                    {formatCurrency(project.currentAmount)}
-                  </span>
-                  <span className="text-[10px] text-gray-400 font-bold uppercase tracking-widest">Recorded</span>
-                </div>
-              </div>
-              <div className="text-right shrink-0">
-                <span className="text-2xl font-serif font-bold text-gold-600 leading-none">
-                  {Math.round(progress)}%
-                </span>
-              </div>
-            </div>
-            <div className="h-3 bg-gray-50 rounded-full overflow-hidden shadow-inner relative">
+            <div className="mt-4 h-3 overflow-hidden rounded-full bg-slate-100 shadow-inner">
               <motion.div
                 initial={{ width: 0 }}
                 animate={{ width: `${progressWidth}%` }}
-                transition={{ duration: 1.5, ease: 'circOut' }}
-                className={`h-full rounded-full shadow-lg relative ${progress >= 100 ? 'bg-gradient-to-r from-green-400 to-green-600' : 'bg-gradient-to-r from-gold-400 to-gold-600'}`}
-              >
-                <div className="absolute inset-0 bg-white/20 animate-pulse" />
-              </motion.div>
+                transition={{ duration: 1.2, ease: 'circOut' }}
+                className={`h-full rounded-full ${progress >= 100 ? 'bg-green-500' : 'bg-gradient-to-r from-gold-400 to-gold-600'}`}
+              />
             </div>
           </div>
+        </div>
 
-          <div className="grid grid-cols-2 gap-6">
-            <div className="p-4 bg-gray-50/50 rounded-3xl border border-gray-100/50 group-hover:bg-white group-hover:shadow-md transition-all duration-500">
-              <p className="text-[9px] text-gray-400 uppercase font-bold tracking-[0.2em] mb-2">Target Goal</p>
-              <p className="text-base font-bold text-church-black">{formatCurrency(project.targetAmount)}</p>
+        <div className="grid grid-cols-2 gap-3">
+          <div className="rounded-2xl border border-slate-100 bg-slate-50 p-4">
+            <div className="mb-3 flex items-center gap-2 text-gold-600">
+              <Target className="h-4 w-4" />
+              <p className="text-[9px] font-black uppercase tracking-[0.18em] text-slate-400">Goal</p>
             </div>
-            <div className="p-4 bg-gray-50/50 rounded-3xl border border-gray-100/50 group-hover:bg-white group-hover:shadow-md transition-all duration-500">
-              <p className="text-[9px] text-gray-400 uppercase font-bold tracking-[0.2em] mb-2">Time Remaining</p>
-              <p className="text-base font-bold text-church-black">{daysRemaining} Days</p>
-            </div>
+            <p className="truncate text-sm font-black text-slate-950">{formatCurrency(project.targetAmount)}</p>
           </div>
+          <div className="rounded-2xl border border-slate-100 bg-slate-50 p-4">
+            <div className="mb-3 flex items-center gap-2 text-gold-600">
+              <Clock3 className="h-4 w-4" />
+              <p className="text-[9px] font-black uppercase tracking-[0.18em] text-slate-400">Left</p>
+            </div>
+            <p className="text-sm font-black text-slate-950">{daysRemaining} days</p>
+          </div>
+        </div>
 
-          <div className="grid grid-cols-1 gap-6">
-            <div className="p-4 bg-gray-50/50 rounded-3xl border border-gray-100/50 group-hover:bg-white group-hover:shadow-md transition-all duration-500">
-              <div className="mb-3 flex items-center gap-2 text-gold-600">
-                <CalendarDays className="w-4 h-4" />
-                <p className="text-[9px] text-gray-400 uppercase font-bold tracking-[0.2em]">Start Date</p>
+        <div className="mt-auto pt-6">
+          <div className="flex items-center justify-between gap-4 border-t border-slate-100 pt-5">
+            <div className="min-w-0">
+              <div className="mb-1 flex items-center gap-2 text-slate-400">
+                <CalendarDays className="h-4 w-4" />
+                <span className="text-[9px] font-black uppercase tracking-[0.18em]">Timeline</span>
               </div>
-              <p className="text-base font-bold text-church-black">
-                {new Date(project.startDate).toLocaleDateString()}
+              <p className="truncate text-xs font-bold text-slate-500">
+                {new Date(project.startDate).toLocaleDateString()} to {new Date(project.endDate).toLocaleDateString()}
               </p>
             </div>
-          </div>
-        </div>
-
-        <div className="pt-6 border-t border-gray-100 flex items-center justify-between mt-auto">
-          <div className="flex items-center gap-3 text-gray-400">
-            <div className="w-8 h-8 rounded-xl bg-gold-500/10 flex items-center justify-center text-gold-600">
-              {getEntityIcon(project.entityType)}
-            </div>
-            <div>
-              <span className="text-[10px] font-bold uppercase tracking-[0.2em] block leading-none">Managed By</span>
-              <span className="text-[8px] font-bold text-gray-300 uppercase tracking-widest mt-1 block">
-                {project.entityId}
-              </span>
+            <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-slate-950 text-white shadow-lg shadow-slate-900/15 transition-all group-hover:bg-gold-500 group-hover:text-black">
+              <ArrowUpRight className="h-5 w-5" />
             </div>
           </div>
-          <motion.div
-            whileHover={{ scale: 1.1, x: 5 }}
-            className="w-12 h-12 rounded-2xl bg-church-green-dark text-white flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all shadow-xl shadow-church-green-dark/20"
-          >
-            <ArrowUpRight className="w-6 h-6" />
-          </motion.div>
         </div>
       </div>
-    </motion.div>
+    </motion.button>
   );
 }

@@ -3,7 +3,7 @@
 CREATE TABLE IF NOT EXISTS diocese.institutions (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   name text NOT NULL,
-  institution_type text NOT NULL CHECK (institution_type IN ('parish', 'school', 'seminary', 'chancery')),
+  institution_type text NOT NULL CHECK (institution_type IN ('diocese', 'parish', 'school', 'seminary')),
   vicariate text,
   district text,
   cluster text,
@@ -120,6 +120,25 @@ CREATE TABLE IF NOT EXISTS diocese.project_expenses (
   deleted_at timestamptz
 );
 
+CREATE TABLE IF NOT EXISTS diocese.events (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  institution_id uuid NOT NULL REFERENCES diocese.institutions(id),
+  event_name text NOT NULL,
+  event_level text NOT NULL DEFAULT 'Minor event' CHECK (event_level IN ('Major event', 'Minor event')),
+  event_type text,
+  expected_financial_impact text CHECK (
+    expected_financial_impact IN ('inflow', 'outflow', 'both', 'none') OR expected_financial_impact IS NULL
+  ),
+  estimated_amount numeric(14, 2),
+  linked_project_id uuid REFERENCES diocese.projects(id) ON DELETE SET NULL,
+  start_date date NOT NULL,
+  end_date date,
+  notes text,
+  created_at timestamptz NOT NULL DEFAULT now(),
+  updated_at timestamptz NOT NULL DEFAULT now(),
+  deleted_at timestamptz
+);
+
 CREATE TABLE IF NOT EXISTS diocese.announcements (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   title text NOT NULL,
@@ -162,6 +181,10 @@ CREATE INDEX IF NOT EXISTS idx_profiles_institution
 
 CREATE INDEX IF NOT EXISTS idx_projects_institution_status
   ON diocese.projects (institution_id, status)
+  WHERE deleted_at IS NULL;
+
+CREATE INDEX IF NOT EXISTS idx_events_institution_start_date
+  ON diocese.events (institution_id, start_date)
   WHERE deleted_at IS NULL;
 
 CREATE INDEX IF NOT EXISTS idx_audit_logs_institution_occurred_at
@@ -208,6 +231,11 @@ CREATE TRIGGER set_updated_at_project_expenses
 BEFORE UPDATE ON diocese.project_expenses
 FOR EACH ROW EXECUTE FUNCTION public.set_row_updated_at();
 
+DROP TRIGGER IF EXISTS set_updated_at_events ON diocese.events;
+CREATE TRIGGER set_updated_at_events
+BEFORE UPDATE ON diocese.events
+FOR EACH ROW EXECUTE FUNCTION public.set_row_updated_at();
+
 DROP TRIGGER IF EXISTS set_updated_at_announcements ON diocese.announcements;
 CREATE TRIGGER set_updated_at_announcements
 BEFORE UPDATE ON diocese.announcements
@@ -217,3 +245,12 @@ DROP TRIGGER IF EXISTS set_updated_at_audit_logs ON diocese.audit_logs;
 CREATE TRIGGER set_updated_at_audit_logs
 BEFORE UPDATE ON diocese.audit_logs
 FOR EACH ROW EXECUTE FUNCTION public.set_row_updated_at();
+
+-- Grant schema and table access to Supabase built-in roles.
+-- Custom schemas require explicit grants; the public schema gets these automatically.
+GRANT USAGE ON SCHEMA diocese TO anon, authenticated, service_role;
+GRANT ALL PRIVILEGES ON ALL TABLES    IN SCHEMA diocese TO service_role;
+GRANT ALL PRIVILEGES ON ALL SEQUENCES IN SCHEMA diocese TO service_role;
+GRANT SELECT, INSERT, UPDATE, DELETE  ON ALL TABLES    IN SCHEMA diocese TO authenticated;
+GRANT USAGE                           ON ALL SEQUENCES IN SCHEMA diocese TO authenticated;
+GRANT SELECT                          ON ALL TABLES    IN SCHEMA diocese TO anon;

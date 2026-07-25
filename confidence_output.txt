@@ -1,0 +1,23 @@
+Fetching rainfall rows...
+  retry 1 after error: column "gfs_weathercode" does not exist
+LINE 1: ...ode", "ecmwf_ifs_weathercode", "jma_weathercode", "gfs_weath...
+                                                             ^
+HINT:  Perhaps you meant to reference the column "weather_rainfall_daily.jma_weathercode".
+  retry 2 after error: column "gfs_weathercode" does not exist
+LINE 1: ...ode", "ecmwf_ifs_weathercode", "jma_weathercode", "gfs_weath...
+                                                             ^
+HINT:  Perhaps you meant to reference the column "weather_rainfall_daily.jma_weathercode".
+  retry 3 after error: column "gfs_weathercode" does not exist
+LINE 1: ...ode", "ecmwf_ifs_weathercode", "jma_weathercode", "gfs_weath...
+                                                             ^
+HINT:  Perhaps you meant to reference the column "weather_rainfall_daily.jma_weathercode".
+Traceback (most recent call last):
+  File "C:\Users\caist\testing\CAPSTONE\src\analytics\confidence_matrix.py", line 228, in <module>
+    rain_rows = fetch_all(
+        "reference", "weather_rainfall_daily",
+    ...<3 lines>...
+         "jma_weathercode", "gfs_weathercode"],
+    )
+  File "C:\Users\caist\testing\CAPSTONE\src\analytics\confidence_matrix.py", line 68, in fetch_all
+    raise RuntimeError("exhausted retries")
+RuntimeError: exhausted retries

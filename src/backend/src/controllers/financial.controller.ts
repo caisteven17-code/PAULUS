@@ -40,16 +40,17 @@ export class FinancialController {
   @Post('records')
   async saveRecord(@Body() record: FinancialRecord, @Req() req: Request, @Res() res: Response) {
     const saved = await this.financialService.saveRecord(record);
+    const userName = (req.headers['x-user-name'] as string) || 'Unknown';
+    const userRole = (req.headers['x-user-role'] as string) || 'unknown';
     await this.auditLogService.logEvent({
+      userName,
+      userRole,
       category: 'finance',
       severity: 'success',
       action: 'Financial Record Saved',
-      detail: `${record.entityType ?? 'Entity'} financial record saved for entity ${record.entityId ?? 'unknown'} (${record.month ?? ''})`,
+      detail: `${record.entityType ?? 'Entity'} financial record for ${record.month ?? 'unknown month'} saved by ${userName}`,
       ipAddress: clientIp(req),
       metadata: { entityId: record.entityId, entityType: record.entityType, month: record.month },
-      userName: 'System',
-      userRole: 'system',
-      isSystem: true,
     });
     return res.status(HttpStatus.OK).json(saved);
   }
@@ -57,16 +58,17 @@ export class FinancialController {
   @Delete('records/:id')
   async deleteRecord(@Param('id') id: string, @Req() req: Request, @Res() res: Response) {
     await this.financialService.deleteRecord(id);
+    const userName = (req.headers['x-user-name'] as string) || 'Unknown';
+    const userRole = (req.headers['x-user-role'] as string) || 'unknown';
     await this.auditLogService.logEvent({
+      userName,
+      userRole,
       category: 'finance',
       severity: 'warning',
       action: 'Financial Record Deleted',
-      detail: `Financial record ${id} permanently deleted`,
+      detail: `Financial record ${id} permanently deleted by ${userName}`,
       ipAddress: clientIp(req),
       metadata: { recordId: id },
-      userName: 'System',
-      userRole: 'system',
-      isSystem: true,
     });
     return res.status(HttpStatus.OK).json({ ok: true });
   }

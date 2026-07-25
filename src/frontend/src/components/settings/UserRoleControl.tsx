@@ -1,9 +1,26 @@
 'use client';
 
 import React, { useState } from 'react';
-import { Search, Plus, ShieldCheck, Trash, Edit2, ShieldAlert } from 'lucide-react';
+import { Search, Plus, ShieldCheck, Trash, Edit2, ShieldAlert, Archive, Lock, Check } from 'lucide-react';
 import { UserRole } from '../../types';
 import { ALL_PERMISSIONS, PREDEFINED_ROLE_IDS, INITIAL_ROLES } from '../../constants';
+
+/**
+ * Archive permissions live together in one "Archives" section. Each entry can
+ * only be checked once its prerequisite "manage" permission is enabled.
+ */
+const ARCHIVE_FEATURES: { key: string; prereq: string; label: string; feature: string }[] = [
+  { key: 'archive_users', prereq: 'create_users', label: 'User Archives', feature: 'Manage User Accounts' },
+  { key: 'archive_entities', prereq: 'manage_entities', label: 'Entity Archives', feature: 'Manage Entities' },
+  { key: 'archive_events', prereq: 'manage_events', label: 'Event Archives', feature: 'Manage Events' },
+  { key: 'archive_announcements', prereq: 'manage_announcements', label: 'Announcement Archives', feature: 'Manage Announcements' },
+  { key: 'archive_projects', prereq: 'manage_projects', label: 'Project Archives', feature: 'Manage Projects' },
+];
+// manage-permission → archive key, used to clear an orphaned flag when a manage
+// permission is switched off.
+const ARCHIVE_SUB: Record<string, { id: string }> = Object.fromEntries(
+  ARCHIVE_FEATURES.map((f) => [f.prereq, { id: f.key }]),
+);
 
 interface UserRoleControlProps {
   roles: UserRole[];
@@ -198,6 +215,21 @@ export function UserRoleControl({ roles, onUpdateRoles, accounts = [] }: UserRol
       } else if (permId === 'view_announcements' && updatedPermissions['view_announcements']) {
         updatedPermissions['manage_announcements'] = false;
       }
+      if (!updatedPermissions['manage_announcements']) updatedPermissions['archive_announcements'] = false;
+      setTempRole({ ...tempRole, permissions: updatedPermissions });
+    } else if (permId === 'manage_events' || permId === 'view_events') {
+      // Radio-group: only one events permission can be active at a time
+      const updatedPermissions = { ...tempRole.permissions } as any;
+      updatedPermissions['manage_events'] =
+        permId === 'manage_events' ? !updatedPermissions['manage_events'] : false;
+      updatedPermissions['view_events'] =
+        permId === 'view_events' ? !updatedPermissions['view_events'] : false;
+      if (permId === 'manage_events' && updatedPermissions['manage_events']) {
+        updatedPermissions['view_events'] = false;
+      } else if (permId === 'view_events' && updatedPermissions['view_events']) {
+        updatedPermissions['manage_events'] = false;
+      }
+      if (!updatedPermissions['manage_events']) updatedPermissions['archive_events'] = false;
       setTempRole({ ...tempRole, permissions: updatedPermissions });
     } else if (permId === 'manage_projects' || permId === 'view_projects') {
       // Radio-group: only one project permission can be active at a time
@@ -211,15 +243,14 @@ export function UserRoleControl({ roles, onUpdateRoles, accounts = [] }: UserRol
       } else if (permId === 'view_projects' && updatedPermissions['view_projects']) {
         updatedPermissions['manage_projects'] = false;
       }
+      if (!updatedPermissions['manage_projects']) updatedPermissions['archive_projects'] = false;
       setTempRole({ ...tempRole, permissions: updatedPermissions });
     } else {
-      setTempRole({
-        ...tempRole,
-        permissions: {
-          ...tempRole.permissions,
-          [permId]: !tempRole.permissions[permId as keyof typeof tempRole.permissions],
-        },
-      });
+      const newVal = !tempRole.permissions[permId as keyof typeof tempRole.permissions];
+      const updated: any = { ...tempRole.permissions, [permId]: newVal };
+      // Clear an orphaned archive flag when its manage permission is switched off.
+      if (ARCHIVE_SUB[permId] && !newVal) updated[ARCHIVE_SUB[permId].id] = false;
+      setTempRole({ ...tempRole, permissions: updated });
     }
   };
 
@@ -289,7 +320,7 @@ export function UserRoleControl({ roles, onUpdateRoles, accounts = [] }: UserRol
   const filteredRoles = sanitizedRoles.filter((r) => r.name.toLowerCase().includes(searchQuery.toLowerCase()));
 
   return (
-    <div className="bg-white rounded-3xl shadow-sm border border-gray-200 overflow-hidden flex h-[700px] relative">
+    <div className="bg-white rounded-3xl shadow-sm border border-gray-200 overflow-hidden flex h-[84vh] min-h-[640px] relative">
       {/* Delete Confirmation Modal */}
       {isDeleteModalOpen && (
         <div className="fixed inset-0 bg-black/40 z-[120] flex items-center justify-center p-4 backdrop-blur-sm animate-in fade-in duration-200">
@@ -487,6 +518,11 @@ export function UserRoleControl({ roles, onUpdateRoles, accounts = [] }: UserRol
                         const isCurrentlyOn = updated[id] === true;
                         updated['manage_announcements'] = id === 'manage_announcements' ? !isCurrentlyOn : false;
                         updated['view_announcements'] = id === 'view_announcements' ? !isCurrentlyOn : false;
+                      } else if (id === 'manage_events' || id === 'view_events') {
+                        // Radio-group: only one events permission active at a time
+                        const isCurrentlyOn = updated[id] === true;
+                        updated['manage_events'] = id === 'manage_events' ? !isCurrentlyOn : false;
+                        updated['view_events'] = id === 'view_events' ? !isCurrentlyOn : false;
                       } else if (id === 'manage_projects' || id === 'view_projects') {
                         // Radio-group: only one project permission active at a time
                         const isCurrentlyOn = updated[id] === true;
@@ -933,6 +969,8 @@ export function UserRoleControl({ roles, onUpdateRoles, accounts = [] }: UserRol
                                     const isOn = permissionsObj[item.id] === true;
                                     const isAnnouncementItem =
                                       item.id === 'manage_announcements' || item.id === 'view_announcements';
+                                    const isEventsItem =
+                                      item.id === 'manage_events' || item.id === 'view_events';
                                     const isProjectItem = item.id === 'manage_projects' || item.id === 'view_projects';
                                     return (
                                       <div key={item.id} className="flex items-center justify-between gap-6 px-5 py-4">
@@ -991,62 +1029,65 @@ export function UserRoleControl({ roles, onUpdateRoles, accounts = [] }: UserRol
         </div>
       )}
 
-      {/* Left Sidebar - Roles List */}
+      {/* Left Sidebar - Roles List (dark for contrast & easier navigation) */}
       <div
-        className={`w-80 bg-[#F9FAFB] border-r border-gray-200 flex flex-col flex-shrink-0 transition-opacity ${isEditing ? 'opacity-50 pointer-events-none' : ''}`}
+        className={`w-80 bg-[#141414] border-r border-black/40 flex flex-col flex-shrink-0 transition-opacity ${isEditing ? 'opacity-50 pointer-events-none' : ''}`}
       >
-        <div className="p-8 border-b border-gray-200 bg-white">
-          <h3 className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-5 flex items-center gap-2.5 ml-1">
+        <div className="p-7 border-b border-white/5">
+          <h3 className="text-[10px] font-bold text-white/40 uppercase tracking-widest mb-5 flex items-center gap-2.5 ml-1">
             <ShieldCheck className="w-4 h-4 text-[#D4AF37]" />
             System Roles
           </h3>
           <div className="relative group">
-            <Search className="w-4 h-4 absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 group-focus-within:text-[#D4AF37] transition-colors" />
+            <Search className="w-4 h-4 absolute left-4 top-1/2 -translate-y-1/2 text-white/30 group-focus-within:text-[#D4AF37] transition-colors" />
             <input
               type="text"
               placeholder="Search roles..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full pl-11 pr-4 py-3 bg-gray-50 border border-gray-100 rounded-2xl text-sm focus:outline-none focus:border-[#D4AF37] focus:ring-4 focus:ring-[#D4AF37]/10 transition-all placeholder:text-gray-400"
+              className="w-full pl-11 pr-4 py-3 bg-white/5 border border-white/10 rounded-2xl text-sm text-white focus:outline-none focus:border-[#D4AF37] focus:ring-4 focus:ring-[#D4AF37]/10 transition-all placeholder:text-white/30"
             />
           </div>
         </div>
-        <div className="flex-1 overflow-y-auto p-5 space-y-2">
+        <div className="flex-1 overflow-y-auto p-4 space-y-1.5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
           {filteredRoles.map((role) => (
             <button
               key={role.id}
               onClick={() => setSelectedRoleId(role.id)}
-              className={`w-full flex items-center gap-4 px-5 py-4 rounded-2xl transition-all text-left group border ${
+              className={`w-full flex items-center gap-4 px-4 py-3.5 rounded-2xl transition-all text-left group border ${
                 selectedRoleId === role.id
-                  ? 'bg-white text-gray-900 shadow-lg shadow-gray-200/50 border-gray-100'
-                  : 'text-gray-500 hover:bg-white hover:text-gray-900 hover:shadow-md border-transparent'
+                  ? 'bg-white/10 text-white shadow-sm border-white/10'
+                  : 'text-white/55 hover:bg-white/5 hover:text-white border-transparent'
               }`}
             >
               <div
-                className="w-3 h-3 rounded-full flex-shrink-0 shadow-sm ring-2 ring-offset-2 ring-transparent group-hover:ring-gray-100 transition-all"
+                className="w-3 h-3 rounded-full flex-shrink-0 shadow-sm ring-2 ring-offset-2 ring-offset-[#141414] ring-transparent group-hover:ring-white/10 transition-all"
                 style={{ backgroundColor: role.color }}
               />
               <div className="flex flex-col min-w-0">
                 <span
-                  className={`text-sm font-bold truncate ${selectedRoleId === role.id ? 'text-gray-900' : 'text-gray-600'}`}
+                  className={`text-sm font-bold truncate ${selectedRoleId === role.id ? 'text-white' : 'text-white/70'}`}
                 >
                   {role.name}
                 </span>
                 {PREDEFINED_ROLE_IDS.includes(role.id) && (
-                  <span className="text-[9px] text-gray-400 font-bold uppercase tracking-widest mt-1">
+                  <span className="text-[9px] text-white/30 font-bold uppercase tracking-widest mt-1">
                     System Default
                   </span>
                 )}
               </div>
+              {selectedRoleId === role.id && (
+                <div className="ml-auto w-1.5 h-1.5 rounded-full bg-[#D4AF37] shadow-[0_0_8px_rgba(212,175,55,0.6)]" />
+              )}
             </button>
           ))}
         </div>
-        <div className="p-8 border-t border-gray-200 bg-white">
+        <div className="p-5 border-t border-white/5">
           <button
             onClick={handleOpenCreateModal}
-            className="w-full flex items-center justify-center gap-2 px-4 py-3.5 bg-white border border-gray-200 rounded-xl text-sm font-bold text-gray-700 hover:bg-gray-50 transition-all shadow-sm active:scale-95"
+            className="w-full flex items-center justify-center gap-2 px-4 py-3.5 bg-[#D4AF37] border border-[#D4AF37] rounded-xl text-sm font-bold text-black hover:bg-[#E5C04B] transition-all shadow-lg shadow-[#D4AF37]/20 active:scale-95"
           >
-            <Plus className="w-4 h-4 text-[#D4AF37]" />
+            <Plus className="w-4 h-4 text-black" />
             Create Role
           </button>
         </div>
@@ -1148,8 +1189,8 @@ export function UserRoleControl({ roles, onUpdateRoles, accounts = [] }: UserRol
           </div>
         </div>
 
-        <div className="flex-1 overflow-y-auto p-10 bg-gray-50/50">
-          <div className="max-w-4xl space-y-12">
+        <div className="flex-1 overflow-y-auto p-5 md:p-6 bg-gray-50/50 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+          <div className="max-w-5xl space-y-7">
             {(() => {
               const activePermissionsState = isEditing && tempRole ? tempRole.permissions : selectedRole.permissions;
               const isDioceseSelected = activePermissionsState.view_diocese === true;
@@ -1199,7 +1240,7 @@ export function UserRoleControl({ roles, onUpdateRoles, accounts = [] }: UserRol
                   {filteredPermissions.map((category, idx) => (
                     <React.Fragment key={idx}>
                       <div>
-                        <h3 className="text-[11px] font-bold text-gray-400 uppercase tracking-widest mb-5 flex items-center gap-2.5 ml-1">
+                        <h3 className="text-[11px] font-bold text-gray-400 uppercase tracking-widest mb-3 flex items-center gap-2.5 ml-1">
                           {category.icon && <category.icon className="w-4 h-4" />}
                           {category.category}
                         </h3>
@@ -1222,7 +1263,7 @@ export function UserRoleControl({ roles, onUpdateRoles, accounts = [] }: UserRol
                                   onClick={() => {
                                     if (canEdit) togglePermission(perm.id);
                                   }}
-                                  className={`p-6 flex items-center justify-between gap-8 transition-all ${
+                                  className={`px-6 py-4 flex items-center justify-between gap-6 transition-all ${
                                     canEdit ? 'hover:bg-gray-50/30 cursor-pointer' : ''
                                   } ${!isEnabled && !canEdit ? 'opacity-40' : 'opacity-100'}`}
                                 >
@@ -1399,7 +1440,7 @@ export function UserRoleControl({ roles, onUpdateRoles, accounts = [] }: UserRol
                           const canEditDash = !isPredefined && isEditing;
                           return (
                             <div>
-                              <h3 className="text-[11px] font-bold text-gray-400 uppercase tracking-widest mb-5 flex items-center gap-2.5 ml-1">
+                              <h3 className="text-[11px] font-bold text-gray-400 uppercase tracking-widest mb-3 flex items-center gap-2.5 ml-1">
                                 📊 Dashboard Access
                               </h3>
                               <div className="bg-white border border-gray-100 rounded-[24px] overflow-hidden divide-y divide-gray-50 shadow-sm">
@@ -1416,7 +1457,7 @@ export function UserRoleControl({ roles, onUpdateRoles, accounts = [] }: UserRol
                                             permissions: { ...tempRole.permissions, [sw.id]: !isToggled },
                                           });
                                       }}
-                                      className={`p-6 flex items-center justify-between gap-8 transition-all ${
+                                      className={`px-6 py-4 flex items-center justify-between gap-6 transition-all ${
                                         canEditDash ? 'hover:bg-gray-50/30 cursor-pointer' : ''
                                       } ${!isToggled && !canEditDash ? 'opacity-40' : 'opacity-100'}`}
                                     >
@@ -1469,7 +1510,7 @@ export function UserRoleControl({ roles, onUpdateRoles, accounts = [] }: UserRol
                       const canEditInst = !isPredefined && isEditing;
                       return (
                         <div className="mt-8">
-                          <h3 className="text-[11px] font-bold text-gray-400 uppercase tracking-widest mb-5 flex items-center gap-2.5 ml-1">
+                          <h3 className="text-[11px] font-bold text-gray-400 uppercase tracking-widest mb-3 flex items-center gap-2.5 ml-1">
                             🔑 Institution Tab Settings
                           </h3>
                           <div className="bg-white border border-gray-100 rounded-[24px] overflow-hidden divide-y divide-gray-50 shadow-sm">
@@ -1500,7 +1541,7 @@ export function UserRoleControl({ roles, onUpdateRoles, accounts = [] }: UserRol
                                       });
                                     }
                                   }}
-                                  className={`p-6 flex items-center justify-between gap-8 transition-all ${
+                                  className={`px-6 py-4 flex items-center justify-between gap-6 transition-all ${
                                     canEditInst ? 'hover:bg-gray-50/30 cursor-pointer' : ''
                                   } ${!isSelected && !canEditInst ? 'opacity-40' : 'opacity-100'}`}
                                 >
@@ -1537,6 +1578,99 @@ export function UserRoleControl({ roles, onUpdateRoles, accounts = [] }: UserRol
                                         isSelected ? 'translate-x-5' : 'translate-x-0'
                                       }`}
                                     />
+                                  </button>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      );
+                    })()}
+
+                  {/* ── Archives — gated checkboxes (each unlocks with its manage permission) ── */}
+                  {(isDioceseSelected || isParishSelected || isSeminarySelected || isSchoolSelected) &&
+                    (() => {
+                      const canEditArch = !isPredefined && isEditing;
+                      // Only surface archive rows whose prerequisite is attainable for this
+                      // access level (users/entities/announcements are diocesan-only).
+                      const diocesanOnlyPrereq = new Set([
+                        'create_users',
+                        'manage_entities',
+                        'manage_announcements',
+                      ]);
+                      const rows = ARCHIVE_FEATURES.filter(
+                        (f) => isDioceseSelected || !diocesanOnlyPrereq.has(f.prereq),
+                      );
+                      if (rows.length === 0) return null;
+                      return (
+                        <div className="mt-8">
+                          <h3 className="text-[11px] font-bold text-gray-400 uppercase tracking-widest mb-3 flex items-center gap-2.5 ml-1">
+                            <Archive className="w-4 h-4" />
+                            Archives Access
+                          </h3>
+                          <p className="text-xs text-gray-400 mb-3 ml-1">
+                            Choose which archived records this role can open and restore. A box can only be ticked once
+                            the matching “Manage” permission above is turned on.
+                          </p>
+                          <div className="bg-white border border-gray-100 rounded-[24px] overflow-hidden divide-y divide-gray-50 shadow-sm">
+                            {rows.map((f) => {
+                              const prereqOn =
+                                (activePermissionsState as any)[f.prereq] === true;
+                              const explicit = (activePermissionsState as any)[f.key];
+                              const checked =
+                                prereqOn && (typeof explicit === 'boolean' ? explicit : isPredefined);
+                              const canCheck = canEditArch && prereqOn;
+                              const toggle = () => {
+                                if (!canCheck || !tempRole) return;
+                                setTempRole({
+                                  ...tempRole,
+                                  permissions: { ...tempRole.permissions, [f.key]: !checked },
+                                });
+                              };
+                              return (
+                                <div
+                                  key={f.key}
+                                  onClick={toggle}
+                                  className={`px-6 py-4 flex items-center justify-between gap-6 transition-all ${
+                                    canCheck ? 'cursor-pointer hover:bg-gray-50/30' : 'cursor-not-allowed'
+                                  } ${!prereqOn ? 'opacity-70' : ''}`}
+                                >
+                                  <div className="flex-1 pr-6">
+                                    <div className="text-sm font-bold text-gray-900 mb-1 flex items-center gap-2">
+                                      {prereqOn ? (
+                                        <Archive className="w-3.5 h-3.5 text-[#D4AF37]" />
+                                      ) : (
+                                        <Lock className="w-3.5 h-3.5 text-gray-400" />
+                                      )}
+                                      {f.label}
+                                    </div>
+                                    <div className="text-xs text-gray-500 leading-relaxed font-medium">
+                                      {prereqOn
+                                        ? 'Can open and restore these archived records.'
+                                        : `Turn on “${f.feature}” first to unlock this.`}
+                                    </div>
+                                  </div>
+                                  {/* Square checkbox */}
+                                  <button
+                                    type="button"
+                                    disabled={!canCheck}
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      toggle();
+                                    }}
+                                    aria-checked={checked}
+                                    role="checkbox"
+                                    className={`w-6 h-6 rounded-md border-2 flex items-center justify-center shrink-0 transition-all ${
+                                      !canCheck ? 'cursor-not-allowed' : 'cursor-pointer'
+                                    } ${
+                                      checked
+                                        ? 'border-[#D4AF37] bg-[#D4AF37]'
+                                        : prereqOn
+                                          ? 'border-gray-300 bg-white'
+                                          : 'border-gray-200 bg-gray-100'
+                                    }`}
+                                  >
+                                    {checked && <Check className="w-4 h-4 text-white" strokeWidth={3} />}
                                   </button>
                                 </div>
                               );

@@ -51,4 +51,56 @@ export class AuthGatewayController {
     response.status(result.status);
     return result.data;
   }
+
+  @Post('send-otp')
+  async sendOtp(@Body() body: unknown, @Res({ passthrough: true }) response: Response) {
+    const result = await requestDownstream<unknown>({
+      baseUrl: SERVICE_URLS.auth,
+      path: '/auth/send-otp',
+      method: 'POST',
+      body,
+    });
+
+    response.status(result.status);
+    return result.data;
+  }
+
+  @Post('verify-otp')
+  async verifyOtp(@Body() body: unknown, @Res({ passthrough: true }) response: Response) {
+    const result = await requestDownstream<unknown>({
+      baseUrl: SERVICE_URLS.auth,
+      path: '/auth/verify-otp',
+      method: 'POST',
+      body,
+    });
+
+    response.status(result.status);
+    return result.data;
+  }
+
+  @Post('complete-onboarding')
+  async completeOnboarding(@Body() body: unknown, @Res({ passthrough: true }) response: Response) {
+    const result = await requestDownstream<unknown>({
+      baseUrl: SERVICE_URLS.auth,
+      path: '/auth/complete-onboarding',
+      method: 'POST',
+      body,
+    });
+
+    response.status(result.status);
+    return result.data;
+  }
+
+  @Post('reset-password')
+  async resetPassword(@Body() body: unknown, @Res({ passthrough: true }) response: Response) {
+    const result = await requestDownstream<unknown>({
+      baseUrl: SERVICE_URLS.auth,
+      path: '/auth/reset-password',
+      method: 'POST',
+      body,
+    });
+
+    response.status(result.status);
+    return result.data;
+  }
 }

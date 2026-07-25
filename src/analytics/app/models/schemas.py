@@ -23,7 +23,32 @@ class HealthScoreResponse(BaseModel):
     percentage_change: float
     analysis: str
     recommendations: List[str]
+    # Earliest/latest year actually used to compute this score — None when a
+    # default (no-data) score was returned. Lets the UI show the real window
+    # ("2021-2025") instead of a vague "all-time" label.
+    period_start_year: Optional[int] = None
+    period_end_year: Optional[int] = None
+    # False when there weren't enough records for the requested institution
+    # (or requested year/timeframe window) to compute a real score — the
+    # numeric fields are a placeholder, not a measurement, in that case.
+    data_sufficient: bool = True
     timestamp: str
+
+
+class FinancialTrendBatchRequest(BaseModel):
+    institution_ids: List[str]
+
+
+class HealthScoreBatchEntity(BaseModel):
+    institution_id: str
+    entity_type: str
+    entity_class: Optional[str] = None
+
+
+class HealthScoreBatchRequest(BaseModel):
+    entities: List[HealthScoreBatchEntity]
+    year: Optional[int] = None
+    timeframe: Optional[str] = None
 
 
 class AnomalyResult(BaseModel):
@@ -71,6 +96,10 @@ class ChampionModelResult(BaseModel):
     all_candidates: Dict[str, Any]
     wape: float
     needs_retraining: bool  # True if WAPE > 0.15
+    folds_used: int  # 1 (single holdout) or more when walk-forward folds were available
+    generalization: Optional[Dict[str, Any]] = (
+        None  # overfitting/underfitting diagnostic; see _champion.diagnose_generalization
+    )
 
 
 # ── Descriptive schemas ───────────────────────────────────────────────────────

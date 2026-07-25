@@ -166,6 +166,26 @@ CREATE TABLE IF NOT EXISTS diocese.project_expenses (
   created_at          TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
+-- Shared Events table inside diocese schema
+CREATE SEQUENCE IF NOT EXISTS diocese.events_id_seq START 1;
+
+CREATE TABLE IF NOT EXISTS diocese.events (
+  id                         TEXT        PRIMARY KEY DEFAULT public.format_seq_id('EVT-', 'diocese.events_id_seq', 5),
+  event_name                 TEXT        NOT NULL,
+  event_level                TEXT        NOT NULL DEFAULT 'Minor event' CHECK (event_level IN ('Major event', 'Minor event')),
+  event_type                 TEXT,
+  expected_financial_impact  TEXT        CHECK (expected_financial_impact IN ('inflow', 'outflow', 'both', 'none')),
+  estimated_amount           NUMERIC     DEFAULT 0,
+  linked_project_id          TEXT        REFERENCES diocese.projects(id) ON DELETE SET NULL,
+  start_date                 TEXT        NOT NULL,
+  end_date                   TEXT,
+  notes                      TEXT,
+  entity_id                  TEXT        NOT NULL,
+  entity_type                TEXT        NOT NULL CHECK (entity_type IN ('parish', 'school', 'seminary', 'diocese')),
+  created_at                 TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at                 TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
 -- Announcements table inside diocese schema
 CREATE SEQUENCE IF NOT EXISTS diocese.announcements_id_seq START 1;
 
@@ -249,17 +269,6 @@ CREATE TABLE IF NOT EXISTS parishes.financial_records (
   others_special_collections              NUMERIC     DEFAULT 0,
   pastoral_parish_fund_total_net_receipts NUMERIC     DEFAULT 0,
   created_at                              TIMESTAMPTZ NOT NULL DEFAULT NOW()
-);
-
-CREATE TABLE IF NOT EXISTS parishes.fiesta_events (
-  id                  UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
-  parish_id           TEXT        NOT NULL REFERENCES parishes.details(id) ON DELETE CASCADE,
-  primary_patron      TEXT        NOT NULL,
-  secondary_patron    TEXT,
-  date                TEXT        NOT NULL,
-  expected_impact     TEXT        NOT NULL CHECK (expected_impact IN ('low', 'medium', 'high')),
-  estimated_increase  NUMERIC     DEFAULT 0,
-  created_at          TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
 -- =============================================================================
@@ -436,10 +445,10 @@ ALTER TABLE diocese.profiles ENABLE ROW LEVEL SECURITY;
 ALTER TABLE diocese.projects ENABLE ROW LEVEL SECURITY;
 ALTER TABLE diocese.donations ENABLE ROW LEVEL SECURITY;
 ALTER TABLE diocese.project_expenses ENABLE ROW LEVEL SECURITY;
+ALTER TABLE diocese.events ENABLE ROW LEVEL SECURITY;
 
 ALTER TABLE parishes.details ENABLE ROW LEVEL SECURITY;
 ALTER TABLE parishes.financial_records ENABLE ROW LEVEL SECURITY;
-ALTER TABLE parishes.fiesta_events ENABLE ROW LEVEL SECURITY;
 
 ALTER TABLE schools.details ENABLE ROW LEVEL SECURITY;
 ALTER TABLE schools.financial_records ENABLE ROW LEVEL SECURITY;
@@ -458,10 +467,10 @@ CREATE POLICY "Auth profiles read" ON diocese.profiles FOR SELECT TO authenticat
 CREATE POLICY "Auth projects read" ON diocese.projects FOR SELECT TO authenticated USING (true);
 CREATE POLICY "Auth donations read" ON diocese.donations FOR SELECT TO authenticated USING (true);
 CREATE POLICY "Auth expenses read" ON diocese.project_expenses FOR SELECT TO authenticated USING (true);
+CREATE POLICY "Auth events read" ON diocese.events FOR SELECT TO authenticated USING (true);
 
 CREATE POLICY "Auth parishes details read" ON parishes.details FOR SELECT TO authenticated USING (true);
 CREATE POLICY "Auth parishes finance read" ON parishes.financial_records FOR SELECT TO authenticated USING (true);
-CREATE POLICY "Auth parishes fiestas read" ON parishes.fiesta_events FOR SELECT TO authenticated USING (true);
 
 CREATE POLICY "Auth schools details read" ON schools.details FOR SELECT TO authenticated USING (true);
 CREATE POLICY "Auth schools finance read" ON schools.financial_records FOR SELECT TO authenticated USING (true);

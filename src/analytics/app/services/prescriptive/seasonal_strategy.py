@@ -12,6 +12,7 @@ from typing import Any
 
 import pandas as pd
 
+from app.services import _aws_financials
 from app.services.data_definitions import (
     _SCHEMA_MAP,
     build_date_index,
@@ -124,15 +125,13 @@ def _sensitivity_analysis(
     return sensitivity
 
 
-def _fetch_and_process(
-    institution_id: str,
-    entity_type: str,
-    total_budget: float,
-    max_preparation_per_season: float,
-) -> dict[str, Any]:
-    ts = datetime.now(timezone.utc).isoformat()
-    schema, receipt_cols, _, _ = _SCHEMA_MAP[entity_type]
+def _fetch_series(institution_id: str, entity_type: str) -> pd.DataFrame | None:
+    if entity_type == "parish":
+        df = _aws_financials.parish_monthly_df(institution_id)
+        if df is not None and len(df) >= 3:
+            return df
 
+    schema, receipt_cols, _, _ = _SCHEMA_MAP[entity_type]
     all_cols = ["institution_id", "month", "year"] + receipt_cols
     seen: set[str] = set()
     select_cols: list[str] = []
@@ -150,8 +149,29 @@ def _fetch_and_process(
         .order("year")
         .execute()
     )
-
     if not res.data or len(res.data) < 3:
+        return None
+
+    df = pd.DataFrame(res.data)
+    df = build_date_index(df)
+    for col in receipt_cols:
+        if col not in df.columns:
+            df[col] = 0.0
+        df[col] = pd.to_numeric(df[col], errors="coerce").fillna(0.0)
+    df["total_receipts"] = df[receipt_cols].sum(axis=1)
+    return df
+
+
+def _fetch_and_process(
+    institution_id: str,
+    entity_type: str,
+    total_budget: float,
+    max_preparation_per_season: float,
+) -> dict[str, Any]:
+    ts = datetime.now(timezone.utc).isoformat()
+
+    df = _fetch_series(institution_id, entity_type)
+    if df is None:
         return {
             "data_sufficient": False,
             "entity_id": institution_id,
@@ -162,15 +182,6 @@ def _fetch_and_process(
             "timestamp": ts,
         }
 
-    df = pd.DataFrame(res.data)
-    df = build_date_index(df)
-
-    for col in receipt_cols:
-        if col not in df.columns:
-            df[col] = 0.0
-        df[col] = pd.to_numeric(df[col], errors="coerce").fillna(0.0)
-
-    df["total_receipts"] = df[receipt_cols].sum(axis=1)
     df["month_num"] = df["date"].dt.month
 
     # Compute season averages
@@ -211,6 +222,11 @@ def _fetch_and_process(
         "season_recommendations": recommendations,
         "sensitivity_results": sensitivity,
         "allocation_efficiency": result.get("allocation_efficiency", 0.0),
+        # Whether this came from the actual PuLP solver ("MILP") or the
+        # proportional fallback — `_solve_seasonal_milp` already computed
+        # this, it just wasn't being surfaced to callers before.
+        "method": result.get("method", "unknown"),
+        "used_fallback": result.get("method") != "MILP",
         "timestamp": ts,
     }
 

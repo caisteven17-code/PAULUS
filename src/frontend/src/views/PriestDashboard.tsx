@@ -40,7 +40,9 @@ import { auth } from '../firebase';
 import { FinancialHealthGauge } from '../components/ui/FinancialHealthGauge';
 import { HealthDimensionBar } from '../components/ui/HealthDimensionBar';
 import { DiagnosticCard } from '../components/ui/DiagnosticCard';
+import { IAFRBreakdownReport } from '../components/financial/IAFRBreakdownReport';
 import { StewardChatbot } from '../components/ui/StewardChatbot';
+import { InlineLoader } from '../components/ui/LoadingScreen';
 import { DashboardHeader } from '../components/layout/DashboardHeader';
 import { Card, CardHeader, CardTitle, CardContent } from '../components/ui/Card';
 import { DataImportExport } from '../components/projects/DataImportExport';
@@ -49,6 +51,7 @@ import { formatCurrency, formatMillions } from '../lib/format';
 import { usePriestDashboardData } from '../hooks/usePriestDashboardData';
 import { FadeIn } from '../components/ui/FadeIn';
 import { ALL_PARISHES, INITIAL_SEMINARIES, INITIAL_SCHOOLS, VICARIATES } from '../constants';
+import { ScoreFormulaModal } from '../components/priest/ScoreFormulaModal';
 
 interface PriestDashboardProps {
   role?: 'priest' | 'school' | 'seminary' | 'bishop';
@@ -58,9 +61,9 @@ interface PriestDashboardProps {
   entityClass?: string;
   isEmbedded?: boolean;
   timeframe?: '3m' | '6m' | '12m';
-  year?: number;
+  year?: number | null;
   onNavigate?: (page: string) => void;
-  onYearChange?: (year: number) => void;
+  onYearChange?: (year: number | null) => void;
   onLogout?: () => void;
 }
 
@@ -104,285 +107,6 @@ const donationTrendsData = [
   { name: 'Fr. Marcelo H. Del Pilar', barValue: 60000, lineValue: 50000 },
 ];
 
-const CustomizedTick = (props: any) => {
-  const { x, y, payload, fontSize = 11 } = props;
-  const value = typeof payload.value === 'string' ? stripVicariatePrefix(payload.value) : payload.value;
-  const words = value.split(' ');
-
-  if (words.length > 5) {
-    const line1 = words.slice(0, 5).join(' ');
-    const line2 = words.slice(5).join(' ');
-    return (
-      <g transform={`translate(${x},${y})`}>
-        <text
-          x={0}
-          y={0}
-          dy={12}
-          textAnchor="end"
-          fill="#6B7280"
-          fontSize={fontSize}
-          fontWeight={500}
-          transform="rotate(-25)"
-        >
-          <tspan x={0} dy="0">
-            {line1}
-          </tspan>
-          <tspan x={0} dy="1.2em">
-            {line2}
-          </tspan>
-        </text>
-      </g>
-    );
-  }
-
-  return (
-    <g transform={`translate(${x},${y})`}>
-      <text
-        x={0}
-        y={0}
-        dy={12}
-        textAnchor="end"
-        fill="#6B7280"
-        fontSize={fontSize}
-        fontWeight={500}
-        transform="rotate(-25)"
-      >
-        {value}
-      </text>
-    </g>
-  );
-};
-
-const AdvancedForecastChart = ({
-  data,
-  actualKey,
-  forecastKey,
-  yAxisLabel,
-  title,
-  metrics = {
-    mae: 35.22,
-    rmse: 42.02,
-    mape: 20.88,
-    mase: 0.38,
-    wape: 19.72,
-    mpe: 4.46,
-  },
-}: {
-  data: any[];
-  actualKey: string;
-  forecastKey: string;
-  yAxisLabel: string;
-  title: string;
-  metrics?: any;
-}) => {
-  const pastEnd = 'Apr';
-  const presentEnd = 'May';
-  const futureEnd = 'Jun';
-
-  // Process data to ensure historical line stops at present, and forecast starts at present
-  const processedData = useMemo(() => {
-    const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-    const presentIndex = months.indexOf(presentEnd);
-    const pastIndex = months.indexOf(pastEnd);
-
-    return data.map((item) => {
-      const itemIndex = months.indexOf(item.month);
-      const actualFieldName = `${actualKey}_actual`;
-      const forecastFieldName = `${forecastKey}_forecast`;
-
-      return {
-        ...item,
-        [actualFieldName]: itemIndex <= presentIndex ? item[actualKey] : null,
-        [forecastFieldName]: itemIndex >= pastIndex ? item[forecastKey] : null,
-      };
-    });
-  }, [data, actualKey, forecastKey, presentEnd, pastEnd]);
-
-  const actualFieldName = `${actualKey}_actual`;
-  const forecastFieldName = `${forecastKey}_forecast`;
-
-  const forecastChartOption = {
-    color: ['#6366f1', '#8b5cf6', '#06b6d4', '#10b981', '#f59e0b', '#ef4444'],
-    tooltip: {
-      trigger: 'axis',
-      formatter: (params: any[]) => {
-        const validParams = params.filter((p) => p.value !== null && p.value !== undefined);
-        if (!validParams.length) return '';
-        const label = validParams[0].axisValue;
-        const lines = validParams
-          .map(
-            (p) =>
-              `<div style="display:flex;align-items:center;gap:8px;justify-content:space-between">
-                <span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:${p.color}"></span>
-                <span style="font-size:11px;color:#6B7280">${p.seriesName}:</span>
-                <span style="font-size:11px;font-weight:700">${new Intl.NumberFormat('en-PH', { style: 'currency', currency: 'PHP', maximumFractionDigits: 0 }).format(p.value)}</span>
-              </div>`,
-          )
-          .join('');
-        return `<div style="padding:8px"><p style="font-size:10px;font-weight:700;color:#9CA3AF;text-transform:uppercase;letter-spacing:0.1em;margin-bottom:6px">${label}</p>${lines}</div>`;
-      },
-      backgroundColor: '#fff',
-      borderColor: '#E5E7EB',
-      borderWidth: 1,
-      extraCssText: 'border-radius:12px;box-shadow:0 10px 25px -5px rgba(0,0,0,0.1)',
-    },
-    legend: {
-      top: 0,
-      right: 0,
-      textStyle: { fontSize: 9, fontWeight: 700, color: '#4B5563' },
-      icon: 'circle',
-      data: ['Historical (Actual)', 'Forecast (ML Model)'],
-    },
-    grid: { top: 50, right: 20, left: 45, bottom: 30 },
-    xAxis: {
-      type: 'category',
-      data: processedData.map((d) => d.month),
-      axisLine: { show: false },
-      axisTick: { show: false },
-      axisLabel: { color: '#9CA3AF', fontSize: 10, fontWeight: 600 },
-      splitLine: { show: true, lineStyle: { color: '#F3F4F6', type: 'dashed' } },
-    },
-    yAxis: {
-      type: 'value',
-      axisLine: { show: false },
-      axisTick: { show: false },
-      axisLabel: { color: '#9CA3AF', fontSize: 10, formatter: (v: number) => `${v / 1000}k` },
-      splitLine: { show: true, lineStyle: { color: '#F3F4F6' } },
-    },
-    series: [
-      {
-        name: 'Historical (Actual)',
-        type: 'line',
-        data: processedData.map((d) => d[actualFieldName] ?? null),
-        smooth: true,
-        lineStyle: { color: '#1a472a', width: 3 },
-        itemStyle: { color: '#1a472a', borderColor: '#fff', borderWidth: 2 },
-        symbolSize: 6,
-        connectNulls: false,
-        markArea: {
-          silent: true,
-          data: [
-            [
-              {
-                xAxis: 'Jan',
-                itemStyle: { color: '#F0F9FF', opacity: 0.4 },
-                label: {
-                  show: true,
-                  position: 'insideTopLeft',
-                  value: 'PAST',
-                  color: '#0EA5E9',
-                  fontSize: 8,
-                  fontWeight: 700,
-                },
-              },
-              { xAxis: pastEnd },
-            ],
-            [
-              {
-                xAxis: pastEnd,
-                itemStyle: { color: '#FFF7ED', opacity: 0.4 },
-                label: {
-                  show: true,
-                  position: 'insideTopLeft',
-                  value: 'PRESENT',
-                  color: '#F97316',
-                  fontSize: 8,
-                  fontWeight: 700,
-                },
-              },
-              { xAxis: presentEnd },
-            ],
-            [
-              {
-                xAxis: presentEnd,
-                itemStyle: { color: '#F0FDF4', opacity: 0.4 },
-                label: {
-                  show: true,
-                  position: 'insideTopLeft',
-                  value: 'FUTURE',
-                  color: '#22C55E',
-                  fontSize: 8,
-                  fontWeight: 700,
-                },
-              },
-              { xAxis: futureEnd },
-            ],
-          ],
-        },
-        markLine: {
-          silent: true,
-          symbol: 'none',
-          data: [{ xAxis: presentEnd, lineStyle: { color: '#D1D5DB', type: 'dashed' } }],
-          label: { show: false },
-        },
-      },
-      {
-        name: 'Forecast (ML Model)',
-        type: 'line',
-        data: processedData.map((d) => d[forecastFieldName] ?? null),
-        smooth: true,
-        lineStyle: { color: '#D4AF37', width: 3, type: 'dashed' },
-        itemStyle: { color: '#D4AF37', borderColor: '#fff', borderWidth: 2 },
-        symbolSize: 6,
-        connectNulls: false,
-      },
-    ],
-  };
-
-  return (
-    <div className="flex flex-col w-full bg-white/50 rounded-2xl p-3 border border-gray-100/50">
-      <div className="h-[240px] flex items-center">
-        <div className="w-8 flex-shrink-0 flex items-center justify-center h-full">
-          <span className="text-[9px] font-black text-gray-300 uppercase tracking-[0.4em] -rotate-90 whitespace-nowrap">
-            {yAxisLabel}
-          </span>
-        </div>
-        <ReactECharts option={forecastChartOption} style={{ height: '100%', width: '100%' }} />
-      </div>
-
-      <div className="mt-6 bg-gray-50/50 rounded-xl p-3 border border-gray-100">
-        <div className="flex items-center justify-between mb-2 px-1">
-          <span className="text-[9px] font-black text-gray-400 uppercase tracking-widest">
-            Model Performance Metrics
-          </span>
-          <div className="flex items-center gap-1.5">
-            <div className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse"></div>
-            <span className="text-[8px] font-bold text-green-600 uppercase tracking-wider">Active Learning</span>
-          </div>
-        </div>
-        <div className="overflow-x-auto">
-          <table className="w-full text-[10px]">
-            <thead>
-              <tr className="text-gray-400 uppercase tracking-wider font-bold">
-                <th className="text-center pb-1.5">MAE</th>
-                <th className="text-center pb-1.5">RMSE</th>
-                <th className="text-center pb-1.5">MAPE%</th>
-                <th className="text-center pb-1.5">MASE</th>
-                <th className="text-center pb-1.5 pr-1.5">WAPE%</th>
-              </tr>
-            </thead>
-            <tbody className="text-church-black font-semibold">
-              <tr className="bg-white rounded-lg shadow-sm">
-                <td className="text-center py-2 border-y border-gray-100">{metrics.mae}</td>
-                <td className="text-center py-2 border-y border-gray-100">{metrics.rmse}</td>
-                <td className="text-center py-2 border-y border-gray-100 text-gold-600 font-bold">{metrics.mape}%</td>
-                <td className="text-center py-2 border-y border-gray-100">{metrics.mase}</td>
-                <td className="text-center py-2 pr-2 border-y border-r border-gray-100">{metrics.wape}%</td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
-      </div>
-
-      <div className="mt-2 flex items-center justify-center gap-2">
-        <div className="h-px flex-1 bg-gradient-to-r from-transparent via-gray-200 to-transparent"></div>
-        <p className="text-[8px] font-bold text-gray-300 uppercase tracking-[0.15em]">{title}</p>
-        <div className="h-px flex-1 bg-gradient-to-r from-transparent via-gray-200 to-transparent"></div>
-      </div>
-    </div>
-  );
-};
-
 export function PriestDashboard({
   role = 'priest',
   dashboardContext,
@@ -391,7 +115,7 @@ export function PriestDashboard({
   entityClass,
   isEmbedded = false,
   timeframe = '6m',
-  year = 2026,
+  year = null,
   onNavigate,
   onYearChange,
   onLogout,
@@ -1312,16 +1036,25 @@ export function PriestDashboard({
       const isOverBudget = priest.avgDisbursements > priest.avgCollections;
       const margin = priest.avgCollections - priest.avgDisbursements;
       const marginRate = priest.avgCollections > 0 ? (margin / priest.avgCollections) * 100 : 0;
-      const collectionScore = clamp((priest.avgCollections / 1_200_000) * 100);
       const trendScore = clamp(70 + priest.collectionChange);
       const marginScore = clamp(60 + marginRate);
-      const tenureScore = priest.monthsAssigned > 60 ? 70 : priest.monthsAssigned > 48 ? 78 : 88;
+      const financialImprovementScore = clamp(trendScore * 0.6 + marginScore * 0.4);
+      const reportingDisciplineScore = clamp(priest.disciplineScore);
+      const financeCouncilScore = clamp(priest.disciplineScore + (marginRate >= 0 ? 5 : -8) - (isOverBudget ? 10 : 0));
+      const pastoralStabilityScore =
+        priest.monthsAssigned >= 24 && priest.monthsAssigned <= 60 ? 90 : priest.monthsAssigned > 60 ? 78 : 72;
+      const contextAdjustedScore = clamp(
+        financialImprovementScore +
+          (priest.avgCollections < 800_000 ? 10 : 0) +
+          (isOverBudget ? 8 : 0) +
+          (priest.collectionChange < 0 ? 7 : 0),
+      );
       const healthScore = Math.round(
-        collectionScore * 0.3 +
-          priest.disciplineScore * 0.3 +
-          trendScore * 0.2 +
-          marginScore * 0.15 +
-          tenureScore * 0.05,
+        financialImprovementScore * 0.25 +
+          reportingDisciplineScore * 0.25 +
+          financeCouncilScore * 0.2 +
+          pastoralStabilityScore * 0.15 +
+          contextAdjustedScore * 0.15,
       );
       const band =
         healthScore >= 85 ? 'excellent' : healthScore >= 70 ? 'healthy' : healthScore >= 55 ? 'support' : 'critical';
@@ -1331,10 +1064,13 @@ export function PriestDashboard({
         isOverBudget,
         margin,
         marginRate,
-        collectionScore,
+        financialImprovementScore,
+        reportingDisciplineScore,
+        financeCouncilScore,
+        pastoralStabilityScore,
+        contextAdjustedScore,
         trendScore,
         marginScore,
-        tenureScore,
         healthScore,
         band,
       };
@@ -1598,12 +1334,16 @@ export function PriestDashboard({
 
   const handleImportRecords = async (importedRecords: FinancialRecord[]) => {
     try {
-      // Add entityId and entityType to records
+      // Add entityId and entityType to records. A saved record always needs
+      // one concrete year — "All Years" (the dashboard filter's default)
+      // isn't a valid value to stamp a real financial record with — so fall
+      // back to the actual current calendar year when the global filter is
+      // unscoped.
       const recordsWithEntity = importedRecords.map((record) => ({
         ...record,
         entityId: entityInfo.name.toLowerCase().replace(/\s+/g, '_'),
         entityType: mappedType as 'parish' | 'school' | 'seminary',
-        year: year,
+        year: year ?? new Date().getFullYear(),
       }));
 
       // Save to dataService
@@ -1616,7 +1356,7 @@ export function PriestDashboard({
   if (isLoading && !isEmbedded) {
     return (
       <div className="flex items-center justify-center h-[calc(100vh-80px)]">
-        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-church-green"></div>
+        <InlineLoader label="Loading dashboard" />
       </div>
     );
   }
@@ -2547,62 +2287,7 @@ export function PriestDashboard({
                 </div>
 
                 {/* Formula Modal */}
-                {showFormulaModal && (
-                  <div
-                    className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[200] flex items-center justify-center p-4"
-                    onClick={() => setShowFormulaModal(false)}
-                  >
-                    <div
-                      className="bg-[#111111] rounded-2xl p-8 max-w-lg w-full shadow-2xl border border-white/10"
-                      onClick={(e) => e.stopPropagation()}
-                    >
-                      <div className="flex items-center justify-between mb-6">
-                        <h3 className="text-xl font-black text-white">Pastoral Association Score Formula</h3>
-                        <button
-                          onClick={() => setShowFormulaModal(false)}
-                          className="p-2 hover:bg-white/10 rounded-full transition-colors text-white"
-                        >
-                          <X size={18} />
-                        </button>
-                      </div>
-                      <div className="space-y-5 text-white">
-                        <div className="bg-white/5 rounded-xl p-5 border border-white/10">
-                          <p className="text-[10px] font-black text-[#D4AF37] uppercase tracking-widest mb-2">
-                            Main Score
-                          </p>
-                          <p className="text-base font-bold">Pastoral Assignment Financial Association Score</p>
-                          <p className="text-[#D4AF37] font-black text-lg mt-1">
-                            = 100 × (Actual Donations ÷ Model-Predicted Donations)
-                          </p>
-                        </div>
-                        <div className="bg-white/5 rounded-xl p-5 border border-white/10">
-                          <p className="text-[10px] font-black text-[#D4AF37] uppercase tracking-widest mb-2">
-                            Companion Metric
-                          </p>
-                          <p className="text-base font-bold">Association Lift %</p>
-                          <p className="text-[#D4AF37] font-black text-lg mt-1">
-                            = 100 × (Actual − Predicted) ÷ Predicted
-                          </p>
-                          <p className="text-white/40 text-xs mt-1">Equivalent to: Score − 100</p>
-                        </div>
-                        <div className="grid grid-cols-3 gap-3 text-center text-xs">
-                          <div className="bg-emerald-500/10 border border-emerald-500/20 rounded-xl p-3">
-                            <p className="font-black text-emerald-400 text-base">&gt; 100%</p>
-                            <p className="text-white/60 mt-1">Overperforming</p>
-                          </div>
-                          <div className="bg-blue-500/10 border border-blue-500/20 rounded-xl p-3">
-                            <p className="font-black text-blue-400 text-base">= 100%</p>
-                            <p className="text-white/60 mt-1">On Target</p>
-                          </div>
-                          <div className="bg-red-500/10 border border-red-500/20 rounded-xl p-3">
-                            <p className="font-black text-red-400 text-base">&lt; 100%</p>
-                            <p className="text-white/60 mt-1">Underperforming</p>
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                )}
+                <ScoreFormulaModal isOpen={showFormulaModal} onClose={() => setShowFormulaModal(false)} />
 
                 {/* Diocese-wide stewardship table */}
                 {isPriestDashboardContext && (
@@ -2693,14 +2378,24 @@ export function PriestDashboard({
               </div>
             </div>
 
+            {mappedType === 'parish' && userEntityInfo.id && (
+              <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-200">
+                <IAFRBreakdownReport
+                  institutionId={userEntityInfo.id}
+                  institutionName={userEntityInfo.name}
+                  year={year ?? null}
+                />
+              </div>
+            )}
+
             {isPriestDashboardContext && (
               <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-200">
                 <div className="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-4 mb-6">
                   <div>
-                    <h3 className="text-lg font-bold text-church-green">Priest Performance Health Score</h3>
+                    <h3 className="text-lg font-bold text-church-green">Priest Stewardship Score</h3>
                     <p className="text-xs text-gray-500 mt-1 max-w-3xl">
-                      Scores summarize financial performance, reporting discipline, collection trend, budget margin, and
-                      assignment tenure.
+                      Scores summarize assignment financial improvement, reporting discipline, budget stewardship,
+                      pastoral stability, and context-adjusted parish difficulty.
                     </p>
                   </div>
                   <div className="grid grid-cols-2 gap-2 min-w-[260px]">
@@ -2721,7 +2416,7 @@ export function PriestDashboard({
                   <div className="rounded-2xl border border-gray-100 bg-gray-50 p-5">
                     <div className="flex items-center justify-between mb-4">
                       <p className="text-[10px] font-black uppercase tracking-[0.2em] text-gray-400">
-                        Health Score Bands
+                        Stewardship Score Bands
                       </p>
                       <p className="text-[10px] font-bold text-gray-400">{diocesanStats.total} total</p>
                     </div>
@@ -2733,7 +2428,7 @@ export function PriestDashboard({
                             trigger: 'axis',
                             formatter: (params: any[]) => {
                               const p = params[0];
-                              return `<div style="font-size:11px"><strong>${p.axisValue} health score band</strong><br/>${p.value} priest${p.value !== 1 ? 's' : ''}</div>`;
+                              return `<div style="font-size:11px"><strong>${p.axisValue} stewardship band</strong><br/>${p.value} priest${p.value !== 1 ? 's' : ''}</div>`;
                             },
                             extraCssText: 'border-radius:12px;border:none;box-shadow:0 10px 25px -5px rgba(0,0,0,0.1)',
                           },
@@ -2789,10 +2484,10 @@ export function PriestDashboard({
                     <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3 mb-4">
                       <div>
                         <p className="text-[10px] font-black uppercase tracking-[0.2em] text-gray-400">
-                          Collection Growth vs Health Score
+                          Collection Growth vs Stewardship Score
                         </p>
                         <p className="text-xs text-gray-500 mt-1">
-                          Each point compares priest collection growth rate with the computed health score.
+                          Each point compares priest collection growth rate with the computed stewardship score.
                         </p>
                       </div>
                       <div className="flex items-center gap-4 text-[10px] font-bold uppercase tracking-wide text-gray-500">
@@ -2815,7 +2510,7 @@ export function PriestDashboard({
                             trigger: 'item',
                             formatter: (params: any) => {
                               const d = params.data;
-                              return `<div style="font-size:11px"><strong>${d[2]}</strong><br/>Collection Growth: ${d[0]}%<br/>Health Score: ${d[1]}/100</div>`;
+                              return `<div style="font-size:11px"><strong>${d[2]}</strong><br/>Collection Growth: ${d[0]}%<br/>Stewardship Score: ${d[1]}/100</div>`;
                             },
                             extraCssText: 'border-radius:12px;border:none;box-shadow:0 10px 25px -5px rgba(0,0,0,0.1)',
                           },
@@ -2832,7 +2527,7 @@ export function PriestDashboard({
                           },
                           yAxis: {
                             type: 'value',
-                            name: 'Health Score',
+                            name: 'Stewardship Score',
                             min: 0,
                             max: 100,
                             axisLine: { show: false },

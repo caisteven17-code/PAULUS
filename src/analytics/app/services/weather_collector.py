@@ -1,7 +1,7 @@
 """
 Laguna Province Multi-Source Weather Collector (Enhanced)
 ==========================================================
-Fetches 3 years of historical weather data for all 30 Laguna municipalities
+Fetches historical weather data (2021–present) for all 30 Laguna municipalities
 from three independent sources, scores each source's validity, selects the
 champion (highest score) per municipality, and merges IBTrACS typhoon flags.
 
@@ -27,6 +27,8 @@ Output:
   {out_dir}/laguna_weather_final.json
   {out_dir}/laguna_source_validity_report.json
   {out_dir}/champion_map.json               # used by weather_updater.py
+  {out_dir}/laguna_weather_daily_classified.json  # rain_rows/temp_rows for the
+                                                  # split daily weather tables
 """
 
 from __future__ import annotations
@@ -36,6 +38,7 @@ import logging
 import time
 import urllib.parse
 import urllib.request
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
 from typing import Optional
@@ -51,22 +54,18 @@ DEFAULT_OUT_DIR = Path(__file__).resolve().parents[4] / "weather_output"
 
 def _create_run_record(period_start: date, period_end: date) -> Optional[str]:
     try:
-        from app.services.supabase_client import get_table
+        from app.services import analytics_db
 
-        resp = (
-            get_table("reference", "weather_runs")
-            .insert(
-                {
-                    "mode": "full",
-                    "status": "running",
-                    "period_start": period_start.isoformat(),
-                    "period_end": period_end.isoformat(),
-                    "started_at": datetime.now(timezone.utc).isoformat(),
-                }
-            )
-            .execute()
+        row = analytics_db.execute_returning_one(
+            """
+            INSERT INTO reference.weather_runs
+              (mode, status, period_start, period_end, started_at)
+            VALUES ('full', 'running', %s, %s, %s)
+            RETURNING id
+            """,
+            (period_start, period_end, datetime.now(timezone.utc)),
         )
-        return resp.data[0]["id"] if resp.data else None
+        return str(row["id"]) if row else None
     except Exception as exc:
         logger.warning("Could not create weather run record: %s", exc)
         return None
@@ -82,17 +81,24 @@ def _update_run_record(
     if not run_id:
         return
     try:
-        from app.services.supabase_client import get_table
+        from app.services import analytics_db
 
-        get_table("reference", "weather_runs").update(
-            {
-                "status": status,
-                "finished_at": datetime.now(timezone.utc).isoformat(),
-                "municipalities_count": municipalities_count,
-                "records_loaded": records_loaded,
-                "error_detail": error_detail,
-            }
-        ).eq("id", run_id).execute()
+        analytics_db.execute(
+            """
+            UPDATE reference.weather_runs
+            SET status = %s, finished_at = %s, municipalities_count = %s,
+                records_loaded = %s, error_detail = %s
+            WHERE id = %s
+            """,
+            (
+                status,
+                datetime.now(timezone.utc),
+                municipalities_count,
+                records_loaded,
+                error_detail,
+                run_id,
+            ),
+        )
     except Exception as exc:
         logger.warning("Could not update weather run record: %s", exc)
 
@@ -104,8 +110,7 @@ REANALYSIS_LAG_DAYS = 7
 
 
 def _default_start() -> date:
-    today = date.today()
-    return date(today.year - 3, today.month, today.day)
+    return date(2021, 1, 1)
 
 
 def _default_end() -> date:
@@ -121,6 +126,11 @@ PH_RAIN_MAX = 800.0  # mm/day — extreme typhoon rainfall
 
 
 # ── 30 Laguna municipalities with coordinates ─────────────────────────────────
+# No documented source for these when originally added (commit dcbb0a7,
+# 2026-06-06) — cross-checked all 30 against independent sources on
+# 2026-07-24; 28 were accurate to within a few km (normal reference-point
+# variance). Nagcarlan and Majayjay were off by ~24km and ~13km respectively
+# (both shifted south of their real towns) and have been corrected here.
 
 MUNICIPALITIES: list[dict] = [
     {"name": "San Pablo City", "lat": 14.0683, "lon": 121.3229},
@@ -132,9 +142,9 @@ MUNICIPALITIES: list[dict] = [
     {"name": "Los Baños", "lat": 14.1667, "lon": 121.2436},
     {"name": "Santa Cruz", "lat": 14.2778, "lon": 121.4133},
     {"name": "Pagsanjan", "lat": 14.2686, "lon": 121.4578},
-    {"name": "Nagcarlan", "lat": 13.9206, "lon": 121.4156},
+    {"name": "Nagcarlan", "lat": 14.1364, "lon": 121.4165},
     {"name": "Liliw", "lat": 14.1292, "lon": 121.4342},
-    {"name": "Majayjay", "lat": 14.0247, "lon": 121.4758},
+    {"name": "Majayjay", "lat": 14.1447, "lon": 121.4723},
     {"name": "Magdalena", "lat": 14.2033, "lon": 121.4442},
     {"name": "Pila", "lat": 14.2353, "lon": 121.3656},
     {"name": "Bay", "lat": 14.1783, "lon": 121.2847},
@@ -158,12 +168,50 @@ MUNICIPALITIES: list[dict] = [
 
 # ── HTTP helper with retry + exponential backoff ──────────────────────────────
 
+# Per-host circuit breaker: if a host exhausts retries on 429 this many times
+# in a row, stop hammering it for a cooldown period instead of burning ~3min
+# per call across every remaining municipality (a sustained 429 usually means
+# an hourly/daily quota, which a 60s retry wait can never clear).
+_CIRCUIT_FAIL_THRESHOLD = 2
+_CIRCUIT_COOLDOWN_S = 1200.0
+_circuit_state: dict[str, dict] = {}
+
 
 def _fetch_json(url: str, max_retries: int = 4, base_delay: float = 2.0) -> Optional[dict]:
+    host = urllib.parse.urlparse(url).hostname or url
+    state = _circuit_state.setdefault(host, {"consecutive_429_exhaustions": 0, "open_until": 0.0})
+
+    if time.time() < state["open_until"]:
+        logger.warning(
+            "Circuit open for %s (repeated 429s) — skipping until %.0fs cooldown elapses: %s",
+            host,
+            state["open_until"] - time.time(),
+            url[:80],
+        )
+        return None
+
+    exhausted_on_429 = False
     for attempt in range(max_retries):
         try:
             with urllib.request.urlopen(url, timeout=30) as resp:
+                state["consecutive_429_exhaustions"] = 0
                 return json.loads(resp.read().decode("utf-8"))
+        except urllib.error.HTTPError as exc:
+            # 429 means the rate-limit window hasn't reset — wait a full minute
+            # before retrying rather than the standard exponential backoff.
+            is_429 = exc.code == 429
+            wait = 60.0 if is_429 else base_delay * (2**attempt)
+            if attempt < max_retries - 1:
+                logger.warning(
+                    "Fetch failed (%s) — retrying in %.0fs: %s",
+                    type(exc).__name__,
+                    wait,
+                    url[:80],
+                )
+                time.sleep(wait)
+            else:
+                logger.error("All retries exhausted for %s: %s", url[:80], exc)
+                exhausted_on_429 = is_429
         except Exception as exc:
             wait = base_delay * (2**attempt)
             if attempt < max_retries - 1:
@@ -176,29 +224,24 @@ def _fetch_json(url: str, max_retries: int = 4, base_delay: float = 2.0) -> Opti
                 time.sleep(wait)
             else:
                 logger.error("All retries exhausted for %s: %s", url[:80], exc)
+
+    if exhausted_on_429:
+        state["consecutive_429_exhaustions"] += 1
+        if state["consecutive_429_exhaustions"] >= _CIRCUIT_FAIL_THRESHOLD:
+            state["open_until"] = time.time() + _CIRCUIT_COOLDOWN_S
+            logger.error(
+                "Repeated 429s from %s — opening circuit breaker for %.0f minutes",
+                host,
+                _CIRCUIT_COOLDOWN_S / 60,
+            )
     return None
 
 
 # ── Source fetchers (daily → list of {date, temp_avg_c, rainfall_mm, wind_ms}) ─
 
 
-def fetch_open_meteo(lat: float, lon: float, start: date, end: date) -> list[dict]:
-    params = urllib.parse.urlencode(
-        {
-            "latitude": lat,
-            "longitude": lon,
-            "start_date": start.isoformat(),
-            "end_date": end.isoformat(),
-            "daily": "temperature_2m_max,temperature_2m_min,temperature_2m_mean,precipitation_sum,windspeed_10m_max",
-            "timezone": "Asia/Manila",
-            "wind_speed_unit": "ms",
-        }
-    )
-    url = f"https://archive-api.open-meteo.com/v1/archive?{params}"
-    data = _fetch_json(url)
-    if not data or "daily" not in data:
-        return []
-
+def _parse_open_meteo_daily(data: dict) -> list[dict]:
+    """Parse Open-Meteo archive JSON into a list of daily dicts."""
     daily = data["daily"]
     dates = daily.get("time", [])
     temp_mean = daily.get("temperature_2m_mean", [None] * len(dates))
@@ -206,7 +249,8 @@ def fetch_open_meteo(lat: float, lon: float, start: date, end: date) -> list[dic
     temp_min = daily.get("temperature_2m_min", [None] * len(dates))
     rain = daily.get("precipitation_sum", [None] * len(dates))
     wind = daily.get("windspeed_10m_max", [None] * len(dates))
-
+    wcode = daily.get("weather_code", [None] * len(dates))
+    rh = daily.get("relative_humidity_2m_mean", [None] * len(dates))
     records = []
     for i, d in enumerate(dates):
         t_avg = temp_mean[i]
@@ -220,15 +264,97 @@ def fetch_open_meteo(lat: float, lon: float, start: date, end: date) -> list[dic
                 "temp_min_c": temp_min[i],
                 "rainfall_mm": rain[i],
                 "wind_ms": wind[i],
+                "weathercode": int(wcode[i]) if wcode[i] is not None else None,
+                "relativehumidity_pct": rh[i],
             }
         )
     return records
 
 
-def _fetch_nasa_power(lat: float, lon: float, start: date, end: date, community: str, wind_param: str) -> list[dict]:
+def _open_meteo_params(lat, lon, start, end, model=None):
+    p = {
+        "latitude": lat,
+        "longitude": lon,
+        "start_date": start.isoformat(),
+        "end_date": end.isoformat(),
+        "daily": "temperature_2m_max,temperature_2m_min,temperature_2m_mean,precipitation_sum,windspeed_10m_max,weather_code,relative_humidity_2m_mean",
+        "timezone": "Asia/Manila",
+        "wind_speed_unit": "ms",
+    }
+    if model:
+        p["models"] = model
+    return urllib.parse.urlencode(p)
+
+
+def fetch_open_meteo(lat: float, lon: float, start: date, end: date) -> list[dict]:
+    url = f"https://archive-api.open-meteo.com/v1/archive?{_open_meteo_params(lat, lon, start, end)}"
+    data = _fetch_json(url)
+    if not data or "daily" not in data:
+        return []
+    return _parse_open_meteo_daily(data)
+
+
+def fetch_open_meteo_era5(lat: float, lon: float, start: date, end: date) -> list[dict]:
+    """ERA5 (full global reanalysis) via Open-Meteo archive — 4th rainfall + temp validator."""
+    url = f"https://archive-api.open-meteo.com/v1/archive?{_open_meteo_params(lat, lon, start, end, model='era5')}"
+    data = _fetch_json(url)
+    if not data or "daily" not in data:
+        return []
+    return _parse_open_meteo_daily(data)
+
+
+def fetch_open_meteo_ecmwf_ifs(lat: float, lon: float, start: date, end: date) -> list[dict]:
+    """ECMWF IFS reanalysis via Open-Meteo archive — replaces Meteostat for temperature validation."""
+    url = f"https://archive-api.open-meteo.com/v1/archive?{_open_meteo_params(lat, lon, start, end, model='ecmwf_ifs')}"
+    data = _fetch_json(url)
+    if not data or "daily" not in data:
+        return []
+    return _parse_open_meteo_daily(data)
+
+
+def fetch_open_meteo_ukmo(lat: float, lon: float, start: date, end: date) -> list[dict]:
+    """UK Met Office (UKMO) via Open-Meteo archive — 5th rainfall + temp validator (replaces JRA-55)."""
+    url = f"https://archive-api.open-meteo.com/v1/archive?{_open_meteo_params(lat, lon, start, end, model='ukmo_seamless')}"
+    data = _fetch_json(url)
+    if not data or "daily" not in data:
+        return []
+    return _parse_open_meteo_daily(data)
+
+
+def fetch_open_meteo_gfs(lat: float, lon: float, start: date, end: date) -> list[dict]:
+    """NOAA GFS via Open-Meteo archive — independent of the ECMWF/NASA lineage already in use."""
+    url = f"https://archive-api.open-meteo.com/v1/archive?{_open_meteo_params(lat, lon, start, end, model='ncep_gfs_seamless')}"
+    data = _fetch_json(url)
+    if not data or "daily" not in data:
+        return []
+    return _parse_open_meteo_daily(data)
+
+
+def fetch_open_meteo_jma(lat: float, lon: float, start: date, end: date) -> list[dict]:
+    """Japan Meteorological Agency via Open-Meteo archive — independent of the ECMWF/NASA lineage already in use."""
+    url = f"https://archive-api.open-meteo.com/v1/archive?{_open_meteo_params(lat, lon, start, end, model='jma_seamless')}"
+    data = _fetch_json(url)
+    if not data or "daily" not in data:
+        return []
+    return _parse_open_meteo_daily(data)
+
+
+def _fetch_nasa_power(
+    lat: float,
+    lon: float,
+    start: date,
+    end: date,
+    community: str,
+    wind_param: str,
+    extra_params: str = "",
+) -> list[dict]:
+    param_str = f"T2M,T2M_MAX,T2M_MIN,PRECTOTCORR,{wind_param}"
+    if extra_params:
+        param_str += f",{extra_params}"
+
     params = urllib.parse.urlencode(
         {
-            "parameters": f"T2M,T2M_MAX,T2M_MIN,PRECTOTCORR,{wind_param}",
+            "parameters": param_str,
             "community": community,
             "longitude": lon,
             "latitude": lat,
@@ -252,6 +378,7 @@ def _fetch_nasa_power(lat: float, lon: float, start: date, end: date, community:
     t2m_min = props.get("T2M_MIN", {})
     precip = props.get("PRECTOTCORR", {})
     wind = props.get(wind_param, {})
+    rh2m = props.get("RH2M", {})  # relative humidity — AG community only
 
     records = []
     for key in t2m:
@@ -282,13 +409,16 @@ def _fetch_nasa_power(lat: float, lon: float, start: date, end: date, community:
                 "temp_min_c": t_min,
                 "rainfall_mm": _safe(precip.get(key)),
                 "wind_ms": _safe(wind.get(key)),
+                "rh_pct": _safe(rh2m.get(key)) if rh2m else None,
             }
         )
     return records
 
 
 def fetch_nasa_power_ag(lat: float, lon: float, start: date, end: date) -> list[dict]:
-    return _fetch_nasa_power(lat, lon, start, end, community="AG", wind_param="WS10M")
+    # RH2M (relative humidity at 2m) is fetched exclusively for the AG community;
+    # it is used by compute_heat_index() to produce PAGASA heat index tiers.
+    return _fetch_nasa_power(lat, lon, start, end, community="AG", wind_param="WS10M", extra_params="RH2M")
 
 
 def fetch_nasa_power_sb(lat: float, lon: float, start: date, end: date) -> list[dict]:
@@ -312,13 +442,17 @@ def _score_source(records: list[dict], all_sources: dict[str, list[dict]]) -> di
     _by_date: dict[str, float | None] = {r["date"]: r.get("temp_avg_c") for r in records}  # noqa: F841
 
     # Cross-source medians for consistency check
-    source_by_date: dict[str, list[float]] = {}
+    source_by_date_temp: dict[str, list[float]] = {}
+    source_by_date_rain: dict[str, list[float]] = {}
     for src_records in all_sources.values():
         for r in src_records:
             d = r["date"]
-            v = r.get("temp_avg_c")
-            if v is not None:
-                source_by_date.setdefault(d, []).append(v)
+            t = r.get("temp_avg_c")
+            rn = r.get("rainfall_mm")
+            if t is not None:
+                source_by_date_temp.setdefault(d, []).append(t)
+            if rn is not None:
+                source_by_date_rain.setdefault(d, []).append(rn)
 
     coverage_count = 0
     plausibility_count = 0
@@ -338,16 +472,36 @@ def _score_source(records: list[dict], all_sources: dict[str, list[dict]]) -> di
         if temp_ok and rain_ok:
             plausibility_count += 1
 
-        # Consistency — within 15% of cross-source median temperature
-        vals = source_by_date.get(r["date"], [])
-        if t is not None and len(vals) >= 2:
-            vals_sorted = sorted(vals)
+        # Consistency — within 15% of cross-source median for BOTH temp and rainfall
+        temp_consistent = False
+        rain_consistent = False
+
+        # Temperature consistency
+        temp_vals = source_by_date_temp.get(r["date"], [])
+        if t is not None and len(temp_vals) >= 2:
+            vals_sorted = sorted(temp_vals)
             med_idx = len(vals_sorted) // 2
             median = vals_sorted[med_idx]
             if median != 0 and abs(t - median) / abs(median) <= 0.15:
-                consistency_count += 1
+                temp_consistent = True
             elif median == 0 and t == 0:
-                consistency_count += 1
+                temp_consistent = True
+
+        # Rainfall consistency
+        rain_vals = source_by_date_rain.get(r["date"], [])
+        if rn is not None and len(rain_vals) >= 2:
+            vals_sorted = sorted(rain_vals)
+            med_idx = len(vals_sorted) // 2
+            median = vals_sorted[med_idx]
+            # For rainfall, allow larger tolerance (0–20%) due to spatial variability
+            if median != 0 and abs(rn - median) / abs(median) <= 0.20:
+                rain_consistent = True
+            elif median == 0 and rn == 0:
+                rain_consistent = True
+
+        # Both must be consistent (or missing) for the record to count
+        if (t is None or temp_consistent) and (rn is None or rain_consistent):
+            consistency_count += 1
 
     cov = round((coverage_count / total) * 100, 2)
     pla = round((plausibility_count / total) * 100, 2)
@@ -355,12 +509,27 @@ def _score_source(records: list[dict], all_sources: dict[str, list[dict]]) -> di
 
     composite = round(cov * 0.30 + pla * 0.30 + con * 0.40, 2)
 
+    # Check for rainfall mismatches (flag if any day has >50% divergence from median)
+    rainfall_warnings = []
+    for r in records:
+        rn = r.get("rainfall_mm")
+        if rn is not None:
+            rain_vals = source_by_date_rain.get(r["date"], [])
+            if len(rain_vals) >= 2:
+                vals_sorted = sorted(rain_vals)
+                med_idx = len(vals_sorted) // 2
+                median = vals_sorted[med_idx]
+                if median != 0 and abs(rn - median) / abs(median) > 0.50:
+                    rainfall_warnings.append(f"{r['date']}: {rn}mm vs median {median:.1f}mm")
+
     return {
         "coverage": cov,
         "plausibility": pla,
         "consistency": con,
         "composite": composite,
         "record_count": total,
+        "rainfall_mismatch_count": len(rainfall_warnings),
+        "rainfall_mismatches": rainfall_warnings[:10],  # first 10 for brevity
     }
 
 
@@ -453,15 +622,40 @@ def collect(
     end: Optional[date] = None,
     out_dir: Path = DEFAULT_OUT_DIR,
     load: bool = False,
+    municipalities: Optional[list[str]] = None,
 ) -> dict:
     """
-    Run full collection for all 30 municipalities.
+    Run full collection for all 30 municipalities (or a filtered subset).
     Returns the master output dict (also saved to JSON files).
     """
     start = start or _default_start()
     end = end or _default_end()
 
+    if municipalities:
+        munis = [m for m in MUNICIPALITIES if m["name"] in municipalities]
+        unknown = set(municipalities) - {m["name"] for m in munis}
+        if unknown:
+            logger.warning("Unknown municipality names (ignored): %s", unknown)
+    else:
+        munis = MUNICIPALITIES
+
     run_id = _create_run_record(start, end)
+
+    # Release the AWS pool's connections now rather than let them idle for the
+    # 30-40+ minutes this collection loop spends on external weather APIs
+    # (nothing below touches the DB again until the bulk upserts at the end).
+    # Idle connections get silently closed by RDS/the network path in that
+    # window; get_pool() lazily reopens a fresh pool next time it's needed,
+    # so the upsert step always starts with known-good connections instead
+    # of relying on a stale one being caught in time (repeatedly wasn't,
+    # even with check=ConnectionPool.check_connection and higher timeouts).
+    try:
+        from app.services import analytics_db
+
+        if analytics_db.enabled():
+            analytics_db.close_pool()
+    except Exception:  # noqa: BLE001
+        pass
 
     out_dir.mkdir(parents=True, exist_ok=True)
     per_city_dir = out_dir / "laguna_weather_per_city"
@@ -471,7 +665,7 @@ def collect(
         "Collecting weather %s → %s for %d municipalities",
         start,
         end,
-        len(MUNICIPALITIES),
+        len(munis),
     )
 
     # Load IBTrACS typhoon flags once for the full date range
@@ -484,22 +678,113 @@ def collect(
         logger.warning("IBTrACS unavailable (%s) — typhoon fields will be 0", exc)
         typhoon_flags = {}
 
+    # Daily classification (reference.weather_rainfall_daily and
+    # reference.weather_temperature_daily): NOAA GSOD station caches are
+    # shared by all municipalities — fetch once before the per-city loop.
+    from app.services.weather_daily_classifier import (
+        build_chirps_daily_cache,
+        build_daily_rows,
+        build_gsmap_nrt_daily_cache,
+        compute_confidence_scores,
+    )
+
+    # GSMaP NRT is a gridded satellite product covering Laguna uniformly —
+    # fetch once for the Province bbox rather than per-municipality.
+    gsmap_daily_cache = build_gsmap_nrt_daily_cache(start, end)
+    logger.info("GSMaP NRT cache ready: %d days", len(gsmap_daily_cache))
+
     master: list[dict] = []
     validity_rows: list[dict] = []
     champion_map: dict[str, str] = {}
+    daily_rain_rows: list[dict] = []
+    daily_temp_rows: list[dict] = []
+    daily_wind_rows: list[dict] = []
 
-    for i, muni in enumerate(MUNICIPALITIES):
+    for i, muni in enumerate(munis):
         name = muni["name"]
         lat = muni["lat"]
         lon = muni["lon"]
-        logger.info("[%d/%d] %s", i + 1, len(MUNICIPALITIES), name)
+        logger.info("[%d/%d] %s", i + 1, len(munis), name)
 
-        # Fetch from all 3 sources
-        sources = {
-            "open_meteo": fetch_open_meteo(lat, lon, start, end),
-            "nasa_power_ag": fetch_nasa_power_ag(lat, lon, start, end),
-            "nasa_power_sb": fetch_nasa_power_sb(lat, lon, start, end),
-        }
+        # Parallel group 1: NASA POWER servers + Open-Meteo base — independent
+        # CDNs, so concurrent I/O is safe and cuts per-municipality latency by
+        # ~60% compared to sequential + 5s sleeps.
+        def _run_parallel_sources(lat=lat, lon=lon, start=start, end=end):
+            tasks = {
+                "open_meteo": lambda: fetch_open_meteo(lat, lon, start, end),
+                "nasa_power_ag": lambda: fetch_nasa_power_ag(lat, lon, start, end),
+                "nasa_power_sb": lambda: fetch_nasa_power_sb(lat, lon, start, end),
+            }
+            results: dict[str, list[dict]] = {}
+            with ThreadPoolExecutor(max_workers=len(tasks)) as pool:
+                futs = {pool.submit(fn): key for key, fn in tasks.items()}
+                for fut in as_completed(futs):
+                    key = futs[fut]
+                    try:
+                        results[key] = fut.result()
+                    except Exception as exc:  # noqa: BLE001
+                        logger.warning("Parallel fetch %s failed: %s", key, exc)
+                        results[key] = []
+            return results
+
+        sources = _run_parallel_sources()
+
+        # Parallel group 2: CHIRPS (separate server) + Open-Meteo validator
+        # quartet (same server — keep sequential with 2s gaps to respect rate
+        # limits). JMA is fetched here too — it's the only severe-weather
+        # validator that isn't ECMWF-lineage (see classify_day's severe block).
+        def _run_chirps_and_validators(lat=lat, lon=lon, start=start, end=end):
+            with ThreadPoolExecutor(max_workers=1) as chirps_pool:
+                chirps_fut = chirps_pool.submit(build_chirps_daily_cache, lat, lon, start, end)
+                # Stagger Open-Meteo validator calls while CHIRPS job is in flight
+                era5_recs = fetch_open_meteo_era5(lat, lon, start, end)
+                time.sleep(8.0)
+                ecmwf_recs = fetch_open_meteo_ecmwf_ifs(lat, lon, start, end)
+                time.sleep(8.0)
+                ukmo_recs = fetch_open_meteo_ukmo(lat, lon, start, end)
+                time.sleep(8.0)
+                jma_recs = fetch_open_meteo_jma(lat, lon, start, end)
+                time.sleep(8.0)
+                try:
+                    chirps_cache = chirps_fut.result()  # CHIRPS has its own poll timeout
+                except Exception as exc:  # noqa: BLE001
+                    logger.warning("CHIRPS fetch failed: %s", exc)
+                    chirps_cache = {}
+            return era5_recs, ecmwf_recs, ukmo_recs, jma_recs, chirps_cache
+
+        era5_records, ecmwf_ifs_records, ukmo_records, jma_records, chirps_daily_cache = _run_chirps_and_validators()
+
+        # Classify each day for the split daily tables.
+        muni_rain_rows, muni_temp_rows, muni_wind_rows = build_daily_rows(
+            name,
+            start,
+            end,
+            sources["nasa_power_ag"],
+            chirps_daily_cache,
+            open_meteo_records=sources["open_meteo"],
+            gsmap_cache=gsmap_daily_cache,
+            era5_records=era5_records,
+            ecmwf_ifs_records=ecmwf_ifs_records,
+            ukmo_records=ukmo_records,
+            jma_records=jma_records,
+            typhoon_flags=typhoon_flags,
+        )
+        daily_rain_rows.extend(muni_rain_rows)
+        daily_temp_rows.extend(muni_temp_rows)
+        daily_wind_rows.extend(muni_wind_rows)
+        logger.info(
+            "  Daily classification: %d rain rows, %d temp rows, %d wind rows "
+            "(CHIRPS %d days, GSMaP %d days, ERA5 %d days, ECMWF IFS %d days, UKMO %d days, JMA %d days)",
+            len(muni_rain_rows),
+            len(muni_temp_rows),
+            len(muni_wind_rows),
+            len(chirps_daily_cache),
+            len(gsmap_daily_cache),
+            len(era5_records),
+            len(ecmwf_ifs_records),
+            len(ukmo_records),
+            len(jma_records),
+        )
 
         # Score each source
         scores = {src: _score_source(recs, sources) for src, recs in sources.items()}
@@ -509,6 +794,16 @@ def collect(
         champion_map[name] = champion
 
         logger.info("  Champion: %s (score %.1f)", champion, scores[champion]["composite"])
+
+        # Warn if champion source has rainfall mismatches
+        if scores[champion].get("rainfall_mismatch_count", 0) > 0:
+            logger.warning(
+                "    ⚠ Champion %s has %d rainfall mismatches (>50%% divergence)",
+                champion,
+                scores[champion]["rainfall_mismatch_count"],
+            )
+            for mismatch in scores[champion].get("rainfall_mismatches", []):
+                logger.warning("      %s", mismatch)
 
         # Build monthly data from champion source
         champion_records = sources[champion]
@@ -554,7 +849,7 @@ def collect(
         )
 
         # Polite delay between municipalities to respect rate limits
-        time.sleep(1.5)
+        time.sleep(15.0)
 
     # Save outputs
     master_path = out_dir / "laguna_weather_final.json"
@@ -603,19 +898,112 @@ def collect(
         )
     )
 
+    # Confidence scoring across all municipalities
+    confidence = compute_confidence_scores(daily_rain_rows, daily_temp_rows, daily_wind_rows)
+    logger.info(
+        "Confidence scores — overall mean Cohen's Kappa: %s (%s) | overall mean Lin's CCC: %s | "
+        "rain κ: %s / CCC: %s | severe κ: %s | temp κ: %s / CCC: %s | "
+        "wind κ: %s / CCC: %s | humidity κ: %s / CCC: %s",
+        confidence["overall_mean_cohens_kappa"],
+        confidence["overall_mean_cohens_kappa_strength"],
+        confidence["overall_mean_lins_ccc"],
+        confidence["rainfall"]["cohens_kappa"],
+        confidence["rainfall"]["lins_ccc"],
+        confidence["severe_weather"]["cohens_kappa"],
+        confidence["temperature"]["cohens_kappa"],
+        confidence["temperature"]["lins_ccc"],
+        confidence["wind"]["cohens_kappa"],
+        confidence["wind"]["lins_ccc"],
+        confidence["humidity"]["cohens_kappa"],
+        confidence["humidity"]["lins_ccc"],
+    )
+    (out_dir / "laguna_weather_confidence.json").write_text(json.dumps(confidence, indent=2))
+
+    # Classified daily rows for the split daily tables (no indent — large file)
+    daily_classified_path = out_dir / "laguna_weather_daily_classified.json"
+    daily_classified_path.write_text(
+        json.dumps(
+            {
+                "generated_at": datetime.utcnow().isoformat() + "Z",
+                "period_start": start.isoformat(),
+                "period_end": end.isoformat(),
+                "rain_row_count": len(daily_rain_rows),
+                "temp_row_count": len(daily_temp_rows),
+                "wind_row_count": len(daily_wind_rows),
+                "confidence": confidence,
+                "rain_rows": daily_rain_rows,
+                "temp_rows": daily_temp_rows,
+                "wind_rows": daily_wind_rows,
+            }
+        )
+    )
+
     logger.info("Done. Output saved to %s", out_dir)
 
     records_loaded = 0
+    daily_rows_loaded = 0
+    gold_rows_loaded = 0
+    legacy_error: Optional[str] = None
     try:
         if load:
-            from app.services.weather_loader import load_from_file
+            from app.services.weather_bronze import archive_file
+            from app.services.weather_loader import (
+                load_from_file,
+                rebuild_monthly_summary,
+                refresh_parish_weather_gold,
+                upsert_monthly_confidence,
+                upsert_weather_rainfall_daily,
+                upsert_weather_temperature_daily,
+                upsert_weather_wind_daily,
+            )
 
-            records_loaded = load_from_file(out_dir / "laguna_weather_final.json")
-            logger.info("Loaded %d records into reference.weather_observations", records_loaded)
+            # Pipeline: daily tables → monthly WCI (SQL) → monthly Fleiss Kappa (Python)
+            for city_file in sorted(per_city_dir.glob("*.json")):
+                archive_file(
+                    city_file,
+                    run_id=run_id,
+                    run_mode="full",
+                    period_start=start,
+                    period_end=end,
+                    artifact_type="municipality_sources",
+                )
 
-        _update_run_record(run_id, "success", len(master), records_loaded)
+            daily_rows_loaded = upsert_weather_rainfall_daily(daily_rain_rows)
+            daily_rows_loaded += upsert_weather_temperature_daily(daily_temp_rows)
+            daily_rows_loaded += upsert_weather_wind_daily(daily_wind_rows)
+            rebuild_monthly_summary(start.isoformat(), end.isoformat())
+            upsert_monthly_confidence(daily_rain_rows, daily_temp_rows, daily_wind_rows)
+            gold_rows_loaded = refresh_parish_weather_gold()
+            logger.info(
+                "Loaded %d rows into rainfall + temperature + wind daily tables",
+                daily_rows_loaded,
+            )
+
+            # Legacy monthly load (reference.weather_observations). A failure
+            # here must not block the new pipeline — log it and keep going.
+            try:
+                records_loaded = load_from_file(out_dir / "laguna_weather_final.json")
+                logger.info("Loaded %d records into reference.weather_observations", records_loaded)
+            except Exception as exc:
+                legacy_error = f"legacy weather_observations load failed: {exc}"
+                logger.error(legacy_error)
+
+        _update_run_record(
+            run_id, "success", len(master), records_loaded + daily_rows_loaded, error_detail=legacy_error
+        )
+        from app.services.weather_bronze import mark_completed
+
+        mark_completed(
+            run_id,
+            silver_rows=daily_rows_loaded,
+            gold_rows=gold_rows_loaded,
+            error_detail=legacy_error,
+        )
     except Exception as exc:
-        _update_run_record(run_id, "failed", len(master), records_loaded, error_detail=str(exc))
+        _update_run_record(run_id, "failed", len(master), records_loaded + daily_rows_loaded, error_detail=str(exc))
+        from app.services.weather_bronze import mark_completed
+
+        mark_completed(run_id, silver_rows=daily_rows_loaded, gold_rows=gold_rows_loaded, error_detail=str(exc))
         raise
 
     return {
@@ -623,6 +1011,9 @@ def collect(
         "validity": validity_rows,
         "champion_map": champion_map,
         "records_loaded": records_loaded,
+        "daily_rows_loaded": daily_rows_loaded,
+        "gold_rows_loaded": gold_rows_loaded,
+        "daily_rows_classified": len(daily_rain_rows) + len(daily_temp_rows),
     }
 
 
@@ -638,7 +1029,7 @@ if __name__ == "__main__":
         "--start",
         type=str,
         default=None,
-        help="Start date YYYY-MM-DD (default: 3 years ago)",
+        help="Start date YYYY-MM-DD (default: 2021-01-01)",
     )
     parser.add_argument(
         "--end",
@@ -652,12 +1043,31 @@ if __name__ == "__main__":
         action="store_true",
         help="Also load results into Supabase after collecting",
     )
+    parser.add_argument(
+        "--municipality",
+        nargs="+",
+        metavar="NAME",
+        help="Only collect for these municipalities (e.g. --municipality Alaminos Kalayaan)",
+    )
     args = parser.parse_args()
 
     start = date.fromisoformat(args.start) if args.start else None
     end = date.fromisoformat(args.end) if args.end else None
 
-    result = collect(start=start, end=end, out_dir=Path(args.out), load=args.load)
+    result = collect(
+        start=start,
+        end=end,
+        out_dir=Path(args.out),
+        load=args.load,
+        municipalities=args.municipality,
+    )
     print(f"Collected {len(result['master'])} municipalities.")
+    print(
+        f"Classified {result['daily_rows_classified']} daily rows for "
+        f"reference.weather_rainfall_daily + reference.weather_temperature_daily"
+    )
     if args.load:
         print(f"Loaded {result['records_loaded']} records into reference.weather_observations")
+        print(
+            f"Loaded {result['daily_rows_loaded']} rows into the split daily weather tables (monthly summary rebuilt)"
+        )

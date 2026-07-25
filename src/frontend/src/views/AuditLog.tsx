@@ -1,8 +1,10 @@
 'use client';
 
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo, useEffect, useCallback } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import ReactECharts from 'echarts-for-react';
+import { InlineLoader } from '../components/ui/LoadingScreen';
+import { getInitials } from '../lib/initials';
 import {
   Download,
   Search,
@@ -16,13 +18,32 @@ import {
   BarChart2,
   X,
   ChevronRight,
+  Briefcase,
+  FileDown,
+  CalendarDays,
+  Megaphone,
+  CalendarCheck2,
+  ShieldCheck,
+  SlidersHorizontal,
 } from 'lucide-react';
 
 // ─────────────────────────────────────────────
 // Types
 // ─────────────────────────────────────────────
-type LogCategory = 'all' | 'auth' | 'finance' | 'analytics' | 'reports' | 'system' | 'access';
+type LogCategory =
+  | 'all'
+  | 'auth'
+  | 'users'
+  | 'projects'
+  | 'finance'
+  | 'data'
+  | 'events'
+  | 'announcements'
+  | 'calendar'
+  | 'analytics'
+  | 'system';
 type LogSeverity = 'info' | 'warning' | 'error' | 'success';
+type InstitutionTypeFilter = 'all' | 'diocese' | 'parish' | 'school' | 'seminary';
 
 interface FieldChange {
   field: string;
@@ -34,6 +55,8 @@ interface AuditEntry {
   id: string;
   user: string;
   role: string;
+  email?: string;
+  avatarUrl?: string;
   isSystem?: boolean;
   category: Exclude<LogCategory, 'all'>;
   severity: LogSeverity;
@@ -41,9 +64,20 @@ interface AuditEntry {
   detail: string;
   timestamp: string;
   date: string;
+  occurredAt?: string;
   ip: string;
+  institutionId?: string;
+  institutionType?: Exclude<InstitutionTypeFilter, 'all'>;
   entity?: string;
   changes?: FieldChange[];
+  metadata?: Record<string, any>;
+}
+
+interface InstitutionOption {
+  id: string;
+  name: string;
+  type: Exclude<InstitutionTypeFilter, 'all'>;
+  key: string;
 }
 
 // ─────────────────────────────────────────────
@@ -81,7 +115,7 @@ const RAW_LOGS: AuditEntry[] = [
     role: 'Priest',
     category: 'finance',
     severity: 'success',
-    action: 'Report Submitted',
+    action: 'Financial Record Saved',
     detail: 'Monthly collection report for March 2026 submitted via portal',
     timestamp: '5:45 PM',
     date: 'Apr 26, 2026',
@@ -92,7 +126,7 @@ const RAW_LOGS: AuditEntry[] = [
     id: 'LOG-5038',
     user: 'Admin Dela Cruz',
     role: 'Admin',
-    category: 'reports',
+    category: 'data',
     severity: 'info',
     action: 'Report Exported',
     detail: 'Consolidated Financial Statement Q1 2026 exported as PDF',
@@ -106,19 +140,20 @@ const RAW_LOGS: AuditEntry[] = [
     role: 'Bishop',
     category: 'analytics',
     severity: 'info',
-    action: 'Dashboard Viewed',
-    detail: 'Accessed Parish Predictive tab — Monthly Collections Forecast',
+    action: 'Scenario Saved',
+    detail: 'Institution simulator scenario created for Santo Cristo Parish — Low Risk, 6-month horizon',
     timestamp: '2:15 PM',
     date: 'Apr 26, 2026',
     ip: '192.168.1.2',
+    entity: 'Santo Cristo Parish',
   },
   {
     id: 'LOG-5036',
     user: 'Admin Dela Cruz',
     role: 'Admin',
-    category: 'access',
+    category: 'users',
     severity: 'warning',
-    action: 'Role Updated',
+    action: 'Roles Updated',
     detail: 'User role changed: Fr. Santos promoted from Priest to Seminary Admin',
     timestamp: '11:30 AM',
     date: 'Apr 26, 2026',
@@ -139,16 +174,16 @@ const RAW_LOGS: AuditEntry[] = [
   },
   {
     id: 'LOG-5034',
-    user: 'Bp. Jose Reyes',
-    role: 'Bishop',
-    category: 'analytics',
-    severity: 'info',
-    action: 'Dashboard Viewed',
-    detail: 'Accessed Seminary Analytics — Prescriptive tab',
+    user: 'Admin Dela Cruz',
+    role: 'Admin',
+    category: 'announcements',
+    severity: 'success',
+    action: 'Announcement Published',
+    detail: '"Q1 Budget Submission Reminder" published to all parishes',
     timestamp: '3:55 PM',
     date: 'Apr 25, 2026',
-    ip: '192.168.1.2',
-    entity: 'Seminaries',
+    ip: '192.168.1.5',
+    entity: 'Diocese-wide',
   },
   {
     id: 'LOG-5033',
@@ -156,8 +191,8 @@ const RAW_LOGS: AuditEntry[] = [
     role: 'Priest',
     category: 'finance',
     severity: 'info',
-    action: 'Data Accessed',
-    detail: 'Viewed April 2026 disbursement breakdown',
+    action: 'Financial Record Saved',
+    detail: 'April 2026 disbursement breakdown submitted for review',
     timestamp: '2:40 PM',
     date: 'Apr 25, 2026',
     ip: '192.168.1.14',
@@ -167,9 +202,9 @@ const RAW_LOGS: AuditEntry[] = [
     id: 'LOG-5032',
     user: 'Admin Dela Cruz',
     role: 'Admin',
-    category: 'reports',
+    category: 'data',
     severity: 'info',
-    action: 'Report Exported',
+    action: 'CSV Export',
     detail: 'Entity Health Rankings — All Parishes April 2026 exported as CSV',
     timestamp: '1:10 PM',
     date: 'Apr 25, 2026',
@@ -205,8 +240,8 @@ const RAW_LOGS: AuditEntry[] = [
     id: 'LOG-5029',
     user: 'Admin Dela Cruz',
     role: 'Admin',
-    category: 'access',
-    severity: 'info',
+    category: 'users',
+    severity: 'success',
     action: 'User Created',
     detail: 'New account provisioned — Sr. Clara Mendoza (School Admin)',
     timestamp: '3:45 PM',
@@ -217,13 +252,14 @@ const RAW_LOGS: AuditEntry[] = [
     id: 'LOG-5028',
     user: 'Bp. Jose Reyes',
     role: 'Bishop',
-    category: 'finance',
-    severity: 'info',
-    action: 'Data Accessed',
-    detail: 'Viewed diocese-wide collections vs disbursements summary — YTD 2026',
+    category: 'events',
+    severity: 'success',
+    action: 'Event Created',
+    detail: '"Diocesan Finance Assembly 2026" created and published to all institutions',
     timestamp: '11:20 AM',
     date: 'Apr 24, 2026',
     ip: '192.168.1.2',
+    entity: 'Diocese of San Pablo',
   },
   {
     id: 'LOG-5027',
@@ -240,16 +276,16 @@ const RAW_LOGS: AuditEntry[] = [
   },
   {
     id: 'LOG-5026',
-    user: 'Admin Dela Cruz',
-    role: 'Admin',
-    category: 'analytics',
-    severity: 'info',
-    action: 'Dashboard Viewed',
-    detail: 'Accessed Diocesan Schools Analytics — Diagnostic tab',
+    user: 'Bp. Jose Reyes',
+    role: 'Bishop',
+    category: 'calendar',
+    severity: 'success',
+    action: 'Calendar Bulk Approved',
+    detail: '47 liturgical calendar entries for May 2026 approved in bulk',
     timestamp: '4:10 PM',
     date: 'Apr 23, 2026',
-    ip: '192.168.1.5',
-    entity: 'Diocesan Schools',
+    ip: '192.168.1.2',
+    entity: 'Diocese of San Pablo',
   },
   {
     id: 'LOG-5025',
@@ -265,16 +301,16 @@ const RAW_LOGS: AuditEntry[] = [
   },
   {
     id: 'LOG-5024',
-    user: 'Fr. Alex Tan',
-    role: 'Priest',
-    category: 'finance',
+    user: 'Admin Dela Cruz',
+    role: 'Admin',
+    category: 'projects',
     severity: 'success',
-    action: 'Report Submitted',
-    detail: 'Monthly collection report for March 2026 submitted via portal',
+    action: 'Project Created',
+    detail: 'New project "Parish Hall Renovation 2026" created for San Isidro Parish',
     timestamp: '10:30 AM',
     date: 'Apr 23, 2026',
-    ip: '192.168.1.19',
-    entity: 'Sto. Niño Parish',
+    ip: '192.168.1.5',
+    entity: 'San Isidro Labrador Parish',
   },
   {
     id: 'LOG-5023',
@@ -284,7 +320,7 @@ const RAW_LOGS: AuditEntry[] = [
     category: 'system',
     severity: 'error',
     action: 'Sync Failed',
-    detail: 'Firebase sync timeout for parish report data — retry queued',
+    detail: 'Database sync timeout for parish report data — retry queued',
     timestamp: '11:45 PM',
     date: 'Apr 22, 2026',
     ip: 'system',
@@ -305,7 +341,7 @@ const RAW_LOGS: AuditEntry[] = [
     id: 'LOG-5021',
     user: 'Admin Dela Cruz',
     role: 'Admin',
-    category: 'reports',
+    category: 'data',
     severity: 'info',
     action: 'Audit Log Exported',
     detail: 'Full audit trail for April 1–21, 2026 exported as CSV',
@@ -342,13 +378,39 @@ const RAW_LOGS: AuditEntry[] = [
     id: 'LOG-5018',
     user: 'Admin Dela Cruz',
     role: 'Admin',
-    category: 'access',
+    category: 'users',
     severity: 'warning',
-    action: 'Password Reset',
-    detail: 'Admin-initiated password reset for Fr. Ben Salazar',
+    action: 'User Archived',
+    detail: 'Admin-initiated account suspension for Fr. Ben Salazar — pending transfer',
     timestamp: '3:30 PM',
     date: 'Apr 20, 2026',
     ip: '192.168.1.5',
+  },
+  {
+    id: 'LOG-5017',
+    user: 'Admin Dela Cruz',
+    role: 'Admin',
+    category: 'projects',
+    severity: 'info',
+    action: 'Donation Added',
+    detail: 'Donation of ₱50,000 recorded for "Parish Hall Renovation 2026" from CBCP Foundation',
+    timestamp: '10:05 AM',
+    date: 'Apr 20, 2026',
+    ip: '192.168.1.5',
+    entity: 'San Isidro Labrador Parish',
+  },
+  {
+    id: 'LOG-5016',
+    user: 'Bp. Jose Reyes',
+    role: 'Bishop',
+    category: 'calendar',
+    severity: 'warning',
+    action: 'Calendar Entry Rejected',
+    detail: '"Feast of San Roque (local)" on Aug 16 rejected — not in Roman Martyrology',
+    timestamp: '2:50 PM',
+    date: 'Apr 19, 2026',
+    ip: '192.168.1.2',
+    entity: 'San Roque Parish',
   },
 ];
 
@@ -357,43 +419,77 @@ const RAW_LOGS: AuditEntry[] = [
 // ─────────────────────────────────────────────
 const CATEGORY_CONFIG: Record<
   Exclude<LogCategory, 'all'>,
-  { label: string; dot: string; pill: string; chart: string }
+  { label: string; dot: string; pill: string; chart: string; icon: React.ReactNode }
 > = {
   auth: {
     label: 'Auth',
     dot: 'bg-gold-500',
     pill: 'bg-gold-500/10 text-gold-700 border border-gold-200',
     chart: '#D4AF37',
+    icon: <ShieldCheck className="w-3 h-3" />,
+  },
+  users: {
+    label: 'Users',
+    dot: 'bg-rose-500',
+    pill: 'bg-rose-50 text-rose-700 border border-rose-200',
+    chart: '#F43F5E',
+    icon: <Users className="w-3 h-3" />,
+  },
+  projects: {
+    label: 'Projects',
+    dot: 'bg-blue-500',
+    pill: 'bg-blue-50 text-blue-700 border border-blue-200',
+    chart: '#3B82F6',
+    icon: <Briefcase className="w-3 h-3" />,
   },
   finance: {
     label: 'Finance',
     dot: 'bg-church-green',
     pill: 'bg-emerald-50 text-emerald-700 border border-emerald-200',
     chart: '#1a472a',
+    icon: <Database className="w-3 h-3" />,
+  },
+  data: {
+    label: 'Data',
+    dot: 'bg-amber-400',
+    pill: 'bg-amber-50 text-amber-700 border border-amber-200',
+    chart: '#F59E0B',
+    icon: <FileDown className="w-3 h-3" />,
+  },
+  events: {
+    label: 'Events',
+    dot: 'bg-sky-500',
+    pill: 'bg-sky-50 text-sky-700 border border-sky-200',
+    chart: '#0EA5E9',
+    icon: <CalendarDays className="w-3 h-3" />,
+  },
+  announcements: {
+    label: 'Announcements',
+    dot: 'bg-orange-400',
+    pill: 'bg-orange-50 text-orange-700 border border-orange-200',
+    chart: '#FB923C',
+    icon: <Megaphone className="w-3 h-3" />,
+  },
+  calendar: {
+    label: 'Calendar',
+    dot: 'bg-teal-500',
+    pill: 'bg-teal-50 text-teal-700 border border-teal-200',
+    chart: '#14B8A6',
+    icon: <CalendarCheck2 className="w-3 h-3" />,
   },
   analytics: {
     label: 'Analytics',
     dot: 'bg-purple-500',
     pill: 'bg-purple-50 text-purple-700 border border-purple-200',
     chart: '#7C3AED',
-  },
-  reports: {
-    label: 'Reports',
-    dot: 'bg-amber-400',
-    pill: 'bg-amber-50 text-amber-700 border border-amber-200',
-    chart: '#F59E0B',
+    icon: <BarChart2 className="w-3 h-3" />,
   },
   system: {
     label: 'System',
     dot: 'bg-gray-400',
     pill: 'bg-gray-100 text-gray-600 border border-gray-200',
     chart: '#6B7280',
-  },
-  access: {
-    label: 'Access',
-    dot: 'bg-rose-500',
-    pill: 'bg-rose-50 text-rose-700 border border-rose-200',
-    chart: '#F43F5E',
+    icon: <Cpu className="w-3 h-3" />,
   },
 };
 
@@ -419,12 +515,20 @@ const SEVERITY_CONFIG: Record<LogSeverity, { icon: React.ReactNode; ring: string
 const FILTER_TABS: { id: LogCategory; label: string }[] = [
   { id: 'all', label: 'All Events' },
   { id: 'auth', label: 'Auth' },
+  { id: 'users', label: 'Users' },
+  { id: 'projects', label: 'Projects' },
   { id: 'finance', label: 'Finance' },
+  { id: 'data', label: 'Data' },
+  { id: 'events', label: 'Events' },
+  { id: 'announcements', label: 'Announcements' },
+  { id: 'calendar', label: 'Calendar' },
   { id: 'analytics', label: 'Analytics' },
-  { id: 'reports', label: 'Reports' },
   { id: 'system', label: 'System' },
-  { id: 'access', label: 'Access' },
 ];
+
+const AUDIT_FETCH_LIMIT = 300;
+const INITIAL_VISIBLE_LOGS = 120;
+const VISIBLE_LOG_INCREMENT = 120;
 
 function groupByDate(logs: AuditEntry[]) {
   const groups: Record<string, AuditEntry[]> = {};
@@ -435,44 +539,366 @@ function groupByDate(logs: AuditEntry[]) {
   return groups;
 }
 
+function normalizeInstitutionType(value: any): Exclude<InstitutionTypeFilter, 'all'> | null {
+  const raw = String(value ?? '').toLowerCase().trim().replace(/[_\s-]+/g, '');
+  if (raw === 'parish' || raw === 'parishes') return 'parish';
+  if (raw === 'school' || raw === 'schools' || raw === 'diocesanschool' || raw === 'diocesanschools') return 'school';
+  if (raw === 'seminary' || raw === 'seminaries') return 'seminary';
+  if (raw === 'diocese') return 'diocese';
+  return null;
+}
+
+function inferInstitutionType(row: any, fallback: Exclude<InstitutionTypeFilter, 'all'>): Exclude<InstitutionTypeFilter, 'all'> {
+  const explicit = normalizeInstitutionType(row?.institution_type ?? row?.entityType ?? row?.entity_type ?? row?.type);
+  if (explicit) return explicit;
+  if (row?.principal || row?.level || row?.cluster !== undefined) return 'school';
+  if (row?.rector) return 'seminary';
+  if (row?.pastor) return 'parish';
+
+  const name = String(row?.name ?? row?.institution_name ?? row?.entityName ?? '').toLowerCase();
+  if (/(^|\s)(parish|quasi-parish|shrine|chaplaincy|manggagawa)(\s|$)/i.test(name)) return 'parish';
+  if (/(school|college|academy|institute|liceo|canossa)/i.test(name)) return 'school';
+  if (/(seminary|formation center)/i.test(name)) return 'seminary';
+
+  return fallback;
+}
+
+function normalizeInstitutionRows(rows: any[], groupType: Exclude<InstitutionTypeFilter, 'all'>): InstitutionOption[] {
+  const seen = new Set<string>();
+  const options: InstitutionOption[] = [];
+
+  rows.forEach((row) => {
+    const type = inferInstitutionType(row, groupType);
+    if (type !== groupType) return;
+
+    const name = String(row?.name ?? row?.institution_name ?? row?.entityName ?? '').trim();
+    if (!name) return;
+
+    const id = String(row?.id ?? row?.institution_id ?? row?.entityId ?? name).trim();
+    const dedupeKey = `${type}:${name.toLowerCase()}`;
+    if (seen.has(dedupeKey)) return;
+    seen.add(dedupeKey);
+
+    options.push({
+      id,
+      name,
+      type,
+      key: `${type}:${id}:${name}`.toLowerCase(),
+    });
+  });
+
+  return options;
+}
+
+function normalizeInstitutions(payload: any): InstitutionOption[] {
+  const groups: [Exclude<InstitutionTypeFilter, 'all'>, any[]][] = [
+    ['parish', Array.isArray(payload?.parishes) ? payload.parishes : []],
+    ['school', Array.isArray(payload?.schools) ? payload.schools : []],
+    ['seminary', Array.isArray(payload?.seminaries) ? payload.seminaries : []],
+  ];
+
+  const options = groups.flatMap(([groupType, rows]) => normalizeInstitutionRows(rows, groupType));
+
+  return options.sort((a, b) => a.type.localeCompare(b.type) || a.name.localeCompare(b.name));
+}
+
+// ── Details panel helpers ─────────────────────────────────────
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+// Hidden from the Details panel: bookkeeping + account-identity fields that say
+// WHO/WHERE (already shown as User / Role / Entity) rather than WHAT happened.
+// Matched after lowercasing and removing underscores (entity_name === entityName).
+const HIDDEN_META_KEYS = new Set([
+  'changes',
+  'id',
+  'email',
+  'role',
+  'roleid',
+  'rolelabel',
+  'accessrole',
+  'displayname',
+  'uid',
+  'userid',
+  'username',
+  'userrole',
+  'entityid',
+  'entityname',
+  'entitytype',
+]);
+
+function isHiddenMetaKey(key: string): boolean {
+  return HIDDEN_META_KEYS.has(key.toLowerCase().replace(/_/g, ''));
+}
+
+function prettyKey(key: string): string {
+  return key
+    .replace(/_/g, ' ')
+    .replace(/([a-z])([A-Z])/g, '$1 $2')
+    .replace(/\b\w/g, (c) => c.toUpperCase())
+    .replace(/\bId\b/g, 'ID');
+}
+
+function formatMetaValue(key: string, value: any): string | null {
+  if (value === null || value === undefined || value === '') return null;
+  if (typeof value === 'object') return null;
+  if (typeof value === 'boolean') return value ? 'Yes' : 'No';
+  if (typeof value === 'number' && /(amount|total|budget|donation|expense)/i.test(key)) {
+    return `₱${value.toLocaleString()}`;
+  }
+  return String(value);
+}
+
+// Turn an audit row's metadata into a clean label/value list, hiding internal
+// ids, raw UUIDs, redundant actor fields, and the changes array.
+function metaEntries(metadata?: Record<string, any>): { label: string; value: string }[] {
+  if (!metadata) return [];
+  const out: { label: string; value: string }[] = [];
+  for (const [key, raw] of Object.entries(metadata)) {
+    if (isHiddenMetaKey(key)) continue;
+    if (/(_id|Id)$/.test(key)) continue; // hide foreign-key ids
+    if (/_by$/.test(key)) continue; // actor already shown in the header
+    if (typeof raw === 'string' && UUID_RE.test(raw)) continue;
+    const value = formatMetaValue(key, raw);
+    if (value === null) continue;
+    out.push({ label: prettyKey(key), value });
+  }
+  return out;
+}
+
+// ── Actor avatar (initials now, profile photo later) ──────────
+function Avatar({ name, photoUrl, system }: { name: string; photoUrl?: string; system?: boolean }) {
+  if (system) {
+    return (
+      <div className="w-9 h-9 rounded-full bg-gray-200 flex items-center justify-center shrink-0">
+        <Cpu className="w-4 h-4 text-gray-500" />
+      </div>
+    );
+  }
+  if (photoUrl) {
+    // eslint-disable-next-line @next/next/no-img-element
+    return <img src={photoUrl} alt={name} className="w-9 h-9 rounded-full object-cover shrink-0" />;
+  }
+  return (
+    <div
+      className="w-9 h-9 rounded-full flex items-center justify-center shrink-0 bg-black text-gold-400 text-xs font-black ring-1 ring-gold-500/35"
+    >
+      {getInitials(name)}
+    </div>
+  );
+}
+
+// ── Friendly, Canva-style action phrasing ─────────────────────
+const ACTION_PHRASES: Record<string, string> = {
+  'Logged In': 'Logged in',
+  'Logged Out': 'Logged out',
+  'Login Failed': 'Failed to log in',
+  'OTP Sent': 'Requested a verification code',
+  'Onboarding Completed': 'Completed onboarding',
+  'Password Reset': 'Reset their password',
+  'Event Created': 'Created an event',
+  'Event Edited': 'Edited an event',
+  'Event Archived': 'Archived an event',
+  'Event Restored': 'Restored an event',
+  'Announcement Published': 'Published an announcement',
+  'Announcement Saved as Draft': 'Saved an announcement draft',
+  'Draft Published': 'Published a draft',
+  'Announcement Edited': 'Edited an announcement',
+  'Announcement Archived': 'Archived an announcement',
+  'Announcement Restored': 'Restored an announcement',
+  'Announcement Pinned': 'Pinned an announcement',
+  'Announcement Unpinned': 'Unpinned an announcement',
+  'Project Created': 'Created a project',
+  'Project Updated': 'Updated a project',
+  'Project Deleted': 'Deleted a project',
+  'Donation Added': 'Added a donation',
+  'Donation Updated': 'Updated a donation',
+  'Expense Added': 'Added an expense',
+  'Expense Updated': 'Updated an expense',
+  'User Created': 'Created a user account',
+  'User Updated': 'Updated a user account',
+  'User Archived': 'Archived a user account',
+  'User Restored': 'Restored a user account',
+  'Roles Updated': 'Updated role permissions',
+  'Budget Saved': 'Saved a budget',
+  'Financial Record Saved': 'Saved a financial record',
+  'Financial Record Deleted': 'Deleted a financial record',
+  'Institution Created': 'Created an institution',
+  'Institution Updated': 'Updated an institution',
+  'Institution Archived': 'Archived an institution',
+  'Calendar Entry Approved': 'Approved a calendar entry',
+  'Calendar Entry Rejected': 'Rejected a calendar entry',
+  'Calendar Bulk Approved': 'Bulk-approved calendar entries',
+  'Scenario Saved': 'Saved a simulator scenario',
+  'Scenario Deleted': 'Deleted a simulator scenario',
+};
+
+function friendlyAction(action: string): string {
+  return ACTION_PHRASES[action] ?? action;
+}
+
 // TooltipBox replaced by ECharts built-in tooltip
 
 // ─────────────────────────────────────────────
 // Component
 // ─────────────────────────────────────────────
 export function AuditLog() {
-  const [logs, setLogs] = useState<AuditEntry[]>(RAW_LOGS);
-  const [isLoading, setIsLoading] = useState(false);
-  useEffect(() => {
-    setIsLoading(true);
-    fetch('/api/audit-log', { credentials: 'include' })
-      .then((res) => (res.ok ? res.json() : null))
-      .then((data: AuditEntry[] | null) => {
-        if (data && data.length > 0) setLogs(data);
-      })
-      .catch(() => {
-        /* keep fallback RAW_LOGS */
-      })
-      .finally(() => setIsLoading(false));
-  }, []);
-
+  const [logs, setLogs] = useState<AuditEntry[]>([]);
+  const [institutions, setInstitutions] = useState<InstitutionOption[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [activeFilter, setActiveFilter] = useState<LogCategory>('all');
+  const [institutionType, setInstitutionType] = useState<InstitutionTypeFilter>('all');
+  const [institutionId, setInstitutionId] = useState('all');
+  const [institutionName, setInstitutionName] = useState('');
+  const [dateFrom, setDateFrom] = useState('');
+  const [timeFrom, setTimeFrom] = useState('');
+  const [dateTo, setDateTo] = useState('');
+  const [timeTo, setTimeTo] = useState('');
+  const [draftInstitutionType, setDraftInstitutionType] = useState<InstitutionTypeFilter>('all');
+  const [draftInstitutionId, setDraftInstitutionId] = useState('all');
+  const [draftDateFrom, setDraftDateFrom] = useState('');
+  const [draftTimeFrom, setDraftTimeFrom] = useState('');
+  const [draftDateTo, setDraftDateTo] = useState('');
+  const [draftTimeTo, setDraftTimeTo] = useState('');
   const [showAnalytics, setShowAnalytics] = useState(false);
+  const [showFilters, setShowFilters] = useState(false);
   const [selectedLog, setSelectedLog] = useState<AuditEntry | null>(null);
+  const [visibleLogCount, setVisibleLogCount] = useState(INITIAL_VISIBLE_LOGS);
+
+  const fetchLogs = useCallback((signal?: AbortSignal) => {
+    setIsLoading(true);
+    const params = new URLSearchParams();
+    if (activeFilter !== 'all') params.set('category', activeFilter);
+    if (institutionType !== 'all') params.set('institutionType', institutionType);
+    if (institutionId !== 'all') params.set('institutionId', institutionId);
+    if (institutionName) params.set('institutionName', institutionName);
+    if (dateFrom) params.set('dateFrom', `${dateFrom}T${timeFrom || '00:00'}`);
+    if (dateTo) params.set('dateTo', `${dateTo}T${timeTo || '23:59:59'}`);
+    params.set('limit', String(AUDIT_FETCH_LIMIT));
+
+    const query = params.toString();
+    fetch(`/api/audit-log${query ? `?${query}` : ''}`, { credentials: 'include', signal })
+      .then((res) => (res.ok ? res.json() : []))
+      .then((data: AuditEntry[]) => {
+        setLogs(Array.isArray(data) ? data : []);
+      })
+      .catch((error) => {
+        if (error?.name !== 'AbortError') setLogs([]);
+      })
+      .finally(() => {
+        if (!signal?.aborted) setIsLoading(false);
+      });
+  }, [activeFilter, institutionType, institutionId, institutionName, dateFrom, timeFrom, dateTo, timeTo]);
+
+  useEffect(() => {
+    fetch('/api/entities', { credentials: 'include' })
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data) => setInstitutions(normalizeInstitutions(data)))
+      .catch(() => setInstitutions([]));
+  }, []);
+  useEffect(() => {
+    setVisibleLogCount(INITIAL_VISIBLE_LOGS);
+    const controller = new AbortController();
+    fetchLogs(controller.signal);
+    return () => controller.abort();
+  }, [fetchLogs]);
+
+  const loadInstitutionsForType = (type: Exclude<InstitutionTypeFilter, 'all' | 'diocese'>) => {
+    fetch(`/api/entities?type=${type}`, { credentials: 'include' })
+      .then((res) => (res.ok ? res.json() : []))
+      .then((data) => {
+        const scopedOptions = normalizeInstitutionRows(Array.isArray(data) ? data : [], type);
+        setInstitutions((current) =>
+          [...current.filter((institution) => institution.type !== type), ...scopedOptions].sort(
+            (a, b) => a.type.localeCompare(b.type) || a.name.localeCompare(b.name),
+          ),
+        );
+      })
+      .catch(() => undefined);
+  };
+
+  const draftInstitutionOptions = useMemo(
+    () => institutions.filter((institution) => draftInstitutionType !== 'all' && institution.type === draftInstitutionType),
+    [institutions, draftInstitutionType],
+  );
+
+  useEffect(() => {
+    if (!showFilters || draftInstitutionId === 'all') return;
+    if (!draftInstitutionOptions.some((institution) => institution.id === draftInstitutionId)) {
+      setDraftInstitutionId('all');
+    }
+  }, [draftInstitutionId, draftInstitutionOptions, showFilters]);
+
+  const openFilters = () => {
+    setDraftInstitutionType(institutionType);
+    setDraftInstitutionId(institutionId);
+    setDraftDateFrom(dateFrom);
+    setDraftTimeFrom(timeFrom);
+    setDraftDateTo(dateTo);
+    setDraftTimeTo(timeTo);
+    setShowFilters(true);
+  };
+
+  const handleDraftInstitutionTypeChange = (type: InstitutionTypeFilter) => {
+    setDraftInstitutionType(type);
+    setDraftInstitutionId('all');
+    if (type === 'parish' || type === 'school' || type === 'seminary') {
+      loadInstitutionsForType(type);
+    }
+  };
+
+  const applyAdvancedFilters = () => {
+    const selectedInstitution = draftInstitutionOptions.find((institution) => institution.id === draftInstitutionId);
+    setInstitutionType(draftInstitutionType);
+    setInstitutionId(draftInstitutionType === 'all' || draftInstitutionType === 'diocese' ? 'all' : draftInstitutionId);
+    setInstitutionName(draftInstitutionType === 'all' || draftInstitutionType === 'diocese' ? '' : (selectedInstitution?.name ?? ''));
+    setDateFrom(draftDateFrom);
+    setTimeFrom(draftTimeFrom);
+    setDateTo(draftDateTo);
+    setTimeTo(draftTimeTo);
+    setShowFilters(false);
+  };
+
+  const clearAdvancedFilters = () => {
+    setDraftInstitutionType('all');
+    setDraftInstitutionId('all');
+    setDraftDateFrom('');
+    setDraftTimeFrom('');
+    setDraftDateTo('');
+    setDraftTimeTo('');
+  };
+
+  const hasAdvancedFilters =
+    institutionType !== 'all' || institutionId !== 'all' || !!institutionName || !!dateFrom || !!timeFrom || !!dateTo || !!timeTo;
 
   const filtered = useMemo(() => {
     return logs.filter((log) => {
       const matchCat = activeFilter === 'all' || log.category === activeFilter;
+      const matchInstitution =
+        institutionId === 'all' ||
+        log.institutionId === institutionId ||
+        (!!institutionName && log.entity?.toLowerCase() === institutionName.toLowerCase());
+      const matchInstitutionType =
+        institutionType === 'all' || log.institutionType === institutionType || (institutionId !== 'all' && matchInstitution);
+      const occurredAt = log.occurredAt ? new Date(log.occurredAt).getTime() : null;
+      const fromTs = dateFrom ? new Date(`${dateFrom}T${timeFrom || '00:00'}`).getTime() : null;
+      const toTs = dateTo ? new Date(`${dateTo}T${timeTo || '23:59:59'}`).getTime() : null;
+      const matchDateFrom = fromTs === null || !Number.isFinite(fromTs) || (occurredAt !== null && occurredAt >= fromTs);
+      const matchDateTo = toTs === null || !Number.isFinite(toTs) || (occurredAt !== null && occurredAt <= toTs);
       const q = search.toLowerCase();
       const matchText =
         !q || [log.user, log.action, log.detail, log.id, log.entity ?? ''].some((s) => s.toLowerCase().includes(q));
-      return matchCat && matchText;
+      return matchCat && matchInstitutionType && matchInstitution && matchDateFrom && matchDateTo && matchText;
     });
-  }, [search, activeFilter]);
+  }, [logs, search, activeFilter, institutionType, institutionId, institutionName, dateFrom, timeFrom, dateTo, timeTo]);
 
-  const grouped = useMemo(() => groupByDate(filtered), [filtered]);
+  useEffect(() => {
+    setVisibleLogCount(INITIAL_VISIBLE_LOGS);
+  }, [search]);
+
+  const visibleLogs = useMemo(() => filtered.slice(0, visibleLogCount), [filtered, visibleLogCount]);
+  const grouped = useMemo(() => groupByDate(visibleLogs), [visibleLogs]);
   const dateKeys = Object.keys(grouped);
+  const hasMoreVisibleLogs = visibleLogs.length < filtered.length;
 
   const stats = useMemo(
     () => ({
@@ -493,7 +919,7 @@ export function AuditLog() {
     return Object.entries(counts)
       .sort((a, b) => new Date(a[0]).getTime() - new Date(b[0]).getTime())
       .map(([date, events]) => ({ date: date.replace(', 2026', ''), events }));
-  }, []);
+  }, [logs]);
 
   const categoryData = useMemo(() => {
     const counts: Partial<Record<Exclude<LogCategory, 'all'>, number>> = {};
@@ -501,11 +927,11 @@ export function AuditLog() {
       counts[l.category] = (counts[l.category] || 0) + 1;
     });
     return Object.entries(counts).map(([cat, count]) => ({
-      name: CATEGORY_CONFIG[cat as Exclude<LogCategory, 'all'>].label,
+      name: (CATEGORY_CONFIG[cat as Exclude<LogCategory, 'all'>] ?? CATEGORY_CONFIG['system']).label,
       value: count as number,
-      color: CATEGORY_CONFIG[cat as Exclude<LogCategory, 'all'>].chart,
+      color: (CATEGORY_CONFIG[cat as Exclude<LogCategory, 'all'>] ?? CATEGORY_CONFIG['system']).chart,
     }));
-  }, []);
+  }, [logs]);
 
   const severityData = useMemo(() => {
     const counts: Partial<Record<LogSeverity, number>> = {};
@@ -517,7 +943,7 @@ export function AuditLog() {
       count: counts[sev] || 0,
       color: SEVERITY_CONFIG[sev].chart,
     }));
-  }, []);
+  }, [logs]);
 
   const topUsersData = useMemo(() => {
     const counts: Record<string, number> = {};
@@ -530,34 +956,36 @@ export function AuditLog() {
       .sort((a, b) => b[1] - a[1])
       .slice(0, 5)
       .map(([name, actions]) => ({ name: name.replace('Admin ', 'Adm. '), actions }));
-  }, []);
+  }, [logs]);
 
   const insightText = useMemo(() => {
+    if (categoryData.length === 0) return ['No audit events recorded yet. Perform actions to generate insights.'];
     const topCat = categoryData.reduce((a, b) => (a.value > b.value ? a : b));
     const warnings = logs.filter((l) => l.severity === 'warning' || l.severity === 'error').length;
     const topUser = topUsersData[0];
+    const systemPct = stats.total > 0 ? Math.round((stats.system / stats.total) * 100) : 0;
     return [
       `Most frequent event category is ${topCat.name} with ${topCat.value} events in the last 30 days.`,
       `${warnings} alert${warnings !== 1 ? 's' : ''} (warnings/errors) detected — review system and access logs for anomalies.`,
       topUser ? `${topUser.name} is the most active user with ${topUser.actions} recorded actions.` : '',
-      `System automated events account for ${stats.system} of ${stats.total} total events (${Math.round((stats.system / stats.total) * 100)}%).`,
+      `System automated events account for ${stats.system} of ${stats.total} total events (${systemPct}%).`,
     ].filter(Boolean);
-  }, [categoryData, topUsersData, stats]);
+  }, [categoryData, topUsersData, stats, logs]);
 
   const handleExport = () => {
     const rows = [
-      ['Log ID', 'Date', 'Time', 'User', 'Role', 'Category', 'Action', 'Detail', 'Entity', 'IP'],
+      ['Log ID', 'Date', 'Time', 'User', 'Role', 'Institution Type', 'Institution', 'Category', 'Action', 'Detail'],
       ...filtered.map((l) => [
         l.id,
         l.date,
         l.timestamp,
         l.user,
         l.role,
+        l.institutionType ?? '',
+        l.entity ?? '',
         CATEGORY_CONFIG[l.category].label,
         l.action,
         l.detail,
-        l.entity ?? '',
-        l.ip,
       ]),
     ];
     const csv = rows.map((r) => r.map((c) => `"${c}"`).join(',')).join('\n');
@@ -632,21 +1060,30 @@ export function AuditLog() {
             />
           </div>
 
-          <div className="flex items-center gap-1.5 flex-wrap flex-1">
+          <select
+            value={activeFilter}
+            onChange={(e) => setActiveFilter(e.target.value as LogCategory)}
+            aria-label="Audit category"
+            className="w-full sm:w-52 h-10 rounded-xl border border-gray-200 bg-gray-50 px-3 text-xs font-black uppercase tracking-wider text-gray-700 focus:outline-none focus:ring-2 focus:ring-church-green/20"
+          >
             {FILTER_TABS.map((tab) => (
-              <button
-                key={tab.id}
-                onClick={() => setActiveFilter(tab.id)}
-                className={`px-3 py-1.5 rounded-lg text-[11px] font-black uppercase tracking-wider transition-all ${
-                  activeFilter === tab.id
-                    ? 'bg-church-black text-gold-400 shadow-sm'
-                    : 'bg-gray-100 text-gray-500 hover:bg-gray-200'
-                }`}
-              >
+              <option key={tab.id} value={tab.id}>
                 {tab.label}
-              </button>
+              </option>
             ))}
-          </div>
+          </select>
+
+          <button
+            onClick={openFilters}
+            className={`shrink-0 flex items-center gap-2 px-4 py-2 text-[11px] font-black uppercase tracking-widest rounded-xl transition-colors border ${
+              hasAdvancedFilters
+                ? 'bg-gold-500/10 text-church-black border-gold-400'
+                : 'bg-white text-gray-600 border-gray-200 hover:border-gray-400'
+            }`}
+          >
+            <SlidersHorizontal className="w-3.5 h-3.5" />
+            Filters
+          </button>
 
           <button
             onClick={() => setShowAnalytics((v) => !v)}
@@ -661,6 +1098,14 @@ export function AuditLog() {
           </button>
 
           <button
+            onClick={() => fetchLogs()}
+            disabled={isLoading}
+            className="shrink-0 flex items-center gap-2 px-4 py-2 bg-white text-gray-600 text-[11px] font-black uppercase tracking-widest rounded-xl border border-gray-200 hover:border-gray-400 transition-colors disabled:opacity-50"
+          >
+            <svg className={`w-3.5 h-3.5 ${isLoading ? 'animate-spin' : ''}`} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M3 12a9 9 0 009 9 9.75 9.75 0 006.74-2.74L21 16"/><path d="M21 12a9 9 0 00-9-9 9.75 9.75 0 00-6.74 2.74L3 8"/><path d="M8 8H3V3M16 16h5v5"/></svg>
+            Refresh
+          </button>
+          <button
             onClick={handleExport}
             className="shrink-0 flex items-center gap-2 px-4 py-2 bg-church-black text-white text-[11px] font-black uppercase tracking-widest rounded-xl hover:bg-church-green transition-colors"
           >
@@ -672,14 +1117,145 @@ export function AuditLog() {
 
       {/* ── Analytics Panel ───────────────────────────── */}
       <AnimatePresence>
+        {showFilters && (
+          <motion.div
+            key="filters-modal"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
+            onClick={() => setShowFilters(false)}
+          >
+            <motion.div
+              initial={{ opacity: 0, y: 16, scale: 0.96 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              exit={{ opacity: 0, y: 16, scale: 0.96 }}
+              transition={{ duration: 0.2 }}
+              className="w-full max-w-2xl rounded-2xl bg-white shadow-2xl"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="flex items-start justify-between gap-4 border-b border-gray-100 px-6 py-5">
+                <div>
+                  <p className="text-[10px] font-black uppercase tracking-[0.25em] text-gold-600">Audit Filters</p>
+                  <h2 className="mt-1 text-xl font-black text-gray-900">Refine history</h2>
+                </div>
+                <button
+                  onClick={() => setShowFilters(false)}
+                  className="rounded-xl p-2 text-gray-400 transition-colors hover:bg-gray-100 hover:text-gray-700"
+                  aria-label="Close filters"
+                >
+                  <X className="h-4 w-4" />
+                </button>
+              </div>
+
+              <div className="grid grid-cols-1 gap-4 px-6 py-5 sm:grid-cols-2">
+                <label className="space-y-1.5">
+                  <span className="text-[10px] font-black uppercase tracking-wider text-gray-400">Institution Type</span>
+                  <select
+                    value={draftInstitutionType}
+                    onChange={(e) => handleDraftInstitutionTypeChange(e.target.value as InstitutionTypeFilter)}
+                    className="h-11 w-full rounded-xl border border-gray-200 bg-gray-50 px-3 text-sm font-bold text-gray-700 focus:outline-none focus:ring-2 focus:ring-church-green/20"
+                  >
+                    <option value="all">All types</option>
+                    <option value="diocese">Diocese</option>
+                    <option value="parish">Parish</option>
+                    <option value="school">School</option>
+                    <option value="seminary">Seminary</option>
+                  </select>
+                </label>
+
+                <label className="space-y-1.5">
+                  <span className="text-[10px] font-black uppercase tracking-wider text-gray-400">Institution</span>
+                  <select
+                    value={draftInstitutionId}
+                    onChange={(e) => setDraftInstitutionId(e.target.value)}
+                    disabled={draftInstitutionType === 'all' || draftInstitutionType === 'diocese'}
+                    className="h-11 w-full rounded-xl border border-gray-200 bg-gray-50 px-3 text-sm font-bold text-gray-700 focus:outline-none focus:ring-2 focus:ring-church-green/20 disabled:cursor-not-allowed disabled:text-gray-400"
+                  >
+                    <option value="all">
+                      {draftInstitutionType === 'all'
+                        ? 'Choose a type first'
+                        : draftInstitutionType === 'diocese'
+                          ? 'All diocesan records'
+                          : `All ${draftInstitutionType} records`}
+                    </option>
+                    {draftInstitutionOptions.map((institution) => (
+                      <option key={institution.key} value={institution.id}>
+                        {institution.name}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+
+                <label className="space-y-1.5">
+                  <span className="text-[10px] font-black uppercase tracking-wider text-gray-400">From Date</span>
+                  <input
+                    type="date"
+                    value={draftDateFrom}
+                    onChange={(e) => setDraftDateFrom(e.target.value)}
+                    className="h-11 w-full rounded-xl border border-gray-200 bg-gray-50 px-3 text-sm font-bold text-gray-700 focus:outline-none focus:ring-2 focus:ring-church-green/20"
+                  />
+                </label>
+
+                <label className="space-y-1.5">
+                  <span className="text-[10px] font-black uppercase tracking-wider text-gray-400">From Time</span>
+                  <input
+                    type="time"
+                    value={draftTimeFrom}
+                    onChange={(e) => setDraftTimeFrom(e.target.value)}
+                    className="h-11 w-full rounded-xl border border-gray-200 bg-gray-50 px-3 text-sm font-bold text-gray-700 focus:outline-none focus:ring-2 focus:ring-church-green/20"
+                  />
+                </label>
+
+                <label className="space-y-1.5">
+                  <span className="text-[10px] font-black uppercase tracking-wider text-gray-400">To Date</span>
+                  <input
+                    type="date"
+                    value={draftDateTo}
+                    onChange={(e) => setDraftDateTo(e.target.value)}
+                    className="h-11 w-full rounded-xl border border-gray-200 bg-gray-50 px-3 text-sm font-bold text-gray-700 focus:outline-none focus:ring-2 focus:ring-church-green/20"
+                  />
+                </label>
+
+                <label className="space-y-1.5">
+                  <span className="text-[10px] font-black uppercase tracking-wider text-gray-400">To Time</span>
+                  <input
+                    type="time"
+                    value={draftTimeTo}
+                    onChange={(e) => setDraftTimeTo(e.target.value)}
+                    className="h-11 w-full rounded-xl border border-gray-200 bg-gray-50 px-3 text-sm font-bold text-gray-700 focus:outline-none focus:ring-2 focus:ring-church-green/20"
+                  />
+                </label>
+              </div>
+
+              <div className="flex items-center justify-end gap-3 border-t border-gray-100 px-6 py-4">
+                <button
+                  onClick={clearAdvancedFilters}
+                  className="rounded-xl border border-gray-200 bg-white px-4 py-2 text-[11px] font-black uppercase tracking-widest text-gray-500 hover:border-gray-400"
+                >
+                  Clear
+                </button>
+                <button
+                  onClick={applyAdvancedFilters}
+                  className="rounded-xl bg-church-black px-5 py-2 text-[11px] font-black uppercase tracking-widest text-white hover:bg-church-green"
+                >
+                  Apply
+                </button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      <AnimatePresence>
         {showAnalytics && (
           <motion.div
             key="analytics"
-            initial={{ opacity: 0, height: 0 }}
-            animate={{ opacity: 1, height: 'auto' }}
-            exit={{ opacity: 0, height: 0 }}
-            transition={{ duration: 0.3, ease: 'easeInOut' }}
-            className="overflow-hidden border-b border-gray-100 bg-gray-50"
+            initial={{ opacity: 0, y: -8 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -8 }}
+            transition={{ duration: 0.18, ease: 'easeOut' }}
+            className="border-b border-gray-100 bg-gray-50"
           >
             <div className="max-w-[1400px] mx-auto px-6 py-8">
               <div className="flex items-center gap-3 mb-6">
@@ -701,6 +1277,7 @@ export function AuditLog() {
                   <ReactECharts
                     style={{ height: '180px', width: '100%' }}
                     option={{
+                      animation: false,
                       color: ['#6366f1', '#8b5cf6', '#06b6d4', '#10b981', '#f59e0b', '#ef4444'],
                       tooltip: { trigger: 'axis' },
                       grid: { top: 5, right: 10, left: 20, bottom: 20 },
@@ -757,6 +1334,7 @@ export function AuditLog() {
                   <ReactECharts
                     style={{ height: '140px', width: '100%' }}
                     option={{
+                      animation: false,
                       color: categoryData.map((c) => c.color),
                       tooltip: { trigger: 'item', formatter: '{b}: {c}' },
                       series: [
@@ -793,6 +1371,7 @@ export function AuditLog() {
                   <ReactECharts
                     style={{ height: '160px', width: '100%' }}
                     option={{
+                      animation: false,
                       color: severityData.map((d) => d.color),
                       tooltip: { trigger: 'axis', axisPointer: { type: 'shadow' } },
                       grid: { top: 5, right: 20, left: 60, bottom: 5 },
@@ -834,6 +1413,7 @@ export function AuditLog() {
                   <ReactECharts
                     style={{ height: '160px', width: '100%' }}
                     option={{
+                      animation: false,
                       color: ['#D4AF37'],
                       tooltip: { trigger: 'axis', axisPointer: { type: 'shadow' } },
                       grid: { top: 5, right: 20, left: 80, bottom: 5 },
@@ -887,20 +1467,21 @@ export function AuditLog() {
 
       {/* ── Timeline Feed ─────────────────────────────── */}
       <div className="flex-1 max-w-[1400px] mx-auto w-full px-6 py-10">
-        {filtered.length === 0 ? (
+        {isLoading ? (
+          <InlineLoader label="Loading audit logs" className="py-32" />
+        ) : filtered.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-32 text-gray-400 gap-4">
             <ScrollText className="w-10 h-10 opacity-30" />
-            <p className="text-sm font-semibold">No log entries match your search or filter.</p>
+            <p className="text-sm font-semibold">
+              {logs.length === 0
+                ? 'No audit events recorded yet. Events will appear here after actions are performed.'
+                : 'No log entries match your search or filter.'}
+            </p>
           </div>
         ) : (
           <div className="space-y-10">
-            {dateKeys.map((date, di) => (
-              <motion.div
-                key={date}
-                initial={{ opacity: 0, y: 16 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: di * 0.05 }}
-              >
+            {dateKeys.map((date) => (
+              <section key={date}>
                 <div className="flex items-center gap-4 mb-6">
                   <div className="w-2 h-2 rounded-full bg-gold-500 shrink-0" />
                   <p className="text-[11px] font-black text-gray-400 uppercase tracking-[0.3em]">{date}</p>
@@ -911,17 +1492,11 @@ export function AuditLog() {
                 </div>
 
                 <div className="relative pl-6 border-l-2 border-gray-100 space-y-1">
-                  {grouped[date].map((log, li) => {
+                  {grouped[date].map((log) => {
                     const sev = SEVERITY_CONFIG[log.severity];
-                    const cat = CATEGORY_CONFIG[log.category];
+                    const cat = CATEGORY_CONFIG[log.category] ?? CATEGORY_CONFIG['system'];
                     return (
-                      <motion.div
-                        key={log.id}
-                        initial={{ opacity: 0, x: -8 }}
-                        animate={{ opacity: 1, x: 0 }}
-                        transition={{ delay: di * 0.04 + li * 0.03 }}
-                        className="relative group"
-                      >
+                      <div key={log.id} className="relative group">
                         <div
                           className={`absolute -left-[1.85rem] top-4 w-3.5 h-3.5 rounded-full ring-2 ring-offset-2 ring-offset-[#FDFCFB] ${sev.ring} flex items-center justify-center`}
                         >
@@ -929,68 +1504,77 @@ export function AuditLog() {
                         </div>
 
                         <div
-                          className="ml-4 mb-3 bg-white rounded-2xl border border-gray-100 shadow-sm hover:shadow-md hover:border-gold-200/60 transition-all duration-300 px-5 py-4 flex flex-col sm:flex-row sm:items-start gap-3 cursor-pointer"
+                          className="ml-4 mb-3 bg-white rounded-2xl border border-gray-100 shadow-sm hover:shadow-md hover:border-gold-200/60 transition-all duration-300 px-5 py-3.5 flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-4 cursor-pointer"
                           onClick={() => setSelectedLog(log)}
                         >
-                          <div className={`mt-0.5 p-2 rounded-xl shrink-0 ring-1 ${sev.ring}`}>{sev.icon}</div>
-
-                          <div className="flex-1 min-w-0">
-                            <div className="flex flex-wrap items-center gap-2 mb-1">
-                              <span
-                                className={`text-sm font-bold ${log.isSystem ? 'text-gray-500 italic' : 'text-church-black'}`}
-                              >
-                                {log.user}
-                              </span>
-                              <span className="text-[10px] font-bold text-gray-400 bg-gray-100 px-2 py-0.5 rounded-full">
-                                {log.role}
-                              </span>
-                              <span
-                                className={`text-[10px] font-black px-2.5 py-0.5 rounded-full uppercase tracking-wider ${cat.pill}`}
-                              >
-                                {cat.label}
-                              </span>
-                              <span className="text-[11px] font-black text-church-black/70 uppercase tracking-wider">
-                                — {log.action}
-                              </span>
-                            </div>
-
-                            <p className="text-sm text-gray-500 leading-relaxed">{log.detail}</p>
-
-                            <div className="mt-2 flex flex-wrap gap-2">
-                              {log.entity && (
-                                <div className="inline-flex items-center gap-1.5 text-[10px] font-black text-church-green uppercase tracking-wider bg-church-green/5 border border-church-green/20 px-2.5 py-1 rounded-full">
-                                  <div className="w-1 h-1 rounded-full bg-church-green" />
-                                  {log.entity}
-                                </div>
-                              )}
-                              {log.changes && log.changes.length > 0 && (
-                                <div className="inline-flex items-center gap-1 text-[10px] font-black text-gold-700 uppercase tracking-wider bg-gold-500/10 border border-gold-200 px-2.5 py-1 rounded-full">
-                                  <ChevronRight className="w-2.5 h-2.5" />
-                                  {log.changes.length} field{log.changes.length !== 1 ? 's' : ''} changed
-                                </div>
-                              )}
+                          {/* Actor: avatar + name + email */}
+                          <div className="flex items-center gap-3 min-w-0 sm:w-72 sm:shrink-0">
+                            <Avatar name={log.user} photoUrl={log.avatarUrl} system={log.isSystem} />
+                            <div className="min-w-0">
+                              <div className="flex items-center gap-1.5">
+                                <span
+                                  className={`text-sm font-bold truncate ${log.isSystem ? 'text-gray-500 italic' : 'text-church-black'}`}
+                                >
+                                  {log.user}
+                                </span>
+                                {!log.isSystem && (
+                                  <span className="text-[10px] text-gray-400 font-semibold shrink-0">· {log.role}</span>
+                                )}
+                              </div>
+                              <p className="text-xs text-gray-400 truncate">{log.email ?? (log.isSystem ? 'Automated' : '—')}</p>
                             </div>
                           </div>
 
-                          <div className="shrink-0 text-right sm:min-w-[130px]">
-                            <p className="text-xs font-bold text-gray-500">{log.timestamp}</p>
-                            <p className="text-[10px] text-gray-300 mt-0.5 font-mono">{log.ip}</p>
-                            <p className="text-[10px] text-gray-300 font-mono">{log.id}</p>
+                          {/* Action: category pill + friendly phrase + entity */}
+                          <div className="flex-1 min-w-0 flex items-center gap-2 flex-wrap">
+                            <span
+                              className={`text-[10px] font-black px-2 py-0.5 rounded-full uppercase tracking-wider ${cat.pill}`}
+                            >
+                              {cat.label}
+                            </span>
+                            <span className="text-sm font-semibold text-gray-700">{friendlyAction(log.action)}</span>
+                            {log.entity && (
+                              <span className="text-[11px] text-church-green font-bold truncate">· {log.entity}</span>
+                            )}
+                          </div>
+
+                          {/* Time + chevron */}
+                          <div className="shrink-0 flex items-center gap-3 self-end sm:self-center">
+                            <div className="text-right">
+                              <p className="text-xs font-bold text-gray-500">{log.timestamp}</p>
+                              {log.changes && log.changes.length > 0 && (
+                                <p className="text-[10px] font-black text-gold-700">
+                                  {log.changes.length} change{log.changes.length !== 1 ? 's' : ''}
+                                </p>
+                              )}
+                            </div>
+                            <ChevronRight className="w-4 h-4 text-gray-300 group-hover:text-gold-500 transition-colors" />
                           </div>
                         </div>
-                      </motion.div>
+                      </div>
                     );
                   })}
                 </div>
-              </motion.div>
+              </section>
             ))}
+          </div>
+        )}
+
+        {!isLoading && hasMoreVisibleLogs && (
+          <div className="mt-8 flex justify-center">
+            <button
+              onClick={() => setVisibleLogCount((count) => count + VISIBLE_LOG_INCREMENT)}
+              className="rounded-xl border border-gray-200 bg-white px-5 py-2.5 text-[11px] font-black uppercase tracking-widest text-gray-600 shadow-sm transition-colors hover:border-church-green hover:text-church-green"
+            >
+              Load more logs
+            </button>
           </div>
         )}
 
         <div className="mt-12 flex items-center gap-4">
           <div className="flex-1 h-px bg-gray-100" />
           <p className="text-[10px] font-black text-gray-300 uppercase tracking-[0.3em] whitespace-nowrap">
-            {filtered.length} of {logs.length} events &nbsp;·&nbsp; 90-day retention
+            {visibleLogs.length} shown of {filtered.length} matched events &nbsp;·&nbsp; {logs.length} loaded
           </p>
           <div className="flex-1 h-px bg-gray-100" />
         </div>
@@ -1019,10 +1603,8 @@ export function AuditLog() {
               <div className="bg-church-black px-6 py-5 rounded-t-2xl flex items-start justify-between gap-4">
                 <div className="flex-1 min-w-0">
                   <div className="flex flex-wrap items-center gap-2 mb-2">
-                    <span
-                      className={`text-[10px] font-black px-2.5 py-0.5 rounded-full uppercase tracking-wider ${CATEGORY_CONFIG[selectedLog.category].pill}`}
-                    >
-                      {CATEGORY_CONFIG[selectedLog.category].label}
+                    <span className="rounded-full border border-[#D4AF37]/70 bg-white px-2.5 py-0.5 text-[10px] font-black uppercase tracking-wider text-church-black shadow-sm shadow-[#D4AF37]/20">
+                      {(CATEGORY_CONFIG[selectedLog.category] ?? CATEGORY_CONFIG['system']).label}
                     </span>
                     <span
                       className={`text-[10px] font-black px-2 py-0.5 rounded-full uppercase tracking-wider ring-1 ${SEVERITY_CONFIG[selectedLog.severity].ring}`}
@@ -1047,7 +1629,6 @@ export function AuditLog() {
                   { label: 'User', value: selectedLog.user },
                   { label: 'Role', value: selectedLog.role },
                   { label: 'Date & Time', value: `${selectedLog.date} — ${selectedLog.timestamp}` },
-                  { label: 'IP Address', value: selectedLog.ip, mono: true },
                   ...(selectedLog.entity ? [{ label: 'Entity', value: selectedLog.entity, green: true }] : []),
                   { label: 'Log ID', value: selectedLog.id, mono: true },
                 ].map((item, i) => (
@@ -1062,13 +1643,13 @@ export function AuditLog() {
                 ))}
               </div>
 
-              {/* Field diff */}
+              {/* Details */}
               {selectedLog.changes && selectedLog.changes.length > 0 ? (
                 <div className="px-6 py-5">
                   <p className="text-[11px] font-black text-gray-500 uppercase tracking-[0.2em] mb-4">
-                    Field Changes &nbsp;
+                    Details &nbsp;
                     <span className="text-gold-600 bg-gold-500/10 border border-gold-200 px-2 py-0.5 rounded-full text-[10px]">
-                      {selectedLog.changes.length} changed
+                      {selectedLog.changes.length} field{selectedLog.changes.length !== 1 ? 's' : ''} changed
                     </span>
                   </p>
                   <div className="border border-gray-100 rounded-xl overflow-hidden">
@@ -1113,10 +1694,24 @@ export function AuditLog() {
                     </table>
                   </div>
                 </div>
+              ) : metaEntries(selectedLog.metadata).length > 0 ? (
+                <div className="px-6 py-5">
+                  <p className="text-[11px] font-black text-gray-500 uppercase tracking-[0.2em] mb-4">Details</p>
+                  <div className="border border-gray-100 rounded-xl divide-y divide-gray-50 overflow-hidden">
+                    {metaEntries(selectedLog.metadata).map((item, i) => (
+                      <div key={i} className={`flex items-start gap-4 px-4 py-2.5 ${i % 2 === 0 ? 'bg-white' : 'bg-gray-50/40'}`}>
+                        <span className="text-[10px] font-black text-gray-500 uppercase tracking-wider w-40 shrink-0 pt-0.5">
+                          {item.label}
+                        </span>
+                        <span className="text-sm font-semibold text-gray-800 break-all">{item.value}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
               ) : (
                 <div className="px-6 py-5">
-                  <p className="text-[11px] font-black text-gray-400 uppercase tracking-[0.2em] mb-2">Field Changes</p>
-                  <p className="text-sm text-gray-400">No field-level diff available for this event type.</p>
+                  <p className="text-[11px] font-black text-gray-400 uppercase tracking-[0.2em] mb-2">Details</p>
+                  <p className="text-sm text-gray-500 leading-relaxed">{selectedLog.detail}</p>
                 </div>
               )}
             </motion.div>

@@ -1,0 +1,1 @@
+entity_type,entity_id,target,record_count,train_count,holdout_count,model,status,wape_pct,mae,rmse,mpe_pct,actual_total,predicted_total,exog_features_used,municipality,error

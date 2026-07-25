@@ -12,16 +12,18 @@ from typing import Any
 import numpy as np
 import pandas as pd
 
+from app.services import _aws_financials
 from app.services.data_definitions import _SCHEMA_MAP, build_date_index, safe_div
 from app.services.supabase_client import get_table
 
 
-def _dea_efficiency(inputs: np.ndarray, outputs: np.ndarray) -> list[float]:
+def _dea_efficiency(inputs: np.ndarray, outputs: np.ndarray) -> tuple[list[float], bool]:
     """
     Compute DEA efficiency scores via LP.
     inputs: (n, 1) — e.g., normalized time index as proxy for resource
     outputs: (n, 1) — e.g., avg monthly collection
-    Returns efficiency score in [0, 1] for each DMU.
+    Returns (efficiency score in [0, 1] for each DMU, whether the ratio
+    fallback was used instead of the actual LP solve).
     """
     try:
         import pulp
@@ -56,17 +58,19 @@ def _dea_efficiency(inputs: np.ndarray, outputs: np.ndarray) -> list[float]:
             else:
                 scores.append(0.5)
 
-        return scores
+        return scores, False
 
     except Exception:
         # Fallback: rank by output/input ratio
         ratios = [safe_div(float(outputs[i]), float(inputs[i]) or 1) for i in range(len(inputs))]
         max_r = max(ratios) or 1.0
-        return [round(r / max_r, 4) for r in ratios]
+        return [round(r / max_r, 4) for r in ratios], True
 
 
-def _fetch_and_process(institution_id: str) -> dict[str, Any]:
-    ts = datetime.now(timezone.utc).isoformat()
+def _fetch_series(institution_id: str) -> pd.DataFrame | None:
+    aws_df = _aws_financials.parish_monthly_df(institution_id)
+    if aws_df is not None and len(aws_df) >= 6:
+        return aws_df
 
     schema = None
     receipt_cols: list[str] = []
@@ -83,14 +87,7 @@ def _fetch_and_process(institution_id: str) -> dict[str, Any]:
             break
 
     if schema is None:
-        return {
-            "data_sufficient": False,
-            "institution_id": institution_id,
-            "recommended_actions": [],
-            "efficiency_scores": {},
-            "performance_improvement_estimate": 0.0,
-            "timestamp": ts,
-        }
+        return None
 
     all_cols = ["institution_id", "month", "year"] + receipt_cols
     seen: set[str] = set()
@@ -109,8 +106,24 @@ def _fetch_and_process(institution_id: str) -> dict[str, Any]:
         .order("year")
         .execute()
     )
-
     if not res.data or len(res.data) < 6:
+        return None
+
+    df = pd.DataFrame(res.data)
+    df = build_date_index(df)
+    for col in receipt_cols:
+        if col not in df.columns:
+            df[col] = 0.0
+        df[col] = pd.to_numeric(df[col], errors="coerce").fillna(0.0)
+    df["total_receipts"] = df[receipt_cols].sum(axis=1)
+    return df
+
+
+def _fetch_and_process(institution_id: str) -> dict[str, Any]:
+    ts = datetime.now(timezone.utc).isoformat()
+
+    df = _fetch_series(institution_id)
+    if df is None:
         return {
             "data_sufficient": False,
             "institution_id": institution_id,
@@ -119,16 +132,6 @@ def _fetch_and_process(institution_id: str) -> dict[str, Any]:
             "performance_improvement_estimate": 0.0,
             "timestamp": ts,
         }
-
-    df = pd.DataFrame(res.data)
-    df = build_date_index(df)
-
-    for col in receipt_cols:
-        if col not in df.columns:
-            df[col] = 0.0
-        df[col] = pd.to_numeric(df[col], errors="coerce").fillna(0.0)
-
-    df["total_receipts"] = df[receipt_cols].sum(axis=1)
 
     # Group by year as proxy for assignment periods
     yearly = df.groupby("year")["total_receipts"].agg(["mean", "count", "std"]).reset_index()
@@ -162,7 +165,7 @@ def _fetch_and_process(institution_id: str) -> dict[str, Any]:
 
     # DEA: inputs = time index, outputs = avg_collection
     time_inputs = np.arange(1, n + 1).astype(float)
-    dea_scores = _dea_efficiency(time_inputs, y)
+    dea_scores, used_fallback = _dea_efficiency(time_inputs, y)
 
     efficiency_scores = {str(int(yearly["year"].iloc[i])): dea_scores[i] for i in range(n)}
 
@@ -197,6 +200,7 @@ def _fetch_and_process(institution_id: str) -> dict[str, Any]:
         "recommended_actions": recommended_actions,
         "efficiency_scores": efficiency_scores,
         "performance_improvement_estimate": perf_improvement,
+        "used_fallback": used_fallback,
         "timestamp": ts,
     }
 

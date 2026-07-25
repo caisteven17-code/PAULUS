@@ -44,29 +44,29 @@ SELECT
   0::smallint,
   EXISTS (
     SELECT 1
-    FROM schools.school_events se
-    WHERE se.institution_id = sr.institution_id
-      AND se.deleted_at IS NULL
-      AND EXTRACT(MONTH FROM se.start_date) = public.month_short_to_int(sr.month)
-      AND EXTRACT(YEAR FROM se.start_date) = sr.year
+    FROM diocese.events e
+    WHERE e.institution_id = sr.institution_id
+      AND e.deleted_at IS NULL
+      AND EXTRACT(MONTH FROM e.start_date) = public.month_short_to_int(sr.month)
+      AND EXTRACT(YEAR FROM e.start_date) = sr.year
   ) AS has_event,
   COALESCE((
     SELECT COUNT(*)::smallint
-    FROM schools.school_events se
-    WHERE se.institution_id = sr.institution_id
-      AND se.deleted_at IS NULL
-      AND se.event_level = 'Major event'
-      AND EXTRACT(MONTH FROM se.start_date) = public.month_short_to_int(sr.month)
-      AND EXTRACT(YEAR FROM se.start_date) = sr.year
+    FROM diocese.events e
+    WHERE e.institution_id = sr.institution_id
+      AND e.deleted_at IS NULL
+      AND e.event_level = 'Major event'
+      AND EXTRACT(MONTH FROM e.start_date) = public.month_short_to_int(sr.month)
+      AND EXTRACT(YEAR FROM e.start_date) = sr.year
   ), 0::smallint),
   COALESCE((
     SELECT COUNT(*)::smallint
-    FROM schools.school_events se
-    WHERE se.institution_id = sr.institution_id
-      AND se.deleted_at IS NULL
-      AND se.event_level = 'Minor event'
-      AND EXTRACT(MONTH FROM se.start_date) = public.month_short_to_int(sr.month)
-      AND EXTRACT(YEAR FROM se.start_date) = sr.year
+    FROM diocese.events e
+    WHERE e.institution_id = sr.institution_id
+      AND e.deleted_at IS NULL
+      AND e.event_level = 'Minor event'
+      AND EXTRACT(MONTH FROM e.start_date) = public.month_short_to_int(sr.month)
+      AND EXTRACT(YEAR FROM e.start_date) = sr.year
   ), 0::smallint),
   0::numeric(14, 2)
 FROM schools.financial_records sr

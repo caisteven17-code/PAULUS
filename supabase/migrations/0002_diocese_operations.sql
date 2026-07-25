@@ -7,7 +7,7 @@ create table if not exists diocese.institutions (
   id uuid primary key default gen_random_uuid(),
   legacy_entity_id text unique,
   name text not null,
-  entity_type text not null check (entity_type in ('parish', 'school', 'seminary', 'chancery')),
+  entity_type text not null check (entity_type in ('diocese', 'parish', 'school', 'seminary')),
   vicariate text,
   district text,
   cluster text,

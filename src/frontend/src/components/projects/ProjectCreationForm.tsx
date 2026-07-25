@@ -1,22 +1,42 @@
-﻿'use client';
+'use client';
 
-import React, { useState } from 'react';
-import { X, Upload, Calendar, Target, FileText, User, Tag, Info, Check, ChevronDown, Plus } from 'lucide-react';
+import React, { useEffect, useState } from 'react';
+import {
+  X,
+  Calendar,
+  Target,
+  FileText,
+  User,
+  Tag,
+  Info,
+  Check,
+  ChevronDown,
+  Plus,
+} from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
-import { Project, ProjectCategory } from '../../types';
+import { EntityType, Project, ProjectCategory } from '../../types';
+
+export interface ProjectInstitutionOption {
+  id: string;
+  name: string;
+  type: EntityType;
+}
 
 interface ProjectCreationFormProps {
   isOpen: boolean;
   onClose: () => void;
+  currentInstitution: ProjectInstitutionOption | null;
   onSubmit: (
-    project: Omit<
-      Project,
-      'id' | 'currentAmount' | 'healthScore' | 'successProbability' | 'recommendation' | 'entityId' | 'entityType'
-    >,
-  ) => void;
+    project: Omit<Project, 'id' | 'currentAmount' | 'healthScore' | 'successProbability' | 'recommendation'>,
+  ) => Promise<void> | void;
 }
 
-export function ProjectCreationForm({ isOpen, onClose, onSubmit }: ProjectCreationFormProps) {
+export function ProjectCreationForm({
+  isOpen,
+  onClose,
+  currentInstitution,
+  onSubmit,
+}: ProjectCreationFormProps) {
   const [formData, setFormData] = useState({
     name: '',
     description: '',
@@ -28,36 +48,45 @@ export function ProjectCreationForm({ isOpen, onClose, onSubmit }: ProjectCreati
     beneficiaries: '',
     contactPerson: '',
     status: 'active' as const,
+    entityId: '',
+    entityName: '',
+    entityType: 'parish' as EntityType,
   });
 
-  const [imagePreview, setImagePreview] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [submitted, setSubmitted] = useState(false);
 
-  const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file) {
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        setImagePreview(reader.result as string);
-      };
-      reader.readAsDataURL(file);
-    }
-  };
+  useEffect(() => {
+    if (!isOpen || !currentInstitution) return;
+    setFormData((prev) => ({
+      ...prev,
+      entityId: currentInstitution.id,
+      entityName: currentInstitution.name,
+      entityType: currentInstitution.type,
+    }));
+  }, [currentInstitution, isOpen]);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    setSubmitted(true);
+    if (!currentInstitution) return;
+    if (!formData.name.trim() || !formData.targetAmount || !formData.startDate) return;
     setIsSubmitting(true);
 
-    // Mock API call
-    setTimeout(() => {
-      onSubmit({
+    try {
+      await onSubmit({
         ...formData,
+        entityId: currentInstitution.id,
+        entityName: currentInstitution.name,
+        entityType: currentInstitution.type,
         targetAmount: Number(formData.targetAmount),
-        coverImage: imagePreview || undefined,
       });
       setIsSubmitting(false);
       onClose();
-    }, 1500);
+    } catch (error) {
+      console.error('Failed to create project:', error);
+      setIsSubmitting(false);
+    }
   };
 
   const categories: ProjectCategory[] = [
@@ -104,63 +133,22 @@ export function ProjectCreationForm({ isOpen, onClose, onSubmit }: ProjectCreati
             </div>
 
             <form onSubmit={handleSubmit} className="p-8 space-y-8 max-h-[75vh] overflow-y-auto scrollbar-thin">
-              {/* Image Upload */}
-              <div className="space-y-3">
-                <label className="text-[11px] font-bold text-gold-700 uppercase tracking-[0.2em] flex items-center gap-2">
-                  <Upload className="w-3.5 h-3.5" />
-                  Visual Identity
-                </label>
-                <div className="relative group">
-                  <input
-                    type="file"
-                    accept="image/*"
-                    onChange={handleImageChange}
-                    className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"
-                  />
-                  <div
-                    className={`w-full h-52 rounded-3xl border-2 border-dashed transition-all duration-500 flex flex-col items-center justify-center gap-3 overflow-hidden ${imagePreview ? 'border-gold-500 bg-gold-50/5' : 'border-gray-200 bg-gray-50 group-hover:border-gold-400 group-hover:bg-gold-50/10'}`}
-                  >
-                    {imagePreview ? (
-                      <div className="relative w-full h-full group/preview">
-                        <img
-                          src={imagePreview}
-                          alt="Preview"
-                          className="w-full h-full object-cover transition-transform duration-700 group-hover/preview:scale-105"
-                        />
-                        <div className="absolute inset-0 bg-black/40 opacity-0 group-hover/preview:opacity-100 transition-opacity flex items-center justify-center">
-                          <p className="text-white text-xs font-bold tracking-widest uppercase">Change Image</p>
-                        </div>
-                      </div>
-                    ) : (
-                      <>
-                        <div className="w-14 h-14 rounded-2xl bg-white shadow-sm flex items-center justify-center text-gray-400 group-hover:text-gold-600 group-hover:scale-110 transition-all duration-500">
-                          <Upload className="w-6 h-6" />
-                        </div>
-                        <div className="text-center">
-                          <p className="text-sm font-bold text-gray-500 group-hover:text-gold-700 transition-colors">
-                            Upload Cover Image
-                          </p>
-                          <p className="text-[10px] text-gray-400 mt-1 uppercase tracking-wider">JPG, PNG up to 5MB</p>
-                        </div>
-                      </>
-                    )}
-                  </div>
-                </div>
-              </div>
-
               <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
                 <div className="space-y-2">
                   <label className="text-[11px] font-bold text-gold-700 uppercase tracking-[0.2em] flex items-center gap-2">
                     <Tag className="w-3.5 h-3.5" />
-                    Project Name
+                    Project Name <span className="text-rose-500">*</span>
                   </label>
                   <input
                     type="text"
-                    required
                     value={formData.name}
                     onChange={(e) => setFormData({ ...formData, name: e.target.value })}
                     placeholder="e.g., Church Roof Repair"
-                    className="w-full px-5 py-4 bg-gray-50/50 border border-gray-200 rounded-2xl text-sm font-medium focus:outline-none focus:ring-4 focus:ring-gold-500/10 focus:border-gold-500 focus:bg-white transition-all placeholder:text-gray-300"
+                    className={`w-full px-5 py-4 bg-gray-50/50 border rounded-2xl text-sm font-medium focus:outline-none focus:ring-4 focus:bg-white transition-all placeholder:text-gray-300 ${
+                      submitted && !formData.name.trim()
+                        ? 'border-rose-400 focus:border-rose-500 focus:ring-rose-500/10'
+                        : 'border-gray-200 focus:border-gold-500 focus:ring-gold-500/10'
+                    }`}
                   />
                 </div>
 
@@ -223,29 +211,35 @@ export function ProjectCreationForm({ isOpen, onClose, onSubmit }: ProjectCreati
                 <div className="space-y-2">
                   <label className="text-[11px] font-bold text-gold-700 uppercase tracking-[0.2em] flex items-center gap-2">
                     <Target className="w-3.5 h-3.5" />
-                    Target (₱)
+                    Target (₱) <span className="text-rose-500">*</span>
                   </label>
                   <input
                     type="number"
-                    required
                     value={formData.targetAmount}
                     onChange={(e) => setFormData({ ...formData, targetAmount: e.target.value })}
                     placeholder="0.00"
-                    className="w-full px-5 py-4 bg-gray-50/50 border border-gray-200 rounded-2xl text-base font-serif font-bold focus:outline-none focus:ring-4 focus:ring-gold-500/10 focus:border-gold-500 focus:bg-white transition-all placeholder:text-gray-300"
+                    className={`w-full px-5 py-4 bg-gray-50/50 border rounded-2xl text-base font-serif font-bold focus:outline-none focus:ring-4 focus:bg-white transition-all placeholder:text-gray-300 ${
+                      submitted && !formData.targetAmount
+                        ? 'border-rose-400 focus:border-rose-500 focus:ring-rose-500/10'
+                        : 'border-gray-200 focus:border-gold-500 focus:ring-gold-500/10'
+                    }`}
                   />
                 </div>
 
                 <div className="space-y-2">
                   <label className="text-[11px] font-bold text-gold-700 uppercase tracking-[0.2em] flex items-center gap-2">
                     <Calendar className="w-3.5 h-3.5" />
-                    Start Date
+                    Start Date <span className="text-rose-500">*</span>
                   </label>
                   <input
                     type="date"
-                    required
                     value={formData.startDate}
                     onChange={(e) => setFormData({ ...formData, startDate: e.target.value })}
-                    className="w-full px-5 py-4 bg-gray-50/50 border border-gray-200 rounded-2xl text-sm font-medium focus:outline-none focus:ring-4 focus:ring-gold-500/10 focus:border-gold-500 focus:bg-white transition-all"
+                    className={`w-full px-5 py-4 bg-gray-50/50 border rounded-2xl text-sm font-medium focus:outline-none focus:ring-4 focus:bg-white transition-all ${
+                      submitted && !formData.startDate
+                        ? 'border-rose-400 focus:border-rose-500 focus:ring-rose-500/10'
+                        : 'border-gray-200 focus:border-gold-500 focus:ring-gold-500/10'
+                    }`}
                   />
                 </div>
 
@@ -258,6 +252,7 @@ export function ProjectCreationForm({ isOpen, onClose, onSubmit }: ProjectCreati
                     type="date"
                     required
                     value={formData.endDate}
+                    min={formData.startDate}
                     onChange={(e) => setFormData({ ...formData, endDate: e.target.value })}
                     className="w-full px-5 py-4 bg-gray-50/50 border border-gray-200 rounded-2xl text-sm font-medium focus:outline-none focus:ring-4 focus:ring-gold-500/10 focus:border-gold-500 focus:bg-white transition-all"
                   />
@@ -304,7 +299,7 @@ export function ProjectCreationForm({ isOpen, onClose, onSubmit }: ProjectCreati
                 </button>
                 <button
                   type="submit"
-                  disabled={isSubmitting}
+                  disabled={isSubmitting || !currentInstitution}
                   className="flex-[2] py-4 px-6 bg-gold-500 text-church-green-dark rounded-2xl text-sm font-bold hover:bg-gold-600 transition-all shadow-xl shadow-gold-500/20 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-3 active:scale-[0.98]"
                 >
                   {isSubmitting ? (
