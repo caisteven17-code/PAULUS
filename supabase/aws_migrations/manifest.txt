@@ -191,6 +191,19 @@ aws_migrations/079_rds_weather_bronze.sql
 aws_migrations/080_sync_institution_addresses.sql
 aws_migrations/081_sync_institution_municipalities.sql
 aws_migrations/082_refresh_weather_on_municipality_change.sql
+# 083-087 renumbered from a colliding 077-081 range: developed in parallel
+# with 077-082 above, against the same live database, before either side had
+# seen the other's migration numbers. Both ranges were applied independently
+# and are compatible (confirmed live: reference_bronze/reference_silver exist,
+# dim_institutions has both address and municipality, and
+# parish_analytics.refresh_parish_weather_analytics exists as both the no-arg
+# and (integer) overloads) -- this reordering only fixes the on-disk/manifest
+# numbering so a fresh deploy replays in a consistent, non-colliding order.
+aws_migrations/083_drop_dead_gold_financial_weather_columns.sql
+aws_migrations/084_fix_weather_dead_columns_and_confidence_schema.sql
+aws_migrations/085_add_institution_municipality.sql
+aws_migrations/086_create_parish_weather_view.sql
+aws_migrations/087_materialize_parish_weather_analytics.sql
 
 # Analytics refresh — run last, after all schema DDL above (see note near 125).
 # Phase 4: these legacy refresh scripts are intentionally excluded because they
