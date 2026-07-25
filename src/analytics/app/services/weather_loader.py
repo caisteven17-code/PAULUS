@@ -510,6 +510,16 @@ def refresh_parish_weather_gold() -> int:
     return count
 
 
+def _year_month(date_value) -> str:
+    """Row dicts here come from two different sources with different date
+    shapes: Supabase's PostgREST client always returns ISO date strings, but
+    analytics_db.fetch_all() (AWS, used by confidence_from_db()) returns
+    native psycopg date objects. Handle both."""
+    if hasattr(date_value, "strftime"):
+        return date_value.strftime("%Y-%m-01")
+    return str(date_value)[:7] + "-01"
+
+
 def upsert_monthly_confidence(
     daily_rain_rows: list[dict],
     daily_temp_rows: list[dict],
@@ -560,15 +570,15 @@ def upsert_monthly_confidence(
     wind_by_key: dict[tuple, list[dict]] = defaultdict(list)
 
     for r in daily_rain_rows:
-        ym = r["date"][:7] + "-01"
+        ym = _year_month(r["date"])
         rain_by_key[(r["municipality"], ym)].append(r)
 
     for r in daily_temp_rows:
-        ym = r["date"][:7] + "-01"
+        ym = _year_month(r["date"])
         temp_by_key[(r["municipality"], ym)].append(r)
 
     for r in daily_wind_rows or []:
-        ym = r["date"][:7] + "-01"
+        ym = _year_month(r["date"])
         wind_by_key[(r["municipality"], ym)].append(r)
 
     all_keys = set(rain_by_key.keys()) | set(temp_by_key.keys()) | set(wind_by_key.keys())
@@ -606,6 +616,14 @@ def upsert_monthly_confidence(
     )
 
     logger.info("Cohen's Kappa + Lin's CCC upserted for %d municipality-months", len(upsert_rows))
+
+    # Refresh the parish-scoped materialization (parish_analytics.fact_parish_weather_monthly)
+    # whenever the source data changes — same trigger point liturgical_calendar_loader.py
+    # uses for refresh_liturgical_calendar_analytics(). Every call site that mutates
+    # weather_monthly_summary goes through this function, so refreshing here (rather than
+    # after each individual caller) can't be missed by a future call site.
+    analytics_db.execute("SELECT * FROM parish_analytics.refresh_parish_weather_analytics()")
+
     return len(upsert_rows)
 
 

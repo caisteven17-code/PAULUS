@@ -1,4 +1,14 @@
-"""Pilot-only polling worker for automatic Supabase-to-AWS bronze sync."""
+"""Pilot-only polling worker for automatic Supabase-to-AWS bronze sync.
+
+NOTE: despite the name, this file does not do bronze-tier mirroring anymore
+- it calls run_silver_record() (Silver) and refresh_incremental() (Gold).
+"bronze" here is leftover naming from before the direct-Silver cutover
+(warehouse_etl.py's actual bronze mirror is retired; see that file). Left
+as-is rather than renamed: _PIPELINE_PREFIX below is persisted into
+warehouse_control.etl_watermarks.pipeline_name, so renaming it is a data
+migration (existing watermark rows would need updating to match), not a
+pure find-replace.
+"""
 
 from __future__ import annotations
 

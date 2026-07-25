@@ -1,17 +1,16 @@
 """
-Fast backfill: fetch DWD ICON weathercode from Open-Meteo archive and
-UPDATE reference.weather_rainfall_daily.gfs_weathercode in AWS RDS.
-
-One API call per municipality, one SQL UPDATE per municipality.
-Estimated runtime: 2-5 minutes for all 30 municipalities.
+One-shot script:
+  1. Adds gfs_weathercode column to reference.weather_rainfall_daily in AWS RDS
+  2. Backfills DWD ICON weathercodes from Open-Meteo archive (model=icon_seamless)
+  3. Runs the confidence matrix and saves output to confidence_output.txt
 
 Run from CAPSTONE root:
-    python backfill_gfs_fast.py
+    python add_icon_column_and_run_matrix.py
 """
-import sys, os, time, urllib.parse, urllib.request, json
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), 'src', 'analytics'))
-
+import sys, os, time, urllib.parse, urllib.request, json, subprocess
 from datetime import date
+
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), 'src', 'analytics'))
 from app.services import analytics_db
 
 MUNICIPALITIES = [
@@ -51,6 +50,28 @@ START = date(2023, 1, 1)
 END   = date(2026, 6, 11)
 
 
+# ── STEP 1: Add column ──────────────────────────────────────────────────────
+print("=" * 60)
+print("STEP 1: Adding gfs_weathercode column to AWS RDS...")
+print("=" * 60)
+
+etl_pool = analytics_db.get_etl_pool()
+with etl_pool.connection() as conn:
+    with conn.cursor() as cur:
+        cur.execute(
+            "ALTER TABLE reference.weather_rainfall_daily "
+            "ADD COLUMN IF NOT EXISTS gfs_weathercode integer"
+        )
+    conn.commit()
+print("  Column added (or already existed).\n")
+
+
+# ── STEP 2: Backfill DWD ICON weathercodes ─────────────────────────────────
+print("=" * 60)
+print("STEP 2: Backfilling DWD ICON weathercodes from Open-Meteo...")
+print("=" * 60)
+
+
 def fetch_icon_codes(lat, lon, start, end):
     params = urllib.parse.urlencode({
         "latitude":   lat,
@@ -75,7 +96,6 @@ def fetch_icon_codes(lat, lon, start, end):
 
 
 total_updated = 0
-pool = analytics_db.get_etl_pool()
 
 for muni in MUNICIPALITIES:
     name = muni["name"]
@@ -84,21 +104,14 @@ for muni in MUNICIPALITIES:
     if not wcode_by_date:
         print(f"  No data — skipping", flush=True)
         continue
-    print(f"  Got {len(wcode_by_date)} days from Open-Meteo", flush=True)
+    print(f"  Got {len(wcode_by_date)} days", flush=True)
 
-    # Build a VALUES list and run one UPDATE per municipality
-    # UPDATE reference.weather_rainfall_daily AS t
-    # SET gfs_weathercode = v.code
-    # FROM (VALUES ('2023-01-01'::date, 1), ...) AS v(date, code)
-    # WHERE t.municipality = %s AND t.date = v.date
-    items = list(wcode_by_date.items())  # [(date_str, code), ...]
-
-    # Build parameterised VALUES: (%s::date, %s), (%s::date, %s), ...
+    items = list(wcode_by_date.items())
     placeholders = ", ".join(["(%s::date, %s)"] * len(items))
     flat_params = []
     for d, c in items:
         flat_params.extend([d, c])
-    flat_params.append(name)  # for WHERE municipality = %s
+    flat_params.append(name)
 
     sql = f"""
 UPDATE reference.weather_rainfall_daily AS t
@@ -107,17 +120,51 @@ FROM (VALUES {placeholders}) AS v(date, code)
 WHERE t.municipality = %s AND t.date = v.date
 """
     try:
-        with pool.connection() as conn:
+        with etl_pool.connection() as conn:
             with conn.cursor() as cur:
                 cur.execute(sql, flat_params)
                 updated = cur.rowcount
             conn.commit()
-        print(f"  Updated {updated} rows in AWS RDS", flush=True)
+        print(f"  Updated {updated} rows", flush=True)
         total_updated += updated
     except Exception as e:
-        print(f"  ERROR updating {name}: {e}", flush=True)
+        print(f"  ERROR: {e}", flush=True)
 
-    time.sleep(0.5)  # gentle rate limit
+    time.sleep(0.5)
 
 analytics_db.close_etl_pool()
-print(f"\nDone. Total rows updated: {total_updated}", flush=True)
+print(f"\nBackfill done. Total rows updated: {total_updated}\n")
+
+
+# ── STEP 3: Run confidence matrix ───────────────────────────────────────────
+print("=" * 60)
+print("STEP 3: Running confidence matrix...")
+print("=" * 60)
+
+output_path = os.path.join(os.path.dirname(__file__), "confidence_output.txt")
+result = subprocess.run(
+    [sys.executable, os.path.join(os.path.dirname(__file__), "src", "analytics", "confidence_matrix.py")],
+    capture_output=True,
+    text=True,
+    cwd=os.path.join(os.path.dirname(__file__), "src", "analytics"),
+)
+
+with open(output_path, "w", encoding="utf-8") as f:
+    f.write(result.stdout)
+
+if result.returncode != 0:
+    print(f"confidence_matrix.py exited with error:\n{result.stderr}")
+else:
+    print(f"Matrix saved to confidence_output.txt")
+    # Print just the SEVERE WEATHER section
+    lines = result.stdout.splitlines()
+    in_severe = False
+    for line in lines:
+        if "SEVERE WEATHER" in line:
+            in_severe = True
+        elif in_severe and line.startswith("===") and "SEVERE" not in line:
+            break
+        if in_severe:
+            print(line)
+
+print("\nAll done.")

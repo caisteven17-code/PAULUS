@@ -1,147 +1,23 @@
 Fetching rainfall rows...
-  37740 rows
-Fetching temperature rows...
-  37740 rows
-Fetching wind rows...
-  37740 rows
-
-====================================================================================================
-RAINFALL — pairwise Cohen's Kappa (classify_rain)
-====================================================================================================
-                                 NASA POWER AG                CHIRPS  Open-Meteo ERA5-Land             GSMaP NRT           ERA5 (Full)                  UKMO
-NASA POWER AG                                —      +0.217 (n=37410)      +0.541 (n=37740)      +0.299 (n=37650)      +0.508 (n=37740)      +0.336 (n=37740)
-CHIRPS                        +0.217 (n=37410)                     —      +0.192 (n=37410)      +0.284 (n=37320)      +0.190 (n=37410)      +0.155 (n=37410)
-Open-Meteo ERA5-Land          +0.541 (n=37740)      +0.192 (n=37410)                     —      +0.242 (n=37650)      +0.505 (n=37740)      +0.429 (n=37740)
-GSMaP NRT                     +0.299 (n=37650)      +0.284 (n=37320)      +0.242 (n=37650)                     —      +0.174 (n=37650)      +0.150 (n=37650)
-ERA5 (Full)                   +0.508 (n=37740)      +0.190 (n=37410)      +0.505 (n=37740)      +0.174 (n=37650)                     —      +0.397 (n=37740)
-UKMO                          +0.336 (n=37740)      +0.155 (n=37410)      +0.429 (n=37740)      +0.150 (n=37650)      +0.397 (n=37740)                     —
-
-Best pair (highest kappa):
-  NASA POWER AG <-> Open-Meteo ERA5-Land: kappa=+0.541 (moderate), n=37740
-
-Worst pair (lowest kappa):
-  GSMaP NRT <-> UKMO: kappa=+0.150 (slight), n=37650
-
-====================================================================================================
-RAINFALL — pairwise Lin's CCC (raw mm)
-====================================================================================================
-                                 NASA POWER AG                CHIRPS  Open-Meteo ERA5-Land             GSMaP NRT           ERA5 (Full)                  UKMO
-NASA POWER AG                                —      +0.579 (n=37410)      +0.661 (n=37740)      +0.599 (n=37650)      +0.621 (n=37740)      +0.471 (n=37740)
-CHIRPS                        +0.579 (n=37410)                     —      +0.456 (n=37410)      +0.597 (n=37320)      +0.451 (n=37410)      +0.340 (n=37410)
-Open-Meteo ERA5-Land          +0.661 (n=37740)      +0.456 (n=37410)                     —      +0.534 (n=37650)      +0.745 (n=37740)      +0.604 (n=37740)
-GSMaP NRT                     +0.599 (n=37650)      +0.597 (n=37320)      +0.534 (n=37650)                     —      +0.453 (n=37650)      +0.360 (n=37650)
-ERA5 (Full)                   +0.621 (n=37740)      +0.451 (n=37410)      +0.745 (n=37740)      +0.453 (n=37650)                     —      +0.562 (n=37740)
-UKMO                          +0.471 (n=37740)      +0.340 (n=37410)      +0.604 (n=37740)      +0.360 (n=37650)      +0.562 (n=37740)                     —
-
-Best pair (highest CCC):
-  Open-Meteo ERA5-Land <-> ERA5 (Full): CCC=+0.745 (poor), n=37740
-
-Worst pair (lowest CCC):
-  CHIRPS <-> UKMO: CCC=+0.340 (poor), n=37410
-
-====================================================================================================
-SEVERE WEATHER — pairwise Cohen's Kappa (classify_severe; NOAA GFS as independent source; UKMO excluded)
-====================================================================================================
-                          Open-Meteo ERA5-Land           ERA5 (Full)             ECMWF IFS              NOAA GFS
-Open-Meteo ERA5-Land                         —      +0.442 (n=37740)      +0.952 (n=37740)                   n/a
-ERA5 (Full)                   +0.442 (n=37740)                     —      +0.430 (n=37740)                   n/a
-ECMWF IFS                     +0.952 (n=37740)      +0.430 (n=37740)                     —                   n/a
-NOAA GFS                                   n/a                   n/a                   n/a                     —
-
-Best pair (highest kappa):
-  Open-Meteo ERA5-Land <-> ECMWF IFS: kappa=+0.952 (almost perfect), n=37740
-
-Worst pair (lowest kappa):
-  ERA5 (Full) <-> ECMWF IFS: kappa=+0.430 (moderate), n=37740
-
-====================================================================================================
-TEMPERATURE — pairwise Cohen's Kappa (classify_temp on raw °C, as production does)
-====================================================================================================
-                                 NASA POWER AG  Open-Meteo ERA5-Land           ERA5 (Full)             ECMWF IFS                  UKMO
-NASA POWER AG                                —      +0.389 (n=37740)      +0.417 (n=37740)      +0.389 (n=37740)      +0.314 (n=37740)
-Open-Meteo ERA5-Land          +0.389 (n=37740)                     —      +0.502 (n=37740)      +1.000 (n=37740)      +0.605 (n=37740)
-ERA5 (Full)                   +0.417 (n=37740)      +0.502 (n=37740)                     —      +0.502 (n=37740)      +0.476 (n=37740)
-ECMWF IFS                     +0.389 (n=37740)      +1.000 (n=37740)      +0.502 (n=37740)                     —      +0.605 (n=37740)
-UKMO                          +0.314 (n=37740)      +0.605 (n=37740)      +0.476 (n=37740)      +0.605 (n=37740)                     —
-
-Best pair (highest kappa):
-  Open-Meteo ERA5-Land <-> ECMWF IFS: kappa=+1.000 (almost perfect), n=37740
-
-Worst pair (lowest kappa):
-  NASA POWER AG <-> UKMO: kappa=+0.314 (fair), n=37740
-
-====================================================================================================
-TEMPERATURE — pairwise Lin's CCC (raw °C)
-====================================================================================================
-                                 NASA POWER AG  Open-Meteo ERA5-Land           ERA5 (Full)             ECMWF IFS                  UKMO
-NASA POWER AG                                —      +0.655 (n=37740)      +0.709 (n=37740)      +0.655 (n=37740)      +0.598 (n=37740)
-Open-Meteo ERA5-Land          +0.655 (n=37740)                     —      +0.816 (n=37740)      +1.000 (n=37740)      +0.877 (n=37740)
-ERA5 (Full)                   +0.709 (n=37740)      +0.816 (n=37740)                     —      +0.816 (n=37740)      +0.823 (n=37740)
-ECMWF IFS                     +0.655 (n=37740)      +1.000 (n=37740)      +0.816 (n=37740)                     —      +0.877 (n=37740)
-UKMO                          +0.598 (n=37740)      +0.877 (n=37740)      +0.823 (n=37740)      +0.877 (n=37740)                     —
-
-Best pair (highest CCC):
-  Open-Meteo ERA5-Land <-> ECMWF IFS: CCC=+1.000 (almost perfect), n=37740
-
-Worst pair (lowest CCC):
-  NASA POWER AG <-> UKMO: CCC=+0.598 (poor), n=37740
-
-====================================================================================================
-HUMIDITY — pairwise Cohen's Kappa (classify_humidity)
-====================================================================================================
-                                 NASA POWER AG  Open-Meteo ERA5-Land           ERA5 (Full)
-NASA POWER AG                                —      +0.211 (n=37740)      +0.278 (n=37740)
-Open-Meteo ERA5-Land          +0.211 (n=37740)                     —      +0.396 (n=37740)
-ERA5 (Full)                   +0.278 (n=37740)      +0.396 (n=37740)                     —
-
-Best pair (highest kappa):
-  Open-Meteo ERA5-Land <-> ERA5 (Full): kappa=+0.396 (fair), n=37740
-
-Worst pair (lowest kappa):
-  NASA POWER AG <-> Open-Meteo ERA5-Land: kappa=+0.211 (fair), n=37740
-
-====================================================================================================
-HUMIDITY — pairwise Lin's CCC (raw %)
-====================================================================================================
-                                 NASA POWER AG  Open-Meteo ERA5-Land           ERA5 (Full)
-NASA POWER AG                                —      +0.583 (n=37740)      +0.647 (n=37740)
-Open-Meteo ERA5-Land          +0.583 (n=37740)                     —      +0.745 (n=37740)
-ERA5 (Full)                   +0.647 (n=37740)      +0.745 (n=37740)                     —
-
-Best pair (highest CCC):
-  Open-Meteo ERA5-Land <-> ERA5 (Full): CCC=+0.745 (poor), n=37740
-
-Worst pair (lowest CCC):
-  NASA POWER AG <-> Open-Meteo ERA5-Land: CCC=+0.583 (poor), n=37740
-
-====================================================================================================
-WIND — pairwise Cohen's Kappa (classify_wind)
-====================================================================================================
-                                 NASA POWER AG  Open-Meteo ERA5-Land           ERA5 (Full)             ECMWF IFS                  UKMO
-NASA POWER AG                                —      -0.051 (n=37740)      +0.059 (n=37740)      -0.051 (n=37740)      -0.018 (n=37740)
-Open-Meteo ERA5-Land          -0.051 (n=37740)                     —      +0.422 (n=37740)      +1.000 (n=37740)      +0.655 (n=37740)
-ERA5 (Full)                   +0.059 (n=37740)      +0.422 (n=37740)                     —      +0.422 (n=37740)      +0.496 (n=37740)
-ECMWF IFS                     -0.051 (n=37740)      +1.000 (n=37740)      +0.422 (n=37740)                     —      +0.655 (n=37740)
-UKMO                          -0.018 (n=37740)      +0.655 (n=37740)      +0.496 (n=37740)      +0.655 (n=37740)                     —
-
-Best pair (highest kappa):
-  Open-Meteo ERA5-Land <-> ECMWF IFS: kappa=+1.000 (almost perfect), n=37740
-
-Worst pair (lowest kappa):
-  NASA POWER AG <-> Open-Meteo ERA5-Land: kappa=-0.051 (poor), n=37740
-
-====================================================================================================
-WIND — pairwise Lin's CCC (raw m/s)
-====================================================================================================
-                                 NASA POWER AG  Open-Meteo ERA5-Land           ERA5 (Full)             ECMWF IFS                  UKMO
-NASA POWER AG                                —      +0.314 (n=37740)      +0.498 (n=37740)      +0.314 (n=37740)      +0.367 (n=37740)
-Open-Meteo ERA5-Land          +0.314 (n=37740)                     —      +0.711 (n=37740)      +1.000 (n=37740)      +0.848 (n=37740)
-ERA5 (Full)                   +0.498 (n=37740)      +0.711 (n=37740)                     —      +0.711 (n=37740)      +0.754 (n=37740)
-ECMWF IFS                     +0.314 (n=37740)      +1.000 (n=37740)      +0.711 (n=37740)                     —      +0.848 (n=37740)
-UKMO                          +0.367 (n=37740)      +0.848 (n=37740)      +0.754 (n=37740)      +0.848 (n=37740)                     —
-
-Best pair (highest CCC):
-  Open-Meteo ERA5-Land <-> ECMWF IFS: CCC=+1.000 (almost perfect), n=37740
-
-Worst pair (lowest CCC):
-  NASA POWER AG <-> Open-Meteo ERA5-Land: CCC=+0.314 (poor), n=37740
+  retry 1 after error: column "gfs_weathercode" does not exist
+LINE 1: ...ode", "ecmwf_ifs_weathercode", "jma_weathercode", "gfs_weath...
+                                                             ^
+HINT:  Perhaps you meant to reference the column "weather_rainfall_daily.jma_weathercode".
+  retry 2 after error: column "gfs_weathercode" does not exist
+LINE 1: ...ode", "ecmwf_ifs_weathercode", "jma_weathercode", "gfs_weath...
+                                                             ^
+HINT:  Perhaps you meant to reference the column "weather_rainfall_daily.jma_weathercode".
+  retry 3 after error: column "gfs_weathercode" does not exist
+LINE 1: ...ode", "ecmwf_ifs_weathercode", "jma_weathercode", "gfs_weath...
+                                                             ^
+HINT:  Perhaps you meant to reference the column "weather_rainfall_daily.jma_weathercode".
+Traceback (most recent call last):
+  File "C:\Users\caist\testing\CAPSTONE\src\analytics\confidence_matrix.py", line 228, in <module>
+    rain_rows = fetch_all(
+        "reference", "weather_rainfall_daily",
+    ...<3 lines>...
+         "jma_weathercode", "gfs_weathercode"],
+    )
+  File "C:\Users\caist\testing\CAPSTONE\src\analytics\confidence_matrix.py", line 68, in fetch_all
+    raise RuntimeError("exhausted retries")
+RuntimeError: exhausted retries

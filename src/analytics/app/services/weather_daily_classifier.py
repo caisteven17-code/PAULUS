@@ -1646,25 +1646,14 @@ def compute_confidence_scores(
        values, averaged the same way (_mean_pairwise_ccc). N/A for severe
        weather (weathercode is nominal, not continuous).
 
-    Legacy metrics (kept, computed in full, nested under "legacy_metrics" —
-    not deleted, just no longer the headline numbers; still consumed by
-    weather_loader.upsert_monthly_fleiss_kappa and the weather_collector log):
-
-    3. Fleiss' Kappa (κ_F) — multi-rater categorical agreement on binned values.
-       Each day = one subject; each API with data that day = one rater.
-       κ_F = (P_bar − P_e_bar) / (1 − P_e_bar)
-         P_bar   = mean per-item proportion of agreeing rater-pairs
-         P_e_bar = sum of squared marginal category proportions
-       Bins:
-         Rainfall    → PAGASA classes via classify_rain()
-         Temperature → PAGASA heat-index tiers via classify_temp()
-       Strength (Landis & Koch, 1977):
-         < 0.20 Slight | 0.21-0.40 Fair | 0.41-0.60 Moderate
-         0.61-0.80 Substantial | 0.81-1.00 Almost Perfect
-
-    4. Weighted Confidence Index (WCI) — per-day majority-vote weight.
-       weight_map: {6:1.00, 5:0.83, 4:0.67, 3:0.50, 2:0.33, 1:0.17, 0:0.00}
-       WCI = mean(weights) x 100 %
+    These are the only two metrics this function computes. Earlier versions
+    also computed Fleiss' Kappa (multi-rater agreement) and a Weighted
+    Confidence Index — both have been fully removed from this function (no
+    _fleiss_kappa helper exists anymore); if you're looking for either, they
+    aren't computed here. Supabase's weather_monthly_summary was migrated from
+    Fleiss' Kappa to Cohen's Kappa/Lin's CCC at the DB level, and AWS's copy
+    was brought in line with the same schema (migration
+    084_fix_weather_dead_columns_and_confidence_schema.sql).
     """
     # ── Rainfall ─────────────────────────────────────────────────────────────
     rain_col_map = {

@@ -126,6 +126,11 @@ PH_RAIN_MAX = 800.0  # mm/day — extreme typhoon rainfall
 
 
 # ── 30 Laguna municipalities with coordinates ─────────────────────────────────
+# No documented source for these when originally added (commit dcbb0a7,
+# 2026-06-06) — cross-checked all 30 against independent sources on
+# 2026-07-24; 28 were accurate to within a few km (normal reference-point
+# variance). Nagcarlan and Majayjay were off by ~24km and ~13km respectively
+# (both shifted south of their real towns) and have been corrected here.
 
 MUNICIPALITIES: list[dict] = [
     {"name": "San Pablo City", "lat": 14.0683, "lon": 121.3229},
@@ -137,9 +142,9 @@ MUNICIPALITIES: list[dict] = [
     {"name": "Los Baños", "lat": 14.1667, "lon": 121.2436},
     {"name": "Santa Cruz", "lat": 14.2778, "lon": 121.4133},
     {"name": "Pagsanjan", "lat": 14.2686, "lon": 121.4578},
-    {"name": "Nagcarlan", "lat": 13.9206, "lon": 121.4156},
+    {"name": "Nagcarlan", "lat": 14.1364, "lon": 121.4165},
     {"name": "Liliw", "lat": 14.1292, "lon": 121.4342},
-    {"name": "Majayjay", "lat": 14.0247, "lon": 121.4758},
+    {"name": "Majayjay", "lat": 14.1447, "lon": 121.4723},
     {"name": "Magdalena", "lat": 14.2033, "lon": 121.4442},
     {"name": "Pila", "lat": 14.2353, "lon": 121.3656},
     {"name": "Bay", "lat": 14.1783, "lon": 121.2847},
