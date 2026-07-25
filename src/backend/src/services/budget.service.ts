@@ -19,6 +19,22 @@ export interface BudgetEntryInput {
   notes?: string;
 }
 
+interface BudgetRow {
+  id: string;
+  institution_id: string;
+  year: number;
+  month: number;
+  amount: number | string | null;
+  notes?: string | null;
+  updated_at?: string;
+}
+
+interface InstitutionRef {
+  id: string;
+  name?: string;
+  institution_type?: string;
+}
+
 @Injectable()
 export class BudgetService {
   constructor(private readonly supabaseService: SupabaseService) {}
@@ -60,7 +76,7 @@ export class BudgetService {
     return data?.id ?? null;
   }
 
-  private toBudget(row: any, institution?: { name?: string; institution_type?: string }): InstitutionBudget {
+  private toBudget(row: BudgetRow, institution?: { name?: string; institution_type?: string }): InstitutionBudget {
     return {
       id: row.id,
       institution_id: row.institution_id,
@@ -111,14 +127,14 @@ export class BudgetService {
     if (rows.length === 0) return [];
 
     // Attach institution names for the diocese overview.
-    const institutionIds = Array.from(new Set(rows.map((r: any) => r.institution_id)));
+    const institutionIds = Array.from(new Set(rows.map((r: BudgetRow) => r.institution_id)));
     const { data: institutions } = await this.db()
       .from('institutions')
       .select('id, name, institution_type')
       .in('id', institutionIds);
 
-    const byId = new Map((institutions ?? []).map((i: any) => [i.id, i]));
-    return rows.map((row: any) => this.toBudget(row, byId.get(row.institution_id)));
+    const byId = new Map((institutions ?? []).map((i: InstitutionRef) => [i.id, i] as [string, InstitutionRef]));
+    return rows.map((row: BudgetRow) => this.toBudget(row, byId.get(row.institution_id)));
   }
 
   /** Upsert one year's worth of monthly entries for a single institution. */
@@ -174,6 +190,6 @@ export class BudgetService {
       .eq('id', institutionId)
       .maybeSingle();
 
-    return data.map((row: any) => this.toBudget(row, institution ?? undefined));
+    return data.map((row: BudgetRow) => this.toBudget(row, institution ?? undefined));
   }
 }

@@ -2,6 +2,60 @@ import { Injectable } from '@nestjs/common';
 import { SupabaseService } from './supabase.service';
 import { Project, Donation, ProjectExpense } from '../types';
 
+interface InstitutionRow {
+  id: string;
+  name?: string;
+}
+
+interface ProjectRow {
+  id: string;
+  name: string;
+  description?: string;
+  fund_usage?: string;
+  target_amount: number | string;
+  current_amount: number | string;
+  start_date?: string;
+  end_date?: string;
+  category: Project['category'];
+  status: Project['status'];
+  beneficiaries?: string;
+  cover_image?: string;
+  contact_person?: string;
+  health_score?: number | string;
+  success_probability?: number | string;
+  recommendation?: string;
+  total_expenses?: number | string | null;
+  entity_type?: string;
+  entity_id?: string;
+  entity_name?: string;
+  institution_id?: string;
+  institution?: { name?: string; institution_type?: string } | { name?: string; institution_type?: string }[];
+}
+
+interface DonationRow {
+  id: string;
+  project_id: string;
+  donor_name?: string;
+  amount: number | string;
+  date?: string;
+  payment_method: Donation['paymentMethod'];
+  receipt_issued?: boolean;
+  receipt_proof_name?: string;
+  notes?: string;
+}
+
+interface ExpenseRow {
+  id: string;
+  project_id: string;
+  description: string;
+  amount: number | string;
+  date?: string;
+  payment_method: ProjectExpense['paymentMethod'];
+  notes?: string;
+  receipt_reference?: string;
+  proof_file_name?: string;
+}
+
 @Injectable()
 export class ProjectService {
   constructor(private readonly supabaseService: SupabaseService) {}
@@ -34,12 +88,12 @@ export class ProjectService {
       return [];
     }
 
-    if (!candidates.length) return (data ?? []).map((row: any) => row.id);
+    if (!candidates.length) return (data ?? []).map((row: InstitutionRow) => row.id);
 
     const candidateSet = new Set(candidates.map((value) => value.toLowerCase()));
     const found = (data ?? [])
-      .filter((row: any) => candidateSet.has(String(row.name ?? '').toLowerCase()))
-      .map((row: any) => row.id);
+      .filter((row: InstitutionRow) => candidateSet.has(String(row.name ?? '').toLowerCase()))
+      .map((row: InstitutionRow) => row.id);
 
     // Auto-register seminary/school/parish institutions that are not yet in
     // diocese.institutions. This is the safety net so a school/seminary user can
@@ -81,7 +135,7 @@ export class ProjectService {
     return found;
   }
 
-  private toProject(row: any): Project {
+  private toProject(row: ProjectRow): Project {
     const institution = Array.isArray(row.institution) ? row.institution[0] : row.institution;
     const entityType = (row.entity_type ?? institution?.institution_type ?? 'parish') as Project['entityType'];
     const entityId = row.entity_id ?? row.institution_id ?? '';
@@ -134,7 +188,7 @@ export class ProjectService {
     return row;
   }
 
-  private toDonation(row: any): Donation {
+  private toDonation(row: DonationRow): Donation {
     return {
       id: row.id,
       projectId: row.project_id,
@@ -163,7 +217,7 @@ export class ProjectService {
     return row;
   }
 
-  private toExpense(row: any): ProjectExpense {
+  private toExpense(row: ExpenseRow): ProjectExpense {
     return {
       id: row.id,
       projectId: row.project_id,
@@ -213,7 +267,7 @@ export class ProjectService {
       console.error('[project.service] getProjects error:', error.message);
       return [];
     }
-    return (data ?? []).map((d: any) => this.toProject(d));
+    return (data ?? []).map((d: ProjectRow) => this.toProject(d));
   }
 
   async saveProject(project: Project): Promise<Project> {
@@ -258,7 +312,7 @@ export class ProjectService {
       console.error('[project.service] getDonations error:', error.message);
       return [];
     }
-    return (data ?? []).map((d: any) => this.toDonation(d));
+    return (data ?? []).map((d: DonationRow) => this.toDonation(d));
   }
 
   async saveDonation(donation: Donation): Promise<Donation> {
@@ -283,7 +337,7 @@ export class ProjectService {
       console.error('[project.service] getExpenses error:', error.message);
       return [];
     }
-    return (data ?? []).map((d: any) => this.toExpense(d));
+    return (data ?? []).map((d: ExpenseRow) => this.toExpense(d));
   }
 
   async saveExpense(expense: ProjectExpense): Promise<ProjectExpense> {

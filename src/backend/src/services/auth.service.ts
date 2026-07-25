@@ -3,6 +3,59 @@ import { SupabaseService } from './supabase.service';
 import { EmailService, OtpPurpose } from './email.service';
 import { AuthUser, AppRole } from '../types';
 
+export interface UserBody {
+  email?: string;
+  password?: string;
+  displayName?: string;
+  role?: string;
+  entityName?: string;
+  entityType?: string;
+  entityId?: string;
+}
+
+interface SupabaseAuthUserLike {
+  id: string;
+  email?: string;
+  user_metadata?: Record<string, any>;
+  raw_user_meta_data?: Record<string, any>;
+}
+
+interface ProfileRow {
+  id: string;
+  external_auth_id?: string;
+  full_name?: string;
+  email?: string;
+  role_id?: string;
+  institution_id?: string;
+  is_active?: boolean;
+  avatar_url?: string;
+  birthday?: string;
+  onboarding_completed?: boolean;
+}
+
+interface PriestAssignmentRow {
+  priest_id: string;
+  institution_id: string;
+}
+
+interface RolePermissionRow {
+  role_id: string;
+  permission_id: string;
+}
+
+interface RolePayload {
+  id: string;
+  name?: string;
+  color?: string;
+  is_predefined?: boolean;
+  permissions?: Record<string, boolean>;
+}
+
+function getErrorMessage(err: unknown): unknown {
+  const message = err && typeof err === 'object' ? (err as { message?: unknown }).message : undefined;
+  return message ?? err;
+}
+
 const OTP_TTL_MS = 10 * 60 * 1000; // codes live 10 minutes
 const OTP_RESEND_THROTTLE_MS = 55 * 1000; // server-side guard behind the 60s client timer
 const OTP_VERIFIED_WINDOW_MS = 15 * 60 * 1000; // verified code usable for follow-up action
@@ -241,7 +294,7 @@ export class AppAuthService {
     return map[roleId] ?? 'USR';
   }
 
-  private async upsertDioceseProfile(userId: string, body: any, fallbackEmail?: string): Promise<void> {
+  private async upsertDioceseProfile(userId: string, body: UserBody, fallbackEmail?: string): Promise<void> {
     const email = body.email ?? fallbackEmail ?? '';
     const roleId = body.role ?? 'parish_priest';
     const fullName = body.displayName ?? email.split('@')[0] ?? '';
@@ -320,7 +373,7 @@ export class AppAuthService {
     throw insertErr;
   }
 
-  private async assertParishPriestDestinationAvailable(body: any, excludedExternalAuthId?: string): Promise<string | null> {
+  private async assertParishPriestDestinationAvailable(body: UserBody, excludedExternalAuthId?: string): Promise<string | null> {
     if (body?.role !== 'parish_priest' || body?.entityType !== 'parish') return null;
     const institutionId = await this.resolveInstitutionId(body.entityId, body.entityName, body.entityType);
     if (!institutionId) return null;
@@ -417,7 +470,7 @@ export class AppAuthService {
     if (detailsError) throw detailsError;
   }
 
-  private mapSupabaseUser(supabaseUser: any): AuthUser {
+  private mapSupabaseUser(supabaseUser: SupabaseAuthUserLike): AuthUser {
     const meta = supabaseUser.user_metadata ?? supabaseUser.raw_user_meta_data ?? {};
     return {
       id: supabaseUser.id,
@@ -452,7 +505,7 @@ export class AppAuthService {
       .maybeSingle();
     if (profileError) throw profileError;
 
-    let assignment: any = null;
+    let assignment: { institution_id: string } | null = null;
     if (profile?.id) {
       const { data, error } = await this.supabaseService.admin
         .schema('clergy')
@@ -487,7 +540,7 @@ export class AppAuthService {
       accessRole: 'parish_priest',
       roleId: 'parish_priest',
       entityType: 'parish',
-      entityId: assigned ? assignment.institution_id : undefined,
+      entityId: assigned ? assignment?.institution_id : undefined,
       entityName: assigned ? institutionName : undefined,
       assignmentStatus: assigned ? 'assigned' : 'unassigned',
       hasParishAccess: assigned,
@@ -507,7 +560,7 @@ export class AppAuthService {
     };
   }
 
-  async logout(token: string): Promise<void> {
+  async logout(_token: string): Promise<void> {
     const { error } = await this.supabaseService.supabaseBrowser.auth.signOut();
     if (error) console.error('[auth.service] logout error:', error.message);
   }
@@ -530,7 +583,7 @@ export class AppAuthService {
     const avatarByAuthId = new Map<string, string>();
     const birthdayByAuthId = new Map<string, string>();
     const onboardedByAuthId = new Map<string, boolean>();
-    const profileByAuthId = new Map<string, any>();
+    const profileByAuthId = new Map<string, ProfileRow>();
     const { data: profiles } = await this.supabaseService.admin
       .schema('diocese')
       .from('profiles')
@@ -543,8 +596,8 @@ export class AppAuthService {
       if (p.onboarding_completed === true) onboardedByAuthId.set(p.external_auth_id, true);
     }
 
-    const priestProfileIds = (profiles ?? []).filter((p: any) => p.role_id === 'parish_priest').map((p: any) => p.id);
-    const assignmentByPriest = new Map<string, any>();
+    const priestProfileIds = (profiles ?? []).filter((p: ProfileRow) => p.role_id === 'parish_priest').map((p: ProfileRow) => p.id);
+    const assignmentByPriest = new Map<string, PriestAssignmentRow>();
     if (priestProfileIds.length) {
       const { data: assignments, error: assignmentError } = await this.supabaseService.admin
         .schema('clergy')
@@ -570,7 +623,7 @@ export class AppAuthService {
       const meta = u.user_metadata ?? {};
       const profile = profileByAuthId.get(u.id);
       const isParishPriest = (profile?.role_id ?? meta.role) === 'parish_priest';
-      const assignment = isParishPriest ? assignmentByPriest.get(profile?.id) : null;
+      const assignment = isParishPriest ? assignmentByPriest.get(profile?.id ?? '') : null;
       const assigned = Boolean(assignment?.institution_id);
       const onboardingCompleted =
         onboardedByAuthId.get(u.id) === true || meta.onboardingCompleted === true || meta.onboarding_completed === true;
@@ -580,7 +633,7 @@ export class AppAuthService {
         displayName: (profile?.full_name ?? meta.displayName ?? meta.display_name ?? u.email ?? '') as string,
         role: (profile?.role_id ?? meta.role ?? 'parish_priest') as string,
         roleId: (profile?.role_id ?? meta.role ?? 'parish_priest') as string,
-        entityName: isParishPriest ? (assigned ? institutionNameById.get(assignment.institution_id) ?? '' : '') : (meta.entityName ?? meta.entity_name ?? '') as string,
+        entityName: isParishPriest ? (assigned ? institutionNameById.get(assignment?.institution_id ?? '') ?? '' : '') : (meta.entityName ?? meta.entity_name ?? '') as string,
         entityType: (meta.entityType ?? meta.entity_type ?? 'parish') as string,
         entityId: isParishPriest ? (assignment?.institution_id ?? '') : (meta.entityId ?? meta.entity_id ?? '') as string,
         assignmentStatus: isParishPriest ? (assigned ? 'assigned' : 'unassigned') : undefined,
@@ -596,7 +649,7 @@ export class AppAuthService {
     });
   }
 
-  async createUser(body: any) {
+  async createUser(body: UserBody & { email: string }) {
     const { email, password, displayName, role, entityName, entityType, entityId } = body;
     const parishPriestInstitutionId = await this.assertParishPriestDestinationAvailable(body);
     const { data, error } = await this.supabaseService.supabaseServer.auth.admin.createUser({
@@ -619,7 +672,7 @@ export class AppAuthService {
     } catch (profileError) {
       // Log but do not roll back the auth user — the account exists and the user can log in.
       // The profile row can be repaired once the diocese schema/roles are seeded.
-      console.error('[auth.service] Profile upsert failed for user', data.user.id, ':', (profileError as any)?.message ?? profileError);
+      console.error('[auth.service] Profile upsert failed for user', data.user.id, ':', getErrorMessage(profileError));
     }
     await this.ensureInitialParishPriestAssignment(data.user.id, parishPriestInstitutionId);
 
@@ -636,7 +689,7 @@ export class AppAuthService {
     };
   }
 
-  async updateUser(id: string, body: any) {
+  async updateUser(id: string, body: UserBody) {
     const { email, displayName, role, entityName, entityType, entityId } = body;
     const parishPriestInstitutionId = await this.assertParishPriestDestinationAvailable(body, id);
     const updates: Record<string, any> = {
@@ -757,8 +810,8 @@ export class AppAuthService {
         permissions[k] = false;
       });
 
-      const activePerms = (permsData ?? []).filter((p: any) => p.role_id === role.id);
-      activePerms.forEach((p: any) => {
+      const activePerms = (permsData ?? []).filter((p: RolePermissionRow) => p.role_id === role.id);
+      activePerms.forEach((p: RolePermissionRow) => {
         permissions[p.permission_id] = true;
       });
 
@@ -772,7 +825,7 @@ export class AppAuthService {
     });
   }
 
-  async saveRoles(rolesList: any[]) {
+  async saveRoles(rolesList: RolePayload[]) {
     const { error: permissionsUpsertError } = await this.supabaseService.admin
       .schema('diocese')
       .from('permissions')
@@ -1038,7 +1091,7 @@ export class AppAuthService {
         '[auth.service] Onboarding profile update failed for user',
         userId,
         ':',
-        (profileError as any)?.message ?? profileError,
+        getErrorMessage(profileError),
       );
     }
 

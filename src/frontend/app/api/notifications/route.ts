@@ -16,6 +16,37 @@ type NotificationItem = {
 
 const MONTH_NAMES = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 
+interface Profile {
+  id: string | null;
+  email: string | null;
+  full_name: string | null;
+  institution_id: string | null;
+  institutions: { id: string; name: string; institution_type: string } | null;
+}
+
+interface AnnouncementRow {
+  id: string;
+  title?: string;
+  content?: string;
+  audience_type?: string;
+  priority?: string;
+  created_at?: string;
+  published_at?: string;
+  start_date?: string;
+  end_date?: string;
+}
+
+interface AnnouncementRecipientRow {
+  announcement_id: string;
+}
+
+interface AuditLogRow {
+  id: string;
+  action?: string;
+  detail?: string;
+  created_at?: string;
+}
+
 function shortTime(value: string | number | null | undefined): string {
   if (!value) return 'Today';
   const date = new Date(value);
@@ -37,7 +68,7 @@ function excerpt(value: unknown, fallback: string): string {
   return text.length > 120 ? `${text.slice(0, 117)}...` : text;
 }
 
-async function resolveProfile(req: NextRequest) {
+async function resolveProfile(req: NextRequest): Promise<Profile> {
   const token = req.headers.get('authorization')?.replace(/^Bearer\s+/i, '');
   const fallbackId = req.headers.get('x-user-id') || '';
   const fallbackName = req.headers.get('x-user-name') || '';
@@ -56,7 +87,7 @@ async function resolveProfile(req: NextRequest) {
         .select('id, email, full_name, institution_id, institutions(id, name, institution_type)')
         .or(`external_auth_id.eq.${authId},auth_user_id.eq.${authId},id.eq.${authId}`)
         .maybeSingle();
-      if (profile) return profile as any;
+      if (profile) return profile as unknown as Profile;
     }
   }
 
@@ -67,7 +98,7 @@ async function resolveProfile(req: NextRequest) {
       .select('id, email, full_name, institution_id, institutions(id, name, institution_type)')
       .eq('id', fallbackId)
       .maybeSingle();
-    if (profile) return profile as any;
+    if (profile) return profile as unknown as Profile;
   }
 
   if (fallbackEmail || fallbackName) {
@@ -79,7 +110,7 @@ async function resolveProfile(req: NextRequest) {
         .ilike('email', fallbackEmail)
         .limit(1)
         .maybeSingle();
-      if (profile) return profile as any;
+      if (profile) return profile as unknown as Profile;
     }
 
     if (fallbackName) {
@@ -90,7 +121,7 @@ async function resolveProfile(req: NextRequest) {
         .ilike('full_name', fallbackName)
         .limit(1)
         .maybeSingle();
-      if (profile) return profile as any;
+      if (profile) return profile as unknown as Profile;
     }
   }
 
@@ -139,8 +170,8 @@ async function getAnnouncementNotifications(profileId: string | null): Promise<N
     .limit(1);
 
   const items: NotificationItem[] = (generalRows ?? [])
-    .filter((row: any) => !row.end_date || new Date(row.end_date).getTime() >= Date.now())
-    .map((row: any) => ({
+    .filter((row: AnnouncementRow) => !row.end_date || new Date(row.end_date).getTime() >= Date.now())
+    .map((row: AnnouncementRow) => ({
       id: `announcement-general-${row.id}`,
       title: row.title || 'General Announcement',
       message: excerpt(row.content, 'There is a new general announcement for you.'),
@@ -157,7 +188,7 @@ async function getAnnouncementNotifications(profileId: string | null): Promise<N
       .select('announcement_id')
       .eq('profile_id', profileId)
       .limit(20);
-    const ids = [...new Set((recipientRows ?? []).map((row: any) => row.announcement_id).filter(Boolean))];
+    const ids = [...new Set((recipientRows ?? []).map((row: AnnouncementRecipientRow) => row.announcement_id).filter(Boolean))];
 
     if (ids.length > 0) {
       const { data: specificRows } = await supabaseServer
@@ -175,8 +206,8 @@ async function getAnnouncementNotifications(profileId: string | null): Promise<N
 
       items.push(
         ...(specificRows ?? [])
-          .filter((row: any) => !row.end_date || new Date(row.end_date).getTime() >= Date.now())
-          .map((row: any) => ({
+          .filter((row: AnnouncementRow) => !row.end_date || new Date(row.end_date).getTime() >= Date.now())
+          .map((row: AnnouncementRow) => ({
             id: `announcement-specific-${row.id}`,
             title: row.title || 'For You Announcement',
             message: excerpt(row.content, 'A new announcement has been posted for you.'),
@@ -192,7 +223,7 @@ async function getAnnouncementNotifications(profileId: string | null): Promise<N
   return items;
 }
 
-async function getSecurityNotification(profile: any): Promise<NotificationItem | null> {
+async function getSecurityNotification(profile: Profile): Promise<NotificationItem | null> {
   if (!profile?.id && !profile?.email) return null;
 
   const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
@@ -216,7 +247,7 @@ async function getSecurityNotification(profile: any): Promise<NotificationItem |
   const { data, error } = await query;
   if (error || !data?.length) return null;
 
-  const row = data[0] as any;
+  const row = data[0] as AuditLogRow;
   return {
     id: `security-${row.id}`,
     title: 'Account Access Alert',
@@ -273,10 +304,10 @@ async function getWarehouseNotification(): Promise<NotificationItem | null> {
   }
 }
 
-async function getMissingFinancialNotification(profile: any): Promise<NotificationItem | null> {
+async function getMissingFinancialNotification(profile: Profile): Promise<NotificationItem | null> {
   const institutionId = profile?.institution_id || profile?.institutions?.id;
   const institutionType = profile?.institutions?.institution_type;
-  if (!institutionId || !['parish', 'school', 'seminary'].includes(institutionType)) return null;
+  if (!institutionId || !['parish', 'school', 'seminary'].includes(institutionType ?? '')) return null;
 
   const now = new Date();
   const month = now.getMonth() + 1;

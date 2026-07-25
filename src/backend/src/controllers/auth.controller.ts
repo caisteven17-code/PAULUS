@@ -1,6 +1,6 @@
 import { Controller, Post, Get, Body, Headers, Req, Res, HttpStatus } from '@nestjs/common';
 import { Request, Response } from 'express';
-import { AppAuthService, ParishPriestAssignmentConflictError } from '../services/auth.service';
+import { AppAuthService, ParishPriestAssignmentConflictError, UserBody } from '../services/auth.service';
 import { AuditLogService } from '../services/audit-log.service';
 import { OtpPurpose } from '../services/email.service';
 
@@ -342,7 +342,7 @@ export class AuthController {
   }
 
   @Post('admin/users')
-  async createUser(@Body() body: Record<string, unknown>, @Req() req: Request, @Res() res: Response) {
+  async createUser(@Body() body: UserBody & { email: string }, @Req() req: Request, @Res() res: Response) {
     try {
       const user = await this.authService.createUser(body);
       await this.auditLogService.logEvent({
