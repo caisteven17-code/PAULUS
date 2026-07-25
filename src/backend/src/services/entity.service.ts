@@ -2,6 +2,17 @@ import { Injectable } from '@nestjs/common';
 import { Parish, DiocesanSchool, Seminary } from '../types';
 import { ALL_PARISHES, INITIAL_SEMINARIES, INITIAL_SCHOOLS } from '../constants';
 import { SupabaseService } from './supabase.service';
+import {
+  clusterFromVicariate,
+  normalizeEntityResponse,
+  normalizeSchoolData,
+  isUuid,
+  normalizeInstitutionClass,
+  fromInstitutionClass,
+  institutionFieldsForResponse,
+  calculateAge,
+} from './entity-normalization';
+import { computeFinancialHealthScore, computeCollectionTrend, generateFinancialInsight, buildFallbackProfile } from './financial-scoring';
 
 type EntityType = 'parish' | 'seminary' | 'school';
 
@@ -21,6 +32,25 @@ const MONTH_ORDER: Record<string, number> = {
 };
 
 const MISSING_TABLE_CODES = new Set(['42P01', 'PGRST205']);
+
+interface InstitutionCodeRef {
+  id: string;
+  name: string;
+  vicariate?: string;
+  institution_code?: string;
+}
+
+interface EnrichableRow {
+  institution_code?: string;
+  institutionCode?: string;
+  iafr_source_code?: string;
+  iafrSourceCode?: string;
+  institution_id?: string;
+  id?: string;
+  name?: string;
+  vicariate?: string;
+  [key: string]: unknown;
+}
 
 @Injectable()
 export class EntityService {
@@ -76,13 +106,13 @@ export class EntityService {
       }
       // Normalize data based on type
       if (entityType === 'school' && data) {
-        return (await this.enrichWithInstitutionCodes(entityType, data)).map((school: any) => this.normalizeSchoolData(school));
+        return (await this.enrichWithInstitutionCodes(entityType, data)).map((school: any) => normalizeSchoolData(school));
       }
       if (entityType === 'parish' && data) {
-        return (await this.enrichWithInstitutionCodes(entityType, data)).map((parish: any) => this.normalizeEntityResponse(parish));
+        return (await this.enrichWithInstitutionCodes(entityType, data)).map((parish: any) => normalizeEntityResponse(parish));
       }
       if (entityType === 'seminary' && data) {
-        return (await this.enrichWithInstitutionCodes(entityType, data)).map((seminary: any) => this.normalizeEntityResponse(seminary));
+        return (await this.enrichWithInstitutionCodes(entityType, data)).map((seminary: any) => normalizeEntityResponse(seminary));
       }
       return data;
     }
@@ -107,18 +137,18 @@ export class EntityService {
 
     return {
       parishes: (await this.enrichWithInstitutionCodes('parish', par.data ?? [])).map((p: any) =>
-        this.normalizeEntityResponse(p),
+        normalizeEntityResponse(p),
       ),
       seminaries: (await this.enrichWithInstitutionCodes('seminary', sem.data ?? [])).map((s: any) =>
-        this.normalizeEntityResponse(s),
+        normalizeEntityResponse(s),
       ),
       schools: (await this.enrichWithInstitutionCodes('school', sch.data ?? [])).map((s: any) =>
-        this.normalizeSchoolData(s),
+        normalizeSchoolData(s),
       ),
     };
   }
 
-  private async enrichWithInstitutionCodes(type: EntityType, rows: any[]): Promise<any[]> {
+  private async enrichWithInstitutionCodes(type: EntityType, rows: EnrichableRow[]): Promise<EnrichableRow[]> {
     if (!rows.length) return rows;
 
     const { data: institutions, error } = await this.supabaseService.admin
@@ -130,11 +160,11 @@ export class EntityService {
 
     if (error || !institutions?.length) return rows;
 
-    const byId = new Map<string, any>();
-    const byNameAndVicariate = new Map<string, any>();
-    const byName = new Map<string, any>();
+    const byId = new Map<string, InstitutionCodeRef>();
+    const byNameAndVicariate = new Map<string, InstitutionCodeRef>();
+    const byName = new Map<string, InstitutionCodeRef>();
     const duplicateNames = new Set<string>();
-    const key = (value: any) =>
+    const key = (value: unknown) =>
       String(value ?? '')
         .trim()
         .toLowerCase();
@@ -160,7 +190,7 @@ export class EntityService {
       const existingCode = row.institution_code ?? row.institutionCode ?? row.iafr_source_code ?? row.iafrSourceCode;
       if (existingCode) return row;
 
-      const idCandidate = this.isUuid(row.institution_id) ? row.institution_id : this.isUuid(row.id) ? row.id : null;
+      const idCandidate = isUuid(row.institution_id) ? row.institution_id : isUuid(row.id) ? row.id : null;
       const match =
         (idCandidate ? byId.get(idCandidate) : null) ??
         byNameAndVicariate.get(`${key(row.name)}|${key(row.vicariate)}`) ??
@@ -207,7 +237,7 @@ export class EntityService {
       iafrSourceCode: institution.institution_code ?? '',
       vicariate: institution.vicariate ?? '',
       district: institution.district ?? '',
-      class: this.fromInstitutionClass(institution.class) ?? institution.class ?? 'Class C',
+      class: fromInstitutionClass(institution.class) ?? institution.class ?? 'Class C',
       address: institution.address ?? '',
       municipality: institution.municipality ?? '',
       contact_number: institution.contact_number ?? '',
@@ -233,67 +263,12 @@ export class EntityService {
       return normalized;
     }
 
-    normalized.cluster = Number(institution.cluster) || this.clusterFromVicariate(institution.vicariate);
+    normalized.cluster = Number(institution.cluster) || clusterFromVicariate(institution.vicariate);
     normalized.principal = '';
     normalized.level = 'K-12';
     normalized.enrollment = 0;
     normalized.capacity = 0;
     normalized.staff = 0;
-    return normalized;
-  }
-
-  private clusterFromVicariate(vicariate: any): 1 | 2 | 3 {
-    const value = String(vicariate ?? '').toLowerCase();
-    if (value.includes('holy family') || value.includes('san isidro')) return 2;
-    if (value.includes('san pedro') || value.includes('sta. rosa')) return 3;
-    return 1;
-  }
-
-  private normalizeSchoolData(school: any): any {
-    let normalized = school;
-
-    // If school has vicariate instead of cluster (pre-migration data), convert it
-    if (school.vicariate && !school.cluster) {
-      // Map vicariate names to clusters
-      const vicariateToCluster: Record<string, number> = {
-        'San Pablo': 1,
-        'Holy Family': 2,
-        'San Isidro Labrador': 3,
-      };
-      normalized = {
-        ...school,
-        cluster: vicariateToCluster[school.vicariate] || 1,
-      };
-    }
-
-    // Use full entity response normalization (handles id, subsidy_type, etc.)
-    return this.normalizeEntityResponse(normalized);
-  }
-
-  private normalizeEntityResponse(entity: any): any {
-    if (!entity) return entity;
-    const normalized: any = { ...entity };
-
-    // Normalize institution_id to id if present
-    if (entity.institution_id && !entity.id) {
-      normalized.id = entity.institution_id;
-    }
-
-    // Normalize snake_case to camelCase for subsidy_type
-    if (entity.subsidy_type) {
-      normalized.subsidyType = entity.subsidy_type;
-    }
-
-    if (entity.institution_code !== undefined) {
-      normalized.institutionCode = entity.institution_code ?? '';
-      normalized.iafrSourceCode = entity.institution_code ?? '';
-      normalized.iafr_source_code = entity.institution_code ?? '';
-    } else if (entity.institutionCode !== undefined) {
-      normalized.institution_code = entity.institutionCode ?? '';
-      normalized.iafrSourceCode = entity.institutionCode ?? '';
-      normalized.iafr_source_code = entity.institutionCode ?? '';
-    }
-
     return normalized;
   }
 
@@ -307,12 +282,8 @@ export class EntityService {
     return 'seminaries';
   }
 
-  private isUuid(value: any): boolean {
-    return typeof value === 'string' && /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value);
-  }
-
   private async resolveDioceseProfileId(userId?: string): Promise<string | null> {
-    if (!this.isUuid(userId)) return null;
+    if (!isUuid(userId)) return null;
 
     const { data: externalProfile, error: externalError } = await this.supabaseService.admin
       .schema('diocese')
@@ -338,43 +309,11 @@ export class EntityService {
     return null;
   }
 
-  private normalizeInstitutionClass(value: any): string | undefined {
-    if (typeof value !== 'string') return undefined;
-    const match = value.trim().match(/^(?:Class\s*)?([A-E])$/i);
-    return match ? match[1].toUpperCase() : undefined;
-  }
-
-  private fromInstitutionClass(value: any): string | undefined {
-    const normalized = this.normalizeInstitutionClass(value);
-    return normalized ? `Class ${normalized}` : undefined;
-  }
-
-  private institutionFieldsForResponse(institution: any): any {
-    if (!institution) return {};
-    const response: any = { ...institution };
-
-    if (institution.latitude !== undefined) response.lat = institution.latitude;
-    if (institution.longitude !== undefined) response.lng = institution.longitude;
-    if (institution.institution_code !== undefined) {
-      response.institutionCode = institution.institution_code ?? '';
-      response.iafrSourceCode = institution.institution_code ?? '';
-      response.iafr_source_code = institution.institution_code ?? '';
-    }
-
-    const className = this.fromInstitutionClass(institution.class);
-    if (className) response.class = className;
-
-    delete response.id;
-    delete response.latitude;
-    delete response.longitude;
-    return response;
-  }
-
   private async findInstitution(type: EntityType, entity: any): Promise<any | null> {
     const institutionType = this.domainInstitutionType(type);
     const candidates = [
       entity?.institution_id,
-      this.isUuid(entity?.id) ? entity.id : null,
+      isUuid(entity?.id) ? entity.id : null,
     ].filter(Boolean);
 
     for (const id of candidates) {
@@ -410,8 +349,10 @@ export class EntityService {
     return null;
   }
 
-  private isMissingTableError(error: any): boolean {
-    return !!error && (MISSING_TABLE_CODES.has(error.code) || String(error.message ?? '').includes('schema cache'));
+  private isMissingTableError(error: unknown): boolean {
+    if (!error || typeof error !== 'object') return false;
+    const { code, message } = error as { code?: string; message?: string };
+    return MISSING_TABLE_CODES.has(code ?? '') || String(message ?? '').includes('schema cache');
   }
 
   async previewParishRenumbering(requestedSourceCode: string): Promise<any> {
@@ -512,7 +453,7 @@ export class EntityService {
   }
 
   async previewBulkParishReorder(district: string, order: string[]): Promise<any> {
-    if (!Array.isArray(order) || order.length === 0 || order.some((id) => !this.isUuid(id))) {
+    if (!Array.isArray(order) || order.length === 0 || order.some((id) => !isUuid(id))) {
       throw new Error('The proposed order must contain valid parish identifiers.');
     }
     const { data, error } = await this.supabaseService.admin
@@ -539,7 +480,7 @@ export class EntityService {
 
   async executeBulkParishReorder(input: any, changedBy?: string): Promise<any> {
     const order = input?.order;
-    if (!Array.isArray(order) || order.length === 0 || order.some((id: any) => !this.isUuid(id))) {
+    if (!Array.isArray(order) || order.length === 0 || order.some((id: any) => !isUuid(id))) {
       throw new Error('The proposed order must contain valid parish identifiers.');
     }
     const actorId = await this.resolveDioceseProfileId(changedBy);
@@ -708,7 +649,7 @@ export class EntityService {
       payload.institution_code = normalizedCode || null;
     }
     if (entity?.class !== undefined) {
-      const normalizedClass = this.normalizeInstitutionClass(entity.class);
+      const normalizedClass = normalizeInstitutionClass(entity.class);
       if (normalizedClass) payload.class = normalizedClass;
     }
     if (entity?.lat !== undefined) payload.latitude = entity.lat;
@@ -801,7 +742,7 @@ export class EntityService {
         vicariate: clusterToVicariate[entity.cluster] || 'San Pablo',
       };
       // Remove cluster if database doesn't have it yet
-      const { cluster, ...payloadWithoutCluster } = payload;
+      const { cluster: _cluster, ...payloadWithoutCluster } = payload;
       payload = payloadWithoutCluster;
     }
 
@@ -814,11 +755,11 @@ export class EntityService {
     }
     if (error) throw error;
     const syncedInstitution = await this.syncInstitutionFields(type, { ...payload, ...data });
-    const createdInstitutionFields = this.institutionFieldsForResponse(syncedInstitution);
+    const createdInstitutionFields = institutionFieldsForResponse(syncedInstitution);
     const normalizedData = syncedInstitution ? { ...data, ...createdInstitutionFields } : data;
     // Normalize the response
-    if (type === 'school') return this.normalizeSchoolData(normalizedData);
-    return this.normalizeEntityResponse(normalizedData);
+    if (type === 'school') return normalizeSchoolData(normalizedData);
+    return normalizeEntityResponse(normalizedData);
   }
 
   async updateAdminEntity(type: EntityType, id: string, updates: any): Promise<any> {
@@ -850,7 +791,7 @@ export class EntityService {
         vicariate: clusterToVicariate[updates.cluster] || 'San Pablo',
       };
       // Remove cluster if database doesn't have it yet
-      const { cluster, ...payloadWithoutCluster } = payload;
+      const { cluster: _cluster, ...payloadWithoutCluster } = payload;
       payload = payloadWithoutCluster;
     }
 
@@ -892,11 +833,11 @@ export class EntityService {
       institution_id: id,
       previousName: updates.previousName ?? existingEntity?.name,
     });
-    const updatedInstitutionFields = this.institutionFieldsForResponse(syncedInstitution);
+    const updatedInstitutionFields = institutionFieldsForResponse(syncedInstitution);
     const normalizedData = syncedInstitution ? { ...data, ...updatedInstitutionFields } : data;
     // Normalize the response
-    if (type === 'school') return this.normalizeSchoolData(normalizedData);
-    return this.normalizeEntityResponse(normalizedData);
+    if (type === 'school') return normalizeSchoolData(normalizedData);
+    return normalizeEntityResponse(normalizedData);
   }
 
   async updateOwnInstitution(type: EntityType, id: string, contactNumber?: string, email?: string): Promise<any> {
@@ -1049,13 +990,13 @@ export class EntityService {
           const monthlyExpenses = expensesHistory.length
             ? expensesHistory.slice(-3).reduce((a, b) => a + b, 0) / Math.min(3, expensesHistory.length)
             : 0;
-          const { healthScore, risk } = this.computeFinancialHealthScore(
+          const { healthScore, risk } = computeFinancialHealthScore(
             monthlyCollections,
             monthlyExpenses,
             currentBalance,
             collectionsHistory,
           );
-          const trend = this.computeCollectionTrend(collectionsHistory);
+          const trend = computeCollectionTrend(collectionsHistory);
 
           result.push({
             id: inst.id,
@@ -1078,14 +1019,14 @@ export class EntityService {
             collectionsHistory,
             expensesHistory,
             trend,
-            insight: this.generateFinancialInsight(healthScore, trend),
+            insight: generateFinancialInsight(healthScore, trend),
           });
         }
       } else {
         // Fallback: use ALL_PARISHES constants
         ALL_PARISHES.forEach((p: any, i: number) => {
           const mc = Math.round((p.collections ?? 0) / 12);
-          result.push(this.buildFallbackProfile(String(i + 1), p.name, 'parish', p.vicariate ?? '', p.class ?? '', mc));
+          result.push(buildFallbackProfile(String(i + 1), p.name, 'parish', p.vicariate ?? '', p.class ?? '', mc));
         });
       }
     }
@@ -1133,88 +1074,6 @@ export class EntityService {
       trend: '0.0%',
       insight: 'Awaiting financial submissions.',
     }));
-  }
-
-  private computeFinancialHealthScore(
-    income: number,
-    expenses: number,
-    balance: number,
-    history: number[],
-  ): { healthScore: number; risk: 'Low' | 'Moderate' | 'High' } {
-    if (income === 0 && expenses === 0 && balance === 0) return { healthScore: 50, risk: 'Moderate' };
-
-    const surplusRatio = income > 0 ? (income - expenses) / income : -1;
-    const surplusScore = Math.max(0, Math.min(1, surplusRatio + 0.5));
-    const coverageScore = expenses > 0 ? Math.min(1, balance / (expenses * 3)) : income > 0 ? 0.5 : 0;
-
-    let consistencyScore = 0.5;
-    if (history.length >= 3) {
-      const avg = history.reduce((a, b) => a + b, 0) / history.length;
-      if (avg > 0) {
-        const variance = history.reduce((s, v) => s + Math.pow(v - avg, 2), 0) / history.length;
-        consistencyScore = Math.max(0, 1 - Math.sqrt(variance) / avg);
-      }
-    }
-
-    const raw = 0.4 * surplusScore + 0.3 * coverageScore + 0.3 * consistencyScore;
-    const healthScore = Math.min(99, Math.max(10, Math.round(raw * 100)));
-    const risk: 'Low' | 'Moderate' | 'High' = healthScore >= 75 ? 'Low' : healthScore >= 55 ? 'Moderate' : 'High';
-    return { healthScore, risk };
-  }
-
-  private computeCollectionTrend(history: number[]): string {
-    if (history.length < 4) return '0.0%';
-    const half = Math.floor(history.length / 2);
-    const older = history.slice(0, half).reduce((a, b) => a + b, 0) / half;
-    const recent = history.slice(-half).reduce((a, b) => a + b, 0) / half;
-    if (older === 0) return '0.0%';
-    const pct = ((recent - older) / older) * 100;
-    return pct >= 0 ? `+${pct.toFixed(1)}%` : `${pct.toFixed(1)}%`;
-  }
-
-  private generateFinancialInsight(score: number, trend: string): string {
-    const up = trend.startsWith('+');
-    if (score >= 80)
-      return up
-        ? 'Consistent collection growth with disciplined operating expenses.'
-        : 'Strong reserves despite mixed collection trend.';
-    if (score >= 65) return 'Stable financial position with moderate growth potential.';
-    if (score >= 50) return 'Adequate reserves; monitor expense trajectory closely.';
-    return 'Tight margins — financial review is recommended.';
-  }
-
-  private buildFallbackProfile(
-    id: string,
-    name: string,
-    type: EntityType,
-    location: string,
-    cls: string,
-    monthlyCollections: number,
-  ): any {
-    const monthlyExpenses = Math.round(monthlyCollections * 0.85);
-    const currentBalance = monthlyCollections * 2;
-    const { healthScore, risk } = this.computeFinancialHealthScore(
-      monthlyCollections,
-      monthlyExpenses,
-      currentBalance,
-      [],
-    );
-    return {
-      id,
-      name,
-      type,
-      location,
-      class: cls,
-      healthScore,
-      risk,
-      currentBalance,
-      monthlyCollections,
-      monthlyExpenses,
-      collectionsHistory: Array(6).fill(monthlyCollections),
-      expensesHistory: Array(6).fill(monthlyExpenses),
-      trend: '0.0%',
-      insight: monthlyCollections > 0 ? 'Baseline data from diocese records.' : 'Awaiting submission data.',
-    };
   }
 
   // ─── Priest health records ────────────────────────────────────────────────────
@@ -1294,7 +1153,7 @@ export class EntityService {
       position: r.position,
       parish: r.parish,
       birthDate: r.birth_date,
-      age: this.calculateAge(r.birth_date),
+      age: calculateAge(r.birth_date),
       lastCheckup: r.last_checkup,
       healthStatus: r.health_status,
       notes: r.notes,
@@ -1357,16 +1216,6 @@ export class EntityService {
       console.warn('[entity.service] Unable to hydrate health document:', error);
       return record;
     }
-  }
-
-  private calculateAge(birthDate: string | null): number {
-    if (!birthDate) return 0;
-    const today = new Date();
-    const birth = new Date(birthDate);
-    let age = today.getFullYear() - birth.getFullYear();
-    const m = today.getMonth() - birth.getMonth();
-    if (m < 0 || (m === 0 && today.getDate() < birth.getDate())) age--;
-    return age;
   }
 
   async deleteAdminEntity(type: EntityType, id: string, hardDelete = false): Promise<any> {
