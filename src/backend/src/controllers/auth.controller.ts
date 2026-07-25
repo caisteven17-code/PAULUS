@@ -2,6 +2,7 @@ import { Controller, Post, Get, Body, Headers, Req, Res, HttpStatus } from '@nes
 import { Request, Response } from 'express';
 import { AppAuthService, ParishPriestAssignmentConflictError } from '../services/auth.service';
 import { AuditLogService } from '../services/audit-log.service';
+import { OtpPurpose } from '../services/email.service';
 
 function clientIp(req: Request): string {
   const forwarded = req.headers['x-forwarded-for'];
@@ -19,6 +20,67 @@ function passwordMeetsPolicy(password: string): boolean {
   );
 }
 
+function getErrorMessage(err: unknown): string {
+  if (err instanceof Error) return err.message;
+  if (err && typeof err === 'object' && 'message' in err) {
+    const message = (err as { message?: unknown }).message;
+    if (typeof message === 'string') return message;
+  }
+  return 'Unknown error';
+}
+
+interface LoginBody {
+  email: string;
+  password: string;
+}
+
+interface SendOtpBody {
+  email: string;
+  purpose: 'onboarding' | 'forgot_password';
+}
+
+interface SecurityAlertBody {
+  email: string;
+}
+
+interface VerifyOtpBody {
+  email: string;
+  code: string;
+  purpose: OtpPurpose;
+}
+
+interface CompleteOnboardingBody {
+  userId: string;
+  email: string;
+  password: string;
+  contactNumber: string;
+  birthday: string;
+  otpCode: string;
+}
+
+interface ResetPasswordBody {
+  email: string;
+  otpCode: string;
+  newPassword: string;
+}
+
+interface UpdateUserBody extends Record<string, unknown> {
+  id: string;
+}
+
+interface DeleteUserBody {
+  id: string;
+  action: 'archive' | 'restore';
+}
+
+interface RoleUpdate extends Record<string, unknown> {
+  id: string;
+}
+
+interface SaveRolesBody {
+  roles: RoleUpdate[];
+}
+
 @Controller('auth')
 export class AuthController {
   constructor(
@@ -27,7 +89,7 @@ export class AuthController {
   ) {}
 
   @Post('login')
-  async login(@Body() body: any, @Req() req: Request, @Res() res: Response) {
+  async login(@Body() body: LoginBody, @Req() req: Request, @Res() res: Response) {
     const { email, password } = body;
     if (!email || !password) {
       return res.status(HttpStatus.BAD_REQUEST).json({ error: 'Email and password are required.' });
@@ -94,8 +156,8 @@ export class AuthController {
 
   // ── OTP / Onboarding / Password reset ──────────────────────────────────────
 
-  private otpErrorResponse(res: Response, err: any) {
-    const message: string = err?.message ?? 'Unknown error';
+  private otpErrorResponse(res: Response, err: unknown) {
+    const message = getErrorMessage(err);
     switch (message) {
       case 'NOT_REGISTERED':
         return res.status(HttpStatus.NOT_FOUND).json({
@@ -124,8 +186,8 @@ export class AuthController {
   }
 
   @Post('send-otp')
-  async sendOtp(@Body() body: any, @Req() req: Request, @Res() res: Response) {
-    const { email, purpose } = body ?? {};
+  async sendOtp(@Body() body: SendOtpBody, @Req() req: Request, @Res() res: Response) {
+    const { email, purpose } = body ?? ({} as SendOtpBody);
     if (!email || !purpose || !['onboarding', 'forgot_password'].includes(purpose)) {
       return res.status(HttpStatus.BAD_REQUEST).json({ error: 'email and a valid purpose are required.' });
     }
@@ -142,14 +204,14 @@ export class AuthController {
         ipAddress: clientIp(req),
       });
       return res.status(HttpStatus.OK).json(result);
-    } catch (err: any) {
+    } catch (err: unknown) {
       return this.otpErrorResponse(res, err);
     }
   }
 
   @Post('security-alert')
-  async securityAlert(@Body() body: any, @Req() req: Request, @Res() res: Response) {
-    const { email } = body ?? {};
+  async securityAlert(@Body() body: SecurityAlertBody, @Req() req: Request, @Res() res: Response) {
+    const { email } = body ?? ({} as SecurityAlertBody);
     if (!email) {
       return res.status(HttpStatus.BAD_REQUEST).json({ error: 'email is required.' });
     }
@@ -165,14 +227,14 @@ export class AuthController {
         ipAddress: clientIp(req),
       });
       return res.status(HttpStatus.OK).json(result);
-    } catch (err: any) {
+    } catch (err: unknown) {
       return this.otpErrorResponse(res, err);
     }
   }
 
   @Post('verify-otp')
-  async verifyOtp(@Body() body: any, @Req() req: Request, @Res() res: Response) {
-    const { email, code, purpose } = body ?? {};
+  async verifyOtp(@Body() body: VerifyOtpBody, @Req() req: Request, @Res() res: Response) {
+    const { email, code, purpose } = body ?? ({} as VerifyOtpBody);
     if (!email || !code || !purpose) {
       return res.status(HttpStatus.BAD_REQUEST).json({ error: 'email, code, and purpose are required.' });
     }
@@ -189,7 +251,7 @@ export class AuthController {
         ipAddress: clientIp(req),
       });
       return res.status(HttpStatus.OK).json(result);
-    } catch (err: any) {
+    } catch (err: unknown) {
       await this.auditLogService.logEvent({
         userName: email,
         userRole: 'unknown',
@@ -204,8 +266,8 @@ export class AuthController {
   }
 
   @Post('complete-onboarding')
-  async completeOnboarding(@Body() body: any, @Req() req: Request, @Res() res: Response) {
-    const { userId, email, password, contactNumber, birthday, otpCode } = body ?? {};
+  async completeOnboarding(@Body() body: CompleteOnboardingBody, @Req() req: Request, @Res() res: Response) {
+    const { userId, email, password, contactNumber, birthday, otpCode } = body ?? ({} as CompleteOnboardingBody);
     if (!userId || !email || !password || !contactNumber || !birthday || !otpCode) {
       return res
         .status(HttpStatus.BAD_REQUEST)
@@ -235,14 +297,14 @@ export class AuthController {
         ipAddress: clientIp(req),
       });
       return res.status(HttpStatus.OK).json({ ok: true, user });
-    } catch (err: any) {
+    } catch (err: unknown) {
       return this.otpErrorResponse(res, err);
     }
   }
 
   @Post('reset-password')
-  async resetPassword(@Body() body: any, @Req() req: Request, @Res() res: Response) {
-    const { email, otpCode, newPassword } = body ?? {};
+  async resetPassword(@Body() body: ResetPasswordBody, @Req() req: Request, @Res() res: Response) {
+    const { email, otpCode, newPassword } = body ?? ({} as ResetPasswordBody);
     if (!email || !otpCode || !newPassword) {
       return res.status(HttpStatus.BAD_REQUEST).json({ error: 'email, otpCode, and newPassword are required.' });
     }
@@ -264,7 +326,7 @@ export class AuthController {
         ipAddress: clientIp(req),
       });
       return res.status(HttpStatus.OK).json(result);
-    } catch (err: any) {
+    } catch (err: unknown) {
       return this.otpErrorResponse(res, err);
     }
   }
@@ -274,13 +336,13 @@ export class AuthController {
     try {
       const users = await this.authService.listUsers();
       return res.status(HttpStatus.OK).json(users);
-    } catch (err: any) {
-      return res.status(HttpStatus.INTERNAL_SERVER_ERROR).json({ error: err.message });
+    } catch (err: unknown) {
+      return res.status(HttpStatus.INTERNAL_SERVER_ERROR).json({ error: getErrorMessage(err) });
     }
   }
 
   @Post('admin/users')
-  async createUser(@Body() body: any, @Req() req: Request, @Res() res: Response) {
+  async createUser(@Body() body: Record<string, unknown>, @Req() req: Request, @Res() res: Response) {
     try {
       const user = await this.authService.createUser(body);
       await this.auditLogService.logEvent({
@@ -296,7 +358,7 @@ export class AuthController {
         metadata: { email: user.email, role: user.role, entityType: user.entityType },
       });
       return res.status(HttpStatus.CREATED).json(user);
-    } catch (err: any) {
+    } catch (err: unknown) {
       if (err instanceof ParishPriestAssignmentConflictError) {
         return res.status(HttpStatus.CONFLICT).json({
           error: err.message,
@@ -305,12 +367,12 @@ export class AuthController {
           existingPriest: err.existingPriest,
         });
       }
-      return res.status(HttpStatus.BAD_REQUEST).json({ error: err.message });
+      return res.status(HttpStatus.BAD_REQUEST).json({ error: getErrorMessage(err) });
     }
   }
 
   @Post('admin/users/update')
-  async updateUser(@Body() body: any, @Req() req: Request, @Res() res: Response) {
+  async updateUser(@Body() body: UpdateUserBody, @Req() req: Request, @Res() res: Response) {
     try {
       const { id, ...updates } = body;
       const user = await this.authService.updateUser(id, updates);
@@ -326,7 +388,7 @@ export class AuthController {
         metadata: { userId: id, email: user.email },
       });
       return res.status(HttpStatus.OK).json(user);
-    } catch (err: any) {
+    } catch (err: unknown) {
       if (err instanceof ParishPriestAssignmentConflictError) {
         return res.status(HttpStatus.CONFLICT).json({
           error: err.message,
@@ -335,12 +397,12 @@ export class AuthController {
           existingPriest: err.existingPriest,
         });
       }
-      return res.status(HttpStatus.BAD_REQUEST).json({ error: err.message });
+      return res.status(HttpStatus.BAD_REQUEST).json({ error: getErrorMessage(err) });
     }
   }
 
   @Post('admin/users/delete')
-  async deleteUser(@Body() body: any, @Req() req: Request, @Res() res: Response) {
+  async deleteUser(@Body() body: DeleteUserBody, @Req() req: Request, @Res() res: Response) {
     try {
       const { id, action } = body;
       const user = await this.authService.deleteUser(id, action);
@@ -356,11 +418,11 @@ export class AuthController {
         metadata: { userId: id, action },
       });
       return res.status(HttpStatus.OK).json(user);
-    } catch (err: any) {
-      if (err?.message === 'ACTIVE_PARISH_ASSIGNMENT') {
+    } catch (err: unknown) {
+      if (getErrorMessage(err) === 'ACTIVE_PARISH_ASSIGNMENT') {
         return res.status(HttpStatus.CONFLICT).json({ code: 'ACTIVE_PARISH_ASSIGNMENT', error: 'Resolve this priest’s active parish assignment before archiving the account.' });
       }
-      return res.status(HttpStatus.BAD_REQUEST).json({ error: err.message });
+      return res.status(HttpStatus.BAD_REQUEST).json({ error: getErrorMessage(err) });
     }
   }
 
@@ -369,13 +431,13 @@ export class AuthController {
     try {
       const roles = await this.authService.listRoles();
       return res.status(HttpStatus.OK).json(roles);
-    } catch (err: any) {
-      return res.status(HttpStatus.INTERNAL_SERVER_ERROR).json({ error: err.message });
+    } catch (err: unknown) {
+      return res.status(HttpStatus.INTERNAL_SERVER_ERROR).json({ error: getErrorMessage(err) });
     }
   }
 
   @Post('admin/roles')
-  async saveRoles(@Body() body: any, @Req() req: Request, @Res() res: Response) {
+  async saveRoles(@Body() body: SaveRolesBody, @Req() req: Request, @Res() res: Response) {
     try {
       const { roles } = body;
       if (!Array.isArray(roles)) {
@@ -390,11 +452,11 @@ export class AuthController {
         action: 'Roles Updated',
         detail: `Role permissions updated for ${roles.length} role(s)`,
         ipAddress: clientIp(req),
-        metadata: { roleIds: roles.map((r: any) => r.id) },
+        metadata: { roleIds: roles.map((r) => r.id) },
       });
       return res.status(HttpStatus.OK).json(result);
-    } catch (err: any) {
-      return res.status(HttpStatus.BAD_REQUEST).json({ error: err.message });
+    } catch (err: unknown) {
+      return res.status(HttpStatus.BAD_REQUEST).json({ error: getErrorMessage(err) });
     }
   }
 }

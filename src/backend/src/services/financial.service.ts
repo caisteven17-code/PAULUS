@@ -4,6 +4,20 @@ import { FinancialRecord, EntityClass } from '../types';
 import { ALL_PARISHES, INITIAL_SEMINARIES, INITIAL_SCHOOLS } from '../constants';
 import { newId } from '../utils/store';
 
+// Loose shape of a `financial_records` row as returned by the untyped Supabase
+// client — the schema is fixed but Supabase's own client here isn't generated,
+// so unlisted columns fall through the index signature as `unknown`.
+interface DomainRow {
+  id?: string;
+  month: string;
+  year?: number | string | null;
+  institution_class?: EntityClass;
+  record_timestamp?: string;
+  institution?: { name?: string } | null;
+  institution_id?: string;
+  [column: string]: unknown;
+}
+
 export const DEFAULT_RECORDS: Omit<FinancialRecord, 'entityId' | 'entityType'>[] = [
   { month: 'Jan', collections: 800000, consumableCollections: 650000, disbursements: 640000 },
   { month: 'Feb', collections: 720000, consumableCollections: 580000, disbursements: 610000 },
@@ -50,11 +64,11 @@ export class FinancialService {
   // Domain → FinancialRecord mapping per entity type
   // ------------------------------------------------------------------
 
-  private num(v: any): number {
+  private num(v: unknown): number {
     return v != null ? Number(v) : 0;
   }
 
-  private parishToRecord(row: any, name: string, entityClass?: EntityClass): FinancialRecord {
+  private parishToRecord(row: DomainRow, name: string | undefined, entityClass?: EntityClass): FinancialRecord {
     const n = this.num.bind(this);
     const collections =
       n(row.sacraments_total) +
@@ -118,7 +132,7 @@ export class FinancialService {
     };
   }
 
-  private schoolToRecord(row: any, name: string, entityClass?: EntityClass): FinancialRecord {
+  private schoolToRecord(row: DomainRow, name: string | undefined, entityClass?: EntityClass): FinancialRecord {
     const n = this.num.bind(this);
     const collections =
       n(row.tuition_revenues) + n(row.miscellaneous_fees) + n(row.other_income) + n(row.subsidy_inflow);
@@ -151,7 +165,7 @@ export class FinancialService {
     };
   }
 
-  private seminaryToRecord(row: any, name: string, entityClass?: EntityClass): FinancialRecord {
+  private seminaryToRecord(row: DomainRow, name: string | undefined, entityClass?: EntityClass): FinancialRecord {
     const n = this.num.bind(this);
     const collections =
       n(row.donations) +
@@ -185,7 +199,7 @@ export class FinancialService {
     };
   }
 
-  private domainToRecord(row: any, name: string, entityType: string, entityClass?: EntityClass): FinancialRecord {
+  private domainToRecord(row: DomainRow, name: string | undefined, entityType: string, entityClass?: EntityClass): FinancialRecord {
     if (entityType === 'parish') return this.parishToRecord(row, name, entityClass);
     if (entityType === 'school') return this.schoolToRecord(row, name, entityClass);
     return this.seminaryToRecord(row, name, entityClass);
@@ -214,7 +228,7 @@ export class FinancialService {
         return this.generateRecords(entityId, entityType, entityClass);
       }
 
-      return data.map((row: any) => this.domainToRecord(row, entityId, entityType, entityClass));
+      return data.map((row: DomainRow) => this.domainToRecord(row, entityId, entityType, entityClass));
     } catch {
       return this.generateRecords(entityId, entityType, entityClass);
     }
@@ -238,7 +252,7 @@ export class FinancialService {
             .order('record_timestamp', { ascending: true });
 
           if (error || !data || data.length === 0) return [];
-          return data.map((row: any) => this.domainToRecord(row, row.institution?.name ?? row.institution_id, type));
+          return data.map((row: DomainRow) => this.domainToRecord(row, row.institution?.name ?? row.institution_id, type));
         }),
       );
 
