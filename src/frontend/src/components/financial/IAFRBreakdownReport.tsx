@@ -21,7 +21,25 @@ interface IAFRBreakdownReportProps {
   hideHeader?: boolean;
 }
 
+const MONTH_NAMES = [
+  'January', 'February', 'March', 'April', 'May', 'June',
+  'July', 'August', 'September', 'October', 'November', 'December',
+];
+
 // ─── helpers ─────────────────────────────────────────────────────────────────
+
+function ChevronIcon({ expanded }: { expanded: boolean }) {
+  return (
+    <svg
+      className={`w-4 h-4 flex-shrink-0 transition-transform duration-150 ${expanded ? 'rotate-90' : ''}`}
+      fill="none"
+      stroke="currentColor"
+      viewBox="0 0 24 24"
+    >
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="m9 18 6-6-6-6" />
+    </svg>
+  );
+}
 
 function NetAmount({ value }: { value: number }) {
   if (value === 0) return <span className="text-gray-400">—</span>;
@@ -76,6 +94,25 @@ export function IAFRBreakdownReport({
   hideHeader,
 }: IAFRBreakdownReportProps) {
   const [report, setReport] = useState<IAFRBreakdownReportData | null | undefined>(undefined);
+  // null = Full Year (the default — aggregates every month in `year`, same
+  // as before this control existed); 1-12 narrows to one calendar month.
+  const [selectedMonth, setSelectedMonth] = useState<number | null>(null);
+  // Collapsed by default — a full report can be 100+ account lines across 6
+  // sections, so starting expanded makes every parish look overwhelming at
+  // a glance. Reset alongside the report itself so switching institutions
+  // doesn't carry over a stale expand state.
+  const [expandedSections, setExpandedSections] = useState<Set<string>>(new Set());
+  const toggleSection = (code: string) =>
+    setExpandedSections((prev) => {
+      const next = new Set(prev);
+      if (next.has(code)) next.delete(code);
+      else next.add(code);
+      return next;
+    });
+
+  useEffect(() => {
+    setSelectedMonth(null);
+  }, [institutionId]);
 
   useEffect(() => {
     if (!institutionId) {
@@ -84,8 +121,9 @@ export function IAFRBreakdownReport({
     }
     let cancelled = false;
     setReport(undefined);
+    setExpandedSections(new Set());
     apiClient
-      .getFinancialBreakdownReport(institutionId, { year, vicariates, institutionIds })
+      .getFinancialBreakdownReport(institutionId, { year, month: selectedMonth, vicariates, institutionIds })
       .then((res) => {
         if (cancelled) return;
         setReport(res?.data_sufficient && Array.isArray(res.sections) && res.sections.length > 0 ? res : null);
@@ -96,7 +134,7 @@ export function IAFRBreakdownReport({
     return () => {
       cancelled = true;
     };
-  }, [institutionId, year, vicariates, institutionIds]);
+  }, [institutionId, year, selectedMonth, vicariates, institutionIds]);
 
   // ── loading / empty states ─────────────────────────────────────────────────
   if (report === undefined) {
@@ -131,9 +169,9 @@ export function IAFRBreakdownReport({
     <div className={className}>
 
       {/* ── branded header ── */}
-      {!hideHeader && (
-        <div className="mb-6 pb-5 border-b border-gray-100">
-          <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
+      <div className="mb-6 pb-5 border-b border-gray-100">
+        {!hideHeader && (
+          <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3 mb-5">
             <div>
               {/* diocese badge */}
               <span className="inline-flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-widest text-church-green/70 mb-2">
@@ -164,57 +202,105 @@ export function IAFRBreakdownReport({
               )}
             </div>
           </div>
+        )}
 
-          {/* ── summary strip ── */}
-          <div className="mt-5 grid grid-cols-3 gap-3">
-            <SummaryCard label="Total Receipts"  value={report.grand_total.receipts}  accent="green" />
-            <SummaryCard label="Total Expenses"  value={report.grand_total.expenses}  accent="red"   />
-            <SummaryCard label="Net Balance"     value={net}                           accent="blue"  />
-          </div>
+        {/* ── month picker — shown regardless of hideHeader; disabled without
+             a year since a month alone is ambiguous (matches the backend's
+             own rule of only narrowing when both are given together) ── */}
+        <div className="flex items-center justify-end gap-2 mb-4">
+          <label className="text-[11px] font-semibold uppercase tracking-widest text-gray-400" htmlFor="iafr-month-picker">
+            Period
+          </label>
+          <select
+            id="iafr-month-picker"
+            value={selectedMonth ?? ''}
+            disabled={!year}
+            onChange={(e) => setSelectedMonth(e.target.value ? Number(e.target.value) : null)}
+            className="bg-gray-100 border-none text-[11px] font-bold text-church-green rounded-lg px-3 py-1.5 outline-none cursor-pointer hover:bg-gray-200 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            <option value="">Full Year{year ? ` (${year})` : ''}</option>
+            {MONTH_NAMES.map((m, i) => (
+              <option key={m} value={i + 1}>
+                {m}{year ? ` ${year}` : ''}
+              </option>
+            ))}
+          </select>
         </div>
-      )}
 
-      {/* ── table ── */}
-      <div className="overflow-x-auto rounded-xl border border-gray-100 shadow-sm">
+        {/* ── summary strip — shown regardless of hideHeader, the totals are
+             useful even when the caller supplies its own title/subtitle ── */}
+        <div className="grid grid-cols-3 gap-3">
+          <SummaryCard label={selectedMonth ? 'Receipts' : 'Total Receipts'} value={report.grand_total.receipts} accent="green" />
+          <SummaryCard label={selectedMonth ? 'Expenses' : 'Total Expenses'} value={report.grand_total.expenses} accent="red"   />
+          <SummaryCard label="Net Balance"     value={net}                           accent="blue"  />
+        </div>
+      </div>
+
+      {/* ── table — fixed-height box with its own scroll, so expanding
+           several sections doesn't blow up the surrounding page layout ── */}
+      <div className="overflow-x-auto overflow-y-auto h-[600px] rounded-xl border border-gray-100 shadow-sm scrollbar-thin scrollbar-thumb-gray-200 scrollbar-track-transparent">
         <table className="w-full text-sm border-collapse">
 
-          {/* column headers */}
-          <thead>
+          {/* column headers — sticky so they stay visible while scrolling */}
+          <thead className="sticky top-0 z-20">
             <tr className="bg-gray-50 border-b border-gray-200">
-              <th className="text-left py-3 px-4 text-[11px] font-bold text-gray-500 uppercase tracking-wider w-[52%]">
+              <th className="text-left py-3 px-4 text-[11px] font-bold text-gray-500 uppercase tracking-wider w-[52%] sticky top-0 bg-gray-50">
                 Account
               </th>
-              <th className="text-right py-3 px-4 text-[11px] font-bold text-emerald-600 uppercase tracking-wider w-[16%]">
+              <th className="text-right py-3 px-4 text-[11px] font-bold text-emerald-600 uppercase tracking-wider w-[16%] sticky top-0 bg-gray-50">
                 Receipts
               </th>
-              <th className="text-right py-3 px-4 text-[11px] font-bold text-rose-600 uppercase tracking-wider w-[16%]">
+              <th className="text-right py-3 px-4 text-[11px] font-bold text-rose-600 uppercase tracking-wider w-[16%] sticky top-0 bg-gray-50">
                 Expenses
               </th>
-              <th className="text-right py-3 px-4 text-[11px] font-bold text-sky-600 uppercase tracking-wider w-[16%]">
+              <th className="text-right py-3 px-4 text-[11px] font-bold text-sky-600 uppercase tracking-wider w-[16%] sticky top-0 bg-gray-50">
                 Net
               </th>
             </tr>
           </thead>
 
           <tbody>
-            {report.sections.map((section, sIdx) => (
+            {report.sections.map((section, sIdx) => {
+              const isExpanded = expandedSections.has(section.code);
+              const sectionNet = section.receipts - section.expenses;
+              return (
               <React.Fragment key={section.code}>
 
-                {/* ── section header ── */}
+                {/* ── section header — click to expand/collapse; collapsed
+                     rows show the section's own totals inline so nothing is
+                     lost by collapsing, only the account-level detail ── */}
                 <tr className={sIdx > 0 ? 'border-t-2 border-gray-100' : ''}>
                   <td colSpan={4} className="py-0">
-                    <div className="flex items-center gap-3 px-4 py-3 bg-gradient-to-r from-church-green/10 to-transparent border-l-4 border-church-green">
+                    <button
+                      type="button"
+                      onClick={() => toggleSection(section.code)}
+                      className="w-full flex items-center gap-3 px-4 py-3 bg-gradient-to-r from-church-green/10 to-transparent border-l-4 border-church-green cursor-pointer hover:from-church-green/15 transition-colors text-left"
+                    >
+                      <ChevronIcon expanded={isExpanded} />
                       <span className="inline-flex items-center justify-center w-7 h-7 rounded-lg bg-church-green text-white text-[11px] font-extrabold shadow-sm flex-shrink-0">
                         {section.code}
                       </span>
                       <span className="font-extrabold text-church-green uppercase tracking-wide text-[13px]">
                         {section.name}
                       </span>
-                    </div>
+                      {!isExpanded && (
+                        <span className="ml-auto flex items-center gap-4 text-[12px] font-bold tabular-nums flex-shrink-0">
+                          <span className="text-emerald-700">
+                            {section.receipts !== 0 ? formatCurrency(section.receipts) : '—'}
+                          </span>
+                          <span className="text-rose-600">
+                            {section.expenses !== 0 ? formatCurrency(section.expenses) : '—'}
+                          </span>
+                          <span className="w-24 text-right">
+                            <NetAmount value={sectionNet} />
+                          </span>
+                        </span>
+                      )}
+                    </button>
                   </td>
                 </tr>
 
-                {section.subsections.map((subsection) => (
+                {isExpanded && section.subsections.map((subsection) => (
                   <React.Fragment key={subsection.code}>
 
                     {/* ── subsection label ── */}
@@ -277,27 +363,32 @@ export function IAFRBreakdownReport({
                   </React.Fragment>
                 ))}
 
-                {/* ── section total ── */}
-                <tr className="bg-church-green/10 border-t-2 border-church-green/20">
-                  <td className="py-2.5 px-4 font-extrabold text-church-green text-[13px]">
-                    <span className="inline-flex items-center gap-2">
-                      <span className="w-1.5 h-1.5 rounded-full bg-church-green inline-block" />
-                      Total — Section {section.code}
-                    </span>
-                  </td>
-                  <td className="py-2.5 px-4 text-right tabular-nums font-extrabold text-emerald-700">
-                    {section.receipts !== 0 ? formatCurrency(section.receipts) : '—'}
-                  </td>
-                  <td className="py-2.5 px-4 text-right tabular-nums font-extrabold text-rose-600">
-                    {section.expenses !== 0 ? formatCurrency(section.expenses) : '—'}
-                  </td>
-                  <td className="py-2.5 px-4 text-right tabular-nums font-extrabold">
-                    <NetAmount value={section.receipts - section.expenses} />
-                  </td>
-                </tr>
+                {/* ── section total — only when expanded; the collapsed
+                     header row above already shows this same total inline,
+                     so repeating it here would be redundant while collapsed ── */}
+                {isExpanded && (
+                  <tr className="bg-church-green/10 border-t-2 border-church-green/20">
+                    <td className="py-2.5 px-4 font-extrabold text-church-green text-[13px]">
+                      <span className="inline-flex items-center gap-2">
+                        <span className="w-1.5 h-1.5 rounded-full bg-church-green inline-block" />
+                        Total — Section {section.code}
+                      </span>
+                    </td>
+                    <td className="py-2.5 px-4 text-right tabular-nums font-extrabold text-emerald-700">
+                      {section.receipts !== 0 ? formatCurrency(section.receipts) : '—'}
+                    </td>
+                    <td className="py-2.5 px-4 text-right tabular-nums font-extrabold text-rose-600">
+                      {section.expenses !== 0 ? formatCurrency(section.expenses) : '—'}
+                    </td>
+                    <td className="py-2.5 px-4 text-right tabular-nums font-extrabold">
+                      <NetAmount value={sectionNet} />
+                    </td>
+                  </tr>
+                )}
 
               </React.Fragment>
-            ))}
+              );
+            })}
           </tbody>
 
           {/* ── grand total ── */}

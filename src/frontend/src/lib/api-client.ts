@@ -397,12 +397,14 @@ export const apiClient = {
     institutionId: string,
     params?: {
       year?: number | null;
+      month?: number | null;
       vicariates?: string[];
       institutionIds?: string[];
     },
   ): Promise<IAFRBreakdownReport> =>
     get(`/api/analytics/descriptive/financial-breakdown-report/${institutionId}`, {
       year: params?.year ? String(params.year) : undefined,
+      month: params?.month ? String(params.month) : undefined,
       vicariates: params?.vicariates?.length ? params.vicariates.join(',') : undefined,
       institution_ids: params?.institutionIds?.length ? params.institutionIds.join(',') : undefined,
     }),

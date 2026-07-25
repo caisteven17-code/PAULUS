@@ -96,9 +96,14 @@ const CONTRIBUTION_COLORS = [
 
 // ─── Period Comparison constants ────────────────────────────────────────────
 const CMP_MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'] as const;
+// Static fallback for entity types on the mock data path (Seminaries/Diocesan
+// Schools have no real per-institution pipeline, so DIOCESE_MONTHLY_BASE only
+// needs a few representative years). Parishes have real AWS-backed history
+// back to 2021 — see availableCmpYears below, which derives the real range
+// from apiParishFinancialTrend instead of this fixed list.
 const CMP_YEARS = ['2024', '2025', '2026'] as const;
 type CmpMonth = (typeof CMP_MONTHS)[number];
-type CmpYear = (typeof CMP_YEARS)[number];
+type CmpYear = string;
 
 const DIOCESE_MONTHLY_BASE: Record<string, { month: string; collections: number; disbursements: number }[]> = {
   Parishes: [
@@ -144,10 +149,10 @@ const DIOCESE_MONTHLY_BASE: Record<string, { month: string; collections: number;
     { month: 'Dec', collections: 9_400_000, disbursements: 8_600_000 },
   ],
 };
-const CMP_YEAR_FACTOR: Record<CmpYear, number> = { '2024': 0.91, '2025': 1.0, '2026': 1.09 };
+const CMP_YEAR_FACTOR: Record<string, number> = { '2024': 0.91, '2025': 1.0, '2026': 1.09 };
 const getDiocesanMonthly = (entityType: string, year: CmpYear) => {
   const base = DIOCESE_MONTHLY_BASE[entityType] ?? DIOCESE_MONTHLY_BASE['Parishes'];
-  const factor = CMP_YEAR_FACTOR[year];
+  const factor = CMP_YEAR_FACTOR[year] ?? 1.0;
   return base.map((d) => ({
     month: d.month,
     collections: Math.round(d.collections * factor),
@@ -271,6 +276,8 @@ const AdvancedForecastChart = ({
     wape: 19.72,
     mpe: 4.46,
   },
+  champion,
+  dataSufficient,
 }: {
   data: any[];
   actualKey: string;
@@ -279,8 +286,39 @@ const AdvancedForecastChart = ({
   title: string;
   entityType?: string;
   metrics?: any;
+  // Live champion-vs-candidates data from getFinancialForecast (see
+  // apiParishForecast) — undefined for the diocese-wide "All Parishes" view
+  // and non-parish entity types, where this endpoint has no aggregate path;
+  // the two call sites below leave both undefined in that case, and every
+  // branch here falls back to the mock `metrics` prop exactly as before.
+  champion?: {
+    champion_model: string;
+    wape: number;
+    all_candidates: Record<string, number>;
+    metrics?: { wape?: number; mape_pct?: number; mpe_pct?: number; mase?: number };
+  } | null;
+  dataSufficient?: boolean;
 }) => {
   const [showInterpretation, setShowInterpretation] = useState(false);
+  const [showModelComparison, setShowModelComparison] = useState(false);
+  const hasLiveChampion = dataSufficient === true && !!champion?.champion_model && champion.champion_model !== 'N/A';
+  // MAE/RMSE aren't computed by the backend's champion selection (WAPE-based
+  // only) — those two cells always keep the illustrative mock values, but
+  // MAPE/MASE/WAPE/MPE are real once a live champion is available. WAPE
+  // comes back from the backend as a 0-1 fraction (full_metrics' existing
+  // convention); MAPE/MPE are already 0-100 percentages and MASE is a plain
+  // ratio, so only WAPE needs the *100 to match this table's display scale.
+  const liveWape = champion?.metrics?.wape ?? champion?.wape;
+  const displayMetrics = hasLiveChampion
+    ? {
+        mae: metrics.mae,
+        rmse: metrics.rmse,
+        mape: champion?.metrics?.mape_pct ?? metrics.mape,
+        mase: champion?.metrics?.mase ?? metrics.mase,
+        wape: liveWape != null ? Math.round(liveWape * 10000) / 100 : metrics.wape,
+        mpe: champion?.metrics?.mpe_pct ?? metrics.mpe,
+      }
+    : metrics;
   const isCollections = actualKey === 'collections';
   const subjectLabel =
     entityType === 'Diocesan Schools' ? 'school' : entityType === 'Seminaries' ? 'seminary' : 'parish';
@@ -525,12 +563,14 @@ const AdvancedForecastChart = ({
             </thead>
             <tbody className="text-church-black font-semibold">
               <tr className="bg-white rounded-lg shadow-sm">
-                <td className="text-center py-3 border-y border-gray-100">{metrics.mae}</td>
-                <td className="text-center py-3 border-y border-gray-100">{metrics.rmse}</td>
-                <td className="text-center py-3 border-y border-gray-100 text-gold-600 font-bold">{metrics.mape}%</td>
-                <td className="text-center py-3 border-y border-gray-100">{metrics.mase}</td>
-                <td className="text-center py-3 border-y border-gray-100">{metrics.wape}%</td>
-                <td className="text-center py-3 pr-3 border-y border-r border-gray-100">{metrics.mpe}%</td>
+                <td className="text-center py-3 border-y border-gray-100">{displayMetrics.mae}</td>
+                <td className="text-center py-3 border-y border-gray-100">{displayMetrics.rmse}</td>
+                <td className="text-center py-3 border-y border-gray-100 text-gold-600 font-bold">
+                  {displayMetrics.mape}%
+                </td>
+                <td className="text-center py-3 border-y border-gray-100">{displayMetrics.mase}</td>
+                <td className="text-center py-3 border-y border-gray-100">{displayMetrics.wape}%</td>
+                <td className="text-center py-3 pr-3 border-y border-r border-gray-100">{displayMetrics.mpe}%</td>
               </tr>
             </tbody>
           </table>
@@ -561,6 +601,64 @@ const AdvancedForecastChart = ({
           </div>
         )}
       </div>
+
+      {/* Champion-vs-candidates comparison — only rendered once live parish
+          forecast data exists (dataSufficient !== undefined); the
+          diocese-wide "All Parishes" view and non-parish entity types pass
+          neither prop, so this block is skipped entirely, same as today. */}
+      {dataSufficient !== undefined && (
+        <div className="mt-4 border border-gray-100 rounded-xl overflow-hidden">
+          <button
+            onClick={() => setShowModelComparison((prev) => !prev)}
+            className="w-full flex items-center justify-between px-4 py-3 bg-gray-50 hover:bg-gray-100 transition-colors"
+          >
+            <div className="flex items-center gap-2">
+              <span className="text-[10px] font-black text-gray-500 uppercase tracking-widest">
+                Model Comparison
+              </span>
+              {hasLiveChampion && (
+                <span className="text-[9px] font-bold text-gold-600 bg-gold-500/10 px-2 py-0.5 rounded-full uppercase tracking-wider">
+                  {champion!.champion_model} Champion
+                </span>
+              )}
+            </div>
+            <ChevronDown
+              className={`w-4 h-4 text-gray-400 transition-transform duration-300 ${showModelComparison ? 'rotate-180' : ''}`}
+            />
+          </button>
+
+          {showModelComparison && (
+            <div className="px-4 py-4 bg-white">
+              {hasLiveChampion ? (
+                <div className="space-y-1.5">
+                  {Object.entries(champion!.all_candidates)
+                    .sort(([, a], [, b]) => (a as number) - (b as number))
+                    .map(([model, wapeScore]) => (
+                      <div
+                        key={model}
+                        className={`flex items-center justify-between px-3 py-2 rounded-lg text-xs ${
+                          model === champion!.champion_model
+                            ? 'bg-gold-500/10 border border-gold-500/30 font-bold text-gold-700'
+                            : 'bg-gray-50 text-gray-600'
+                        }`}
+                      >
+                        <span>
+                          {model}
+                          {model === champion!.champion_model ? ' (Champion)' : ''}
+                        </span>
+                        <span>{((wapeScore as number) * 100).toFixed(2)}% WAPE</span>
+                      </div>
+                    ))}
+                </div>
+              ) : (
+                <p className="text-xs text-gray-500 leading-relaxed">
+                  Not enough submitted history yet for a reliable model comparison.
+                </p>
+              )}
+            </div>
+          )}
+        </div>
+      )}
     </div>
   );
 };
@@ -1086,6 +1184,13 @@ export function BishopDashboard({
   );
   const [apiParishFinancialTrend, setApiParishFinancialTrend] = useState<any | null>(null);
   const [apiParishSeasonality, setApiParishSeasonality] = useState<any | null>(null);
+  // Live champion-vs-candidates forecast data (getFinancialForecast) — only
+  // resolvable for a single selected parish; _fetch_series in the Python
+  // service has no "all" aggregate path, unlike financial_trend.py, so the
+  // diocese-wide "All Parishes" view keeps its existing mock metrics (see
+  // AdvancedForecastChart's dataSufficient/champion props, left undefined
+  // there).
+  const [apiParishForecast, setApiParishForecast] = useState<any | null>(null);
   const financialTrendCacheRef = useRef<Map<string, any>>(new Map());
   // True while a filter/year/parish change is refetching real data. The old
   // values stay on screen until the new response lands (avoids a jarring
@@ -1347,6 +1452,14 @@ export function BishopDashboard({
   }, []);
 
   const [liveDeclineData, setLiveDeclineData] = useState<any[]>([]);
+  // Real "YYYY-MM" labels for the Trend Monitor's 4 month columns, sourced
+  // from the AWS batch response (which carries real period strings per
+  // row). Empty on the Supabase-fallback path (collectionsHistory has no
+  // period info) — the table falls back to generic "Month 1..4" headers
+  // when this is empty, since the monitor deliberately ignores the Year
+  // filter and there'd otherwise be no way to tell which calendar months
+  // are actually shown.
+  const [trendMonitorPeriods, setTrendMonitorPeriods] = useState<string[]>([]);
   const [parishProfileIdByName, setParishProfileIdByName] = useState<Record<string, string>>({});
   // Real entity list (name/vicariate/class/collections) backing the entity
   // dropdown + all downstream filters, for whichever tab (Parishes/Diocesan
@@ -1393,6 +1506,7 @@ export function BishopDashboard({
               };
             }),
         );
+        setTrendMonitorPeriods([]);
         setLiveDeclineData(
           rows.map((p: any) => {
             const hist: number[] = p.collectionsHistory ?? [];
@@ -1436,12 +1550,18 @@ export function BishopDashboard({
       .getFinancialTrendBatch(withIds.map((e: any) => e.id))
       .then((res) => {
         if (cancelled || !res?.data_sufficient) return;
+        let periods: string[] = [];
         const rows = withIds
           .map((e: any) => {
             const r = res.results[e.id];
             if (!r || r.monthly_series.length < 4) return null;
-            const last4 = r.monthly_series.slice(-4).map((m) => m.total_receipts);
-            const [w1, w2, w3, w4] = last4;
+            const last4 = r.monthly_series.slice(-4);
+            // Every parish is loaded from the same diocese-wide monthly
+            // batch, so the trailing-4 periods are the same across rows in
+            // practice — capture them once, from whichever row we see
+            // first with a full 4-month window, for the column headers.
+            if (periods.length === 0) periods = last4.map((m: any) => m.period);
+            const [w1, w2, w3, w4] = last4.map((m: any) => m.total_receipts);
             return {
               name: e.name,
               vicariate: e.vicariate,
@@ -1460,7 +1580,10 @@ export function BishopDashboard({
             };
           })
           .filter(Boolean);
-        if (rows.length > 0) setLiveDeclineData(rows);
+        if (rows.length > 0) {
+          setLiveDeclineData(rows);
+          setTrendMonitorPeriods(periods);
+        }
       })
       .catch(() => {});
     return () => {
@@ -1518,6 +1641,43 @@ export function BishopDashboard({
   const [cmpYear1, setCmpYear1] = useState<CmpYear>('2025');
   const [cmpMonth2, setCmpMonth2] = useState<CmpMonth>('Jan');
   const [cmpYear2, setCmpYear2] = useState<CmpYear>('2026');
+
+  // Years actually offered in the Period 1/2 — Year pickers. Parishes have
+  // real AWS-backed history back to 2021 (see apiParishFinancialTrend,
+  // fetched unscoped by year — full history, not just the current Year
+  // filter), so derive the real range from it instead of hardcoding a guess
+  // that goes stale the moment more history loads. Non-Parish entity types
+  // have no real per-institution pipeline yet, so they keep the static mock
+  // range (CMP_YEARS) that DIOCESE_MONTHLY_BASE/CMP_YEAR_FACTOR are built for.
+  const availableCmpYears = useMemo(() => {
+    if (entityType === 'Parishes') {
+      const rows = apiParishFinancialTrend?.monthly_series;
+      if (Array.isArray(rows) && rows.length > 0) {
+        const years = new Set<string>();
+        rows.forEach((row: any) => {
+          const y = String(row.period ?? '').split('-')[0];
+          if (y) years.add(y);
+        });
+        if (years.size > 0) return [...years].sort();
+      }
+    }
+    return [...CMP_YEARS];
+  }, [entityType, apiParishFinancialTrend]);
+
+  // Keep cmpYear1/cmpYear2 valid whenever availableCmpYears changes (e.g.
+  // real data loads and replaces the static ['2024','2025','2026'] guess
+  // with the true ['2021'..'2025'] range). A <select> whose bound value
+  // isn't among its own <option>s renders the browser's fallback (first
+  // option) while the React state stays at the stale value underneath —
+  // so the dropdown visibly shows one year while the comparison silently
+  // looks up a different one. Snapping to the last (most recent) available
+  // year keeps what's displayed and what's actually queried in sync.
+  useEffect(() => {
+    if (availableCmpYears.length === 0) return;
+    const latest = availableCmpYears[availableCmpYears.length - 1];
+    setCmpYear1((y) => (availableCmpYears.includes(y) ? y : latest));
+    setCmpYear2((y) => (availableCmpYears.includes(y) ? y : latest));
+  }, [availableCmpYears]);
 
   // Parish names in local state come from the static ALL_PARISHES list, but the
   // descriptive analytics endpoints need real diocese.institutions UUIDs.
@@ -1639,12 +1799,17 @@ export function BishopDashboard({
       setIsDescriptiveLoading(false);
       return;
     }
-    // No `year` here — the getFinancialTrend call below is always full,
-    // unscoped history (see its own comment), so caching it per-year would
-    // just cause a redundant re-fetch of identical data on every Year
-    // filter change instead of reusing what's already cached.
+    // `year` is included here even though monthly_series itself is always
+    // full unscoped history now (the backend stopped date-filtering that
+    // part — see financial_trend.py's _fetch_and_process_aws_parish) —
+    // vicariate_totals/parish_totals/disbursement_categories in the same
+    // response are still genuinely year-scoped server-side, so a request
+    // for Year 2024 and Year 2026 can return different rollups even with
+    // byte-identical monthly_series. Caching without `year` would serve one
+    // year's rollups (e.g. the chart data) under another year's key.
     const requestKey = JSON.stringify({
       institutionId,
+      year,
       vicariates: vicariates ? [...vicariates].sort() : [],
       institutionIds: institutionIds ? [...institutionIds].sort() : [],
     });
@@ -1654,21 +1819,21 @@ export function BishopDashboard({
     if (cachedFinancialTrend) setApiParishFinancialTrend(cachedFinancialTrend);
 
     Promise.all([
-      // Always fetch the full real history (no year, timeframe: 'all') in a
-      // single request — parishTrendData/kpiData/kpiYoyTrends all filter
-      // this down client-side (by year, then by 6m/12m). This used to be
-      // two separate requests (one year-scoped for display, one unscoped
-      // for the YoY trend badges), each running the same expensive
-      // diocese-wide query + STL decomposition + isolation forest
-      // independently — halving that load directly cuts the concurrent
-      // request pile-up that made filter/year changes look stuck.
+      // timeframe: 'all' + year: the backend returns full unscoped
+      // monthly_series regardless of year (parishTrendData/kpiData/
+      // kpiYoyTrends filter that down client-side by year, then 6m/12m),
+      // but still scopes vicariate_totals/parish_totals/
+      // disbursement_categories to this specific year — so the Vicariate/
+      // Parish drill-down chart honestly reflects the selected Year (e.g.
+      // shows "no data" for a year with none) instead of silently falling
+      // back to the backend's own trailing-12-months default.
       apiClient
         .getFinancialTrend(
           'parish',
           institutionId,
           institutionIds
-            ? { timeframe: 'all', institutionIds }
-            : { timeframe: 'all', vicariates },
+            ? { year, timeframe: 'all', institutionIds }
+            : { year, timeframe: 'all', vicariates },
         )
         .then((res: any) => {
           if (cancelled) return;
@@ -1721,6 +1886,30 @@ export function BishopDashboard({
     timeframe,
     year,
   ]);
+
+  // Live champion-vs-candidates comparison for the Predictive tab's forecast
+  // chart — only fetchable for one specific parish (see apiParishForecast's
+  // declaration above for why "All Parishes" is excluded). Independent of
+  // the financial-trend/seasonality effect above: this doesn't need
+  // vicariate/year scoping, so it only re-fetches on an actual parish change.
+  useEffect(() => {
+    if (entityType !== 'Parishes' || filterMode !== 'per-entity' || !selectedParishInstitutionId) {
+      setApiParishForecast(null);
+      return;
+    }
+    let cancelled = false;
+    apiClient
+      .getFinancialForecast('parish', selectedParishInstitutionId, 12)
+      .then((res: any) => {
+        if (!cancelled) setApiParishForecast(res);
+      })
+      .catch(() => {
+        if (!cancelled) setApiParishForecast(null);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [entityType, filterMode, selectedParishInstitutionId]);
 
   // Same-month-last-year % change for each KPI tile, matching the "VS LY"
   useEffect(() => {
@@ -2358,6 +2547,14 @@ export function BishopDashboard({
     return 'Needs Attention';
   }, [averageScore]);
 
+  // Change/Growth always reads chronologically (later period vs earlier
+  // period) regardless of which picker (Period 1 or Period 2) the user put
+  // each date in — otherwise picking a more recent date into "Period 1"
+  // and an older one into "Period 2" shows a misleading decrease even when
+  // the real trend over time is growth. The two value boxes and bar chart
+  // still display in whatever order the user picked (p1/p2 stay as typed).
+  const cmpChronKey = (m: CmpMonth, y: CmpYear) => Number(y) * 100 + (CMP_MONTHS.indexOf(m) + 1);
+
   // Period Comparison derived data
   const cmpResult = useMemo(() => {
     if (entityType === 'Parishes') {
@@ -2389,13 +2586,17 @@ export function BishopDashboard({
       if (!m1 || !m2) return null;
       const v1 = m1[cmpMetric];
       const v2 = m2[cmpMetric];
-      const delta = v2 - v1;
-      const pct = v1 > 0 ? (delta / v1) * 100 : 0;
+      const chronological = cmpChronKey(cmpMonth1, cmpYear1) <= cmpChronKey(cmpMonth2, cmpYear2);
+      const earlierValue = chronological ? v1 : v2;
+      const laterValue = chronological ? v2 : v1;
+      const delta = laterValue - earlierValue;
+      const pct = earlierValue > 0 ? (delta / earlierValue) * 100 : 0;
       return {
         p1: { label: `${cmpMonth1} ${cmpYear1}`, value: v1 },
         p2: { label: `${cmpMonth2} ${cmpYear2}`, value: v2 },
         delta,
         pct,
+        baseLabel: chronological ? `${cmpMonth1} ${cmpYear1}` : `${cmpMonth2} ${cmpYear2}`,
         barData: [
           { period: `${cmpMonth1} ${cmpYear1}`, value: v1 },
           { period: `${cmpMonth2} ${cmpYear2}`, value: v2 },
@@ -2409,13 +2610,17 @@ export function BishopDashboard({
     if (!m1 || !m2) return null;
     const v1 = m1[cmpMetric];
     const v2 = m2[cmpMetric];
-    const delta = v2 - v1;
-    const pct = v1 > 0 ? (delta / v1) * 100 : 0;
+    const chronological = cmpChronKey(cmpMonth1, cmpYear1) <= cmpChronKey(cmpMonth2, cmpYear2);
+    const earlierValue = chronological ? v1 : v2;
+    const laterValue = chronological ? v2 : v1;
+    const delta = laterValue - earlierValue;
+    const pct = earlierValue > 0 ? (delta / earlierValue) * 100 : 0;
     return {
       p1: { label: `${cmpMonth1} ${cmpYear1}`, value: v1 },
       p2: { label: `${cmpMonth2} ${cmpYear2}`, value: v2 },
       delta,
       pct,
+      baseLabel: chronological ? `${cmpMonth1} ${cmpYear1}` : `${cmpMonth2} ${cmpYear2}`,
       barData: [
         { period: `${cmpMonth1} ${cmpYear1}`, value: v1 },
         { period: `${cmpMonth2} ${cmpYear2}`, value: v2 },
@@ -3108,13 +3313,6 @@ export function BishopDashboard({
             <div className="flex items-center gap-2 mt-auto">
               <span className="text-[10px] font-black text-gray-500">{renderKpiSubValue(kpiData.collectionsAvg)}</span>
               <span className="text-[10px] text-gray-400 font-bold uppercase tracking-wider">Avg / Month</span>
-              <button
-                onClick={() => handleDiagnosticRequest('Jan')}
-                className="ml-auto w-8 h-8 bg-gray-50 hover:bg-gold-500 hover:text-black rounded-xl text-church-green transition-all duration-300 flex items-center justify-center border border-gray-100 hover:border-gold-600 shadow-sm"
-                title="AI Diagnostic"
-              >
-                <BrainCircuit size={16} />
-              </button>
             </div>
           </div>
 
@@ -4808,7 +5006,12 @@ export function BishopDashboard({
                                 onClick={() => handleSort(col)}
                               >
                                 <div className="flex items-center gap-1">
-                                  Month {i + 1}
+                                  {(() => {
+                                    const period = trendMonitorPeriods[i];
+                                    if (!period) return `Month ${i + 1}`;
+                                    const [y, m] = period.split('-');
+                                    return `${CMP_MONTHS[Number(m) - 1] ?? m} ${y}`;
+                                  })()}
                                   {sortConfig?.key === col ? (
                                     sortConfig.direction === 'asc' ? (
                                       <ArrowUp className="w-3 h-3 text-gold-600" />
@@ -5227,25 +5430,39 @@ export function BishopDashboard({
                       'Class D': '#F87171',
                       'Class E': '#A78BFA',
                     };
-                    // A/B/C/D Stability × Net Margin quadrant (see backend
-                    // _parish_quadrant.py): A stable+surplus, B stable+deficit,
-                    // C volatile+surplus, D volatile+deficit.
+                    // A/B/C/D classification (see backend _parish_quadrant.py):
+                    // D = currently subsidized by the diocese, regardless of
+                    // stability. A/B/C = the remaining self-sufficient
+                    // parishes, split into stability terciles (A = most
+                    // stable third, C = most volatile third).
                     const CLUSTER_COLORS: Record<string, string> = {
                       A: '#D4AF37',
                       B: '#60A5FA',
                       C: '#10B981',
                       D: '#F87171',
                     };
+                    const CLASS_STABILITY_LABEL: Record<string, string> = {
+                      A: 'Most Stable',
+                      B: 'Moderate Stability',
+                      C: 'Most Volatile',
+                      D: 'Subsidized',
+                    };
                     const realCluster = apiParishCluster;
                     let pieData: { name: string; value: number; color: string }[];
-                    let listRows: { name: string; subtitle: string; label: string; color: string }[];
+                    let listRows: {
+                      name: string;
+                      subtitle: string;
+                      label: string;
+                      color: string;
+                      reviewFlag: boolean;
+                    }[];
                     let total: number;
                     let clusterKpis: { coverage: number } | null = null;
 
                     if (realCluster) {
                       pieData = Object.entries(CLUSTER_COLORS)
                         .map(([key, color]) => ({
-                          name: `Cluster ${key}`,
+                          name: `Class ${key}`,
                           value: (realCluster.cluster_counts?.[key] as number) ?? 0,
                           color,
                         }))
@@ -5253,16 +5470,16 @@ export function BishopDashboard({
                       const ranked = [...realCluster.parishes].sort(
                         (a: any, b: any) => (b.avg_monthly_collection ?? 0) - (a.avg_monthly_collection ?? 0),
                       );
-                      const volThreshold = Number(realCluster.stability_threshold ?? 0);
                       listRows = ranked.map((p: any) => ({
                         name: p.institution_name || p.institution_id,
                         subtitle: `${formatCurrency(p.avg_monthly_collection ?? 0)}/mo avg • ${
                           (p.net_margin ?? 0) >= 0 ? '+' : ''
                         }${Math.round((p.net_margin ?? 0) * 100)}% margin • ${
-                          (p.volatility_index ?? 0) <= volThreshold ? 'Stable' : 'Volatile'
+                          CLASS_STABILITY_LABEL[p.cluster_label] ?? ''
                         }`,
-                        label: `Cluster ${p.cluster_label}`,
+                        label: `Class ${p.cluster_label}`,
                         color: CLUSTER_COLORS[p.cluster_label] || '#6B7280',
+                        reviewFlag: p.cluster_label === 'D' && !!p.review_recommended,
                       }));
                       total = realCluster.parishes.length;
                       clusterKpis = {
@@ -5282,6 +5499,7 @@ export function BishopDashboard({
                         subtitle: `${entity.location}${entity.vicariate ? ` • ${stripVicariatePrefix(entity.vicariate)}` : ''}`,
                         label: entity.class || 'Other',
                         color: CLASS_COLORS[entity.class || ''] || '#6B7280',
+                        reviewFlag: false,
                       }));
                       total = filteredTopTierData.length;
                     }
@@ -5300,22 +5518,24 @@ export function BishopDashboard({
                                 Diocese Analytics
                               </p>
                               <div className="flex items-center gap-1.5">
-                                <h3 className="text-xl font-bold text-white">Parish Clustering</h3>
+                                <h3 className="text-xl font-bold text-white">Parish Classification</h3>
                                 <ChartHelpToggle>
-                                  Each parish&apos;s Volatility Index (STL-residual volatility of its receipts,
-                                  scaled by its own average — so a small and a large parish are compared fairly) is
-                                  split at the diocese-wide median into Stable vs. Volatile. Net Margin above/below
-                                  zero splits Surplus vs. Deficit. That gives 4 quadrants — A (stable + surplus), B
-                                  (stable + deficit), C (volatile + surplus), D (volatile + deficit). Net Margin
-                                  excludes diocese subsidy — a subsidized parish's margin reflects whether its own
-                                  collections cover its own expenses, not whether the subsidy happens to cover the
-                                  gap. Rule Coverage is the share of parishes with enough history to be classified at
-                                  all.
+                                  Class D is any parish currently receiving diocese subsidy (Section B.3.03), full
+                                  stop — regardless of how stable or volatile its own collections are. The remaining,
+                                  self-sufficient parishes are ranked by Volatility Index (STL-residual volatility of
+                                  receipts, scaled by each parish&apos;s own average, seasonally adjusted so
+                                  predictable Christmas/Holy Week swings don&apos;t count against it) and split into
+                                  thirds diocese-wide: Class A is the most stable third, B the middle third, C the
+                                  most volatile third. Net Margin (organic, subsidy excluded) is shown for context
+                                  but no longer determines the class. A Class D parish whose organic margin is
+                                  comfortably positive is tagged &quot;Recommend Review&quot; — a flag for the diocese
+                                  to consider, never an automatic change; the parish stays Class D until acted on.
+                                  Rule Coverage is the share of parishes with enough history to be classified at all.
                                 </ChartHelpToggle>
                               </div>
                               <p className="text-xs text-gray-500 mt-2 leading-relaxed max-w-sm">
                                 {realCluster
-                                  ? 'Parishes are segmented by rule-based analysis of their actual financial history into four clusters on a Stability × Net Margin quadrant. Stability is seasonally adjusted — predictable Christmas/Holy Week swings don’t count as volatility. A: stable with surplus · B: stable but in deficit · C: volatile with surplus · D: volatile and in deficit.'
+                                  ? 'Parishes currently receiving diocese subsidy are Class D. The rest are self-sufficient and split into three tiers by how stable their collections are, seasonally adjusted — predictable Christmas/Holy Week swings don’t count as volatility. A: most stable · B: moderate stability · C: most volatile.'
                                   : 'Parishes are grouped by collection volume and pastoral capacity. Class A parishes are high-performing anchors; lower classes represent developing communities requiring targeted diocesan support.'}
                               </p>
                               {clusterKpis && (
@@ -5349,6 +5569,14 @@ export function BishopDashboard({
                                     <span className="font-bold text-sm" style={{ color: row.color }}>
                                       {row.label}
                                     </span>
+                                    {row.reviewFlag && (
+                                      <span
+                                        className="text-[9px] font-black uppercase tracking-wider px-1.5 py-0.5 rounded-full border border-[#D4AF37]/40 text-[#D4AF37] bg-[#D4AF37]/10"
+                                        title="Organic margin (excluding subsidy) is comfortably positive — consider reviewing this parish's continued need for subsidy."
+                                      >
+                                        Recommend Review
+                                      </span>
+                                    )}
                                   </div>
                                 </div>
                               ))}
@@ -5359,10 +5587,10 @@ export function BishopDashboard({
                           <div className="lg:col-span-5 flex flex-col items-center justify-center px-6 py-6 gap-5">
                             <div className="text-center">
                               <p className="text-[10px] font-black text-[#D4AF37]/70 uppercase tracking-[0.3em] mb-0.5">
-                                {realCluster ? 'Cluster Distribution' : 'Class Distribution'}
+                                Class Distribution
                               </p>
                               <p className="text-xs text-gray-500">
-                                {total} parishes across {pieData.length} {realCluster ? 'clusters' : 'classes'}
+                                {total} parishes across {pieData.length} classes
                               </p>
                             </div>
 
@@ -5518,7 +5746,7 @@ export function BishopDashboard({
                           onChange={(e) => setCmpYear1(e.target.value as CmpYear)}
                           className="w-full bg-white border border-gray-200 text-[11px] font-bold text-church-green rounded-xl px-3 py-2.5 outline-none cursor-pointer focus:ring-2 focus:ring-church-green/20"
                         >
-                          {CMP_YEARS.map((y) => (
+                          {availableCmpYears.map((y) => (
                             <option key={y} value={y}>
                               {y}
                             </option>
@@ -5551,7 +5779,7 @@ export function BishopDashboard({
                           onChange={(e) => setCmpYear2(e.target.value as CmpYear)}
                           className="w-full bg-white border border-gray-200 text-[11px] font-bold text-church-green rounded-xl px-3 py-2.5 outline-none cursor-pointer focus:ring-2 focus:ring-church-green/20"
                         >
-                          {CMP_YEARS.map((y) => (
+                          {availableCmpYears.map((y) => (
                             <option key={y} value={y}>
                               {y}
                             </option>
@@ -5663,7 +5891,7 @@ export function BishopDashboard({
                                 <TrendingDown className="w-3.5 h-3.5" />
                               )}
                               {cmpResult.delta >= 0 ? '+' : ''}
-                              {cmpResult.pct.toFixed(1)}% vs Period 1
+                              {cmpResult.pct.toFixed(1)}% vs {cmpResult.baseLabel}
                             </p>
                           </div>
                         </div>
@@ -5715,6 +5943,16 @@ export function BishopDashboard({
                         title="MONTHLY COLLECTIONS"
                         entityType={entityType}
                         metrics={{ mae: 35.22, rmse: 42.02, mape: 20.88, mase: 0.38, wape: 19.72, mpe: 4.46 }}
+                        // Only Collections gets live champion data: the
+                        // backend's champion selection races candidates for
+                        // receipts only — expenses always use a fixed
+                        // Holt-Winters forecast with no comparable
+                        // candidate race (see financial_forecast.py's
+                        // _fetch_and_process), so Disbursements below keeps
+                        // its mock metrics with no champion/dataSufficient
+                        // props, same as before.
+                        champion={apiParishForecast?.champion}
+                        dataSufficient={apiParishForecast ? apiParishForecast.data_sufficient : undefined}
                       />
                     ) : (
                       <AdvancedForecastChart

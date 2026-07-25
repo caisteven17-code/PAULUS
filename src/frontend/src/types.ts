@@ -74,6 +74,7 @@ export interface IAFRBreakdownReport {
   data_sufficient: boolean;
   entity_id: string;
   year: number | null;
+  month: number | null;
   sections: IAFRSectionBreakdown[];
   grand_total: { receipts: number; expenses: number; total: number };
   timestamp: string;
