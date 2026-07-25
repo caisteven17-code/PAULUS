@@ -15,11 +15,13 @@ import pandas as pd
 from app.services import _aws_financials
 from app.services._institution_pool import run_parallel
 from app.services.data_definitions import (
+    KPI_PARISH_UPGRADE_ACTIONABILITY_RATE_MIN,
     PARISH_EXPENSES,
     PARISH_RECEIPTS,
     build_date_index,
     safe_div,
 )
+from app.services.prescriptive.financial_recommendation import _dea_target_floor
 from app.services.supabase_client import get_table
 
 _CLUSTER_LABELS = ["High-Performing", "Growing", "Stable", "At-Risk"]
@@ -43,15 +45,17 @@ def _upgrade_cluster(current: str) -> str | None:
     return order[idx + 1]
 
 
-def _solve_milp(parishes: list[dict], budget: float, upgrade_cost_per_parish: float) -> list[dict]:
+def _solve_milp(parishes: list[dict], budget: float, upgrade_cost_per_parish: float) -> tuple[list[dict], bool]:
     """
     MILP: binary x_i = 1 if parish i is selected for upgrade.
     Maximize sum(x_i) subject to sum(x_i * cost) <= budget.
     Priority: At-Risk parishes first, then Stable.
+    Returns (selected parishes, whether the greedy fallback was used instead
+    of the actual MILP solve).
     """
     n = len(parishes)
     if n == 0 or budget <= 0:
-        return []
+        return [], False
 
     try:
         import pulp
@@ -82,7 +86,7 @@ def _solve_milp(parishes: list[dict], budget: float, upgrade_cost_per_parish: fl
         for i in range(n):
             if x[i].varValue and float(x[i].varValue) > 0.5:
                 selected.append(parishes[i])
-        return selected
+        return selected, False
 
     except Exception:
         # Fallback: greedy selection by priority
@@ -96,12 +100,13 @@ def _solve_milp(parishes: list[dict], budget: float, upgrade_cost_per_parish: fl
             if remaining_budget >= upgrade_cost_per_parish:
                 selected.append(p)
                 remaining_budget -= upgrade_cost_per_parish
-        return selected
+        return selected, True
 
 
 def _features_from_totals(iid: str, r: np.ndarray, e: np.ndarray) -> dict[str, Any]:
     n = len(r)
     avg = float(np.mean(r))
+    avg_expenses = float(np.mean(e))
     var = float(np.var(r, ddof=0))
     cv = safe_div(float(np.sqrt(var)), avg)
 
@@ -122,6 +127,7 @@ def _features_from_totals(iid: str, r: np.ndarray, e: np.ndarray) -> dict[str, A
     return {
         "institution_id": iid,
         "avg_collection": round(avg, 2),
+        "avg_expenses": round(avg_expenses, 2),
         "cluster_label": cluster,
         "target_cluster": target,
         "growth_rate": round(growth, 4),
@@ -155,6 +161,7 @@ def _fetch_and_process(budget: float = 500000.0, upgrade_cost: float = 50000.0) 
                 "data_sufficient": False,
                 "recommended_upgrades": [],
                 "actionability_rate": 0.0,
+                "actionability_rate_pass": False,
                 "budget_allocation": {},
                 "timestamp": ts,
             }
@@ -207,15 +214,32 @@ def _fetch_and_process(budget: float = 500000.0, upgrade_cost: float = 50000.0) 
             "timestamp": ts,
         }
 
-    # DEA efficiency for budget allocation priority
+    # DEA efficiency for budget allocation priority — real LP-based, input-
+    # oriented DEA (same implementation `financial_recommendation.py` uses for
+    # its spending floor), not a simple ratio to the max. Input: avg_expenses
+    # (resources consumed); output: avg_collection (value produced) — a
+    # parish spending a lot but collecting no more than a lower-spending peer
+    # scores as inefficient, which is exactly the signal "needs an upgrade"
+    # should be based on. Input-oriented (not output-oriented, e.g.
+    # `pastoral_action.py`'s `_dea_efficiency`) because the question here is
+    # "could this parish have spent less for the same result," not "could it
+    # have collected more with what it already spends" — an output-oriented
+    # score can't tell two same-output, different-spend parishes apart.
+    inputs = np.array([[p["avg_expenses"]] for p in parishes])
     outputs = np.array([p["avg_collection"] for p in parishes])
-    _inputs = np.arange(1, len(parishes) + 1).astype(float)  # noqa: F841
-    max_out = float(np.max(outputs)) or 1.0
-    eff_scores = [round(safe_div(float(outputs[i]), max_out), 4) for i in range(len(parishes))]
+    eff_scores = []
+    dea_used_fallback = False
+    for i in range(len(parishes)):
+        result = _dea_target_floor(i, inputs, outputs)
+        if result is None:
+            eff_scores.append(0.5)
+            dea_used_fallback = True
+        else:
+            eff_scores.append(round(result[0], 4))
     for i, p in enumerate(parishes):
         p["efficiency_score"] = eff_scores[i]
 
-    selected = _solve_milp(parishes, budget, upgrade_cost)
+    selected, milp_used_fallback = _solve_milp(parishes, budget, upgrade_cost)
 
     # Rank selected by priority
     priority_map = {"At-Risk": 1, "Stable": 2, "Growing": 3}
@@ -237,7 +261,12 @@ def _fetch_and_process(budget: float = 500000.0, upgrade_cost: float = 50000.0) 
         "data_sufficient": True,
         "recommended_upgrades": selected,
         "actionability_rate": actionability_rate,
+        # actionability_rate was already computed but never checked against
+        # the diagram's own "≥70%" threshold — same gap/fix shape as
+        # financial_trend.py's KPI_* thresholds.
+        "actionability_rate_pass": bool(actionability_rate >= KPI_PARISH_UPGRADE_ACTIONABILITY_RATE_MIN),
         "budget_allocation": budget_allocation,
+        "used_fallback": milp_used_fallback or dea_used_fallback,
         "timestamp": ts,
     }
 

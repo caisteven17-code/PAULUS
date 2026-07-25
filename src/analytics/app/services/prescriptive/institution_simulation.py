@@ -1,11 +1,17 @@
 """
 Prescriptive: Institution Simulation (Digital Twin)
-Scenario-based projection of financials + health score trajectory + sensitivity analysis.
+Scenario-based projection of financials + health score trajectory +
+sensitivity analysis, plus a genuine agent-based Monte Carlo layer (see
+_agent_simulation.py) — this institution's own parish-agent, sharing a
+diocese-wide subsidy pool with every other subsidized parish when
+entity_type is "parish", producing a best/worst/most-likely range rather
+than one deterministic line.
 """
 
 from __future__ import annotations
 
 import asyncio
+import time
 from datetime import datetime, timezone
 from typing import Any
 
@@ -14,6 +20,7 @@ import pandas as pd
 
 from app.services import _aws_financials
 from app.services.data_definitions import _SCHEMA_MAP, build_date_index, safe_div
+from app.services.prescriptive import _agent_simulation as _agent_sim
 from app.services.supabase_client import get_table
 
 
@@ -61,6 +68,50 @@ def _run_simulation(
         health_traj.append({"period": period_date, "health_score": score})
 
     return monthly, health_traj
+
+
+# Months of known-real history held out for the backtest below. Needs
+# enough remaining training history on top of it to still be a reasonable
+# baseline projection — 3 held-out months against a 6-month minimum training
+# window keeps this usable down to institutions with modest history.
+_BACKTEST_HOLDOUT_MONTHS = 3
+_BACKTEST_MIN_TRAIN_MONTHS = 6
+
+
+def _backtest_accuracy(
+    baseline_receipts: np.ndarray,
+    baseline_expenses: np.ndarray,
+    consumable_avg: float,
+) -> dict[str, float] | None:
+    """Simulation Accuracy / Realized Outcome / Forecast-to-Simulation Error
+    — there's no persisted history of past scenario runs to score a live
+    prediction against, so instead this holds out the most recent
+    _BACKTEST_HOLDOUT_MONTHS of REAL history, re-runs the exact same
+    deterministic projector this endpoint already uses (_run_simulation)
+    from the truncated series under a zero-change "business as usual"
+    baseline (the only honest backtest assumption — we can't know what
+    change_pct scenario a user will ask about for a genuinely future
+    period), and compares the projection against what actually happened.
+    None when there isn't enough history for a meaningful holdout."""
+    if len(baseline_receipts) < _BACKTEST_MIN_TRAIN_MONTHS + _BACKTEST_HOLDOUT_MONTHS:
+        return None
+
+    train_r = baseline_receipts[:-_BACKTEST_HOLDOUT_MONTHS]
+    train_e = baseline_expenses[:-_BACKTEST_HOLDOUT_MONTHS]
+    actual_r = baseline_receipts[-_BACKTEST_HOLDOUT_MONTHS:]
+
+    monthly, _health_traj = _run_simulation(train_r, train_e, consumable_avg, 0.0, 0.0, _BACKTEST_HOLDOUT_MONTHS)
+    predicted_r = np.array([m["simulated_receipts"] for m in monthly])
+
+    wape = safe_div(float(np.sum(np.abs(actual_r - predicted_r))), float(np.sum(np.abs(actual_r))))
+    actual_total = float(np.sum(actual_r))
+    predicted_total = float(np.sum(predicted_r))
+
+    return {
+        "simulation_accuracy": round(max(0.0, 1.0 - wape), 4),
+        "forecast_to_simulation_error": round(wape, 4),
+        "realized_outcome_pct": round(safe_div(predicted_total, actual_total) * 100, 2) if actual_total else 0.0,
+    }
 
 
 def _sensitivity_analysis(
@@ -152,13 +203,57 @@ def _fetch_baseline(institution_id: str, entity_type: str) -> tuple[np.ndarray, 
     )
 
 
+def _run_agent_monte_carlo(
+    institution_id: str,
+    entity_type: str,
+    baseline_r: np.ndarray,
+    baseline_e: np.ndarray,
+    collection_change_pct: float,
+    periods: int,
+    subsidy_pool_change_pct: float,
+) -> tuple[list[dict], dict[str, Any], dict[str, Any] | None]:
+    """Builds this institution's parish-agent (diocese cross-section for
+    parishes when AWS is available, a solo agent otherwise/for schools and
+    seminaries — see module docstring on the pool's parish-only scope), runs
+    the Monte Carlo layer, and returns (range, agent_context, pool_context)."""
+    pool_context: dict[str, Any] | None = None
+    agent: _agent_sim.ParishAgent | None = None
+
+    if entity_type == "parish":
+        diocese_ctx = _agent_sim.build_parish_agent_with_pool_context(institution_id)
+        if diocese_ctx is not None:
+            agent, pool_context = diocese_ctx
+
+    if agent is None:
+        solo_df = pd.DataFrame({"total_receipts": baseline_r, "total_expenses": baseline_e})
+        agent = _agent_sim.build_parish_agent(institution_id, solo_df)
+
+    pool_share_val = pool_context["this_agent_pool_share"] if pool_context else 0.0
+    paths = _agent_sim.run_monte_carlo(
+        agent,
+        periods,
+        collection_change_pct,
+        subsidy_pool_change_pct,
+        pool_share_val,
+    )
+    monte_carlo_range = _agent_sim.summarize_paths(paths)
+    agent_context = {
+        "cluster": agent.cluster,
+        "is_subsidized": agent.is_subsidized,
+        "volatility": round(agent.volatility, 4),
+    }
+    return monte_carlo_range, agent_context, pool_context
+
+
 def _run_scenario(
     institution_id: str,
     entity_type: str,
     collection_change_pct: float,
     expense_change_pct: float,
     periods: int,
+    subsidy_pool_change_pct: float = 0.0,
 ) -> dict[str, Any]:
+    started = time.perf_counter()
     ts = datetime.now(timezone.utc).isoformat()
 
     baseline_r, baseline_e, consumable_avg = _fetch_baseline(institution_id, entity_type)
@@ -181,6 +276,24 @@ def _run_scenario(
         periods,
     )
 
+    monte_carlo_range, agent_context, pool_context = _run_agent_monte_carlo(
+        institution_id,
+        entity_type,
+        baseline_r,
+        baseline_e,
+        collection_change_pct,
+        periods,
+        subsidy_pool_change_pct,
+    )
+
+    backtest = _backtest_accuracy(baseline_r, baseline_e, consumable_avg)
+    kpis = {
+        "scenario_processing_latency_ms": round((time.perf_counter() - started) * 1000, 2),
+        "simulation_accuracy": backtest["simulation_accuracy"] if backtest else None,
+        "realized_outcome_pct": backtest["realized_outcome_pct"] if backtest else None,
+        "forecast_to_simulation_error": backtest["forecast_to_simulation_error"] if backtest else None,
+    }
+
     return {
         "entity_id": institution_id,
         "entity_type": entity_type,
@@ -188,10 +301,15 @@ def _run_scenario(
             "collection_change_pct": collection_change_pct,
             "expense_change_pct": expense_change_pct,
             "periods": periods,
+            "subsidy_pool_change_pct": subsidy_pool_change_pct,
         },
         "simulated_monthly": monthly,
         "health_score_trajectory": health_traj,
         "sensitivity_results": sensitivity,
+        "agent_context": agent_context,
+        "subsidy_pool_context": pool_context,
+        "monte_carlo_range": monte_carlo_range,
+        "kpis": kpis,
         "timestamp": ts,
     }
 
@@ -202,6 +320,7 @@ async def run_institution_simulation(
     collection_change_pct: float = 0.0,
     expense_change_pct: float = 0.0,
     periods: int = 12,
+    subsidy_pool_change_pct: float = 0.0,
 ) -> dict[str, Any]:
     if entity_type not in _SCHEMA_MAP:
         raise ValueError(f"Unknown entity type: {entity_type}")
@@ -212,6 +331,7 @@ async def run_institution_simulation(
         collection_change_pct,
         expense_change_pct,
         periods,
+        subsidy_pool_change_pct,
     )
 
 

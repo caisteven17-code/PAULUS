@@ -103,7 +103,16 @@ def _fetch_and_process(institution_id: str) -> dict[str, Any]:
             "timestamp": ts,
         }
 
-    today = pd.Timestamp.now(tz="UTC").normalize()
+    # Tz-naive to match pd.Timestamp(start)/pd.Timestamp(end) below, which
+    # parse plain "YYYY-MM-DD" date strings (no tz component) from Supabase.
+    # A tz-aware `today` here previously made every (today - start)
+    # subtraction raise TypeError, silently caught by the broad except below
+    # and defaulted to elapsed_days = 0.0 for every project — which meant
+    # time_elapsed_pct was always 0, progress_gap always equaled
+    # completion_pct, and schedule_variance_days was always non-negative
+    # (never actually reflecting schedule risk, and never able to trigger
+    # the progress-gap branch of is_at_risk or the new is_delayed flag).
+    today = pd.Timestamp.now().normalize()
     features_list: list[dict] = []
     projects_detail: list[dict] = []
 
@@ -134,6 +143,17 @@ def _fetch_and_process(institution_id: str) -> dict[str, Any]:
         schedule_variance_days = float((completion_pct - time_elapsed_pct) * total_days) if total_days > 0 else 0.0
 
         is_at_risk = (budget_variance > 0.3) or (progress_gap < -0.15)
+        # Distinct from is_at_risk (which conflates budget AND progress-gap
+        # risk): "delayed" is specifically running behind its expected pace,
+        # independent of whether it's also over budget.
+        is_delayed = schedule_variance_days < 0
+        # Whether this project actually had usable target/schedule data to
+        # diagnose from, vs. silently defaulting budget_variance/
+        # schedule_variance_days to 0.0 above for a missing target_amount or
+        # start/end date — the diagram's "Diagnostic Coverage Rate" is the
+        # fraction of projects where a real diagnosis (not a placeholder
+        # zero) was possible.
+        has_diagnosable_data = target > 0 and total_days > 0
 
         features_list.append(
             {
@@ -151,6 +171,8 @@ def _fetch_and_process(institution_id: str) -> dict[str, Any]:
                 "project_id": pid,
                 "name": p.get("name", ""),
                 "is_at_risk": is_at_risk,
+                "is_delayed": is_delayed,
+                "has_diagnosable_data": has_diagnosable_data,
                 "budget_variance": round(budget_variance, 4),
                 "schedule_variance_days": round(schedule_variance_days, 1),
                 "progress_gap": round(progress_gap, 4),
@@ -159,6 +181,8 @@ def _fetch_and_process(institution_id: str) -> dict[str, Any]:
         )
 
     at_risk_projects = [p for p in projects_detail if p["is_at_risk"]]
+    delayed_projects = [p for p in projects_detail if p["is_delayed"]]
+    diagnosable_projects = [p for p in projects_detail if p["has_diagnosable_data"]]
 
     # SHAP on project features
     feature_names = ["budget_variance", "schedule_variance_days", "progress_gap", "completion_pct", "time_elapsed_pct"]
@@ -243,6 +267,10 @@ def _fetch_and_process(institution_id: str) -> dict[str, Any]:
         "kpis": {
             "total_projects": len(raw_projects),
             "at_risk_count": len(at_risk_projects),
+            "at_risk_rate": round(safe_div(len(at_risk_projects), len(raw_projects)), 4),
+            "delayed_count": len(delayed_projects),
+            "delayed_rate": round(safe_div(len(delayed_projects), len(raw_projects)), 4),
+            "diagnostic_coverage_rate": round(safe_div(len(diagnosable_projects), len(raw_projects)), 4),
             "avg_budget_variance": round(avg_bv, 4),
             "avg_schedule_variance_days": round(avg_sv, 2),
             "budget_completion_spearman": round(float(corr_val), 4),

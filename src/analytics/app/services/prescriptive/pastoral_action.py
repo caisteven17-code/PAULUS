@@ -17,12 +17,13 @@ from app.services.data_definitions import _SCHEMA_MAP, build_date_index, safe_di
 from app.services.supabase_client import get_table
 
 
-def _dea_efficiency(inputs: np.ndarray, outputs: np.ndarray) -> list[float]:
+def _dea_efficiency(inputs: np.ndarray, outputs: np.ndarray) -> tuple[list[float], bool]:
     """
     Compute DEA efficiency scores via LP.
     inputs: (n, 1) — e.g., normalized time index as proxy for resource
     outputs: (n, 1) — e.g., avg monthly collection
-    Returns efficiency score in [0, 1] for each DMU.
+    Returns (efficiency score in [0, 1] for each DMU, whether the ratio
+    fallback was used instead of the actual LP solve).
     """
     try:
         import pulp
@@ -57,13 +58,13 @@ def _dea_efficiency(inputs: np.ndarray, outputs: np.ndarray) -> list[float]:
             else:
                 scores.append(0.5)
 
-        return scores
+        return scores, False
 
     except Exception:
         # Fallback: rank by output/input ratio
         ratios = [safe_div(float(outputs[i]), float(inputs[i]) or 1) for i in range(len(inputs))]
         max_r = max(ratios) or 1.0
-        return [round(r / max_r, 4) for r in ratios]
+        return [round(r / max_r, 4) for r in ratios], True
 
 
 def _fetch_series(institution_id: str) -> pd.DataFrame | None:
@@ -164,7 +165,7 @@ def _fetch_and_process(institution_id: str) -> dict[str, Any]:
 
     # DEA: inputs = time index, outputs = avg_collection
     time_inputs = np.arange(1, n + 1).astype(float)
-    dea_scores = _dea_efficiency(time_inputs, y)
+    dea_scores, used_fallback = _dea_efficiency(time_inputs, y)
 
     efficiency_scores = {str(int(yearly["year"].iloc[i])): dea_scores[i] for i in range(n)}
 
@@ -199,6 +200,7 @@ def _fetch_and_process(institution_id: str) -> dict[str, Any]:
         "recommended_actions": recommended_actions,
         "efficiency_scores": efficiency_scores,
         "performance_improvement_estimate": perf_improvement,
+        "used_fallback": used_fallback,
         "timestamp": ts,
     }
 

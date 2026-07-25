@@ -1,6 +1,8 @@
 """
 Predictive: Pastoral Assignment Financial Trend Forecast
-Candidates: Holt-Winters, SARIMA, XGBoost, Markov Chain.
+Candidates: Holt-Winters, SARIMA, XGBoost, Markov Chain — selected by average
+WAPE across a fixed-size holdout plus any additional chronological
+walk-forward folds the series has room for (see _champion.py).
 Also predicts discrete state (improving/stable/declining) via Markov transitions.
 """
 
@@ -16,9 +18,12 @@ import pandas as pd
 from app.services import _aws_financials
 from app.services.data_definitions import _SCHEMA_MAP, build_date_index
 from app.services.predictive._champion import (
+    diagnose_generalization,
+    full_metrics,
     markov_forecast,
     select_champion,
     train_test_split_ts,
+    walk_forward_folds,
 )
 from app.services.supabase_client import get_table
 
@@ -177,6 +182,8 @@ def _fetch_and_process(institution_id: str, periods: int) -> dict[str, Any]:
                 "all_candidates": {},
                 "wape": 1.0,
                 "needs_retraining": True,
+                "folds_used": 0,
+                "generalization": None,
             },
             "timestamp": ts,
         }
@@ -184,8 +191,28 @@ def _fetch_and_process(institution_id: str, periods: int) -> dict[str, Any]:
     series = df["total_receipts"].values.astype(float)
 
     train, holdout = train_test_split_ts(series)
-    champion_name, all_scores = select_champion(_CANDIDATES, train, holdout)
+    # Extra chronological folds (see walk_forward_folds), same pattern as
+    # financial_forecast.py/seasonal_forecast.py — champion selection
+    # averages WAPE across several unseen windows instead of trusting just
+    # the one most recent.
+    extra_folds = walk_forward_folds(series)
+    champion_name, all_scores = select_champion(_CANDIDATES, train, holdout, extra_folds=extra_folds)
+    # Fold-averaged score used for champion selection and needs_retraining —
+    # will generally differ from champion.metrics.wape below, which is the
+    # champion's WAPE on the real holdout alone (see financial_forecast.py's
+    # matching comment for why that's not a bug).
     champion_wape = all_scores.get(champion_name, 1.0)
+
+    # select_champion() only returns WAPE scores, not predictions — re-run the
+    # champion once on the same holdout split to compute MAPE/MASE/MPE
+    # alongside WAPE.
+    try:
+        champion_holdout_preds = np.asarray(_CANDIDATES[champion_name](train, holdout), dtype=float)
+        champion_metrics = full_metrics(holdout, champion_holdout_preds, train)
+    except Exception:
+        champion_metrics = {"wape": round(champion_wape, 4)}
+
+    generalization = diagnose_generalization(_CANDIDATES[champion_name], train, holdout)
 
     # Generate forecast
     try:
@@ -246,10 +273,12 @@ def _fetch_and_process(institution_id: str, periods: int) -> dict[str, Any]:
         "transition_probabilities": transition_probabilities,
         "champion": {
             "champion_model": champion_name,
-            "metrics": {"wape": round(champion_wape, 4)},
+            "metrics": champion_metrics,
             "all_candidates": {k: round(v, 4) for k, v in all_scores.items()},
             "wape": round(champion_wape, 4),
             "needs_retraining": champion_wape > 0.15,
+            "folds_used": 1 + len(extra_folds),
+            "generalization": generalization,
         },
         "timestamp": ts,
     }

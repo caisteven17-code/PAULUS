@@ -52,6 +52,15 @@ def _upsert_in_chunks(
 def sync_parish_dimensions() -> dict[str, int]:
     # The dedicated institution synchronizer owns this dimension. Gold must
     # never repopulate it from the temporary AWS operational mirror.
+    #
+    # Below, dim_parishes/dim_iafr_account are populated directly from
+    # Supabase (parishes.details / parishes.iafr_account_titles), skipping a
+    # Silver-tier intermediary — there is no Silver table for parish
+    # master-data/account-titles today. Accepted as-is: this is low-churn
+    # reference/master data (assigned priest, chart-of-accounts), not a
+    # transactional fact stream, so the reconciliation rigor the financial
+    # Silver->Gold path has isn't needed here. Revisit only if this data
+    # starts changing frequently enough that staleness becomes a real risk.
     institutions = analytics_db.fetch_query(
         """
         SELECT institution_id::text AS id, institution_key, institution_code,

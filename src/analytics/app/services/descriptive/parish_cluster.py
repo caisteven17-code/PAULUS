@@ -1,8 +1,9 @@
 """
 Descriptive: Parish Cluster Analysis
-Rule-based segmentation of parishes into 4 clusters (A/B/C/D) on a
-Stability × Net Margin quadrant — see _parish_quadrant.py for the shared
-definition (also used by predictive/cluster_forecast.py).
+Rule-based segmentation of parishes into 4 classes (A/B/C/D): subsidized
+parishes are D unconditionally, the rest are split into stability terciles
+— see _parish_quadrant.py for the shared definition (also used by
+predictive/cluster_forecast.py).
 """
 
 from __future__ import annotations
@@ -38,9 +39,9 @@ def _features_from_series(
     institution_name: str = "",
     subsidy: np.ndarray | None = None,
 ) -> dict[str, Any]:
-    """Quadrant inputs only — cluster_label is assigned in a second pass once
-    the diocese-wide median volatility threshold is known (classification is
-    relative to the whole diocese, not computable per-parish in isolation)."""
+    """Classification inputs only — cluster_label is assigned in a second
+    pass once the diocese-wide stability terciles are known (classification
+    is relative to the whole diocese, not computable per-parish in isolation)."""
     return {
         "institution_id": institution_id,
         "institution_name": institution_name,
@@ -48,13 +49,55 @@ def _features_from_series(
     }
 
 
-def _assign_clusters(parishes: list[dict[str, Any]]) -> float:
-    """Second pass: diocese-wide median split, then label every parish.
-    Returns the threshold so it can be included in the response."""
-    threshold = _parish_quadrant.stability_threshold(parishes)
+def _assign_clusters(parishes: list[dict[str, Any]]) -> tuple[float, float]:
+    """Second pass: diocese-wide stability terciles (among non-subsidized
+    parishes only), then label every parish. Returns (low, high) cutoffs so
+    they can be included in the response."""
+    low, high = _parish_quadrant.stability_terciles(parishes)
     for p in parishes:
-        p["cluster_label"] = _parish_quadrant.classify(p["volatility_index"], p["net_margin"], threshold)
-    return threshold
+        p["cluster_label"] = _parish_quadrant.classify(p["volatility_index"], p["is_subsidized"], low, high)
+    return low, high
+
+
+def _cluster_purity(parishes: list[dict[str, Any]]) -> float:
+    """How cleanly the classification separates parishes into cohesive
+    groups. This is rule-based (not distance-based) clustering, so there's
+    no external ground truth to score "purity" against in the classic
+    sense — instead this measures internal cohesion. Class D is perfectly
+    pure by construction (is_subsidized is a binary, unambiguous
+    criterion) — contributes 1.0 per member. For the stability terciles
+    (A/B/C), purity is eta-squared: the fraction of total volatility_index
+    variance explained by cluster membership (between-group / total
+    variance) — well-separated terciles score close to 1.0, near-identical
+    clusters score close to 0."""
+    d_count = sum(1 for p in parishes if p["cluster_label"] == "D")
+    non_d = [p for p in parishes if p["cluster_label"] != "D"]
+
+    if not non_d:
+        return 1.0 if d_count else 0.0
+
+    values = np.array([p["volatility_index"] for p in non_d])
+    overall_mean = float(np.mean(values))
+    total_ss = float(np.sum((values - overall_mean) ** 2))
+
+    # Exact-zero equality is unreliable here: near-identical volatility
+    # values can leave a tiny nonzero total_ss from float rounding in the
+    # mean/subtraction, which would otherwise fall through to an unstable
+    # ~0/~0 division below.
+    if np.isclose(total_ss, 0.0):
+        eta_sq = 1.0  # every non-D parish has identical volatility -- terciles are trivially cohesive
+    else:
+        between_ss = 0.0
+        for label in ("A", "B", "C"):
+            group = [p["volatility_index"] for p in non_d if p["cluster_label"] == label]
+            if not group:
+                continue
+            group_mean = float(np.mean(group))
+            between_ss += len(group) * (group_mean - overall_mean) ** 2
+        eta_sq = safe_div(between_ss, total_ss)
+
+    total = len(parishes)
+    return round(safe_div(d_count * 1.0 + len(non_d) * eta_sq, total), 4)
 
 
 def _parish_features(df: pd.DataFrame, institution_id: str, institution_name: str = "") -> dict[str, Any]:
@@ -133,7 +176,7 @@ def _fetch_and_process() -> dict[str, Any]:
             "timestamp": ts,
         }
 
-    threshold = _assign_clusters(parishes)
+    low, high = _assign_clusters(parishes)
 
     cluster_counts = {c: 0 for c in _CLUSTERS}
     for p in parishes:
@@ -146,9 +189,10 @@ def _fetch_and_process() -> dict[str, Any]:
         "data_sufficient": True,
         "cluster_counts": cluster_counts,
         "parishes": parishes,
-        "stability_threshold": round(threshold, 4),
+        "stability_terciles": {"low": round(low, 4), "high": round(high, 4)},
         "kpis": {
             "rule_coverage_rate": rule_coverage_rate,
+            "cluster_purity": _cluster_purity(parishes),
         },
         "timestamp": ts,
     }
@@ -189,7 +233,7 @@ def _fetch_and_process_aws() -> dict[str, Any]:
             "timestamp": ts,
         }
 
-    threshold = _assign_clusters(parishes)
+    low, high = _assign_clusters(parishes)
 
     cluster_counts = {c: 0 for c in _CLUSTERS}
     for p in parishes:
@@ -202,9 +246,10 @@ def _fetch_and_process_aws() -> dict[str, Any]:
         "data_sufficient": True,
         "cluster_counts": cluster_counts,
         "parishes": parishes,
-        "stability_threshold": round(threshold, 4),
+        "stability_terciles": {"low": round(low, 4), "high": round(high, 4)},
         "kpis": {
             "rule_coverage_rate": round(safe_div(len(parishes), max(total_institutions, len(parishes))), 4),
+            "cluster_purity": _cluster_purity(parishes),
         },
         "timestamp": ts,
         "source": "aws",
@@ -212,12 +257,11 @@ def _fetch_and_process_aws() -> dict[str, Any]:
 
 
 async def get_parish_cluster() -> dict[str, Any]:
-    # Diocese-wide, identical for every caller, no request parameters (this
-    # endpoint never scopes by year — it's always the "full history" shape),
-    # so it always gets the longer unscoped TTL, not the default one.
+    # Client requirement: classification recomputes monthly, not on every
+    # dashboard load — see _ttl_cache.MONTHLY_TTL_SECONDS's docstring.
     return await _ttl_cache.cached(
         "parish_cluster",
-        _ttl_cache.UNSCOPED_TTL_SECONDS,
+        _ttl_cache.MONTHLY_TTL_SECONDS,
         _get_parish_cluster_uncached,
         # The Supabase fallback below is also empty for parishes, so an AWS
         # read failing mid-contention and falling back looks identical to a

@@ -30,18 +30,22 @@ ANALYTICS_ROOT = Path(__file__).resolve().parents[1]
 if str(ANALYTICS_ROOT) not in sys.path:
     sys.path.insert(0, str(ANALYTICS_ROOT))
 
+from app.services import _aws_financials  # noqa: E402
 from app.services.data_definitions import SCHEMA_MAP, build_date_index  # noqa: E402
 from app.services.predictive._champion import markov_forecast, train_test_split_ts  # noqa: E402
 from app.services.predictive.financial_forecast import (  # noqa: E402
+    LITURGICAL_FEATURE_COLUMNS,
+    _clean_exog,
     _holtwinters_trainer,
     _prophet_trainer,
     _sarima_trainer,
+    _sarimax_exog_trainer,
     _xgboost_trainer,
+    fetch_liturgical_features,
 )
 from app.services.supabase_client import get_table  # noqa: E402
 from app.services.weather_repository import get_table as get_weather_table  # noqa: E402
 from model_lab.dashboard_graphs import plot_forecast_comparison, plot_model_leaderboard  # noqa: E402
-
 
 OUTPUT_DIR = ANALYTICS_ROOT / "model_lab" / "outputs" / "db_evaluation"
 MIN_RECORDS = 6
@@ -78,22 +82,6 @@ LAGUNA_MUNICIPALITIES = [
     "Santa Rosa City",
     "Siniloan",
     "Victoria",
-]
-
-LITURGICAL_FEATURE_COLUMNS = [
-    "liturgical_solemnity_days",
-    "liturgical_feast_days",
-    "liturgical_memorial_days",
-    "liturgical_sunday_days",
-    "liturgical_weekday_days",
-    "liturgical_advent_days",
-    "liturgical_christmas_days",
-    "liturgical_lent_days",
-    "liturgical_easter_days",
-    "liturgical_triduum_days",
-    "liturgical_ordinary_days",
-    "liturgical_major_days",
-    "liturgical_penitential_days",
 ]
 
 WEATHER_FEATURE_COLUMNS = [
@@ -246,6 +234,19 @@ def fetch_institution_profile(entity_id: str) -> dict:
 
 
 def fetch_financial_records(entity_type: str, entity_id: str) -> pd.DataFrame:
+    """AWS warehouse first for parishes (matches the production path,
+    `financial_forecast.py`'s `_aws_financials.parish_monthly_df()`), Supabase
+    otherwise. Per docs/HYBRID_DATABASE_TARGET_ARCHITECTURE.md, Supabase owns
+    operational data and AWS owns derived analytical data — this evaluation
+    script previously skipped the AWS-first step entirely and evaluated an
+    effectively empty Supabase table for parishes with real, mostly-complete
+    history sitting in the warehouse. Schools/seminaries have no AWS silver
+    tables yet, so they correctly stay on Supabase only."""
+    if entity_type == "parish":
+        aws_df = _aws_financials.parish_monthly_df(entity_id)
+        if aws_df is not None and not aws_df.empty:
+            return aws_df
+
     schema, _, _, _ = SCHEMA_MAP[entity_type]
     columns = _select_columns(entity_type)
     rows = _fetch_all_pages(
@@ -259,59 +260,6 @@ def fetch_financial_records(entity_type: str, entity_id: str) -> pd.DataFrame:
     if not rows:
         return pd.DataFrame(columns=columns)
     return pd.DataFrame(rows)
-
-
-def fetch_liturgical_features(years: Sequence[int]) -> pd.DataFrame:
-    years = sorted({int(year) for year in years if pd.notna(year)})
-    if not years:
-        return pd.DataFrame(columns=["year", "month_num", *LITURGICAL_FEATURE_COLUMNS])
-
-    rows = _fetch_all_pages(
-        get_table("reference", "liturgical_calendar")
-        .select("year, month, rank, liturgical_season, review_status")
-        .in_("year", years)
-    )
-    if not rows:
-        return pd.DataFrame(columns=["year", "month_num", *LITURGICAL_FEATURE_COLUMNS])
-
-    calendar = pd.DataFrame(rows)
-    if "review_status" in calendar.columns:
-        calendar = calendar[calendar["review_status"].isin(["approved", "approved_with_revisions", "pending"])]
-    calendar["year"] = pd.to_numeric(calendar["year"], errors="coerce")
-    calendar["month_num"] = pd.to_numeric(calendar["month"], errors="coerce")
-    calendar["rank"] = calendar["rank"].astype(str).str.upper().str.strip()
-    calendar["liturgical_season"] = calendar["liturgical_season"].astype(str).str.lower().str.strip()
-
-    feature_map = {
-        "liturgical_solemnity_days": calendar["rank"].eq("SOLEMNITY"),
-        "liturgical_feast_days": calendar["rank"].eq("FEAST"),
-        "liturgical_memorial_days": calendar["rank"].eq("MEMORIAL"),
-        "liturgical_sunday_days": calendar["rank"].eq("SUNDAY"),
-        "liturgical_weekday_days": calendar["rank"].eq("WEEKDAY"),
-        "liturgical_advent_days": calendar["liturgical_season"].eq("advent"),
-        "liturgical_christmas_days": calendar["liturgical_season"].eq("christmas"),
-        "liturgical_lent_days": calendar["liturgical_season"].eq("lent"),
-        "liturgical_easter_days": calendar["liturgical_season"].eq("easter"),
-        "liturgical_triduum_days": calendar["liturgical_season"].eq("paschal triduum"),
-        "liturgical_ordinary_days": calendar["liturgical_season"].eq("ordinary time"),
-    }
-    for feature_name, mask in feature_map.items():
-        calendar[feature_name] = mask.astype(int)
-
-    calendar["liturgical_major_days"] = (
-        calendar["liturgical_solemnity_days"]
-        + calendar["liturgical_feast_days"]
-        + calendar["liturgical_sunday_days"]
-    )
-    calendar["liturgical_penitential_days"] = (
-        calendar["liturgical_lent_days"] + calendar["liturgical_triduum_days"]
-    )
-
-    return (
-        calendar.dropna(subset=["year", "month_num"])
-        .groupby(["year", "month_num"], as_index=False)[LITURGICAL_FEATURE_COLUMNS]
-        .sum()
-    )
 
 
 def fetch_weather_features(municipality: str | None, start_date: pd.Timestamp, end_date: pd.Timestamp) -> pd.DataFrame:
@@ -369,14 +317,23 @@ def normalize_financial_records(df: pd.DataFrame, entity_type: str) -> pd.DataFr
     if df.empty:
         return df
 
-    mapped = build_date_index(df)
-    for col in receipt_cols + expense_cols:
-        if col not in mapped.columns:
-            mapped[col] = 0.0
-        mapped[col] = pd.to_numeric(mapped[col], errors="coerce").fillna(0.0)
+    if "total_receipts" in df.columns and "total_expenses" in df.columns:
+        # AWS warehouse path (`_aws_financials.parish_monthly_df`) — totals are
+        # already aggregated server-side and `date`/`month_num` already set by
+        # its own `_finalize()`; nothing to sum from raw receipt/expense columns.
+        mapped = df.copy()
+        if "date" not in mapped.columns:
+            mapped = build_date_index(mapped)
+    else:
+        mapped = build_date_index(df)
+        for col in receipt_cols + expense_cols:
+            if col not in mapped.columns:
+                mapped[col] = 0.0
+            mapped[col] = pd.to_numeric(mapped[col], errors="coerce").fillna(0.0)
 
-    mapped["total_receipts"] = mapped[receipt_cols].sum(axis=1)
-    mapped["total_expenses"] = mapped[expense_cols].sum(axis=1)
+        mapped["total_receipts"] = mapped[receipt_cols].sum(axis=1)
+        mapped["total_expenses"] = mapped[expense_cols].sum(axis=1)
+
     mapped["net_receipts"] = mapped["total_receipts"] - mapped["total_expenses"]
 
     # Model-lab compatibility columns. These mirror the old test CSV names but
@@ -432,40 +389,6 @@ def _seasonal_naive_trainer(train: np.ndarray, holdout: np.ndarray) -> np.ndarra
 
 def _markov_trainer(train: np.ndarray, holdout: np.ndarray) -> np.ndarray:
     return markov_forecast(train, holdout)
-
-
-def _clean_exog(values: np.ndarray | None) -> np.ndarray | None:
-    if values is None or values.size == 0:
-        return None
-    cleaned = np.asarray(values, dtype=float)
-    cleaned = np.nan_to_num(cleaned, nan=0.0, posinf=0.0, neginf=0.0)
-    return cleaned
-
-
-def _sarimax_exog_trainer(
-    train: np.ndarray,
-    holdout: np.ndarray,
-    train_exog: np.ndarray | None,
-    holdout_exog: np.ndarray | None,
-) -> np.ndarray:
-    from statsmodels.tsa.statespace.sarimax import SARIMAX
-
-    train_exog = _clean_exog(train_exog)
-    holdout_exog = _clean_exog(holdout_exog)
-    if train_exog is None or holdout_exog is None or train_exog.shape[1] == 0:
-        return _sarima_trainer(train, holdout)
-
-    seasonal_order = (1, 1, 1, 12) if len(train) >= 24 else (0, 0, 0, 0)
-    model = SARIMAX(
-        train,
-        exog=train_exog,
-        order=(1, 1, 1),
-        seasonal_order=seasonal_order,
-        enforce_stationarity=False,
-        enforce_invertibility=False,
-    )
-    fitted = model.fit(disp=False)
-    return np.asarray(fitted.forecast(steps=len(holdout), exog=holdout_exog), dtype=float)
 
 
 def _xgboost_exog_trainer(
@@ -537,7 +460,9 @@ def model_candidates() -> dict[str, Callable[[np.ndarray, np.ndarray], np.ndarra
     }
 
 
-def exogenous_model_candidates() -> dict[str, Callable[[np.ndarray, np.ndarray, np.ndarray | None, np.ndarray | None], np.ndarray]]:
+def exogenous_model_candidates() -> dict[
+    str, Callable[[np.ndarray, np.ndarray, np.ndarray | None, np.ndarray | None], np.ndarray]
+]:
     return {
         "Linear Regression + Exog": _linear_exog_trainer,
         "SARIMAX + Exog": _sarimax_exog_trainer,
@@ -636,8 +561,8 @@ def evaluate_series(
                     exog_features_used=0,
                     municipality=municipality,
                     error=None,
-                  )
-              )
+                )
+            )
             predictions.extend(
                 PredictionPoint(
                     entity_type=entity_type,
@@ -671,8 +596,8 @@ def evaluate_series(
                     exog_features_used=0,
                     municipality=municipality,
                     error=f"{type(exc).__name__}: {exc}",
-                  )
-              )
+                )
+            )
 
     exog_feature_count = int(exog.shape[1]) if exog is not None and exog.ndim == 2 else 0
     for name, trainer in exogenous_model_candidates().items():
@@ -703,8 +628,8 @@ def evaluate_series(
                     exog_features_used=exog_feature_count,
                     municipality=municipality,
                     error=None,
-                  )
-              )
+                )
+            )
             predictions.extend(
                 PredictionPoint(
                     entity_type=entity_type,
@@ -738,12 +663,14 @@ def evaluate_series(
                     exog_features_used=exog_feature_count,
                     municipality=municipality,
                     error=f"{type(exc).__name__}: {exc}",
-                  )
-              )
+                )
+            )
     return results, predictions
 
 
-def evaluate_entity(entity_type: str, entity_id: str, targets: list[str]) -> tuple[list[EntityEvaluation], list[PredictionPoint]]:
+def evaluate_entity(
+    entity_type: str, entity_id: str, targets: list[str]
+) -> tuple[list[EntityEvaluation], list[PredictionPoint]]:
     raw = fetch_financial_records(entity_type, entity_id)
     mapped = normalize_financial_records(raw, entity_type)
     institution = fetch_institution_profile(entity_id)
@@ -812,11 +739,7 @@ def _summary(frame: pd.DataFrame) -> dict:
     ok = frame[frame["status"] == "ok"].copy()
     if ok.empty:
         return {"ok_results": 0, "champions": []}
-    champions = (
-        ok.sort_values("wape_pct")
-        .groupby(["entity_type", "entity_id", "target"], as_index=False)
-        .first()
-    )
+    champions = ok.sort_values("wape_pct").groupby(["entity_type", "entity_id", "target"], as_index=False).first()
     by_model = (
         ok.groupby("model", as_index=False)
         .agg(
@@ -834,6 +757,59 @@ def _summary(frame: pd.DataFrame) -> dict:
     }
 
 
+def _readiness_report(frame: pd.DataFrame) -> dict:
+    """Group evaluated institutions by how much history they actually have, so a
+    run with few/no eligible institutions says so explicitly instead of quietly
+    producing an empty summary."""
+    if frame.empty or "record_count" not in frame.columns:
+        return {"total_entities": 0, "eligible_for_evaluation": 0, "buckets": {}}
+
+    per_entity = frame.groupby(["entity_type", "entity_id"], as_index=False)["record_count"].max()
+    counts = per_entity["record_count"]
+    buckets = {
+        f"below_minimum (<{MIN_RECORDS} months)": int((counts < MIN_RECORDS).sum()),
+        f"{MIN_RECORDS}_to_11_months": int(((counts >= MIN_RECORDS) & (counts < 12)).sum()),
+        "12_to_23_months": int(((counts >= 12) & (counts < 24)).sum()),
+        "24_plus_months": int((counts >= 24).sum()),
+    }
+    return {
+        "total_entities": int(len(per_entity)),
+        "eligible_for_evaluation": int((counts >= MIN_RECORDS).sum()),
+        "buckets": buckets,
+    }
+
+
+def _calibration_coverage(prediction_frame: pd.DataFrame) -> list[dict]:
+    """Empirical prediction-interval calibration per model: build an 80% band from
+    the 10th/90th percentile of that model's own historical residuals, then report
+    what % of actuals actually fall inside it. A well-calibrated 80% interval
+    should contain ~80% of actuals — this replaces the old fixed `predicted * 8%`
+    band, which wasn't measuring anything."""
+    if prediction_frame.empty:
+        return []
+
+    results = []
+    for model, group in prediction_frame.groupby("model"):
+        residuals = (group["predicted"] - group["actual"]).to_numpy(dtype=float)
+        if len(residuals) < 5:
+            continue
+        r_low, r_high = np.percentile(residuals, [10, 90])
+        lower = group["predicted"] - r_high
+        upper = group["predicted"] - r_low
+        covered = (group["actual"] >= lower) & (group["actual"] <= upper)
+        results.append(
+            {
+                "model": model,
+                "n_predictions": int(len(group)),
+                "residual_p10": round(float(r_low), 2),
+                "residual_p90": round(float(r_high), 2),
+                "empirical_coverage_pct": round(float(covered.mean() * 100), 2),
+                "target_coverage_pct": 80.0,
+            }
+        )
+    return sorted(results, key=lambda row: row["model"])
+
+
 def _safe_stem(value: str) -> str:
     return re.sub(r"[^A-Za-z0-9_.-]+", "_", value).strip("_")[:120]
 
@@ -848,6 +824,7 @@ def write_graphs(
     prediction_frame: pd.DataFrame,
     summary: dict,
     run_dir: Path,
+    calibration: list[dict] | None = None,
 ) -> list[str]:
     graph_dir = run_dir / "graphs"
     graph_dir.mkdir(parents=True, exist_ok=True)
@@ -857,17 +834,14 @@ def write_graphs(
     if ok.empty:
         return paths
 
-    leaderboard = (
-        ok.groupby("model", as_index=False)
-        .agg(wape=("wape_pct", "mean"))
-        .sort_values("wape")
-    )
+    leaderboard = ok.groupby("model", as_index=False).agg(wape=("wape_pct", "mean")).sort_values("wape")
     if not leaderboard.empty:
         paths.append(plot_model_leaderboard(leaderboard, str(graph_dir)))
 
     if prediction_frame.empty or not summary.get("champions"):
         return paths
 
+    calibration_by_model = {row["model"]: row for row in (calibration or [])}
     champions = pd.DataFrame(summary["champions"])
     for _, champion in champions.iterrows():
         mask = (
@@ -882,23 +856,61 @@ def write_graphs(
 
         rows["date"] = pd.to_datetime(rows["date"], errors="coerce")
         rows = rows.sort_values("date")
-        residual_abs = (rows["predicted"] - rows["actual"]).abs()
-        uncertainty = np.maximum(residual_abs, rows["predicted"].abs() * 0.08)
+        # Empirical residual-quantile band from this model's own historical
+        # residuals (see `_calibration_coverage`) — a statistically meaningful
+        # interval instead of the old fixed `predicted * 8%` guess. Falls back
+        # to the old heuristic only if there isn't enough history yet to have
+        # computed a calibration band for this model.
+        model_calibration = calibration_by_model.get(champion["model"])
+        if model_calibration is not None:
+            lower = rows["predicted"] - model_calibration["residual_p90"]
+            upper = rows["predicted"] - model_calibration["residual_p10"]
+        else:
+            residual_abs = (rows["predicted"] - rows["actual"]).abs()
+            uncertainty = np.maximum(residual_abs, rows["predicted"].abs() * 0.08)
+            lower = rows["predicted"] - uncertainty
+            upper = rows["predicted"] + uncertainty
         chart_frame = pd.DataFrame(
             {
                 "month": rows["date"].dt.strftime("%Y-%m"),
                 "actual": rows["actual"],
                 "forecast": rows["predicted"],
-                "lower": (rows["predicted"] - uncertainty).clip(lower=0),
-                "upper": rows["predicted"] + uncertainty,
+                "lower": lower.clip(lower=0),
+                "upper": upper,
             }
         )
-        stem = _safe_stem(
-            f"forecast_comparison_{champion['entity_type']}_{champion['entity_id']}_{champion['target']}"
-        )
+        stem = _safe_stem(f"forecast_comparison_{champion['entity_type']}_{champion['entity_id']}_{champion['target']}")
         paths.append(plot_forecast_comparison(chart_frame, str(graph_dir), file_stem=stem))
 
     return paths
+
+
+HISTORY_CSV = OUTPUT_DIR / "history.csv"
+
+
+def _append_history(run_id: str, timestamp: str, summary: dict, readiness: dict) -> None:
+    """Append one row per model per run to a persistent history CSV, so WAPE
+    drift across runs can be read from one file instead of re-deriving it from
+    every timestamped run folder."""
+    by_model = summary.get("by_model") or [{}]
+    rows = [
+        {
+            "run_id": run_id,
+            "timestamp": timestamp,
+            "eligible_entities": readiness.get("eligible_for_evaluation", 0),
+            "total_entities": readiness.get("total_entities", 0),
+            "model": row.get("model"),
+            "avg_wape_pct": row.get("avg_wape_pct"),
+            "median_wape_pct": row.get("median_wape_pct"),
+            "runs": row.get("runs", 0),
+            "failures": row.get("failures", 0),
+        }
+        for row in by_model
+    ]
+    history_frame = pd.DataFrame(rows)
+    HISTORY_CSV.parent.mkdir(parents=True, exist_ok=True)
+    write_header = not HISTORY_CSV.exists()
+    history_frame.to_csv(HISTORY_CSV, mode="a", header=write_header, index=False)
 
 
 def parse_args() -> argparse.Namespace:
@@ -949,11 +961,13 @@ def main() -> int:
     frame = _leaderboard_frame(all_results)
     predictions = _prediction_frame(all_predictions)
     summary = _summary(frame)
+    readiness = _readiness_report(frame)
+    calibration = _calibration_coverage(predictions)
 
     csv_path = run_dir / "financial_model_evaluation.csv"
     json_path = run_dir / "financial_model_evaluation.json"
     predictions_csv_path = run_dir / "financial_model_predictions.csv"
-    graph_paths = write_graphs(frame, predictions, summary, run_dir)
+    graph_paths = write_graphs(frame, predictions, summary, run_dir, calibration)
     frame.to_csv(csv_path, index=False)
     predictions.to_csv(predictions_csv_path, index=False)
     json_path.write_text(
@@ -974,6 +988,8 @@ def main() -> int:
                         for entity_type, mapping in SCHEMA_MAP.items()
                     },
                     "summary": summary,
+                    "readiness": readiness,
+                    "calibration": calibration,
                     "graphs": graph_paths,
                     "results": frame.to_dict(orient="records"),
                     "predictions": predictions.to_dict(orient="records"),
@@ -982,15 +998,24 @@ def main() -> int:
             indent=2,
         )
     )
+    _append_history(stamp, datetime.now(timezone.utc).isoformat(), summary, readiness)
 
     print(f"\nRun folder: {run_dir}")
     print(f"Wrote CSV:  {csv_path}")
     print(f"Wrote predictions CSV: {predictions_csv_path}")
     print(f"Wrote JSON: {json_path}")
+    print(f"Appended history: {HISTORY_CSV}")
     if graph_paths:
         print("\nWrote graphs:")
         for path in graph_paths:
             print(f"  {path}")
+
+    print(
+        f"\nData readiness: {readiness['eligible_for_evaluation']}/{readiness['total_entities']} "
+        f"entities have >= {MIN_RECORDS} monthly records."
+    )
+    if readiness["total_entities"] > 0 and readiness["eligible_for_evaluation"] == 0:
+        print(f"  No entities cleared the minimum yet — breakdown: {readiness['buckets']}")
 
     ok = frame[frame["status"] == "ok"]
     if not ok.empty:
@@ -1000,6 +1025,10 @@ def main() -> int:
 
         print("\nAverage model performance:")
         print(pd.DataFrame(summary["by_model"]).to_string(index=False))
+
+    if calibration:
+        print("\nPrediction-interval calibration (80% band, target coverage 80%):")
+        print(pd.DataFrame(calibration).to_string(index=False))
 
     failed = frame[frame["status"] == "failed"]
     if not failed.empty:

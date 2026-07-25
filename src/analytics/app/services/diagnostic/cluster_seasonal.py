@@ -213,6 +213,10 @@ def _fetch_and_process(entity_id: str, entity_type: str) -> dict[str, Any]:
         "attribution_precision": precision,
         "shap_values": shap_dict,
         "narrative": narrative,
+        "anomaly_count": anomaly_count,
+        # anomaly_count was already computed above but never surfaced as a
+        # rate — this is the diagram's "Seasonal-Impact Detection Rate" KPI.
+        "seasonal_impact_detection_rate": round(safe_div(anomaly_count, n), 4),
         "timestamp": ts,
     }
 

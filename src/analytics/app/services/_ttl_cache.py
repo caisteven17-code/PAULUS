@@ -36,6 +36,15 @@ DEFAULT_TTL_SECONDS = 90
 # actually runs.
 UNSCOPED_TTL_SECONDS = 300
 
+# For parish classification (A/B/C/D) specifically — this recomputation
+# cadence is a client requirement, not just a performance optimization like
+# the two constants above: the class assignment is meant to refresh on a
+# monthly basis, matching how often IAFR submissions actually land, rather
+# than reacting to every dashboard load. Kept separate from
+# UNSCOPED_TTL_SECONDS so changing this cadence can't silently slow down the
+# unrelated endpoints (health_scoring.py, financial_trend.py) that share it.
+MONTHLY_TTL_SECONDS = 30 * 24 * 60 * 60
+
 _cache: dict[str, tuple[float, Any]] = {}
 
 

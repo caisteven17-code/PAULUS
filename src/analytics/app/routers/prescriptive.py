@@ -28,6 +28,10 @@ class SimulationRequest(BaseModel):
     collection_change_pct: float = 0.0
     expense_change_pct: float = 0.0
     periods: int = 12
+    # % change to the diocese-wide subsidy pool this parish shares with every
+    # other currently-subsidized parish (see _agent_simulation.py) — only
+    # has an effect when the institution is itself subsidized.
+    subsidy_pool_change_pct: float = 0.0
 
 
 class CounterfactualReplayRequest(BaseModel):
@@ -41,6 +45,13 @@ class PastoralSimulationRequest(BaseModel):
     assignment_duration_months: int = 12
     collection_impact_pct: float = 5.0
     periods: int = 12
+    # A specific priest's own historical performance profile is used to
+    # shift the destination's trajectory instead of the abstract
+    # assignment_duration/collection_impact knobs above (see
+    # _agent_simulation.build_priest_agent); omit for the legacy knob-based
+    # behavior.
+    incoming_priest_id: str | None = None
+    subsidy_pool_change_pct: float = 0.0
 
 
 # ── Endpoints ─────────────────────────────────────────────────────────────────
@@ -69,6 +80,7 @@ async def institution_simulation(
             collection_change_pct=body.collection_change_pct,
             expense_change_pct=body.expense_change_pct,
             periods=body.periods,
+            subsidy_pool_change_pct=body.subsidy_pool_change_pct,
         )
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc))
@@ -114,6 +126,8 @@ async def pastoral_simulation(institution_id: str, body: PastoralSimulationReque
             assignment_duration_months=body.assignment_duration_months,
             collection_impact_pct=body.collection_impact_pct,
             periods=body.periods,
+            incoming_priest_id=body.incoming_priest_id,
+            subsidy_pool_change_pct=body.subsidy_pool_change_pct,
         )
     except Exception as exc:
         raise HTTPException(status_code=500, detail=f"Pastoral simulation error: {exc}")

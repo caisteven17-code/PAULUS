@@ -89,18 +89,22 @@ async def financial_breakdown(
 async def financial_breakdown_report(
     institution_id: str,
     year: int | None = None,
+    month: int | None = None,
     vicariates: str | None = None,
     institution_ids: str | None = None,
 ):
     """Full IAFR report tree (all sections → subsections → accounts, with
     subtotals) in one round trip — the report-table counterpart of
-    /financial-breakdown, which only returns one drill level at a time."""
+    /financial-breakdown, which only returns one drill level at a time.
+    month narrows to a single calendar month within `year` (ignored without
+    a year, since a month alone is ambiguous)."""
     try:
         vicariate_list = [v for v in vicariates.split(",") if v] if vicariates else None
         institution_id_list = [i for i in institution_ids.split(",") if i] if institution_ids else None
         return await svc_ft.get_financial_breakdown_report(
             institution_id,
             year=year,
+            month=month,
             vicariates=vicariate_list,
             institution_ids=institution_id_list,
         )

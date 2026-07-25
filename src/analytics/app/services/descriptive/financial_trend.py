@@ -19,6 +19,10 @@ from app.services._institution_pool import run_parallel
 from app.services._stl import run_stl
 from app.services.data_definitions import (
     _SCHEMA_MAP,
+    KPI_ANNUAL_COLLECTION_GROWTH_RATE_MIN,
+    KPI_DISBURSEMENT_COLLECTION_RATIO_MAX,
+    KPI_MOM_COLLECTION_CHANGE_MIN,
+    KPI_NET_RECEIPT_DEFICIT_RATE_MAX,
     build_date_index,
     safe_div,
 )
@@ -83,6 +87,16 @@ def _compute_kpis(df: pd.DataFrame) -> dict[str, float]:
         "disbursement_to_collection_ratio": round(disbursement_ratio, 4),
         "mom_collection_change": round(mom_change, 4),
         "net_receipt_deficit_rate": round(deficit_rate, 4),
+        # Diocese benchmark thresholds — these were previously computed as
+        # raw numbers only, with no pass/fail signal against the diocese's
+        # own KPI targets (data_definitions.py's KPI_* constants). bool(...)
+        # wrapping matters here: comparisons against numpy-typed values above
+        # yield numpy.bool_, which FastAPI's jsonable_encoder can't serialize
+        # (same issue _isolation_forest_flags works around above).
+        "annual_collection_growth_rate_pass": bool(annual_growth > KPI_ANNUAL_COLLECTION_GROWTH_RATE_MIN),
+        "disbursement_to_collection_ratio_pass": bool(disbursement_ratio <= KPI_DISBURSEMENT_COLLECTION_RATIO_MAX),
+        "mom_collection_change_pass": bool(mom_change >= KPI_MOM_COLLECTION_CHANGE_MIN),
+        "net_receipt_deficit_rate_pass": bool(deficit_rate <= KPI_NET_RECEIPT_DEFICIT_RATE_MAX),
     }
 
 
@@ -351,9 +365,14 @@ def _fetch_and_process_aws_parish(
         # frontend narrows to a concrete institution set before the request.
         where.append("f.institution_id = ANY(%s)")
         params.append(institution_ids)
-    if year:
-        where.append("f.date_key >= %s AND f.date_key < %s")
-        params.extend([year * 100, (year + 1) * 100])
+    # Deliberately NOT filtered by `year` — monthly_series is always full,
+    # unscoped history. year only scopes the rollups below (vicariate_totals/
+    # parish_totals/disbursement_categories); callers that want a specific
+    # year's monthly_series filter it client-side (see parishTrendData in
+    # BishopDashboard.tsx). This used to filter by year here too, which
+    # meant a caller couldn't get full history without giving up year-scoped
+    # rollups (or vice versa) in the same request — they're independent
+    # concerns and now behave that way.
     where_sql = ("WHERE " + " AND ".join(where)) if where else ""
 
     rows = analytics_db.fetch_query(_AWS_TREND_SQL_TEMPLATE.format(where_sql=where_sql), params)
@@ -863,6 +882,7 @@ _AWS_BREAKDOWN_REPORT_SQL = """
 def _fetch_breakdown_report(
     institution_id: str,
     year: int | None,
+    month: int | None = None,
     vicariates: list[str] | None = None,
     institution_ids: list[str] | None = None,
 ) -> dict[str, Any]:
@@ -884,7 +904,12 @@ def _fetch_breakdown_report(
         params.append(vicariates)
 
     where: list[str] = []
-    if year:
+    if year and month:
+        # Single calendar month — month is meaningless without a year, so it
+        # only narrows further when both are given together.
+        where.append("AND f.date_key = %s")
+        params.append(year * 100 + month)
+    elif year:
         where.append("AND f.date_key >= %s AND f.date_key < %s")
         params.extend([year * 100, (year + 1) * 100])
 
@@ -950,6 +975,7 @@ def _fetch_breakdown_report(
         "data_sufficient": len(section_list) > 0,
         "entity_id": institution_id,
         "year": year,
+        "month": month if year else None,
         "sections": section_list,
         "grand_total": grand_total,
         "timestamp": ts,
@@ -959,6 +985,7 @@ def _fetch_breakdown_report(
 async def get_financial_breakdown_report(
     institution_id: str,
     year: int | None = None,
+    month: int | None = None,
     vicariates: list[str] | None = None,
     institution_ids: list[str] | None = None,
 ) -> dict[str, Any]:
@@ -969,8 +996,9 @@ async def get_financial_breakdown_report(
             "data_sufficient": False,
             "entity_id": institution_id,
             "year": year,
+            "month": month if year else None,
             "sections": [],
             "grand_total": {"receipts": 0.0, "expenses": 0.0, "total": 0.0},
             "timestamp": datetime.now(timezone.utc).isoformat(),
         }
-    return await asyncio.to_thread(_fetch_breakdown_report, institution_id, year, vicariates, institution_ids)
+    return await asyncio.to_thread(_fetch_breakdown_report, institution_id, year, month, vicariates, institution_ids)

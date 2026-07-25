@@ -16,6 +16,7 @@ from typing import Any
 from app.config import WAREHOUSE_INSTITUTION_POLL_SECONDS
 from app.services import analytics_db
 from app.services.supabase_client import get_table
+from app.services.weather_collector import MUNICIPALITIES
 
 logger = logging.getLogger(__name__)
 
@@ -154,15 +155,41 @@ def _fetch_changes(watermark: dict[str, Any]) -> list[dict[str, Any]]:
     return rows
 
 
+def _nearest_municipality(latitude: Any, longitude: Any) -> str | None:
+    """Bridge institutions to municipality-grain weather data. No structured
+    location field exists on diocese.institutions (only free-text address),
+    so this resolves the municipality from lat/lon via nearest-centroid match
+    against the same 30-municipality list the weather pipeline itself uses —
+    a single canonical source rather than yet another hardcoded copy (two
+    already exist in the frontend and have drifted out of sync with each
+    other). Squared distance is enough since only the minimum is needed, and
+    Euclidean is fine at this scale (municipalities are well-separated)."""
+    if latitude is None or longitude is None:
+        return None
+    lat, lon = float(latitude), float(longitude)
+    nearest = min(
+        MUNICIPALITIES,
+        key=lambda muni: (muni["lat"] - lat) ** 2 + (muni["lon"] - lon) ** 2,
+    )
+    return nearest["name"]
+
+
 def _dimension_row(source: dict[str, Any]) -> dict[str, Any]:
     """Allowlist the analytical projection; private operational fields never pass through."""
     deleted_at = source.get("deleted_at")
+    # Prefer the explicit, alias-normalized municipality/address text (accurate
+    # when Supabase has a clean value) and fall back to the geometric
+    # nearest-centroid match against the weather pipeline's municipality list
+    # (covers institutions with coordinates but no parseable address).
+    municipality = _municipality(source) or _nearest_municipality(
+        source.get("latitude"), source.get("longitude")
+    )
     return {
         "institution_id": source["id"],
         "institution_code": source.get("institution_code"),
         "institution_name": source["name"],
         "address": source.get("address"),
-        "municipality": _municipality(source),
+        "municipality": municipality,
         "institution_type": source["institution_type"],
         "vicariate": source.get("vicariate"),
         "district": source.get("district"),

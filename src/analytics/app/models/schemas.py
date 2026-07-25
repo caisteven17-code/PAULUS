@@ -96,6 +96,10 @@ class ChampionModelResult(BaseModel):
     all_candidates: Dict[str, Any]
     wape: float
     needs_retraining: bool  # True if WAPE > 0.15
+    folds_used: int  # 1 (single holdout) or more when walk-forward folds were available
+    generalization: Optional[Dict[str, Any]] = (
+        None  # overfitting/underfitting diagnostic; see _champion.diagnose_generalization
+    )
 
 
 # ── Descriptive schemas ───────────────────────────────────────────────────────

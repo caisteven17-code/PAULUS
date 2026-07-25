@@ -46,6 +46,17 @@ WAREHOUSE_ETL_FAILURE_RETENTION_DAYS: int = max(30, int(os.getenv("WAREHOUSE_ETL
 WAREHOUSE_INSTITUTION_SYNC_ENABLED: bool = os.getenv("WAREHOUSE_INSTITUTION_SYNC_ENABLED", "false").lower() == "true"
 WAREHOUSE_INSTITUTION_POLL_SECONDS: int = max(10, int(os.getenv("WAREHOUSE_INSTITUTION_POLL_SECONDS", "60")))
 
+# Independent Supabase -> AWS submission dimension sync. Populates
+# shared_analytics.dim_submission, replacing the retired portable migration
+# 130's dim_submission block (excluded from the AWS manifest because it read
+# the retired AWS operational mirror). education_financial_sync's
+# _submission_key() and the parish Gold candidate view both depend on this
+# table being populated; enable this before/alongside
+# WAREHOUSE_EDUCATION_SYNC_ENABLED. Run `python -m app.services.submission_dimension_sync --once`
+# manually first and confirm a clean run before flipping this on.
+WAREHOUSE_SUBMISSION_SYNC_ENABLED: bool = os.getenv("WAREHOUSE_SUBMISSION_SYNC_ENABLED", "false").lower() == "true"
+WAREHOUSE_SUBMISSION_POLL_SECONDS: int = max(10, int(os.getenv("WAREHOUSE_SUBMISSION_POLL_SECONDS", "60")))
+
 # Direct Supabase -> AWS Silver/Gold for school and seminary finance.
 WAREHOUSE_EDUCATION_SYNC_ENABLED: bool = os.getenv("WAREHOUSE_EDUCATION_SYNC_ENABLED", "false").lower() == "true"
 WAREHOUSE_EDUCATION_POLL_SECONDS: int = max(30, int(os.getenv("WAREHOUSE_EDUCATION_POLL_SECONDS", "60")))

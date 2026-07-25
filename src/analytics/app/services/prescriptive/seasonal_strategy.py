@@ -222,6 +222,11 @@ def _fetch_and_process(
         "season_recommendations": recommendations,
         "sensitivity_results": sensitivity,
         "allocation_efficiency": result.get("allocation_efficiency", 0.0),
+        # Whether this came from the actual PuLP solver ("MILP") or the
+        # proportional fallback — `_solve_seasonal_milp` already computed
+        # this, it just wasn't being surfaced to callers before.
+        "method": result.get("method", "unknown"),
+        "used_fallback": result.get("method") != "MILP",
         "timestamp": ts,
     }
 
