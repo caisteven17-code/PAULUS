@@ -71,6 +71,13 @@ jobs:
       - name: Typecheck
         run: npm run typecheck
 
+      - name: Lint backend
+        run: npm run lint --workspace=src/backend
+
+      - name: Lint frontend (non-blocking)
+        continue-on-error: true
+        run: npm run lint --workspace=src/frontend
+
       - name: Test
         run: npm test
 
