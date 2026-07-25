@@ -63,8 +63,8 @@ Browser → apiClient (src/lib/api-client.ts)
 
 ### Backend has a monolith AND a microservices split — the microservices are what run
 - Business logic lives once in `src/backend/src/services/*.service.ts` and `src/backend/src/controllers/*.controller.ts`. `app.module.ts` wires these as a single monolith (not used by the run scripts).
-- The deployed shape is `src/backend/src/apps/*`: an **api-gateway** plus five domain services (**auth, entity, financial, project, analytics**), each its own NestJS app with its own `main.ts` + `*.module.ts`. The domain service modules import the shared `services/` providers.
-- Ports come from `shared/http/service-urls.ts`: gateway 4000, auth 4101, entity 4102, financial 4103, project 4104, analytics 4105 (override via `*_SERVICE_PORT` / `*_SERVICE_URL` env vars).
+- The deployed shape is `src/backend/src/apps/*`: an **api-gateway** plus seven domain services (**auth, entity, financial, project, analytics, announcement, audit-log**), each its own NestJS app with its own `main.ts` + `*.module.ts`. The domain service modules import the shared `services/` providers.
+- Ports come from `shared/http/service-urls.ts`: gateway 4000, auth 4101, entity 4102, financial 4103, project 4104, analytics 4105, announcement 4106, audit-log 4107 (override via `*_SERVICE_PORT` / `*_SERVICE_URL` env vars).
 - Gateway controllers (`apps/api-gateway/controllers/*-gateway.controller.ts`) forward requests to downstream services with `requestDownstream` (`shared/http/request-downstream.ts`) and re-apply Set-Cookie via `applyDownstreamCookies`. The gateway uses global prefix `api`; downstream services have no prefix.
 - All services share `SupabaseService` (`services/supabase.service.ts`), which exposes `.client` (anon key) and `.admin` (service-role key, bypasses RLS).
 - Backend must be compiled before running (`npm run build:backend` → `dist/`). The `dev:*` scripts build first; running `dist/apps/<svc>/main.js` directly requires an existing build.
