@@ -29,6 +29,9 @@ export interface LiturgicalCalendarRecord {
   reviewed_at?: string;
   review_notes?: string;
   revision_payload?: Record<string, unknown>;
+  raw_payload?: {
+    options?: Array<{ key: string; title?: { en?: string; tl?: string }; designation?: string }>;
+  };
   created_at?: string;
   updated_at?: string;
 }

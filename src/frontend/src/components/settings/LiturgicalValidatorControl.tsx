@@ -43,6 +43,9 @@ interface LiturgicalRecord {
   reviewed_by?: string;
   reviewed_at?: string;
   review_notes?: string;
+  raw_payload?: {
+    options?: Array<{ key: string; title?: { en?: string; tl?: string }; designation?: string }>;
+  };
 }
 
 const PAGE_SIZE = 20;
@@ -134,6 +137,11 @@ const getValidationState = (record: LiturgicalRecord): 'matched' | 'mismatched' 
   const validatorStatuses = [record.romcal_match_status, record.gcatholic_match_status, record.litcal_match_status];
   return validatorStatuses.some((status) => status === 'matched') ? 'matched' : 'mismatched';
 };
+
+const getOptionalMemorials = (record: LiturgicalRecord) =>
+  (record.raw_payload?.options || [])
+    .map((option) => option.title?.en)
+    .filter((name): name is string => Boolean(name));
 
 const getNameOptions = (record: LiturgicalRecord) =>
   [
@@ -534,7 +542,7 @@ export function LiturgicalValidatorControl() {
                 className={selectField(yearFilter !== 0, 'h-11 w-full rounded-2xl px-4 text-sm font-bold')}
               >
                 <option value={0}>All Years</option>
-                {[2023, 2024, 2025, 2026, 2027, 2028, 2029, 2030, 2031, 2032].map((year) => (
+                {[2021, 2022, 2023, 2024, 2025, 2026, 2027, 2028, 2029, 2030, 2031, 2032, 2033].map((year) => (
                   <option key={year} value={year}>
                     {year}
                   </option>
@@ -581,6 +589,7 @@ export function LiturgicalValidatorControl() {
                     ? 'border-emerald-100 bg-emerald-50 text-emerald-700'
                     : 'border-rose-100 bg-rose-50 text-rose-700';
                 const validationDot = validationState === 'matched' ? 'bg-emerald-500' : 'bg-rose-500';
+                const optionalMemorials = getOptionalMemorials(record);
                 return (
                   <tr key={record.id} className="group hover:bg-gray-50/50 transition-colors">
                     <td className="py-4 pr-4 whitespace-nowrap">
@@ -589,6 +598,11 @@ export function LiturgicalValidatorControl() {
                     </td>
                     <td className="py-4 pr-4">
                       <div className="font-semibold text-gray-800 text-sm">{record.celebration_name}</div>
+                      {optionalMemorials.length > 0 && (
+                        <div className="text-xs text-gray-400 font-medium mt-0.5">
+                          Optional: {optionalMemorials.join(', ')}
+                        </div>
+                      )}
                     </td>
                     <td className="py-4 pr-4 text-gray-600 text-sm font-medium whitespace-nowrap">
                       {record.liturgical_season || '—'}
@@ -775,6 +789,17 @@ export function LiturgicalValidatorControl() {
                 })}
               </div>
             </div>
+
+            {getOptionalMemorials(editTarget).length > 0 && (
+              <div className="mb-6 rounded-2xl border border-gray-100 bg-gray-50 p-4">
+                <div className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-2">
+                  Optional Memorial{getOptionalMemorials(editTarget).length === 1 ? '' : 's'} (from source options)
+                </div>
+                <p className="text-sm text-gray-700 font-semibold leading-relaxed">
+                  {getOptionalMemorials(editTarget).join(', ')}
+                </p>
+              </div>
+            )}
 
             {(editTarget.validation_reason || editTarget.review_notes) && (
               <div className="mb-6 rounded-2xl border border-gray-100 bg-gray-50 p-4">

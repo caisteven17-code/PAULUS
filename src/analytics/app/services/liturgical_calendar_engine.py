@@ -432,7 +432,10 @@ class LiturgicalEngine:
                 applied_precedence = candidate_precedence
                 applied_priority = candidate_priority
 
-        options = self._build_options(dt, anchors, applied_rule["key"])
+        # Sundays always outrank optional memorials, which are never observed
+        # or even commemorated on a Sunday — matches the approved 2023-2032
+        # source-of-truth corpus, which never lists an option on a Sunday.
+        options = [] if dt.weekday() == 6 else self._build_options(dt, anchors, applied_rule["key"])
         return {
             "date": dt.isoformat(),
             "season": season,
@@ -895,7 +898,13 @@ def _ordinary_time_week_number(dt: date, anchors: YearAnchors) -> int:
     if dt < anchors.ash_wednesday:
         return _ordinary_first_part_week_number(dt, anchors.ordinary_first_start, anchors.ordinary_first_sunday)
     if dt < anchors.first_advent:
-        return min(34, anchors.ordinary_second_start_week + ((dt - anchors.ordinary_second_start).days // 7))
+        week = anchors.ordinary_second_start_week + ((dt - anchors.ordinary_second_start).days // 7)
+        # Each week's Sunday opens the *next* week's number (matches the
+        # Monday-Saturday block it starts, not the block that just ended) —
+        # the weekday-only formula above is correct as-is for Mon-Sat.
+        if dt.weekday() == 6:
+            week += 1
+        return min(34, week)
     return 34
 
 
@@ -1229,10 +1238,8 @@ def generate_and_load_year(
     out_dir: Path = DEFAULT_OUT_DIR,
     write_json: bool = True,
     validate: bool = True,
+    load: bool = True,
 ) -> dict[str, Any]:
-    from app.services.liturgical_calendar_collector import _create_run_record, _update_run_record
-    from app.services.liturgical_calendar_loader import load_records
-
     if read_approved_db:
         effective_history_end = history_end_year or (target_year - 1)
         engine = LiturgicalEngine.from_approved_database(
@@ -1249,6 +1256,17 @@ def generate_and_load_year(
     records = _normalize_generated_records_for_db(payload, engine.corpus_info)
     if validate:
         _apply_generated_validator_results(records, target_year)
+
+    if not load:
+        return {
+            "payload": payload,
+            "records": records,
+            "loaded": 0,
+            "corpus_info": engine.corpus_info,
+        }
+
+    from app.services.liturgical_calendar_collector import _create_run_record, _update_run_record
+    from app.services.liturgical_calendar_loader import load_records
 
     run_id = _create_run_record([target_year])
     loaded = 0
@@ -1280,6 +1298,13 @@ def generate_and_load_year(
     }
 
 
+def _print_validation_summary(year: int, records: list[dict[str, Any]]) -> None:
+    counts: Counter[str] = Counter(record["validation_status"] for record in records)
+    total = len(records)
+    parts = ", ".join(f"{status}={count}" for status, count in counts.most_common())
+    print(f"Validation {year}: {total} days — {parts}")
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description="Generate future liturgical calendar years from source-of-truth JSON")
     parser.add_argument("--year", type=int, help="Generate a single year")
@@ -1300,6 +1325,11 @@ def main() -> int:
         "--load",
         action="store_true",
         help="Load generated year(s) directly into reference.liturgical_calendar.",
+    )
+    parser.add_argument(
+        "--validate",
+        action="store_true",
+        help="Run GCatholic/Romcal/LitCal validation and print a match-status summary without loading to the database.",
     )
     parser.add_argument(
         "--skip-validators",
@@ -1337,7 +1367,7 @@ def main() -> int:
     loaded_total = 0
     engine: Optional[LiturgicalEngine] = None
     if args.year:
-        if args.load:
+        if args.load or args.validate:
             result = generate_and_load_year(
                 target_year=args.year,
                 read_approved_db=args.read_approved_db,
@@ -1347,9 +1377,12 @@ def main() -> int:
                 out_dir=out_dir,
                 write_json=True,
                 validate=not args.skip_validators,
+                load=args.load,
             )
             payload = result["payload"]
             loaded_total += result["loaded"]
+            if args.validate:
+                _print_validation_summary(args.year, result["records"])
         else:
             engine = (
                 LiturgicalEngine.from_approved_database(
@@ -1372,7 +1405,7 @@ def main() -> int:
             else LiturgicalEngine(source_dir=Path(args.source_dir))
         )
         for year in range(args.start_year, args.end_year + 1):
-            if args.load:
+            if args.load or args.validate:
                 result = generate_and_load_year(
                     target_year=year,
                     read_approved_db=args.read_approved_db,
@@ -1382,8 +1415,11 @@ def main() -> int:
                     out_dir=out_dir,
                     write_json=True,
                     validate=not args.skip_validators,
+                    load=args.load,
                 )
                 loaded_total += result["loaded"]
+                if args.validate:
+                    _print_validation_summary(year, result["records"])
             else:
                 payload = engine.build_year_payload(year)
                 _write_json(out_dir / f"{year}.json", payload)
