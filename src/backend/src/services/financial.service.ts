@@ -301,7 +301,7 @@ export class FinancialService {
   ): FinancialRecord[] {
     const seed = this.hashString(entityId);
     let baseMultiplier = 0.1 + this.pseudoRandom(seed) * 9.9;
-    let healthProfile = 0.2 + this.pseudoRandom(seed + 123) * 1.8;
+    const healthProfile = 0.2 + this.pseudoRandom(seed + 123) * 1.8;
 
     let classBonus = 0;
     if (entityClass === 'Class A') {
